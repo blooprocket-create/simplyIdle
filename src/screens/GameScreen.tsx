@@ -50,6 +50,9 @@ import AchievementToast from '../components/AchievementToast';
 import RebirthModal from '../components/PrestigeModal';
 
 type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment';
+type HeroesSubTab = 'summon' | 'roster' | 'forge';
+type EquipmentSubTab = 'inventory' | 'craft';
+type AchievementsSubTab = 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex';
 
 interface GameScreenProps {
   accountName: string;
@@ -132,16 +135,20 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [tempTeam, setTempTeam] = useState<string[]>(state.activeTeamHeroIds);
   const [expandedHeroes, setExpandedHeroes] = useState<Set<string>>(new Set());
   const [recycleConfirmUid, setRecycleConfirmUid] = useState<string | null>(null);
-  const [recycleDropdownOpen, setRecycleDropdownOpen] = useState(false);
-  const [guidedMode, setGuidedMode] = useState(true);
-  const [heroesAdvancedOpen, setHeroesAdvancedOpen] = useState(false);
-  const [equipmentToolsOpen, setEquipmentToolsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [heroesSubTab, setHeroesSubTab] = useState<HeroesSubTab>('summon');
+  const [equipmentSubTab, setEquipmentSubTab] = useState<EquipmentSubTab>('inventory');
+  const [achievementsSubTab, setAchievementsSubTab] = useState<AchievementsSubTab>('overview');
+  const [eventsOpen, setEventsOpen] = useState(false);
+  const [heroFormation, setHeroFormation] = useState<Record<string, 'front' | 'mid' | 'back'>>({});
+  const [compareItemId, setCompareItemId] = useState<string | null>(null);
   const [warPanels, setWarPanels] = useState({
     frontline: true,
     roster: true,
     armory: false,
     growth: false,
     objectives: true,
+    prestige: false,
   });
 
   const classConfig = getClassConfig(state.playerClass ?? 'warrior');
@@ -305,79 +312,41 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     claimableWeeklyMilestones.forEach(ms => claimWeeklyTrack(ms));
     claimableMissionIds.forEach(id => claimMission(id));
   };
+  const cycleAutoRecycleRarity = () => {
+    const idx = RARITIES.findIndex(r => r.id === state.autoRecycleMaxRarity);
+    const next = RARITIES[(idx + 1) % RARITIES.length];
+    setAutoRecycleMaxRarity(next.id);
+  };
 
   const canCraftWeapon = state.equipmentScrap >= 130;
 
-  const renderPrimaryActions = () => {
-    type ActionChip = {
-      id: string;
-      label: string;
-      onPress: () => void;
-      disabled?: boolean;
-      emphasis?: 'default' | 'accent';
-    };
-
-    let actions: ActionChip[] = [];
-    if (tab === 'warroom') {
-      actions = [
-        { id: 'wr_claim', label: `Claim All (${claimableWeeklyMilestones.length + claimableMissionIds.length})`, onPress: claimAllRewards, disabled: !hasClaimableRewards, emphasis: 'accent' },
-        { id: 'wr_rebirth', label: canRebirthNow ? 'Rebirth' : `Rebirth @ W${REBIRTH_WAVE_THRESHOLD}`, onPress: () => setRebirthOpen(true), disabled: !canRebirthNow },
-        { id: 'wr_mode', label: guidedMode ? 'Full Mode' : 'Guided Mode', onPress: () => setGuidedMode(!guidedMode) },
-      ];
-    } else if (tab === 'battle') {
-      actions = [
-        { id: 'b_rebirth', label: canRebirthNow ? 'Rebirth' : `Rebirth @ W${REBIRTH_WAVE_THRESHOLD}`, onPress: () => setRebirthOpen(true), disabled: !canRebirthNow, emphasis: 'accent' },
-        { id: 'b_warroom', label: 'War Room', onPress: () => onTabChange('warroom') },
-        { id: 'b_objectives', label: 'Objectives', onPress: () => onTabChange('achievements') },
-      ];
-    } else if (tab === 'heroes') {
-      actions = [
-        { id: 'h_summon', label: state.freeSummonCharges > 0 ? 'Free Summon' : 'Summon', onPress: summonHero, disabled: !canGachaOnce, emphasis: 'accent' },
-        { id: 'h_auto', label: 'Auto Equip Best', onPress: autoEquipBestHeroes },
-        { id: 'h_adv', label: heroesAdvancedOpen ? 'Hide Advanced' : 'Advanced', onPress: () => setHeroesAdvancedOpen(prev => !prev) },
-      ];
-    } else if (tab === 'stats') {
-      actions = [
-        { id: 's_heroes', label: 'Roster', onPress: () => onTabChange('heroes') },
-        { id: 's_armory', label: 'Armory', onPress: () => onTabChange('equipment') },
-        { id: 's_legends', label: 'Legends', onPress: () => onTabChange('achievements') },
-      ];
-    } else if (tab === 'equipment') {
-      actions = [
-        { id: 'e_craft', label: 'Craft Weapon', onPress: () => craftEquipment('weapon'), disabled: !canCraftWeapon, emphasis: 'accent' },
-        { id: 'e_tools', label: equipmentToolsOpen ? 'Hide Tools' : 'Tools', onPress: () => setEquipmentToolsOpen(prev => !prev) },
-        { id: 'e_warroom', label: 'War Room', onPress: () => onTabChange('warroom') },
-      ];
-    } else if (tab === 'achievements') {
-      actions = [
-        { id: 'a_claim', label: `Claim All (${claimableWeeklyMilestones.length + claimableMissionIds.length})`, onPress: claimAllRewards, disabled: !hasClaimableRewards, emphasis: 'accent' },
-        { id: 'a_warroom', label: 'War Room', onPress: () => onTabChange('warroom') },
-        { id: 'a_battle', label: 'Warfront', onPress: () => onTabChange('battle') },
-      ];
-    }
-
-    return (
-      <View style={styles.primaryActionBar}>
-        <Text style={styles.primaryActionTitle}>Primary Actions</Text>
-        <View style={styles.primaryActionRow}>
-          {actions.map(action => (
-            <Pressable
-              key={action.id}
-              style={[
-                styles.primaryActionBtn,
-                action.emphasis === 'accent' && styles.primaryActionBtnAccent,
-                action.disabled && styles.primaryActionBtnDisabled,
-              ]}
-              disabled={action.disabled}
-              onPress={action.onPress}
-            >
-              <Text style={styles.primaryActionBtnText}>{action.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-    );
+  const optimizeEquipment = () => {
+    const slots: EquipmentSlot[] = ['weapon', 'armor', 'accessory'];
+    const rarityOrder: Record<string, number> = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4 };
+    slots.forEach(slot => {
+      const slotItems = state.inventoryItemIds
+        .map(id => getEquipmentItem(id))
+        .filter((item): item is NonNullable<ReturnType<typeof getEquipmentItem>> => !!item && item.slot === slot);
+      if (slotItems.length === 0) return;
+      const best = [...slotItems].sort((a, b) => {
+        const rd = (rarityOrder[b.rarity] ?? 0) - (rarityOrder[a.rarity] ?? 0);
+        if (rd !== 0) return rd;
+        const aVal = Object.values(a.bonus).reduce((s, v) => s + (v ?? 0), 0);
+        const bVal = Object.values(b.bonus).reduce((s, v) => s + (v ?? 0), 0);
+        return bVal - aVal;
+      })[0];
+      if (best) equipItem(best.id);
+    });
   };
+
+  const seasonScore = (state.wave * 10) + ((state.prestigeCount ?? 0) * 500);
+  const seasonRank = seasonScore < 1000 ? '🥉 Bronze' : seasonScore < 5000 ? '🥈 Silver' : seasonScore < 15000 ? '🥇 Gold' : seasonScore < 40000 ? '💎 Diamond' : '👑 Legend';
+  const classMasteryLevel = Math.floor(state.wave / 100);
+  const prestige1Done = (state.prestigeCount ?? 0) >= 1;
+  const prestige5Done = (state.prestigeCount ?? 0) >= 5;
+  const prestige10Done = (state.prestigeCount ?? 0) >= 10;
+  const prestige25Done = (state.prestigeCount ?? 0) >= 25;
+  const prestige50Done = (state.prestigeCount ?? 0) >= 50;
 
   // Character creation screen
   if (!state.characterCreated) {
@@ -459,6 +428,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           {state.unspentStatPoints > 0 && (
             <Text style={styles.headerHighlight}>+{state.unspentStatPoints} Pts</Text>
           )}
+          <Pressable style={styles.eventsBtn} onPress={() => setEventsOpen(true)}>
+            <Text style={styles.eventsBtnText}>🗓️ Events</Text>
+          </Pressable>
+          <Pressable style={styles.settingsBtn} onPress={() => setSettingsOpen(true)}>
+            <Text style={styles.settingsBtnText}>⚙️ Settings</Text>
+          </Pressable>
           <Pressable style={styles.logoutBtn} onPress={onLogout}>
             <Text style={styles.logoutBtnText}>Logout</Text>
           </Pressable>
@@ -505,38 +480,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             <Text style={styles.nextStepItemDetail}>{entry.detail}</Text>
           </Pressable>
         ))}
-      </View>
-
-      <View style={styles.uiModeCard}>
-        <View>
-          <Text style={styles.uiModeTitle}>Interface Mode</Text>
-          <Text style={styles.uiModeDesc}>{guidedMode ? 'Guided: only core controls shown.' : 'Full: show all controls and systems.'}</Text>
-        </View>
-        <Pressable style={[styles.uiModeBtn, !guidedMode && styles.uiModeBtnAlt]} onPress={() => setGuidedMode(!guidedMode)}>
-          <Text style={styles.uiModeBtnText}>{guidedMode ? 'Switch to Full' : 'Switch to Guided'}</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.rebirthBanner}>
-        <View style={styles.rebirthBannerTop}>
-          <Text style={styles.rebirthBannerTitle}>Ascension Status</Text>
-          <Pressable
-            style={[styles.rebirthBannerBtn, !canRebirthNow && styles.rebirthBannerBtnDisabled]}
-            disabled={!canRebirthNow}
-            onPress={() => {
-              onTabChange('battle');
-              setRebirthOpen(true);
-            }}
-          >
-            <Text style={styles.rebirthBannerBtnText}>{canRebirthNow ? 'Rebirth Now' : 'Locked'}</Text>
-          </Pressable>
-        </View>
-        <Text style={styles.rebirthBannerInfo}>
-          {canRebirthNow ? `Ready at Wave ${state.wave}. Use Rebirth for permanent cores.` : `${rebirthWavesLeft} waves until Rebirth unlock (Wave ${REBIRTH_WAVE_THRESHOLD}).`}
-        </Text>
-        <View style={styles.hpBarBg}>
-          <View style={[styles.hpBarFill, { width: `${rebirthProgressPct}%`, backgroundColor: canRebirthNow ? '#FF5B8A' : '#6E7EA8' }]} />
-        </View>
       </View>
 
       {/* Team HP Bar */}
@@ -654,6 +597,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                         {cls.name} Lv{hero.level}
                       </Text>
                     </View>
+                    <Pressable
+                      style={styles.formationBadge}
+                      onPress={() => setHeroFormation(prev => {
+                        const roles: Array<'front' | 'mid' | 'back'> = ['front', 'mid', 'back'];
+                        const cur = prev[heroId] ?? 'front';
+                        const next = roles[(roles.indexOf(cur) + 1) % roles.length];
+                        return { ...prev, [heroId]: next };
+                      })}
+                    >
+                      <Text style={styles.formationBadgeText}>
+                        {(heroFormation[heroId] ?? 'front') === 'front' ? '🛡️ Front' : (heroFormation[heroId] ?? 'mid') === 'mid' ? '⚔️ Mid' : '🏹 Back'}
+                      </Text>
+                    </Pressable>
                   </View>
                 );
               })
@@ -687,7 +643,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
       {/* Tab Content */}
       <ScrollView style={styles.tabContent}>
-        {renderPrimaryActions()}
 
         {tab === 'warroom' && (
           <View style={styles.warRoomTab}>
@@ -805,6 +760,42 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     </Pressable>
                     <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('achievements')}>
                       <Text style={styles.warPanelActionText}>Open Objectives</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.warPanel}>
+              <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('prestige')}>
+                <Text style={styles.warPanelTitle}>♾️ Prestige Milestones</Text>
+                <Text style={styles.warPanelChevron}>{warPanels.prestige ? '−' : '+'}</Text>
+              </Pressable>
+              {warPanels.prestige && (
+                <View style={styles.warPanelBody}>
+                  <Text style={styles.warPanelStat}>Rebirths Completed: {state.prestigeCount ?? 0}</Text>
+                  {[
+                    { n: 1, label: '1st Rebirth', bonus: 'Unlock Core Tree', done: prestige1Done },
+                    { n: 5, label: '5th Rebirth', bonus: '+5% all stats', done: prestige5Done },
+                    { n: 10, label: '10th Rebirth', bonus: 'Legendary Aura visual', done: prestige10Done },
+                    { n: 25, label: '25th Rebirth', bonus: '+15% core efficiency', done: prestige25Done },
+                    { n: 50, label: '50th Rebirth', bonus: 'Grand Ascendant title', done: prestige50Done },
+                  ].map(m => (
+                    <View key={m.n} style={styles.prestigeMilestoneRow}>
+                      <Text style={[styles.prestigeMilestoneCheck, m.done && styles.prestigeMilestoneDone]}>{m.done ? '✅' : '○'}</Text>
+                      <View>
+                        <Text style={styles.prestigeMilestoneLabel}>{m.label}</Text>
+                        <Text style={styles.prestigeMilestoneBonus}>{m.bonus}</Text>
+                      </View>
+                    </View>
+                  ))}
+                  <View style={styles.warPanelActionRow}>
+                    <Pressable
+                      style={[styles.warPanelActionBtn, !canRebirthNow && styles.warPanelActionBtnDisabled]}
+                      disabled={!canRebirthNow}
+                      onPress={() => setRebirthOpen(true)}
+                    >
+                      <Text style={styles.warPanelActionText}>{canRebirthNow ? 'Rebirth Now' : `Rebirth @ W${REBIRTH_WAVE_THRESHOLD}`}</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -959,31 +950,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
             <View style={styles.battleSection}>
               <Text style={styles.battleSectionTitle}>🧰 Usable Items</Text>
-              <View style={styles.autoPotionRow}>
-                <Pressable
-                  style={[styles.autoPotionToggle, state.autoUsePotionEnabled && styles.autoPotionToggleActive]}
-                  onPress={() => setAutoUsePotion(!state.autoUsePotionEnabled)}
-                >
-                  <Text style={styles.autoPotionToggleText}>
-                    Auto Potion: {state.autoUsePotionEnabled ? 'ON' : 'OFF'}
-                  </Text>
-                </Pressable>
-                <View style={styles.autoPotionThresholdWrap}>
-                  <Pressable
-                    style={styles.autoPotionAdjustBtn}
-                    onPress={() => setAutoUsePotionThreshold(state.autoUsePotionThresholdPct - 0.05)}
-                  >
-                    <Text style={styles.autoPotionAdjustText}>-</Text>
-                  </Pressable>
-                  <Text style={styles.autoPotionThresholdText}>HP {(state.autoUsePotionThresholdPct * 100).toFixed(0)}%</Text>
-                  <Pressable
-                    style={styles.autoPotionAdjustBtn}
-                    onPress={() => setAutoUsePotionThreshold(state.autoUsePotionThresholdPct + 0.05)}
-                  >
-                    <Text style={styles.autoPotionAdjustText}>+</Text>
-                  </Pressable>
-                </View>
-              </View>
+              <Text style={styles.sectionHelperText}>Automation toggles moved to Settings.</Text>
               {usableInventory.length === 0 ? (
                 <Text style={styles.emptyMsg}>No consumables yet. Keep pushing waves for drops.</Text>
               ) : (
@@ -1025,122 +992,74 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
         {tab === 'heroes' && (
           <View style={styles.heroesTab}>
-            <View style={styles.gachaSection}>
-              <Text style={styles.sectionTitle}>✨ Gacha Summon</Text>
-              <Text style={styles.pityLabel}>Pity: {state.gachaPityCounter}/30 • {pityRemaining} until guaranteed Legendary+</Text>
-              {state.freeSummonCharges > 0 ? (
-                <Text style={styles.gachaFree}>Free Summon Ready ({state.freeSummonCharges})</Text>
-              ) : (
-                <Text style={styles.gachaCost}>Cost: 💰 {fmt(GACHA_SUMMON_COST)}</Text>
-              )}
-              <View style={styles.gachaBtnRow}>
-                <Pressable
-                  style={[
-                    styles.gachaBtn,
-                    !canGachaOnce && styles.gachaBtnDisabled,
-                    hasGachaNotification && styles.gachaBtnNotify,
-                  ]}
-                  disabled={!canGachaOnce}
-                  onPress={summonHero}
-                >
-                  <Text style={styles.gachaBtnText}>{state.freeSummonCharges > 0 ? 'Use Free Summon' : 'Summon Hero'}</Text>
-                  {hasGachaNotification && <View style={styles.gachaBtnDot} />}
-                </Pressable>
-                <Pressable
-                  style={[styles.gachaBtn, styles.gachaBtnX10, !canGachaX10 && styles.gachaBtnDisabled]}
-                  disabled={!canGachaX10}
-                  onPress={summonHeroX10}
-                >
-                  <Text style={[styles.gachaBtnText, styles.gachaBtnTextLight]}>Summon x10</Text>
-                  <Text style={styles.gachaX10Cost}>💰 {fmt(gachaX10Cost)}</Text>
-                </Pressable>
-              </View>
-              <View style={styles.rarityInfo}>
-                {RARITIES.map(r => (
-                  <View key={r.id} style={styles.rarityRow}>
-                    <View style={[styles.rarityDot, { backgroundColor: r.color }]} />
-                    <Text style={styles.rarityLabel}>{r.label}</Text>
-                    <Text style={styles.rarityChance}>{(r.chance * 100).toFixed(1)}%</Text>
-                  </View>
-                ))}
-              </View>
-
-              <View style={styles.summonHistoryBox}>
-                <Text style={styles.summonHistoryTitle}>Recent Summons</Text>
-                <View style={styles.timelineRow}>
-                  {summonTimeline.length === 0 ? (
-                    <Text style={styles.timelineEmpty}>No summons yet</Text>
-                  ) : (
-                    summonTimeline.map(entry => {
-                      const rarity = rarityConfig(entry.rarity);
-                      return (
-                        <View key={entry.id} style={[styles.timelineDot, { backgroundColor: rarity.color }]} />
-                      );
-                    })
-                  )}
-                </View>
-                {state.summonHistory[0] && (
-                  <Text style={styles.lastSummonText}>
-                    Last: {state.summonHistory[0].heroEmoji} {state.summonHistory[0].heroName} • {state.summonHistory[0].rarity}
-                    {state.summonHistory[0].pityTriggered ? ' (Pity)' : ''}
+            <View style={styles.subTabBar}>
+              {(['summon', 'roster', 'forge'] as const).map(st => (
+                <Pressable key={st} style={[styles.subTabBtn, heroesSubTab === st && styles.subTabBtnActive]} onPress={() => setHeroesSubTab(st)}>
+                  <Text style={[styles.subTabBtnText, heroesSubTab === st && styles.subTabBtnTextActive]}>
+                    {st === 'summon' ? 'Summon Bay' : st === 'roster' ? 'Roster' : 'Forge'}
                   </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {heroesSubTab === 'summon' && (
+              <View style={styles.gachaSection}>
+                <Text style={styles.sectionTitle}>✨ Gacha Summon</Text>
+                <Text style={styles.pityLabel}>Pity: {state.gachaPityCounter}/30 • {pityRemaining} until guaranteed Legendary+</Text>
+                {state.freeSummonCharges > 0 ? (
+                  <Text style={styles.gachaFree}>Free Summon Ready ({state.freeSummonCharges})</Text>
+                ) : (
+                  <Text style={styles.gachaCost}>Cost: 💰 {fmt(GACHA_SUMMON_COST)}</Text>
                 )}
-              </View>
-            </View>
-
-            <View style={styles.heroRosterHeader}>
-              <Text style={styles.sectionTitle}>📇 Hero Roster</Text>
-              <View style={styles.heroRosterActions}>
-                <Pressable style={styles.autoRecycleBtn} onPress={autoRecycleHeroes}>
-                  <Text style={styles.autoRecycleBtnText}>Auto Recycle</Text>
-                </Pressable>
-                <Pressable style={styles.autoEquipBtn} onPress={autoEquipBestHeroes}>
-                  <Text style={styles.autoEquipBtnText}>Auto Equip Best</Text>
-                </Pressable>
-              </View>
-            </View>
-            <Pressable style={styles.sectionToggle} onPress={() => setHeroesAdvancedOpen(prev => !prev)}>
-              <Text style={styles.sectionToggleText}>
-                {heroesAdvancedOpen ? 'Hide Advanced Roster Controls' : 'Show Advanced Roster Controls'}
-              </Text>
-            </Pressable>
-            {(heroesAdvancedOpen || !guidedMode) && (
-              <>
-                <View style={styles.recyclePickerWrap}>
-                  <Text style={styles.recyclePickerLabel}>Recycle rarity threshold (and below):</Text>
-                  <View style={styles.recycleToggleRow}>
-                    <Text style={styles.recycleToggleLabel}>Background Auto Recycle</Text>
-                    <Pressable
-                      style={[styles.recycleToggleBtn, state.autoRecycleEnabled && styles.recycleToggleBtnActive]}
-                      onPress={() => setAutoRecycleEnabled(!state.autoRecycleEnabled)}
-                    >
-                      <Text style={styles.recycleToggleBtnText}>{state.autoRecycleEnabled ? 'ON' : 'OFF'}</Text>
-                    </Pressable>
-                  </View>
+                <View style={styles.gachaBtnRow}>
                   <Pressable
-                    style={styles.recyclePickerBtn}
-                    onPress={() => setRecycleDropdownOpen(prev => !prev)}
+                    style={[
+                      styles.gachaBtn,
+                      !canGachaOnce && styles.gachaBtnDisabled,
+                      hasGachaNotification && styles.gachaBtnNotify,
+                    ]}
+                    disabled={!canGachaOnce}
+                    onPress={summonHero}
                   >
-                    <Text style={styles.recyclePickerBtnText}>▼ {state.autoRecycleMaxRarity.toUpperCase()}</Text>
+                    <Text style={styles.gachaBtnText}>{state.freeSummonCharges > 0 ? 'Use Free Summon' : 'Summon Hero'}</Text>
+                    {hasGachaNotification && <View style={styles.gachaBtnDot} />}
                   </Pressable>
-                  {recycleDropdownOpen && (
-                    <View style={styles.recycleDropdown}>
-                      {RARITIES.map(r => (
-                        <Pressable
-                          key={r.id}
-                          style={[styles.recycleOption, state.autoRecycleMaxRarity === r.id && styles.recycleOptionActive]}
-                          onPress={() => {
-                            setAutoRecycleMaxRarity(r.id);
-                            setRecycleDropdownOpen(false);
-                          }}
-                        >
-                          <Text style={[styles.recycleOptionText, { color: r.color }]}>{r.label}</Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  )}
+                  <Pressable
+                    style={[styles.gachaBtn, styles.gachaBtnX10, !canGachaX10 && styles.gachaBtnDisabled]}
+                    disabled={!canGachaX10}
+                    onPress={summonHeroX10}
+                  >
+                    <Text style={[styles.gachaBtnText, styles.gachaBtnTextLight]}>Summon x10</Text>
+                    <Text style={styles.gachaX10Cost}>💰 {fmt(gachaX10Cost)}</Text>
+                  </Pressable>
                 </View>
+                <View style={styles.rarityInfo}>
+                  {RARITIES.map(r => (
+                    <View key={r.id} style={styles.rarityRow}>
+                      <View style={[styles.rarityDot, { backgroundColor: r.color }]} />
+                      <Text style={styles.rarityLabel}>{r.label}</Text>
+                      <Text style={styles.rarityChance}>{(r.chance * 100).toFixed(1)}%</Text>
+                    </View>
+                  ))}
+                </View>
+                <View style={styles.summonHistoryBox}>
+                  <Text style={styles.summonHistoryTitle}>Recent Summons</Text>
+                  <View style={styles.timelineRow}>
+                    {summonTimeline.length === 0 ? (
+                      <Text style={styles.timelineEmpty}>No summons yet</Text>
+                    ) : (
+                      summonTimeline.map(entry => {
+                        const rarity = rarityConfig(entry.rarity);
+                        return <View key={entry.id} style={[styles.timelineDot, { backgroundColor: rarity.color }]} />;
+                      })
+                    )}
+                  </View>
+                </View>
+              </View>
+            )}
 
+            {heroesSubTab === 'forge' && (
+              <>
                 <View style={styles.shardForgeCard}>
                   <Text style={styles.shardForgeTitle}>🔧 Shard Forge</Text>
                   <Text style={styles.shardForgeDesc}>Spend overflow shards for persistent value.</Text>
@@ -1161,59 +1080,45 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     </Pressable>
                   </View>
                 </View>
+                <Text style={styles.sectionHelperText}>All automation toggles are in ⚙️ Settings.</Text>
+              </>
+            )}
 
-                <View style={styles.autoSummonCard}>
-                  <Text style={styles.shardForgeTitle}>🤖 Auto Summon Rules</Text>
-                  <View style={styles.autoSummonTopRow}>
-                    <Pressable
-                      style={[styles.autoSummonToggle, state.autoSummonEnabled && styles.autoSummonToggleActive]}
-                      onPress={() => setAutoSummonEnabled(!state.autoSummonEnabled)}
-                    >
-                      <Text style={styles.autoSummonToggleText}>Auto Summon: {state.autoSummonEnabled ? 'ON' : 'OFF'}</Text>
+            {heroesSubTab === 'roster' && (
+              <>
+                <View style={styles.heroRosterHeader}>
+                  <Text style={styles.sectionTitle}>📇 Hero Roster</Text>
+                  <View style={styles.heroRosterActions}>
+                    <Pressable style={styles.autoRecycleBtn} onPress={autoRecycleHeroes}>
+                      <Text style={styles.autoRecycleBtnText}>Auto Recycle</Text>
                     </Pressable>
-                    <Pressable
-                      style={styles.autoSummonModeBtn}
-                      onPress={() => setAutoSummonMode(state.autoSummonMode === 'single' ? 'x10' : 'single')}
-                    >
-                      <Text style={styles.autoSummonModeText}>Mode: {state.autoSummonMode.toUpperCase()}</Text>
-                    </Pressable>
-                  </View>
-                  <View style={styles.autoSummonReserveRow}>
-                    <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoSummonReserveGold(state.autoSummonReserveGold - 1000)}>
-                      <Text style={styles.autoPotionAdjustText}>-</Text>
-                    </Pressable>
-                    <Text style={styles.autoSummonReserveText}>Reserve Gold: {fmt(state.autoSummonReserveGold)}</Text>
-                    <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoSummonReserveGold(state.autoSummonReserveGold + 1000)}>
-                      <Text style={styles.autoPotionAdjustText}>+</Text>
+                    <Pressable style={styles.autoEquipBtn} onPress={autoEquipBestHeroes}>
+                      <Text style={styles.autoEquipBtnText}>Auto Equip Best</Text>
                     </Pressable>
                   </View>
                 </View>
-              </>
-            )}
-            <Text style={styles.rosterCount}>
-              {state.heroRoster.length} heroes • {state.activeTeamHeroIds.length}/{ACTIVE_TEAM_SIZE} in active team
-            </Text>
-            {(heroesAdvancedOpen || !guidedMode) && (
-              <View style={styles.loadoutRow}>
-                {[0, 1, 2].map(slot => (
-                  <View key={slot} style={styles.loadoutCell}>
-                    <Text style={styles.loadoutLabel}>L{slot + 1}</Text>
-                    <View style={styles.loadoutBtnsWrap}>
-                      <Pressable style={styles.loadoutSaveBtn} onPress={() => saveTeamLoadout(slot)}>
-                        <Text style={styles.loadoutBtnText}>Save</Text>
-                      </Pressable>
-                      <Pressable style={styles.loadoutLoadBtn} onPress={() => loadTeamLoadout(slot)}>
-                        <Text style={styles.loadoutBtnText}>Load</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-            {state.heroRoster.length === 0 ? (
-              <Text style={styles.emptyMsg}>Summon your first hero!</Text>
-            ) : (
-              state.heroRoster.map(hero => {
+                <Text style={styles.rosterCount}>
+                  {state.heroRoster.length} heroes • {state.activeTeamHeroIds.length}/{ACTIVE_TEAM_SIZE} in active team
+                </Text>
+                <View style={styles.loadoutRow}>
+                    {[0, 1, 2].map(slot => (
+                      <View key={slot} style={styles.loadoutCell}>
+                        <Text style={styles.loadoutLabel}>L{slot + 1}</Text>
+                        <View style={styles.loadoutBtnsWrap}>
+                          <Pressable style={styles.loadoutSaveBtn} onPress={() => saveTeamLoadout(slot)}>
+                            <Text style={styles.loadoutBtnText}>Save</Text>
+                          </Pressable>
+                          <Pressable style={styles.loadoutLoadBtn} onPress={() => loadTeamLoadout(slot)}>
+                            <Text style={styles.loadoutBtnText}>Load</Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    ))}
+                </View>
+                {state.heroRoster.length === 0 ? (
+                  <Text style={styles.emptyMsg}>Summon your first hero!</Text>
+                ) : (
+                  state.heroRoster.map(hero => {
                 const inActiveTeam = activeTeamSet.has(hero.uid);
                 const cls = getClassConfig(hero.heroClass);
                 const rarity = rarityConfig(hero.rarity);
@@ -1224,8 +1129,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 const canRankUp = nextRankConfig && state.heroShards >= nextRankConfig.shardCostToRankUp;
                 const trait = getHeroPassiveTraitInfo(hero.passiveTrait);
                 const activeArchetype = getHeroActiveArchetypeInfo(hero.activeSkillArchetype);
-                return (
-                  <View key={hero.uid} style={[styles.heroCard, inActiveTeam && styles.heroCardActive]}>
+                    return (
+                      <View key={hero.uid} style={[styles.heroCard, inActiveTeam && styles.heroCardActive]}>
                     <View style={[styles.heroCardRarityBar, { backgroundColor: rarity.color }]} />
                     <View style={styles.heroCardBody}>
                       {/* Main row */}
@@ -1323,9 +1228,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                         <Text style={styles.recycleBtnText}>♻️ Recycle for {shardValue} 💎</Text>
                       </Pressable>
                     </View>
-                  </View>
-                );
-              })
+                      </View>
+                    );
+                  })
+                )}
+              </>
             )}
           </View>
         )}
@@ -1487,12 +1394,50 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Text style={styles.equipmentBonusText}>+SPR {stats.equipmentBonus.spirit}</Text>
               </View>
             </View>
+
+            <View style={styles.masteryCard}>
+              <Text style={styles.masteryTitle}>⚡ Class Mastery: {stats.className}</Text>
+              <Text style={styles.masteryLevel}>Mastery Level {classMasteryLevel} <Text style={styles.masteryLevelSub}>(1 level per 100 waves)</Text></Text>
+              <View style={styles.hpBarBg}>
+                <View style={[styles.hpBarFill, { width: `${(state.wave % 100)}%`, backgroundColor: '#7BD9A8' }]} />
+              </View>
+              <Text style={styles.masteryHint}>{state.wave % 100}/100 waves to next level</Text>
+              {[
+                { lvl: 1, perk: '+10% class stat bonus', done: classMasteryLevel >= 1 },
+                { lvl: 5, perk: '+5% gold gains', done: classMasteryLevel >= 5 },
+                { lvl: 10, perk: '+15% DPS from passive skills', done: classMasteryLevel >= 10 },
+                { lvl: 25, perk: 'Mastery Aura: team-wide +8% HP', done: classMasteryLevel >= 25 },
+                { lvl: 50, perk: 'Grand Mastery: unlock legendary passive', done: classMasteryLevel >= 50 },
+              ].map(m => (
+                <View key={m.lvl} style={styles.masteryMilestoneRow}>
+                  <Text style={[styles.masteryMilestoneCheck, m.done && styles.masteryMilestoneDone]}>{m.done ? '✅' : '○'}</Text>
+                  <View>
+                    <Text style={styles.masteryMilestoneLvl}>Lv {m.lvl}</Text>
+                    <Text style={styles.masteryMilestonePerk}>{m.perk}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
           </View>
         )}
 
         {tab === 'equipment' && (
           <View style={styles.equipmentTab}>
-            <Text style={styles.sectionTitle}>🎒 Equipment Inventory</Text>
+            <View style={styles.equipHeaderRow}>
+              <Text style={styles.sectionTitle}>🎒 Equipment Inventory</Text>
+              <Pressable style={styles.equipOptimizeBtnHeader} onPress={optimizeEquipment}>
+                <Text style={styles.equipOptimizeBtnHeaderText}>⚡ Optimize</Text>
+              </Pressable>
+            </View>
+            <View style={styles.subTabBar}>
+              {(['inventory', 'craft'] as const).map(st => (
+                <Pressable key={st} style={[styles.subTabBtn, equipmentSubTab === st && styles.subTabBtnActive]} onPress={() => setEquipmentSubTab(st)}>
+                  <Text style={[styles.subTabBtnText, equipmentSubTab === st && styles.subTabBtnTextActive]}>
+                    {st === 'inventory' ? 'Inventory' : 'Crafting'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
             <Text style={styles.equipInventoryCount}>
               Total: {state.inventoryItemIds.length} items • Shards: <Text style={{ color: '#FFB347' }}>{state.heroShards}</Text>
             </Text>
@@ -1500,12 +1445,15 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             <Text style={styles.mythicTierLabel}>
               Mythic Tier: {state.permanentUnlocks.includes('mythic_equipment') ? 'Unlocked' : 'Locked (Defeat Act 3 Boss)'}
             </Text>
-            <Pressable style={styles.sectionToggle} onPress={() => setEquipmentToolsOpen(prev => !prev)}>
-              <Text style={styles.sectionToggleText}>
-                {equipmentToolsOpen ? 'Hide Crafting / Dismantle Tools' : 'Show Crafting / Dismantle Tools'}
-              </Text>
-            </Pressable>
-            {(equipmentToolsOpen || !guidedMode) && (
+            {equipmentSubTab === 'inventory' && (
+              <View style={styles.equipOptimizeRow}>
+                <Pressable style={styles.equipOptimizeBtn} onPress={optimizeEquipment}>
+                  <Text style={styles.equipOptimizeBtnText}>⚡ Optimize Gear</Text>
+                </Pressable>
+                <Text style={styles.equipOptimizeHint}>Auto-equips best item per slot</Text>
+              </View>
+            )}
+            {equipmentSubTab === 'craft' && (
               <View style={styles.craftRow}>
                 {(['weapon', 'armor', 'accessory'] as EquipmentSlot[]).map(slot => {
                   const cost = slot === 'weapon' ? 130 : slot === 'armor' ? 120 : 100;
@@ -1524,9 +1472,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 })}
               </View>
             )}
-            {state.inventoryItemIds.length === 0 ? (
+            {equipmentSubTab === 'inventory' && state.inventoryItemIds.length === 0 ? (
               <Text style={styles.emptyMsg}>No equipment yet! Kill monsters to find better gear.</Text>
-            ) : (
+            ) : equipmentSubTab === 'inventory' ? (
               state.inventoryItemIds.map(itemId => {
                 const item = getEquipmentItem(itemId);
                 if (!item) return null;
@@ -1551,9 +1499,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       {isEquipped && <Text style={styles.invEquipActive}>✓ Equipped</Text>}
                       <View style={styles.equipActionRow}>
                         {!isEquipped && (
-                          <Pressable style={styles.equipNowBtn} onPress={() => equipItem(item.id)}>
-                            <Text style={styles.equipNowBtnText}>Equip</Text>
-                          </Pressable>
+                          <>
+                            <Pressable style={styles.equipNowBtn} onPress={() => equipItem(item.id)}>
+                              <Text style={styles.equipNowBtnText}>Equip</Text>
+                            </Pressable>
+                            <Pressable style={styles.compareBtn} onPress={() => setCompareItemId(compareItemId === item.id ? null : item.id)}>
+                              <Text style={styles.compareBtnText}>vs</Text>
+                            </Pressable>
+                          </>
                         )}
                         <Pressable
                           style={[styles.upgradeGearBtn, !upgradePlan.canUpgrade && styles.upgradeGearBtnDisabled]}
@@ -1567,7 +1520,33 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                           </Text>
                         </Pressable>
                       </View>
-                      {!isEquipped && (equipmentToolsOpen || !guidedMode) && (
+                      {!isEquipped && compareItemId === item.id && (() => {
+                        const curId = state.equippedItems[item.slot as EquipmentSlot];
+                        const curItem = curId ? getEquipmentItem(curId) : null;
+                        const allStats = ['strength', 'vitality', 'agility', 'intelligence', 'spirit'] as const;
+                        return (
+                          <View style={styles.comparePanel}>
+                            <Text style={styles.comparePanelTitle}>vs Current: {curItem ? `${curItem.name} (${curItem.rarity})` : 'Empty slot'}</Text>
+                            <View style={styles.compareStatRow}>
+                              {allStats.map(stat => {
+                                const nv = item.bonus[stat] ?? 0;
+                                const cv = curItem?.bonus[stat] ?? 0;
+                                const diff = nv - cv;
+                                if (nv === 0 && cv === 0) return null;
+                                return (
+                                  <Text key={stat} style={[
+                                    styles.compareStat,
+                                    diff > 0 ? styles.compareStatUp : diff < 0 ? styles.compareStatDown : styles.compareStatNeutral,
+                                  ]}>
+                                    {stat.slice(0, 3).toUpperCase()}: {diff >= 0 ? '+' : ''}{diff}
+                                  </Text>
+                                );
+                              })}
+                            </View>
+                          </View>
+                        );
+                      })()}
+                      {!isEquipped && (
                         <Pressable style={styles.dismantleBtn} onPress={() => dismantleEquipment(item.id)}>
                           <Text style={styles.dismantleBtnText}>Dismantle</Text>
                         </Pressable>
@@ -1576,36 +1555,51 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   </View>
                 );
               })
+            ) : (
+              <Text style={styles.sectionHelperText}>Select Inventory to manage equipped items and upgrades.</Text>
             )}
           </View>
         )}
 
         {tab === 'achievements' && (
           <View style={styles.achievementsTab}>
-            <View style={styles.achievementBonusCard}>
-              <View style={styles.achievementBonusHeader}>
-                <Text style={styles.achievementBonusTitle}>Legacy Bonus Engine</Text>
-                <Text style={styles.achievementBonusValue}>+{(stats.achievementBonusPercent * 100).toFixed(0)}%</Text>
-              </View>
-              <Text style={styles.achievementBonusDesc}>
-                Each unlocked achievement grants +{ACH_BONUS_PER_UNLOCK_PCT}% global combat/economy power.
-              </Text>
-              <Text style={styles.achievementBonusDesc}>
-                Cap: +{ACH_BONUS_CAP_PCT}% • Unlocked: {state.achievements.size}/{ACHIEVEMENTS.length}
-              </Text>
-              <View style={styles.claimAllRow}>
-                <Text style={styles.claimAllInfo}>Claimable: {claimableWeeklyMilestones.length + claimableMissionIds.length}</Text>
-                <Pressable
-                  style={[styles.claimAllBtn, !hasClaimableRewards && styles.claimAllBtnDisabled]}
-                  disabled={!hasClaimableRewards}
-                  onPress={claimAllRewards}
-                >
-                  <Text style={styles.claimAllBtnText}>Claim All Rewards</Text>
+            <View style={styles.subTabBar}>
+              {(['overview', 'weekly', 'missions', 'achievements', 'collection', 'codex'] as const).map(st => (
+                <Pressable key={st} style={[styles.subTabBtn, achievementsSubTab === st && styles.subTabBtnActive]} onPress={() => setAchievementsSubTab(st)}>
+                  <Text style={[styles.subTabBtnText, achievementsSubTab === st && styles.subTabBtnTextActive]}>
+                    {st === 'overview' ? 'Overview' : st === 'weekly' ? 'Weekly' : st === 'missions' ? 'Missions' : st === 'achievements' ? 'Records' : st === 'collection' ? 'Collection' : 'Codex'}
+                  </Text>
                 </Pressable>
-              </View>
+              ))}
             </View>
 
-            <View style={styles.weeklyEventCard}>
+            {(achievementsSubTab === 'overview' || achievementsSubTab === 'weekly' || achievementsSubTab === 'missions') && (
+              <View style={styles.achievementBonusCard}>
+                <View style={styles.achievementBonusHeader}>
+                  <Text style={styles.achievementBonusTitle}>Legacy Bonus Engine</Text>
+                  <Text style={styles.achievementBonusValue}>+{(stats.achievementBonusPercent * 100).toFixed(0)}%</Text>
+                </View>
+                <Text style={styles.achievementBonusDesc}>
+                  Each unlocked achievement grants +{ACH_BONUS_PER_UNLOCK_PCT}% global combat/economy power.
+                </Text>
+                <Text style={styles.achievementBonusDesc}>
+                  Cap: +{ACH_BONUS_CAP_PCT}% • Unlocked: {state.achievements.size}/{ACHIEVEMENTS.length}
+                </Text>
+                <View style={styles.claimAllRow}>
+                  <Text style={styles.claimAllInfo}>Claimable: {claimableWeeklyMilestones.length + claimableMissionIds.length}</Text>
+                  <Pressable
+                    style={[styles.claimAllBtn, !hasClaimableRewards && styles.claimAllBtnDisabled]}
+                    disabled={!hasClaimableRewards}
+                    onPress={claimAllRewards}
+                  >
+                    <Text style={styles.claimAllBtnText}>Claim All Rewards</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+
+            {(achievementsSubTab === 'overview' || achievementsSubTab === 'weekly') && (
+              <View style={styles.weeklyEventCard}>
               <Text style={styles.weeklyEventTitle}>{weeklyEvent.emoji} Weekly Event: {weeklyEvent.name}</Text>
               <Text style={styles.weeklyEventDesc}>{weeklyEvent.description}</Text>
               <Text style={styles.weeklyProgressLabel}>Weekly Kills: {state.weeklyKills}</Text>
@@ -1628,9 +1622,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   </View>
                 );
               })}
-            </View>
+              </View>
+            )}
 
-            <View style={styles.missionBoardCard}>
+            {(achievementsSubTab === 'overview' || achievementsSubTab === 'missions') && (
+              <View style={styles.missionBoardCard}>
               <Text style={styles.sectionTitle}>🎯 Mission Board</Text>
               {missionCards.map(({ mission, progress, claimed }) => (
                 <View key={mission.id} style={styles.missionRow}>
@@ -1648,10 +1644,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   </Pressable>
                 </View>
               ))}
-            </View>
+              </View>
+            )}
 
-            <Text style={styles.sectionTitle}>🏆 Achievements</Text>
-            {ACHIEVEMENTS.map(ach => {
+            {(achievementsSubTab === 'overview' || achievementsSubTab === 'achievements') && <Text style={styles.sectionTitle}>🏆 Achievements</Text>}
+            {(achievementsSubTab === 'overview' || achievementsSubTab === 'achievements') && ACHIEVEMENTS.map(ach => {
               const unlocked = state.achievements.has(ach.id);
               return (
                 <View key={ach.id} style={[styles.achCard, unlocked && styles.achCardUnlocked]}>
@@ -1666,6 +1663,87 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 </View>
               );
             })}
+
+            {achievementsSubTab === 'collection' && (
+              <View>
+                <Text style={styles.sectionTitle}>📚 Collection Log</Text>
+                <Text style={styles.sectionHelperText}>Track everything you've collected. Completion grants bonus power.</Text>
+
+                <View style={styles.collectionCard}>
+                  <Text style={styles.collectionCardTitle}>👥 Heroes</Text>
+                  <Text style={styles.collectionStat}>{state.heroRoster.length} heroes summoned</Text>
+                  {(['common','rare','epic','legendary','mythic'] as const).map(r => {
+                    const count = state.heroRoster.filter(h => h.rarity === r).length;
+                    return count > 0 ? (
+                      <Text key={r} style={styles.collectionStat}> • {r}: {count}</Text>
+                    ) : null;
+                  })}
+                  {state.heroRoster.length >= 10 && <Text style={styles.collectionBonus}>✅ Bonus: +5% team DPS</Text>}
+                  {state.heroRoster.length >= 25 && <Text style={styles.collectionBonus}>✅ Bonus: +10% hero boost</Text>}
+                </View>
+
+                <View style={styles.collectionCard}>
+                  <Text style={styles.collectionCardTitle}>🎒 Equipment</Text>
+                  <Text style={styles.collectionStat}>{state.inventoryItemIds.length} items held</Text>
+                  <Text style={styles.collectionStat}>{Object.values(state.equippedItems).filter(Boolean).length} / 3 slots filled</Text>
+                  {state.permanentUnlocks.includes('mythic_equipment') && <Text style={styles.collectionBonus}>✅ Mythic Tier Unlocked</Text>}
+                  {!state.permanentUnlocks.includes('mythic_equipment') && <Text style={styles.collectionHint}>🔒 Defeat Act 3 Boss to unlock Mythic</Text>}
+                </View>
+
+                <View style={styles.collectionCard}>
+                  <Text style={styles.collectionCardTitle}>👑 Bosses Defeated</Text>
+                  <Text style={styles.collectionStat}>Highest wave: {state.wave}</Text>
+                  <Text style={styles.collectionStat}>Boss waves cleared: {Math.floor(state.wave / 10)}</Text>
+                  {Math.floor(state.wave / 10) >= 5 && <Text style={styles.collectionBonus}>✅ Boss Veteran: +5% gold</Text>}
+                </View>
+
+                <View style={styles.collectionCard}>
+                  <Text style={styles.collectionCardTitle}>🔓 Unlocks & Relics</Text>
+                  {state.permanentUnlocks.length === 0 ? (
+                    <Text style={styles.collectionStat}>No unlocks yet. Defeat bosses to progress.</Text>
+                  ) : (
+                    state.permanentUnlocks.map(u => (
+                      <Text key={u} style={styles.collectionBonus}>✅ {u.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</Text>
+                    ))
+                  )}
+                </View>
+
+                <View style={styles.collectionCard}>
+                  <Text style={styles.collectionCardTitle}>♾️ Rebirths</Text>
+                  <Text style={styles.collectionStat}>Times ascended: {state.prestigeCount ?? 0}</Text>
+                  <Text style={styles.collectionStat}>Rebirth Cores: {state.rebirthCores}</Text>
+                  {(state.prestigeCount ?? 0) >= 1 && <Text style={styles.collectionBonus}>✅ First Rebirth: Unlocked Core Tree</Text>}
+                  {(state.prestigeCount ?? 0) >= 5 && <Text style={styles.collectionBonus}>✅ Veteran: +5% core efficiency</Text>}
+                </View>
+              </View>
+            )}
+
+            {achievementsSubTab === 'codex' && (
+              <View>
+                <Text style={styles.sectionTitle}>📖 Legacy Codex</Text>
+                <Text style={styles.sectionHelperText}>Long-term milestones that define your legend. Each grants a permanent title.</Text>
+                {[
+                  { id: 'codex_wave100', title: 'Warlord', desc: 'Reach Wave 100', done: state.wave >= 100, reward: 'Title: Warlord' },
+                  { id: 'codex_wave500', title: 'Conqueror', desc: 'Reach Wave 500', done: state.wave >= 500, reward: 'Title: Conqueror' },
+                  { id: 'codex_wave1000', title: 'Legend', desc: 'Reach Wave 1000', done: state.wave >= 1000, reward: 'Title: Legend' },
+                  { id: 'codex_rebirth1', title: 'Reborn', desc: 'Complete 1 Rebirth', done: (state.prestigeCount ?? 0) >= 1, reward: 'Title: Reborn' },
+                  { id: 'codex_rebirth10', title: 'Eternal', desc: 'Complete 10 Rebirths', done: (state.prestigeCount ?? 0) >= 10, reward: 'Title: Eternal' },
+                  { id: 'codex_rebirth25', title: 'Immortal', desc: 'Complete 25 Rebirths', done: (state.prestigeCount ?? 0) >= 25, reward: 'Title: Immortal' },
+                  { id: 'codex_heroes25', title: 'Commander', desc: 'Summon 25 heroes', done: state.heroRoster.length >= 25, reward: 'Title: Commander' },
+                  { id: 'codex_ach10', title: 'Achiever', desc: 'Unlock 10 achievements', done: state.achievements.size >= 10, reward: 'Title: Achiever' },
+                  { id: 'codex_allunlocks', title: 'Sovereign', desc: 'Collect all permanent unlocks', done: state.permanentUnlocks.length >= 5, reward: 'Title: Sovereign' },
+                  { id: 'codex_streak30', title: 'Devoted', desc: 'Maintain a 30-day login streak', done: (state.dailyLoginStreak ?? 0) >= 30, reward: 'Title: Devoted' },
+                ].map(entry => (
+                  <View key={entry.id} style={[styles.codexEntry, entry.done && styles.codexEntryDone]}>
+                    <View style={styles.codexEntryLeft}>
+                      <Text style={[styles.codexTitle, entry.done && styles.codexTitleDone]}>{entry.done ? '✅' : '🔒'} {entry.title}</Text>
+                      <Text style={styles.codexDesc}>{entry.desc}</Text>
+                      <Text style={styles.codexReward}>{entry.reward}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
@@ -1686,6 +1764,113 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         achievementId={state.newAchievement}
         onDismiss={clearAchievement}
       />
+
+      {/* Events Modal */}
+      <Modal
+        visible={eventsOpen}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setEventsOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.eventsModalBox}>
+            <View style={styles.settingsHeaderRow}>
+              <Text style={styles.modalTitle}>🗓️ Events & Seasons</Text>
+              <Pressable style={styles.settingsCloseBtn} onPress={() => setEventsOpen(false)}>
+                <Text style={styles.settingsCloseBtnText}>Close</Text>
+              </Pressable>
+            </View>
+            <ScrollView style={styles.settingsScroll}>
+
+              {/* Streak Insurance */}
+              <View style={styles.eventsCard}>
+                <Text style={styles.eventsCardTitle}>🔥 Login Streak</Text>
+                <Text style={styles.eventsStatLine}>Current Streak: {state.dailyLoginStreak ?? 0} days</Text>
+                <Text style={styles.eventsStatLine}>Streak Insurance: Active — miss 1 day without penalty</Text>
+                <View style={styles.hpBarBg}>
+                  <View style={[styles.hpBarFill, { width: `${Math.min(100, ((state.dailyLoginStreak ?? 0) / 30) * 100)}%`, backgroundColor: '#FFB347' }]} />
+                </View>
+                <Text style={styles.eventsHint}>{Math.max(0, 30 - (state.dailyLoginStreak ?? 0))} days to streak milestone (30 days)</Text>
+              </View>
+
+              {/* Daily Quest Chain */}
+              <View style={styles.eventsCard}>
+                <Text style={styles.eventsCardTitle}>📋 Daily Chain</Text>
+                <Text style={styles.eventsSubtitle}>Complete all 3 for bonus essence cache</Text>
+                {[
+                  { id: 'd1', title: 'Wave Pusher', desc: `Defeat ${Math.ceil(state.wave / 10) * 10 + 10} waves`, progress: state.wave, target: Math.ceil(state.wave / 10) * 10 + 10, reward: '10 Shards' },
+                  { id: 'd2', title: 'Recruiter', desc: 'Have 5 heroes in your roster', progress: state.heroRoster.length, target: 5, reward: '200 Gold' },
+                  { id: 'd3', title: 'Gear Up', desc: 'Fill all 3 equipment slots', progress: Object.values(state.equippedItems).filter(Boolean).length, target: 3, reward: '50 Scrap' },
+                ].map(q => {
+                  const done = q.progress >= q.target;
+                  return (
+                    <View key={q.id} style={[styles.dailyQuestRow, done && styles.dailyQuestRowDone]}>
+                      <Text style={styles.dailyQuestCheck}>{done ? '✅' : '○'}</Text>
+                      <View style={styles.dailyQuestInfo}>
+                        <Text style={styles.dailyQuestTitle}>{q.title}</Text>
+                        <Text style={styles.dailyQuestDesc}>{q.desc}</Text>
+                        <Text style={styles.dailyQuestProgress}>{Math.min(q.progress, q.target)}/{q.target}</Text>
+                        <View style={styles.hpBarBg}>
+                          <View style={[styles.hpBarFill, { width: `${Math.min(100, (q.progress / q.target) * 100)}%`, backgroundColor: done ? '#6DDB7B' : '#5DA8FF' }]} />
+                        </View>
+                      </View>
+                      <Text style={styles.dailyQuestReward}>{q.reward}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+
+              {/* Weekly Event */}
+              <View style={styles.eventsCard}>
+                <Text style={styles.eventsCardTitle}>{weeklyEvent.emoji} Weekly Event: {weeklyEvent.name}</Text>
+                <Text style={styles.eventsStatLine}>{weeklyEvent.description}</Text>
+                <Text style={styles.eventsStatLine}>Weekly Kills: {state.weeklyKills}</Text>
+                <Text style={styles.eventsHint}>Earn kills to claim milestone rewards on the Achievements tab.</Text>
+                <Pressable style={styles.eventsActionBtn} onPress={() => { setEventsOpen(false); onTabChange('achievements'); setAchievementsSubTab('weekly'); }}>
+                  <Text style={styles.eventsActionBtnText}>View Weekly Track</Text>
+                </Pressable>
+              </View>
+
+              {/* Seasonal Ladder */}
+              <View style={styles.eventsCard}>
+                <Text style={styles.eventsCardTitle}>🏆 Season Ladder</Text>
+                <Text style={styles.eventsSubtitle}>Season score: {fmt(seasonScore)} pts</Text>
+                <Text style={[styles.seasonRankBadge]}>{seasonRank}</Text>
+                <Text style={styles.eventsHint}>Score based on wave progression + rebirths. Top ranks earn cosmetic banners at season end.</Text>
+                {[
+                  { rank: '🥉 Bronze', threshold: 0, banner: 'Iron Commander' },
+                  { rank: '🥈 Silver', threshold: 1000, banner: 'Silver Vanguard' },
+                  { rank: '🥇 Gold', threshold: 5000, banner: 'Gold Legion' },
+                  { rank: '💎 Diamond', threshold: 15000, banner: 'Diamond Warlord' },
+                  { rank: '👑 Legend', threshold: 40000, banner: 'Eternal Legend' },
+                ].map(tier => (
+                  <View key={tier.rank} style={[styles.ladderTierRow, seasonScore >= tier.threshold && styles.ladderTierActive]}>
+                    <Text style={styles.ladderTierRank}>{tier.rank}</Text>
+                    <Text style={styles.ladderTierInfo}>{tier.threshold > 0 ? `${fmt(tier.threshold)} pts` : 'Start'} — Banner: {tier.banner}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Formation Info */}
+              <View style={styles.eventsCard}>
+                <Text style={styles.eventsCardTitle}>⚔️ Formation Bonuses</Text>
+                <Text style={styles.eventsSubtitle}>Assign hero roles in your active team (tap badge to cycle)</Text>
+                {[
+                  { role: '🛡️ Front', perk: '+20% HP for this hero' },
+                  { role: '⚔️ Mid', perk: '+10% DPS, balanced' },
+                  { role: '🏹 Back', perk: '+15% DPS, takes less damage' },
+                ].map(row => (
+                  <View key={row.role} style={styles.formationInfoRow}>
+                    <Text style={styles.formationInfoRole}>{row.role}</Text>
+                    <Text style={styles.formationInfoPerk}>{row.perk}</Text>
+                  </View>
+                ))}
+              </View>
+
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Recycle Confirmation Modal */}
       {recycleConfirmUid && (() => {
@@ -1730,6 +1915,100 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           </Modal>
         );
       })()}
+
+      <Modal
+        visible={settingsOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSettingsOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.settingsModalBox}>
+            <View style={styles.settingsHeaderRow}>
+              <Text style={styles.modalTitle}>⚙️ Settings & Automation</Text>
+              <Pressable style={styles.settingsCloseBtn} onPress={() => setSettingsOpen(false)}>
+                <Text style={styles.settingsCloseBtnText}>Close</Text>
+              </Pressable>
+            </View>
+            <ScrollView style={styles.settingsScroll}>
+              <View style={styles.settingsCard}>
+                <Text style={styles.settingsCardTitle}>Auto Potion</Text>
+                <View style={styles.settingsRowBetween}>
+                  <Text style={styles.settingsLabel}>Enabled</Text>
+                  <Pressable
+                    style={[styles.settingsToggleBtn, state.autoUsePotionEnabled && styles.settingsToggleBtnActive]}
+                    onPress={() => setAutoUsePotion(!state.autoUsePotionEnabled)}
+                  >
+                    <Text style={styles.settingsToggleText}>{state.autoUsePotionEnabled ? 'ON' : 'OFF'}</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.settingsRowBetween}>
+                  <Text style={styles.settingsLabel}>Trigger HP</Text>
+                  <View style={styles.settingsAdjustWrap}>
+                    <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoUsePotionThreshold(state.autoUsePotionThresholdPct - 0.05)}>
+                      <Text style={styles.autoPotionAdjustText}>-</Text>
+                    </Pressable>
+                    <Text style={styles.settingsValueText}>{(state.autoUsePotionThresholdPct * 100).toFixed(0)}%</Text>
+                    <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoUsePotionThreshold(state.autoUsePotionThresholdPct + 0.05)}>
+                      <Text style={styles.autoPotionAdjustText}>+</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.settingsCard}>
+                <Text style={styles.settingsCardTitle}>Auto Recycle</Text>
+                <View style={styles.settingsRowBetween}>
+                  <Text style={styles.settingsLabel}>Enabled</Text>
+                  <Pressable
+                    style={[styles.settingsToggleBtn, state.autoRecycleEnabled && styles.settingsToggleBtnActive]}
+                    onPress={() => setAutoRecycleEnabled(!state.autoRecycleEnabled)}
+                  >
+                    <Text style={styles.settingsToggleText}>{state.autoRecycleEnabled ? 'ON' : 'OFF'}</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.settingsRowBetween}>
+                  <Text style={styles.settingsLabel}>Max Rarity</Text>
+                  <Pressable style={styles.settingsCycleBtn} onPress={cycleAutoRecycleRarity}>
+                    <Text style={styles.settingsCycleBtnText}>{state.autoRecycleMaxRarity.toUpperCase()}</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              <View style={styles.settingsCard}>
+                <Text style={styles.settingsCardTitle}>Auto Summon</Text>
+                <View style={styles.settingsRowBetween}>
+                  <Text style={styles.settingsLabel}>Enabled</Text>
+                  <Pressable
+                    style={[styles.settingsToggleBtn, state.autoSummonEnabled && styles.settingsToggleBtnActive]}
+                    onPress={() => setAutoSummonEnabled(!state.autoSummonEnabled)}
+                  >
+                    <Text style={styles.settingsToggleText}>{state.autoSummonEnabled ? 'ON' : 'OFF'}</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.settingsRowBetween}>
+                  <Text style={styles.settingsLabel}>Mode</Text>
+                  <Pressable style={styles.settingsCycleBtn} onPress={() => setAutoSummonMode(state.autoSummonMode === 'single' ? 'x10' : 'single')}>
+                    <Text style={styles.settingsCycleBtnText}>{state.autoSummonMode.toUpperCase()}</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.settingsRowBetween}>
+                  <Text style={styles.settingsLabel}>Reserve Gold</Text>
+                  <View style={styles.settingsAdjustWrap}>
+                    <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoSummonReserveGold(state.autoSummonReserveGold - 1000)}>
+                      <Text style={styles.autoPotionAdjustText}>-</Text>
+                    </Pressable>
+                    <Text style={styles.settingsValueText}>{fmt(state.autoSummonReserveGold)}</Text>
+                    <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoSummonReserveGold(state.autoSummonReserveGold + 1000)}>
+                      <Text style={styles.autoPotionAdjustText}>+</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Rebirth Modal */}
       <RebirthModal
@@ -1962,6 +2241,18 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#FFF',
     fontWeight: '600',
+  },
+  settingsBtn: {
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: '#2E4363',
+  },
+  settingsBtnText: {
+    fontSize: 10,
+    color: '#E8F2FF',
+    fontWeight: '700',
   },
 
   questBanner: {
@@ -2495,6 +2786,37 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2B4258',
     backgroundColor: '#0C131D',
+  },
+  subTabBar: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+    flexWrap: 'wrap',
+  },
+  subTabBtn: {
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#3a5471',
+    backgroundColor: '#16283B',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  subTabBtnActive: {
+    borderColor: '#7fd0a6',
+    backgroundColor: '#214435',
+  },
+  subTabBtnText: {
+    fontSize: 10,
+    color: '#b8d2e6',
+    fontWeight: '700',
+  },
+  subTabBtnTextActive: {
+    color: '#e6fff1',
+  },
+  sectionHelperText: {
+    fontSize: 10,
+    color: '#98b2c8',
+    marginBottom: 8,
   },
   primaryActionBar: {
     marginBottom: 10,
@@ -4170,5 +4492,544 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#FFF',
+  },
+  settingsModalBox: {
+    backgroundColor: '#121A26',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2E425A',
+    width: '88%',
+    maxHeight: '80%',
+    padding: 14,
+  },
+  settingsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  settingsCloseBtn: {
+    borderRadius: 5,
+    backgroundColor: '#314A66',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  settingsCloseBtnText: {
+    fontSize: 10,
+    color: '#E5F2FF',
+    fontWeight: '700',
+  },
+  settingsScroll: {
+    maxHeight: 520,
+  },
+  settingsCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#304761',
+    backgroundColor: '#162336',
+    padding: 10,
+    marginBottom: 8,
+    gap: 8,
+  },
+  settingsCardTitle: {
+    fontSize: 12,
+    color: '#D8EDFF',
+    fontWeight: '700',
+  },
+  settingsRowBetween: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  settingsLabel: {
+    fontSize: 11,
+    color: '#A9C4DB',
+  },
+  settingsToggleBtn: {
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#567795',
+    backgroundColor: '#243C57',
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+  },
+  settingsToggleBtnActive: {
+    borderColor: '#6FC59B',
+    backgroundColor: '#27503F',
+  },
+  settingsToggleText: {
+    fontSize: 10,
+    color: '#E3F4FF',
+    fontWeight: '700',
+  },
+  settingsCycleBtn: {
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#6A84A4',
+    backgroundColor: '#273B55',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+  },
+  settingsCycleBtnText: {
+    fontSize: 10,
+    color: '#E7F0FF',
+    fontWeight: '700',
+  },
+  settingsAdjustWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  settingsValueText: {
+    minWidth: 72,
+    textAlign: 'center',
+    fontSize: 10,
+    color: '#CFE6FF',
+    fontWeight: '700',
+  },
+
+  // Events button
+  eventsBtn: {
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: '#3C2E5C',
+    borderWidth: 1,
+    borderColor: '#7B5FC0',
+  },
+  eventsBtnText: {
+    fontSize: 10,
+    color: '#E0D0FF',
+    fontWeight: '700',
+  },
+
+  // Events modal
+  eventsModalBox: {
+    backgroundColor: '#0F1A2A',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#3A5278',
+    width: '94%',
+    maxHeight: '88%',
+    paddingTop: 4,
+    overflow: 'hidden',
+  },
+  eventsCard: {
+    backgroundColor: '#131F30',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#2E4563',
+    padding: 12,
+    marginBottom: 10,
+  },
+  eventsCardTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#E6F0FF',
+    marginBottom: 6,
+  },
+  eventsSubtitle: {
+    fontSize: 10,
+    color: '#8BAEC8',
+    marginBottom: 8,
+  },
+  eventsStatLine: {
+    fontSize: 11,
+    color: '#B3CCE5',
+    marginBottom: 4,
+  },
+  eventsHint: {
+    fontSize: 10,
+    color: '#7899B5',
+    fontStyle: 'italic',
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  eventsActionBtn: {
+    alignSelf: 'flex-start',
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#5A80A8',
+    backgroundColor: '#1E3450',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    marginTop: 4,
+  },
+  eventsActionBtnText: {
+    fontSize: 10,
+    color: '#D4EAFF',
+    fontWeight: '700',
+  },
+
+  // Daily quest rows
+  dailyQuestRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#1E3348',
+  },
+  dailyQuestRowDone: {
+    opacity: 0.7,
+  },
+  dailyQuestCheck: {
+    fontSize: 14,
+    paddingTop: 2,
+    minWidth: 20,
+  },
+  dailyQuestInfo: {
+    flex: 1,
+    gap: 3,
+  },
+  dailyQuestTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#DDEFFF',
+  },
+  dailyQuestDesc: {
+    fontSize: 10,
+    color: '#9ABBD5',
+  },
+  dailyQuestProgress: {
+    fontSize: 10,
+    color: '#7FA3BF',
+  },
+  dailyQuestReward: {
+    fontSize: 10,
+    color: '#FFD98A',
+    fontWeight: '700',
+    alignSelf: 'center',
+  },
+
+  // Seasonal ladder
+  seasonRankBadge: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFE080',
+    marginBottom: 6,
+  },
+  ladderTierRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 5,
+    borderRadius: 5,
+    paddingHorizontal: 6,
+    marginBottom: 3,
+    opacity: 0.5,
+  },
+  ladderTierActive: {
+    backgroundColor: '#1C3250',
+    opacity: 1,
+    borderWidth: 1,
+    borderColor: '#3F6899',
+  },
+  ladderTierRank: {
+    fontSize: 12,
+    minWidth: 80,
+    fontWeight: '700',
+    color: '#DDF1FF',
+  },
+  ladderTierInfo: {
+    fontSize: 10,
+    color: '#A4C0D8',
+    flex: 1,
+  },
+
+  // Formation info (in events modal)
+  formationInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#1D3248',
+  },
+  formationInfoRole: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#D5ECFF',
+    minWidth: 80,
+  },
+  formationInfoPerk: {
+    fontSize: 10,
+    color: '#93B9D6',
+    flex: 1,
+  },
+
+  // Formation badge (active team display)
+  formationBadge: {
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#3E5C7A',
+    backgroundColor: '#192A3D',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    alignSelf: 'center',
+  },
+  formationBadgeText: {
+    fontSize: 10,
+    color: '#C8DEF0',
+    fontWeight: '700',
+  },
+
+  // Equipment optimize
+  equipHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  equipOptimizeBtnHeader: {
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#5FA870',
+    backgroundColor: '#1E3D2C',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  equipOptimizeBtnHeaderText: {
+    fontSize: 10,
+    color: '#AFFFCA',
+    fontWeight: '700',
+  },
+  equipOptimizeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  equipOptimizeBtn: {
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#5FA870',
+    backgroundColor: '#1E3D2C',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  equipOptimizeBtnText: {
+    fontSize: 10,
+    color: '#AFFFCA',
+    fontWeight: '700',
+  },
+  equipOptimizeHint: {
+    fontSize: 10,
+    color: '#6FA880',
+    fontStyle: 'italic',
+  },
+
+  // Compare UI
+  compareBtn: {
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#4A6A9A',
+    backgroundColor: '#152B48',
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+  },
+  compareBtnText: {
+    fontSize: 10,
+    color: '#C5DEFF',
+    fontWeight: '700',
+  },
+  comparePanel: {
+    backgroundColor: '#0C1B2C',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#2E4F70',
+    padding: 8,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  comparePanelTitle: {
+    fontSize: 10,
+    color: '#A8C8E8',
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  compareStatRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  compareStat: {
+    fontSize: 10,
+    fontWeight: '700',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+    backgroundColor: '#182A3E',
+  },
+  compareStatUp: {
+    color: '#7DFF9A',
+  },
+  compareStatDown: {
+    color: '#FF7D7D',
+  },
+  compareStatNeutral: {
+    color: '#A0BAD0',
+  },
+
+  // Collection Log
+  collectionCard: {
+    backgroundColor: '#111E2C',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2A4260',
+    padding: 10,
+    marginBottom: 8,
+  },
+  collectionCardTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#DAEEFF',
+    marginBottom: 6,
+  },
+  collectionStat: {
+    fontSize: 11,
+    color: '#9BB6CC',
+    marginBottom: 2,
+  },
+  collectionBonus: {
+    fontSize: 10,
+    color: '#7DFF9A',
+    marginTop: 3,
+    fontWeight: '700',
+  },
+  collectionHint: {
+    fontSize: 10,
+    color: '#AA8855',
+    marginTop: 3,
+    fontStyle: 'italic',
+  },
+
+  // Legacy Codex
+  codexEntry: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#2A3C55',
+    backgroundColor: '#0F1A28',
+    marginBottom: 6,
+    opacity: 0.6,
+  },
+  codexEntryDone: {
+    opacity: 1,
+    borderColor: '#4A8E6A',
+    backgroundColor: '#122218',
+  },
+  codexEntryLeft: {
+    flex: 1,
+  },
+  codexTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#A0C0DD',
+    marginBottom: 2,
+  },
+  codexTitleDone: {
+    color: '#7DFF9A',
+  },
+  codexDesc: {
+    fontSize: 10,
+    color: '#7A9BB5',
+    marginBottom: 2,
+  },
+  codexReward: {
+    fontSize: 10,
+    color: '#FFD88A',
+    fontWeight: '700',
+  },
+
+  // Mastery Tracks
+  masteryCard: {
+    backgroundColor: '#111D2C',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#2E4A6A',
+    padding: 12,
+    marginTop: 10,
+  },
+  masteryTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#C8E6FF',
+    marginBottom: 4,
+  },
+  masteryLevel: {
+    fontSize: 11,
+    color: '#A5C8E0',
+    marginBottom: 6,
+  },
+  masteryLevelSub: {
+    fontSize: 10,
+    color: '#6A90B0',
+    fontStyle: 'italic',
+  },
+  masteryHint: {
+    fontSize: 10,
+    color: '#7BA0BC',
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  masteryMilestoneRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingVertical: 5,
+    borderTopWidth: 1,
+    borderTopColor: '#1E324A',
+  },
+  masteryMilestoneCheck: {
+    fontSize: 12,
+    color: '#6A90B0',
+    paddingTop: 2,
+    minWidth: 18,
+  },
+  masteryMilestoneDone: {
+    color: '#7DFF9A',
+  },
+  masteryMilestoneLvl: {
+    fontSize: 10,
+    color: '#FFD98A',
+    fontWeight: '700',
+  },
+  masteryMilestonePerk: {
+    fontSize: 10,
+    color: '#9ABCD8',
+  },
+
+  // Prestige Milestones (War Room)
+  prestigeMilestoneRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingVertical: 5,
+    borderTopWidth: 1,
+    borderTopColor: '#1A2E42',
+  },
+  prestigeMilestoneCheck: {
+    fontSize: 12,
+    color: '#6080A0',
+    minWidth: 18,
+    paddingTop: 2,
+  },
+  prestigeMilestoneDone: {
+    color: '#7DFF9A',
+  },
+  prestigeMilestoneLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#D0E8FF',
+  },
+  prestigeMilestoneBonus: {
+    fontSize: 10,
+    color: '#8AAFCC',
   },
 });
