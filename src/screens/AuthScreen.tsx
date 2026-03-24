@@ -7,6 +7,7 @@ import {
   Pressable,
   StyleSheet,
   StatusBar,
+  Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
@@ -28,6 +29,7 @@ interface AccountRecord {
 
 const ACCOUNTS_KEY = 'idlerpg_accounts_v1';
 const SESSION_KEY = 'idlerpg_current_account_v1';
+const STORAGE_PREFIXES_TO_CLEAR = ['idlerpg_', 'simplyidle_'];
 const HASH_ROUNDS = 12000;
 
 function randomSalt(): string {
@@ -150,6 +152,41 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     }
   }
 
+  function requestWipeAllData() {
+    if (busy) return;
+    Alert.alert(
+      'Delete Local Data?',
+      'This will erase all local accounts, sessions, saves, and telemetry on this device.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Everything',
+          style: 'destructive',
+          onPress: async () => {
+            setBusy(true);
+            setError(null);
+            try {
+              const keys = await AsyncStorage.getAllKeys();
+              const scopedKeys = keys.filter(key => STORAGE_PREFIXES_TO_CLEAR.some(prefix => key.startsWith(prefix)));
+              if (scopedKeys.length > 0) {
+                await AsyncStorage.multiRemove(scopedKeys);
+              }
+              setUsername('');
+              setPassword('');
+              setConfirmPassword('');
+              setMode('login');
+              setError(`Local data wiped. Removed ${scopedKeys.length} storage keys.`);
+            } catch {
+              setError('Failed to wipe local data. Please try again.');
+            } finally {
+              setBusy(false);
+            }
+          },
+        },
+      ],
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#0A0A18" />
@@ -217,6 +254,14 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           onPress={handleSubmit}
         >
           <Text style={styles.submitBtnText}>{busy ? 'Please wait...' : mode === 'login' ? 'Login' : 'Create Account'}</Text>
+        </Pressable>
+
+        <Pressable
+          style={[styles.wipeBtn, busy && styles.submitBtnDisabled]}
+          disabled={busy}
+          onPress={requestWipeAllData}
+        >
+          <Text style={styles.wipeBtnText}>Delete All Local Data</Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -303,6 +348,20 @@ const styles = StyleSheet.create({
   submitBtnText: {
     color: '#000',
     fontSize: 14,
+    fontWeight: '700',
+  },
+  wipeBtn: {
+    marginTop: 10,
+    paddingVertical: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#6A2D35',
+    backgroundColor: '#2A1418',
+    alignItems: 'center',
+  },
+  wipeBtnText: {
+    color: '#FF9BA4',
+    fontSize: 12,
     fontWeight: '700',
   },
 });

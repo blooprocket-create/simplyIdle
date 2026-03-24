@@ -52,7 +52,8 @@ import {
   rollEquipmentRarityByTier,
   rollRarity,
   rarityConfig,
-  RANK_CONFIGS,
+  getRankUpShardCost,
+  getRankStatMultiplier,
   calculateShardReward,
   unlockLabel,
 } from './gameConfig';
@@ -706,7 +707,7 @@ function getTeamMaxHp(state: GameState): number {
   for (const hero of state.heroRoster) {
     if (activeTeam.has(hero.uid)) {
       const heroClass = getClassConfig(hero.heroClass);
-      const rankMult = getRankMultiplier(hero.rank);
+      const rankMult = getRankMultiplier(hero.rank, hero.rarity);
       const heroVit = (heroClass.baseStats.vitality + hero.level * 0.8) * rankMult;
       maxHp += (heroVit + 3) * 8;
     }
@@ -728,7 +729,7 @@ function getTeamDefense(state: GameState): number {
   for (const hero of state.heroRoster) {
     if (activeTeam.has(hero.uid)) {
       const heroClass = getClassConfig(hero.heroClass);
-      const rankMult = getRankMultiplier(hero.rank);
+      const rankMult = getRankMultiplier(hero.rank, hero.rarity);
       const heroVit = (heroClass.baseStats.vitality + hero.level * 0.8) * rankMult;
       const heroSpirit = (heroClass.baseStats.spirit + hero.level * 0.5) * rankMult;
       defense += heroVit * 0.2 + heroSpirit * 0.1;
@@ -756,7 +757,7 @@ function getDps(state: GameState): number {
   for (const hero of state.heroRoster) {
     if (activeTeam.has(hero.uid)) {
       const heroClass = getClassConfig(hero.heroClass);
-      const rankMult = getRankMultiplier(hero.rank);
+      const rankMult = getRankMultiplier(hero.rank, hero.rarity);
       const heroStr = (heroClass.baseStats.strength + hero.level * 0.9) * rankMult;
       const heroInt = (heroClass.baseStats.intelligence + hero.level * 0.85) * rankMult;
       const heroAgi = (heroClass.baseStats.agility + hero.level * 0.7) * rankMult;
@@ -926,9 +927,8 @@ function getMissionProgressValue(state: GameState, mission: MissionBoardGoal): n
   return state.essence;
 }
 
-function getRankMultiplier(rank: number): number {
-  const cfg = RANK_CONFIGS.find(r => r.rankNumber === rank);
-  return cfg?.statMultiplier ?? 1;
+function getRankMultiplier(rank: number, rarity: Rarity): number {
+  return getRankStatMultiplier(rank, rarity);
 }
 
 function defaultTraitForClass(playerClass: PlayerClass): HeroPassiveTraitId {
@@ -974,7 +974,7 @@ export function computeStats(state: GameState) {
   }> = {};
   for (const hero of state.heroRoster) {
     const heroClass = getClassConfig(hero.heroClass);
-    const rankMult = getRankMultiplier(hero.rank);
+    const rankMult = getRankMultiplier(hero.rank, hero.rarity);
     const hStr = (heroClass.baseStats.strength + hero.level * 0.9) * rankMult;
     const hInt = (heroClass.baseStats.intelligence + hero.level * 0.85) * rankMult;
     const hAgi = (heroClass.baseStats.agility + hero.level * 0.7) * rankMult;
@@ -1277,10 +1277,16 @@ function checkAchievements(state: GameState): string | null {
     totalGold: state.totalGold,
     totalKills: state.totalKills,
     wave: state.wave,
+    highestWaveReached: state.highestWaveReached,
     level: state.level,
     prestigeCount: state.prestigeCount,
     totalSummons: state.totalSummons,
     equippedCount: state.activeTeamHeroIds.length,
+    heroRosterCount: state.heroRoster.length,
+    heroShards: state.heroShards,
+    essence: state.essence,
+    unlockedCount: state.achievements.size,
+    dailyLoginStreak: state.dailyLoginStreak,
   };
 
   for (const ach of ACHIEVEMENTS) {
@@ -2194,8 +2200,8 @@ function reducer(state: GameState, action: Action): GameState {
       const hero = state.heroRoster.find(h => h.uid === action.uid);
       if (!hero || hero.rank >= 10) return state;
       
-      const nextRankConfig = RANK_CONFIGS.find(r => r.rankNumber === hero.rank + 1);
-      if (!nextRankConfig || state.heroShards < nextRankConfig.shardCostToRankUp) return state;
+      const nextRankCost = getRankUpShardCost(hero.rarity, hero.rank + 1);
+      if (!Number.isFinite(nextRankCost) || state.heroShards < nextRankCost) return state;
       
       // Rank up the hero
       const updatedHero = { ...hero, rank: hero.rank + 1 };
@@ -2204,7 +2210,7 @@ function reducer(state: GameState, action: Action): GameState {
       return {
         ...state,
         heroRoster: newRoster,
-        heroShards: state.heroShards - nextRankConfig.shardCostToRankUp,
+        heroShards: state.heroShards - nextRankCost,
       };
     }
 

@@ -43,8 +43,9 @@ import {
   getHeroActiveArchetypeInfo,
   WEEKLY_TRACK_MILESTONES,
   MISSION_BOARD_GOALS,
+  STORY_BEATS,
   calculateShardReward,
-  getRankConfig,
+  getRankUpShardCost,
   getUsableItem,
   Rarity,
 } from '../gameConfig';
@@ -164,7 +165,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [idleChestOpen, setIdleChestOpen] = useState(false);
   const [idleChestReward, setIdleChestReward] = useState<{ title: string; detail: string } | null>(null);
   const [battleSpeed, setBattleSpeed] = useState<1 | 2 | 4>(1);
+  const [storyUnlockToast, setStoryUnlockToast] = useState<{ id: string; title: string; chapter: string } | null>(null);
   const lastSummonIdRef = useRef<string | null>(null);
+  const storyUnlockInitRef = useRef(false);
+  const seenStoryUnlockIdsRef = useRef<Set<string>>(new Set());
   const [warPanels, setWarPanels] = useState({
     frontline: true,
     roster: true,
@@ -208,6 +212,18 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const currentQuest = state.tutorialEnabled
     ? TUTORIAL_QUESTS[state.tutorialCurrentQuestIndex] ?? null
     : null;
+  const tutorialTargetTab = state.tutorialEnabled && currentQuest ? currentQuest.targetTab : null;
+  const tutorialStepId = currentQuest?.id ?? null;
+  const forceFreeSummonStep = tutorialStepId === 'q_use_free_summon';
+  const forceBuildTeamStep = tutorialStepId === 'q_build_team';
+  const forceSpendStatStep = tutorialStepId === 'q_spend_stat';
+  const tutorialActionHint = useMemo(() => {
+    if (!currentQuest) return null;
+    if (forceFreeSummonStep) return 'Tap the highlighted Summon Hero button.';
+    if (forceBuildTeamStep) return 'Tap Edit, pick a hero, then Confirm Team.';
+    if (forceSpendStatStep) return 'Tap a highlighted +1 button to spend exactly one stat point.';
+    return 'Only the highlighted tab is enabled for this step.';
+  }, [currentQuest, forceFreeSummonStep, forceBuildTeamStep, forceSpendStatStep]);
   const weeklyEvent = getWeeklyEvent();
   const shardForgeCosts = getShardForgeCosts();
   const rebirthDamageCost = getRebirthCoreCost('damage');
@@ -315,6 +331,74 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const claimableWeeklyMilestones = WEEKLY_TRACK_MILESTONES.filter(ms => state.weeklyKills >= ms && !state.weeklyTrackClaimed.includes(ms));
   const claimableMissionIds = missionCards.filter(m => !m.claimed && m.progress.done).map(m => m.mission.id);
   const hasClaimableRewards = claimableWeeklyMilestones.length > 0 || claimableMissionIds.length > 0;
+  const storyEntries = useMemo(
+    () => STORY_BEATS.map(beat => {
+      const waveReady = state.highestWaveReached >= beat.unlockWave;
+      const prestigeReady = beat.unlockPrestige == null || state.prestigeCount >= beat.unlockPrestige;
+      return {
+        ...beat,
+        unlocked: waveReady && prestigeReady,
+      };
+    }),
+    [state.highestWaveReached, state.prestigeCount],
+  );
+  const nextStoryEntry = storyEntries.find(entry => !entry.unlocked) ?? null;
+  const nearUnlockAchievements = useMemo(() => {
+    function parseMagnitudeToken(token: string): number {
+      const t = token.toLowerCase();
+      if (t.endsWith('k')) return Math.floor(Number(t.slice(0, -1)) * 1000);
+      if (t.endsWith('m')) return Math.floor(Number(t.slice(0, -1)) * 1_000_000);
+      return Number(t);
+    }
+
+    function progressForAchievement(id: string): { label: string; value: number; target: number } | null {
+      if (id === 'first_blood') return { label: 'Kills', value: state.totalKills, target: 1 };
+      if (id.startsWith('kills_')) return { label: 'Kills', value: state.totalKills, target: parseMagnitudeToken(id.split('_')[1]) };
+      if (id.startsWith('wave_')) return { label: 'Wave', value: state.wave, target: parseMagnitudeToken(id.split('_')[1]) };
+      if (id.startsWith('level_')) return { label: 'Level', value: state.level, target: parseMagnitudeToken(id.split('_')[1]) };
+      if (id.startsWith('gold_')) return { label: 'Gold', value: state.totalGold, target: parseMagnitudeToken(id.split('_')[1]) };
+      if (id.startsWith('summon_')) return { label: 'Summons', value: state.totalSummons, target: parseMagnitudeToken(id.split('_')[1]) };
+      if (id === 'equip_5') return { label: 'Active Team', value: state.activeTeamHeroIds.length, target: 4 };
+      if (id.startsWith('rebirth_')) return { label: 'Rebirths', value: state.prestigeCount, target: parseMagnitudeToken(id.split('_')[1]) };
+      if (id.startsWith('roster_')) return { label: 'Roster Size', value: state.heroRoster.length, target: parseMagnitudeToken(id.split('_')[1]) };
+      if (id.startsWith('shards_')) return { label: 'Shards', value: state.heroShards, target: parseMagnitudeToken(id.split('_')[1]) };
+      if (id.startsWith('essence_')) return { label: 'Essence', value: state.essence, target: parseMagnitudeToken(id.split('_')[1]) };
+      if (id.startsWith('unlocks_')) return { label: 'Permanent Unlocks', value: state.permanentUnlocks.length, target: parseMagnitudeToken(id.split('_')[1]) };
+      if (id.startsWith('streak_')) return { label: 'Login Streak', value: state.dailyLoginStreak, target: parseMagnitudeToken(id.split('_')[1]) };
+      if (id.startsWith('highest_wave_')) return { label: 'Highest Wave', value: state.highestWaveReached, target: parseMagnitudeToken(id.split('_')[2]) };
+      if (id === 'legend_slate') return { label: 'Achievements', value: state.achievements.size, target: 20 };
+      return null;
+    }
+
+    return ACHIEVEMENTS
+      .filter(ach => !state.achievements.has(ach.id))
+      .map(ach => {
+        const progress = progressForAchievement(ach.id);
+        if (!progress) {
+          return { ach, ratio: 0, remaining: null, progress: null as null | { label: string; value: number; target: number } };
+        }
+        const ratio = Math.max(0, Math.min(1, progress.value / Math.max(1, progress.target)));
+        const remaining = Math.max(0, progress.target - progress.value);
+        return { ach, ratio, remaining, progress };
+      })
+      .sort((a, b) => b.ratio - a.ratio)
+      .slice(0, 3);
+  }, [
+    state.achievements,
+    state.dailyLoginStreak,
+    state.essence,
+    state.heroRoster.length,
+    state.heroShards,
+    state.highestWaveReached,
+    state.level,
+    state.activeTeamHeroIds.length,
+    state.permanentUnlocks.length,
+    state.prestigeCount,
+    state.totalGold,
+    state.totalKills,
+    state.totalSummons,
+    state.wave,
+  ]);
   const expPct = Math.floor((state.exp / Math.max(1, stats.expNeeded)) * 100);
   const topStatChips = [
     { id: 'gold', label: 'Gold', value: fmt(state.gold) },
@@ -328,6 +412,36 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     { id: 'streak', label: 'Streak', value: `${state.dailyLoginStreak}` },
     { id: 'peakwave', label: 'Peak Wave', value: `${state.highestWaveReached}` },
   ];
+
+  useEffect(() => {
+    const unlockedIds = storyEntries.filter(entry => entry.unlocked).map(entry => entry.id);
+    if (!storyUnlockInitRef.current) {
+      seenStoryUnlockIdsRef.current = new Set(unlockedIds);
+      storyUnlockInitRef.current = true;
+      return;
+    }
+
+    const newlyUnlocked = unlockedIds.filter(id => !seenStoryUnlockIdsRef.current.has(id));
+    if (newlyUnlocked.length === 0) return;
+
+    const latestId = newlyUnlocked[newlyUnlocked.length - 1];
+    const latestEntry = storyEntries.find(entry => entry.id === latestId);
+    newlyUnlocked.forEach(id => seenStoryUnlockIdsRef.current.add(id));
+
+    if (latestEntry) {
+      setStoryUnlockToast({
+        id: latestEntry.id,
+        title: latestEntry.title,
+        chapter: latestEntry.chapter,
+      });
+    }
+  }, [storyEntries]);
+
+  useEffect(() => {
+    if (!storyUnlockToast) return;
+    const timer = setTimeout(() => setStoryUnlockToast(null), 4500);
+    return () => clearTimeout(timer);
+  }, [storyUnlockToast]);
 
   useEffect(() => {
     if (!rewardPopup) return;
@@ -374,7 +488,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     }
   }, [rewardPopup, idleChestOpen]);
 
+  useEffect(() => {
+    if (!state.tutorialEnabled || !currentQuest) return;
+    if (forceFreeSummonStep && heroesSubTab !== 'summon') setHeroesSubTab('summon');
+    if (forceBuildTeamStep && heroesSubTab !== 'roster') setHeroesSubTab('roster');
+  }, [state.tutorialEnabled, currentQuest, forceFreeSummonStep, forceBuildTeamStep, heroesSubTab]);
+
   const onTabChange = (nextTab: Tab) => {
+    if (tutorialTargetTab && nextTab !== tutorialTargetTab) return;
     setTab(nextTab);
     const eventMap: Record<Tab, TutorialEvent | null> = {
       warroom: null,
@@ -629,6 +750,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           <Text style={styles.questName}>{currentQuest.title}</Text>
           <Text style={styles.questDesc}>{currentQuest.description}</Text>
           <Text style={styles.questHint}>Go to: {currentQuest.targetTab.toUpperCase()} tab</Text>
+          {tutorialActionHint && <Text style={styles.questForceHint}>👉 {tutorialActionHint}</Text>}
         </View>
       )}
 
@@ -745,7 +867,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   setTempTeam([...state.activeTeamHeroIds]);
                   setTeamSelectionMode(!teamSelectionMode);
                 }}
-                style={styles.editBtn}
+                style={[styles.editBtn, forceBuildTeamStep && !teamSelectionMode && styles.tutorialPulse]}
               >
                 <Text style={styles.editBtnText}>{teamSelectionMode ? 'Cancel' : 'Edit'}</Text>
               </Pressable>
@@ -784,7 +906,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   })}
                 </ScrollView>
                 <Pressable
-                  style={styles.confirmBtn}
+                  style={[styles.confirmBtn, forceBuildTeamStep && styles.tutorialPulse]}
                   onPress={() => {
                     setActiveTeam(tempTeam);
                     setTeamSelectionMode(false);
@@ -838,25 +960,35 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
       {/* Command Deck */}
       <View style={styles.tabBar}>
-        {(['warroom', 'battle', 'heroes', 'stats', 'equipment', 'achievements'] as const).map(t => (
-          <Pressable
-            key={t}
-            style={[styles.tab, tab === t && styles.tabActive]}
-            onPress={() => onTabChange(t)}
-          >
-            <View style={styles.tabIconWrap}>
-              <Text style={[styles.tabIcon, tab === t && styles.tabIconActive]}>{TAB_META[t].icon}</Text>
-              <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{TAB_META[t].label}</Text>
-              <Text style={[styles.tabSubText, tab === t && styles.tabSubTextActive]}>{TAB_META[t].mood}</Text>
-              <View style={styles.tabSignalPill}>
-                <Text style={styles.tabSignalText}>{tabSignals[t]}</Text>
+        {(['warroom', 'battle', 'heroes', 'stats', 'equipment', 'achievements'] as const).map(t => {
+          const lockedOut = !!tutorialTargetTab && t !== tutorialTargetTab;
+          const tutorialTarget = !!tutorialTargetTab && t === tutorialTargetTab;
+          return (
+            <Pressable
+              key={t}
+              style={[
+                styles.tab,
+                tab === t && styles.tabActive,
+                lockedOut && styles.tabLocked,
+                tutorialTarget && styles.tutorialPulse,
+              ]}
+              onPress={() => onTabChange(t)}
+              disabled={lockedOut}
+            >
+              <View style={styles.tabIconWrap}>
+                <Text style={[styles.tabIcon, tab === t && styles.tabIconActive]}>{TAB_META[t].icon}</Text>
+                <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{TAB_META[t].label}</Text>
+                <Text style={[styles.tabSubText, tab === t && styles.tabSubTextActive]}>{TAB_META[t].mood}</Text>
+                <View style={styles.tabSignalPill}>
+                  <Text style={styles.tabSignalText}>{tabSignals[t]}</Text>
+                </View>
+                {((t === 'stats' && hasStatsNotification) || (t === 'heroes' && hasGachaNotification)) && (
+                  <View style={styles.redDot} />
+                )}
               </View>
-              {((t === 'stats' && hasStatsNotification) || (t === 'heroes' && hasGachaNotification)) && (
-                <View style={styles.redDot} />
-              )}
-            </View>
-          </Pressable>
-        ))}
+            </Pressable>
+          );
+        })}
       </View>
 
       {/* Tab Content */}
@@ -885,6 +1017,43 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Text style={styles.campaignRailValue}>{fmt(teamPowerIndex)} ({powerTier})</Text>
                 <Text style={styles.campaignRailHint}>Aim for next tier via gear + mastery</Text>
               </View>
+            </View>
+
+            <View style={styles.warNearUnlockCard}>
+              <View style={styles.warNearUnlockHeader}>
+                <Text style={styles.warNearUnlockTitle}>🏆 Near Unlocks</Text>
+                <Pressable
+                  style={styles.warNearUnlockBtn}
+                  onPress={() => {
+                    onTabChange('achievements');
+                    setAchievementsSubTab('achievements');
+                  }}
+                >
+                  <Text style={styles.warNearUnlockBtnText}>Open Records</Text>
+                </Pressable>
+              </View>
+              {nearUnlockAchievements.length === 0 ? (
+                <Text style={styles.warNearUnlockEmpty}>All achievements unlocked. You have completed the current records board.</Text>
+              ) : (
+                nearUnlockAchievements.map(item => (
+                  <View key={item.ach.id} style={styles.warNearUnlockRow}>
+                    <View style={styles.warNearUnlockTop}>
+                      <Text style={styles.warNearUnlockName}>{item.ach.emoji} {item.ach.name}</Text>
+                      <Text style={styles.warNearUnlockPct}>{Math.round(item.ratio * 100)}%</Text>
+                    </View>
+                    <Text style={styles.warNearUnlockDesc}>{item.ach.description}</Text>
+                    {item.progress && (
+                      <Text style={styles.warNearUnlockProgress}>
+                        {item.progress.label}: {fmt(item.progress.value)} / {fmt(item.progress.target)}
+                        {item.remaining != null ? ` • ${fmt(item.remaining)} to go` : ''}
+                      </Text>
+                    )}
+                    <View style={styles.hpBarBg}>
+                      <View style={[styles.hpBarFill, { width: `${Math.max(4, Math.round(item.ratio * 100))}%`, backgroundColor: '#7BD9A8' }]} />
+                    </View>
+                  </View>
+                ))
+              )}
             </View>
 
             <View style={styles.warPanel}>
@@ -1271,7 +1440,17 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           <View style={styles.heroesTab}>
             <View style={styles.subTabBar}>
               {(['summon', 'roster', 'forge'] as const).map(st => (
-                <Pressable key={st} style={[styles.subTabBtn, heroesSubTab === st && styles.subTabBtnActive]} onPress={() => setHeroesSubTab(st)}>
+                <Pressable
+                  key={st}
+                  style={[
+                    styles.subTabBtn,
+                    heroesSubTab === st && styles.subTabBtnActive,
+                    ((forceFreeSummonStep && st !== 'summon') || (forceBuildTeamStep && st !== 'roster')) && styles.subTabBtnLocked,
+                    ((forceFreeSummonStep && st === 'summon') || (forceBuildTeamStep && st === 'roster')) && styles.tutorialPulse,
+                  ]}
+                  onPress={() => setHeroesSubTab(st)}
+                  disabled={(forceFreeSummonStep && st !== 'summon') || (forceBuildTeamStep && st !== 'roster')}
+                >
                   <Text style={[styles.subTabBtnText, heroesSubTab === st && styles.subTabBtnTextActive]}>
                     {st === 'summon' ? 'Summon Bay' : st === 'roster' ? 'Roster' : 'Forge'}
                   </Text>
@@ -1293,8 +1472,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     <View style={[styles.hpBarFill, { width: `${Math.min(100, (state.gachaPityCounter / 30) * 100)}%`, backgroundColor: '#C77DFF' }]} />
                   </View>
                   <Pressable
-                    style={[styles.featuredSummonBtn, !canGachaX10 && styles.featuredSummonBtnDisabled]}
-                    disabled={!canGachaX10}
+                    style={[
+                      styles.featuredSummonBtn,
+                      !canGachaX10 && styles.featuredSummonBtnDisabled,
+                      forceFreeSummonStep && styles.featuredSummonBtnDisabled,
+                    ]}
+                    disabled={!canGachaX10 || forceFreeSummonStep}
                     onPress={summonHeroX10}
                   >
                     <Text style={styles.featuredSummonBtnText}>Cinematic x10 Summon</Text>
@@ -1312,6 +1495,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       styles.gachaBtn,
                       !canGachaOnce && styles.gachaBtnDisabled,
                       hasGachaNotification && styles.gachaBtnNotify,
+                      forceFreeSummonStep && styles.tutorialPulse,
                     ]}
                     disabled={!canGachaOnce}
                     onPress={summonHero}
@@ -1320,8 +1504,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     {hasGachaNotification && <View style={styles.gachaBtnDot} />}
                   </Pressable>
                   <Pressable
-                    style={[styles.gachaBtn, styles.gachaBtnX10, !canGachaX10 && styles.gachaBtnDisabled]}
-                    disabled={!canGachaX10}
+                    style={[
+                      styles.gachaBtn,
+                      styles.gachaBtnX10,
+                      !canGachaX10 && styles.gachaBtnDisabled,
+                      forceFreeSummonStep && styles.gachaBtnDisabled,
+                    ]}
+                    disabled={!canGachaX10 || forceFreeSummonStep}
                     onPress={summonHeroX10}
                   >
                     <Text style={[styles.gachaBtnText, styles.gachaBtnTextLight]}>Summon x10</Text>
@@ -1420,8 +1609,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 const details = stats.heroDetails[hero.uid];
                 const isExpanded = expandedHeroes.has(hero.uid);
                 const shardValue = calculateShardReward(hero.rarity, hero.level);
-                const nextRankConfig = hero.rank < 10 ? getRankConfig(hero.rank + 1) : null;
-                const canRankUp = nextRankConfig && state.heroShards >= nextRankConfig.shardCostToRankUp;
+                const nextRankCost = hero.rank < 10 ? getRankUpShardCost(hero.rarity, hero.rank + 1) : null;
+                const canRankUp = !!nextRankCost && state.heroShards >= nextRankCost;
                 const trait = getHeroPassiveTraitInfo(hero.passiveTrait);
                 const activeArchetype = getHeroActiveArchetypeInfo(hero.activeSkillArchetype);
                 const faction = hero.heroClass === 'warrior' || hero.heroClass === 'berserker'
@@ -1464,15 +1653,15 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       </View>
 
                       {/* Rank up section */}
-                      {nextRankConfig && (
+                      {nextRankCost && (
                         <View style={styles.rankUpSection}>
-                          <Text style={styles.rankUpLabel}>Rank Up Cost: {nextRankConfig.shardCostToRankUp} 💎</Text>
+                          <Text style={styles.rankUpLabel}>Rank Up Cost: {nextRankCost} 💎</Text>
                           <Pressable
                             style={[styles.rankUpBtn, !canRankUp && styles.rankUpBtnDisabled]}
                             disabled={!canRankUp}
                             onPress={() => rankUpHero(hero.uid)}
                           >
-                            <Text style={styles.rankUpBtnText}>{canRankUp ? 'Rank Up' : `Need ${nextRankConfig.shardCostToRankUp - state.heroShards} more`}</Text>
+                            <Text style={styles.rankUpBtnText}>{canRankUp ? 'Rank Up' : `Need ${nextRankCost - state.heroShards} more`}</Text>
                           </Pressable>
                         </View>
                       )}
@@ -1565,15 +1754,20 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       </View>
                       <View style={styles.statBtnGroup}>
                         <Pressable
-                          style={[styles.statBtn, state.unspentStatPoints === 0 && styles.statBtnDisabled]}
+                          style={[styles.statBtn, state.unspentStatPoints === 0 && styles.statBtnDisabled, forceSpendStatStep && styles.tutorialPulse]}
                           disabled={state.unspentStatPoints === 0}
                           onPress={() => allocateStat(stat as any)}
                         >
                           <Text style={styles.statBtnText}>+1</Text>
                         </Pressable>
                         <Pressable
-                          style={[styles.statBtn, styles.statBtnMax, state.unspentStatPoints === 0 && styles.statBtnDisabled]}
-                          disabled={state.unspentStatPoints === 0}
+                          style={[
+                            styles.statBtn,
+                            styles.statBtnMax,
+                            state.unspentStatPoints === 0 && styles.statBtnDisabled,
+                            forceSpendStatStep && styles.statBtnDisabled,
+                          ]}
+                          disabled={state.unspentStatPoints === 0 || forceSpendStatStep}
                           onPress={() => allocateStatMax(stat as any)}
                         >
                           <Text style={styles.statBtnText}>+MAX</Text>
@@ -2030,6 +2224,30 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <View>
                 <Text style={styles.sectionTitle}>📖 Legacy Codex</Text>
                 <Text style={styles.sectionHelperText}>Long-term milestones that define your legend. Each grants a permanent title.</Text>
+                <View style={styles.storyCardWrap}>
+                  <Text style={styles.storyCardTitle}>🧭 War Chronicle</Text>
+                  <Text style={styles.storyCardSubtitle}>
+                    Unlocked chapters: {storyEntries.filter(entry => entry.unlocked).length}/{storyEntries.length}
+                  </Text>
+                  {storyEntries.map(entry => (
+                    <View key={entry.id} style={[styles.storyBeatCard, entry.unlocked && styles.storyBeatCardUnlocked]}>
+                      <Text style={[styles.storyBeatChapter, entry.unlocked && styles.storyBeatChapterUnlocked]}>
+                        {entry.unlocked ? '✅' : '🔒'} {entry.chapter} - {entry.title}
+                      </Text>
+                      <Text style={styles.storyBeatBody}>{entry.unlocked ? entry.body : 'Classified until campaign requirements are met.'}</Text>
+                      <Text style={styles.storyBeatReq}>
+                        Req: Wave {entry.unlockWave}
+                        {entry.unlockPrestige != null ? ` • Rebirth ${entry.unlockPrestige}+` : ''}
+                      </Text>
+                    </View>
+                  ))}
+                  {nextStoryEntry && (
+                    <Text style={styles.storyNextHint}>
+                      Next chapter unlock: Wave {nextStoryEntry.unlockWave}
+                      {nextStoryEntry.unlockPrestige != null ? ` and Rebirth ${nextStoryEntry.unlockPrestige}+` : ''}
+                    </Text>
+                  )}
+                </View>
                 {[
                   { id: 'codex_wave100', title: 'Warlord', desc: 'Reach Wave 100', done: state.wave >= 100, reward: 'Title: Warlord' },
                   { id: 'codex_wave500', title: 'Conqueror', desc: 'Reach Wave 500', done: state.wave >= 500, reward: 'Title: Conqueror' },
@@ -2039,7 +2257,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   { id: 'codex_rebirth25', title: 'Immortal', desc: 'Complete 25 Rebirths', done: (state.prestigeCount ?? 0) >= 25, reward: 'Title: Immortal' },
                   { id: 'codex_heroes25', title: 'Commander', desc: 'Summon 25 heroes', done: state.heroRoster.length >= 25, reward: 'Title: Commander' },
                   { id: 'codex_ach10', title: 'Achiever', desc: 'Unlock 10 achievements', done: state.achievements.size >= 10, reward: 'Title: Achiever' },
-                  { id: 'codex_allunlocks', title: 'Sovereign', desc: 'Collect all permanent unlocks', done: state.permanentUnlocks.length >= 5, reward: 'Title: Sovereign' },
+                  { id: 'codex_allunlocks', title: 'Sovereign', desc: 'Collect all permanent unlocks', done: state.permanentUnlocks.length >= 3, reward: 'Title: Sovereign' },
                   { id: 'codex_streak30', title: 'Devoted', desc: 'Maintain a 30-day login streak', done: (state.dailyLoginStreak ?? 0) >= 30, reward: 'Title: Devoted' },
                 ].map(entry => (
                   <View key={entry.id} style={[styles.codexEntry, entry.done && styles.codexEntryDone]}>
@@ -2055,6 +2273,24 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           </View>
         )}
       </ScrollView>
+
+      {storyUnlockToast && (
+        <Pressable
+          style={[styles.storyToast, styles.storyToastActive]}
+          onPress={() => {
+            setStoryUnlockToast(null);
+            onTabChange('achievements');
+            setAchievementsSubTab('codex');
+          }}
+        >
+          <Text style={styles.storyToastIcon}>📖</Text>
+          <View style={styles.storyToastContent}>
+            <Text style={styles.storyToastTitle}>New Chronicle Unlocked</Text>
+            <Text style={styles.storyToastDetail}>{storyUnlockToast.chapter} - {storyUnlockToast.title}</Text>
+          </View>
+          <Text style={styles.storyToastHint}>View</Text>
+        </Pressable>
+      )}
 
       {rewardPopup && !idleChestReady && (
         <Pressable style={[styles.rewardToast, styles.rewardToastActive]} onPress={clearRewardPopup}>
@@ -2877,6 +3113,12 @@ const styles = StyleSheet.create({
     color: '#6DDB7B',
     marginTop: 4,
   },
+  questForceHint: {
+    fontSize: 10,
+    color: '#FFE4A8',
+    marginTop: 4,
+    fontWeight: '700',
+  },
   hintBanner: {
     marginHorizontal: 12,
     marginBottom: 6,
@@ -3349,6 +3591,17 @@ const styles = StyleSheet.create({
     borderColor: '#8FD2FF',
     backgroundColor: '#15334A',
   },
+  tabLocked: {
+    opacity: 0.35,
+  },
+  tutorialPulse: {
+    borderColor: '#FFD36B',
+    shadowColor: '#FFD36B',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 8,
+    elevation: 8,
+  },
   tabIcon: {
     fontSize: 16,
     marginBottom: 2,
@@ -3433,6 +3686,9 @@ const styles = StyleSheet.create({
   subTabBtnActive: {
     borderColor: '#7fd0a6',
     backgroundColor: '#214435',
+  },
+  subTabBtnLocked: {
+    opacity: 0.35,
   },
   subTabBtnText: {
     fontSize: 10,
@@ -5910,6 +6166,63 @@ const styles = StyleSheet.create({
     color: '#AA8855',
     marginTop: 3,
     fontStyle: 'italic',
+  },
+
+  storyCardWrap: {
+    backgroundColor: '#111E2B',
+    borderWidth: 1,
+    borderColor: '#28465F',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+  },
+  storyCardTitle: {
+    color: '#EAF3FF',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  storyCardSubtitle: {
+    color: '#9DB4C9',
+    fontSize: 11,
+    marginBottom: 8,
+  },
+  storyBeatCard: {
+    backgroundColor: '#0D1722',
+    borderWidth: 1,
+    borderColor: '#243A4E',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+  },
+  storyBeatCardUnlocked: {
+    borderColor: '#3B6A8E',
+    backgroundColor: '#132636',
+  },
+  storyBeatChapter: {
+    color: '#AFC6DA',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  storyBeatChapterUnlocked: {
+    color: '#D8ECFF',
+  },
+  storyBeatBody: {
+    color: '#C7D8E7',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  storyBeatReq: {
+    color: '#8FA7BC',
+    fontSize: 10,
+    marginTop: 6,
+  },
+  storyNextHint: {
+    color: '#FFE4A8',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 4,
   },
 
   // Legacy Codex

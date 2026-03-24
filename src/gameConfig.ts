@@ -438,6 +438,21 @@ export const EQUIPMENT_CATALOG: EquipmentItem[] = [
   { id: 'x_archer_skylens', name: 'Skylens Pendant', emoji: '🔭', slot: 'accessory', rarity: 'mythic', allowedClasses: ['archer'], description: 'Finds weak points before they exist.', bonus: { agility: 7, spirit: 2 } },
   { id: 'x_mage_voidtear', name: 'Voidtear Orb', emoji: '🌀', slot: 'accessory', rarity: 'mythic', allowedClasses: ['mage'], description: 'A hollow star that amplifies spells.', bonus: { intelligence: 7, spirit: 4 } },
   { id: 'x_monk_sunsigil', name: 'Sunsigil Charm', emoji: '☀️', slot: 'accessory', rarity: 'mythic', allowedClasses: ['monk'], description: 'Anchors the breath in radiant rhythm.', bonus: { spirit: 7, vitality: 3 } },
+  { id: 'w_warrior_gravemark', name: 'Gravemark Halberd', emoji: '🗡️', slot: 'weapon', rarity: 'legendary', allowedClasses: ['warrior'], description: 'Heavy polearm forged for siege lines.', bonus: { strength: 7, vitality: 3 } },
+  { id: 'w_berserker_skullsplit', name: 'Skullsplit Maul', emoji: '🔨', slot: 'weapon', rarity: 'legendary', allowedClasses: ['berserker'], description: 'A brutal hammer that grows louder in battle.', bonus: { strength: 8, vitality: 2 } },
+  { id: 'w_archer_duskgale', name: 'Duskgale Repeater', emoji: '🏹', slot: 'weapon', rarity: 'legendary', allowedClasses: ['archer'], description: 'Fires in controlled stormburst volleys.', bonus: { agility: 7, strength: 2 } },
+  { id: 'w_mage_riftlantern', name: 'Rift Lantern', emoji: '🏮', slot: 'weapon', rarity: 'legendary', allowedClasses: ['mage'], description: 'Carries a miniature tear in space.', bonus: { intelligence: 8, spirit: 3 } },
+  { id: 'w_monk_thunderstaff', name: 'Thunderstaff', emoji: '⚡', slot: 'weapon', rarity: 'legendary', allowedClasses: ['monk'], description: 'Conducts focused strikes through breath control.', bonus: { spirit: 6, agility: 3 } },
+  { id: 'a_warrior_garrison', name: 'Garrison Shell', emoji: '🛡️', slot: 'armor', rarity: 'legendary', allowedClasses: ['warrior'], description: 'Layered plating from fortress captains.', bonus: { vitality: 8, strength: 2 } },
+  { id: 'a_berserker_ironhide', name: 'Ironhide Mantle', emoji: '🧱', slot: 'armor', rarity: 'legendary', allowedClasses: ['berserker'], description: 'Absorbs punishment and answers with force.', bonus: { vitality: 7, strength: 3 } },
+  { id: 'a_archer_shadesilk', name: 'Shadesilk Cloak', emoji: '🕶️', slot: 'armor', rarity: 'legendary', allowedClasses: ['archer'], description: 'Weightless cloak tuned for sudden movement.', bonus: { agility: 7, spirit: 2 } },
+  { id: 'a_mage_orbitweave', name: 'Orbitweave Robes', emoji: '🌠', slot: 'armor', rarity: 'mythic', allowedClasses: ['mage'], description: 'Runes orbit the wearer like satellites.', bonus: { intelligence: 10, spirit: 4 } },
+  { id: 'a_monk_stormveil', name: 'Stormveil Wraps', emoji: '🥋', slot: 'armor', rarity: 'legendary', allowedClasses: ['monk'], description: 'Flexes between impact and flow.', bonus: { vitality: 6, spirit: 4 } },
+  { id: 'x_warrior_wardring', name: 'Wardring of Oaths', emoji: '💍', slot: 'accessory', rarity: 'legendary', allowedClasses: ['warrior'], description: 'Binds old oaths into active defenses.', bonus: { vitality: 5, spirit: 2 } },
+  { id: 'x_berserker_warbrand', name: 'Warbrand Token', emoji: '🔥', slot: 'accessory', rarity: 'rare', allowedClasses: ['berserker'], description: 'Marks each hit with rising fury.', bonus: { strength: 3, vitality: 1 } },
+  { id: 'x_archer_galecrest', name: 'Galecrest Brooch', emoji: '🍃', slot: 'accessory', rarity: 'legendary', allowedClasses: ['archer'], description: 'Keeps rhythm between movement and release.', bonus: { agility: 6, spirit: 2 } },
+  { id: 'x_mage_starseal', name: 'Starseal Prism', emoji: '🔷', slot: 'accessory', rarity: 'epic', allowedClasses: ['mage'], description: 'Condenses unstable mana into clean bursts.', bonus: { intelligence: 4, spirit: 2 } },
+  { id: 'x_monk_tidebead', name: 'Tidebead Charm', emoji: '🌊', slot: 'accessory', rarity: 'rare', allowedClasses: ['monk'], description: 'Stabilizes cadence under pressure.', bonus: { spirit: 3, vitality: 1 } },
 ];
 
 export function getEquipmentItem(id: string): EquipmentItem | undefined {
@@ -708,8 +723,44 @@ export const RANK_CONFIGS: RankConfig[] = [
   { rankNumber: 10, shardCostToRankUp: 1000, statMultiplier: 1.45 },
 ];
 
+const RARITY_RANK_COST_MULT: Record<Rarity, number> = {
+  common: 1.0,
+  uncommon: 1.25,
+  rare: 1.7,
+  epic: 2.45,
+  legendary: 3.7,
+  mythic: 5.3,
+  godly: 7.8,
+};
+
+const RARITY_RANK_POWER_MULT: Record<Rarity, number> = {
+  common: 0.9,
+  uncommon: 1.0,
+  rare: 1.12,
+  epic: 1.28,
+  legendary: 1.48,
+  mythic: 1.72,
+  godly: 2.05,
+};
+
 export function getRankConfig(rank: number): RankConfig | null {
   return RANK_CONFIGS.find(r => r.rankNumber === rank) ?? null;
+}
+
+export function getRankUpShardCost(rarity: Rarity, targetRank: number): number {
+  const cfg = getRankConfig(targetRank);
+  if (!cfg) return Number.MAX_SAFE_INTEGER;
+  const rarityMult = RARITY_RANK_COST_MULT[rarity] ?? 1;
+  const progressiveMult = 1 + Math.pow(Math.max(0, targetRank - 1), 1.15) * 0.08;
+  return Math.ceil(cfg.shardCostToRankUp * rarityMult * progressiveMult);
+}
+
+export function getRankStatMultiplier(rank: number, rarity: Rarity): number {
+  const r = Math.max(1, rank);
+  const rarityPower = RARITY_RANK_POWER_MULT[rarity] ?? 1;
+  const additiveGrowth = (r - 1) * 0.015 * rarityPower;
+  const acceleratedGrowth = Math.pow(r - 1, 1.22) * 0.018 * rarityPower;
+  return Number((1 + additiveGrowth + acceleratedGrowth).toFixed(4));
 }
 
 // Calculate shards earned when recycling a hero
@@ -744,6 +795,21 @@ export const HERO_POOL: HeroTemplate[] = [
   { id: 'h13', name: 'Nyx Whisperleaf', heroClass: 'archer', emoji: '🌿', passiveTrait: 'fortune_hunter', activeSkillArchetype: 'burst_volley', baseTeamBoost: 0.055 },
   { id: 'h14', name: 'Vex Starchant', heroClass: 'mage', emoji: '✨', passiveTrait: 'sage_instinct', activeSkillArchetype: 'mending_pulse', baseTeamBoost: 0.07 },
   { id: 'h15', name: 'Tarin Sunstep', heroClass: 'monk', emoji: '☀️', passiveTrait: 'sage_instinct', activeSkillArchetype: 'battle_chant', baseTeamBoost: 0.06 },
+  { id: 'h16', name: 'Orin Bastionforge', heroClass: 'warrior', emoji: '🧱', passiveTrait: 'bulwark_instinct', activeSkillArchetype: 'frontline_ward', baseTeamBoost: 0.058 },
+  { id: 'h17', name: 'Selene Ironbanner', heroClass: 'warrior', emoji: '🚩', passiveTrait: 'fortune_hunter', activeSkillArchetype: 'battle_chant', baseTeamBoost: 0.062 },
+  { id: 'h18', name: 'Varric Doomhowl', heroClass: 'berserker', emoji: '🐺', passiveTrait: 'warpath_instinct', activeSkillArchetype: 'battle_chant', baseTeamBoost: 0.068 },
+  { id: 'h19', name: 'Morga Chainstorm', heroClass: 'berserker', emoji: '⛓️', passiveTrait: 'bulwark_instinct', activeSkillArchetype: 'burst_volley', baseTeamBoost: 0.057 },
+  { id: 'h20', name: 'Aela Windpierce', heroClass: 'archer', emoji: '🦅', passiveTrait: 'fortune_hunter', activeSkillArchetype: 'burst_volley', baseTeamBoost: 0.061 },
+  { id: 'h21', name: 'Kestrel Moonshot', heroClass: 'archer', emoji: '🌙', passiveTrait: 'warpath_instinct', activeSkillArchetype: 'frontline_ward', baseTeamBoost: 0.058 },
+  { id: 'h22', name: 'Seris Riftborn', heroClass: 'mage', emoji: '🌀', passiveTrait: 'sage_instinct', activeSkillArchetype: 'burst_volley', baseTeamBoost: 0.071 },
+  { id: 'h23', name: 'Noctis Emberveil', heroClass: 'mage', emoji: '🌌', passiveTrait: 'warpath_instinct', activeSkillArchetype: 'mending_pulse', baseTeamBoost: 0.066 },
+  { id: 'h24', name: 'Korin Stillwater', heroClass: 'monk', emoji: '🌊', passiveTrait: 'sage_instinct', activeSkillArchetype: 'mending_pulse', baseTeamBoost: 0.063 },
+  { id: 'h25', name: 'Maeve Stormpalm', heroClass: 'monk', emoji: '⚡', passiveTrait: 'bulwark_instinct', activeSkillArchetype: 'battle_chant', baseTeamBoost: 0.064 },
+  { id: 'h26', name: 'Gideon Flamecrest', heroClass: 'warrior', emoji: '🔥', passiveTrait: 'warpath_instinct', activeSkillArchetype: 'frontline_ward', baseTeamBoost: 0.06 },
+  { id: 'h27', name: 'Rook Ashrender', heroClass: 'berserker', emoji: '💀', passiveTrait: 'warpath_instinct', activeSkillArchetype: 'burst_volley', baseTeamBoost: 0.067 },
+  { id: 'h28', name: 'Lyra Starquill', heroClass: 'archer', emoji: '⭐', passiveTrait: 'sage_instinct', activeSkillArchetype: 'burst_volley', baseTeamBoost: 0.06 },
+  { id: 'h29', name: 'Eldrin Palefire', heroClass: 'mage', emoji: '🕯️', passiveTrait: 'fortune_hunter', activeSkillArchetype: 'mending_pulse', baseTeamBoost: 0.065 },
+  { id: 'h30', name: 'Jin Hollowreed', heroClass: 'monk', emoji: '🎋', passiveTrait: 'sage_instinct', activeSkillArchetype: 'frontline_ward', baseTeamBoost: 0.062 },
 ];
 
 export const MAX_EQUIPPED_HEROES = 5;
@@ -953,26 +1019,143 @@ export interface Achievement {
   name: string;
   description: string;
   emoji: string;
-  condition: (s: {
-    totalGold: number;
-    totalKills: number;
-    wave: number;
-    level: number;
-    prestigeCount: number;
-    totalSummons: number;
-    equippedCount: number;
-  }) => boolean;
+  condition: (s: AchievementContext) => boolean;
+}
+
+export interface AchievementContext {
+  totalGold: number;
+  totalKills: number;
+  wave: number;
+  highestWaveReached: number;
+  level: number;
+  prestigeCount: number;
+  totalSummons: number;
+  equippedCount: number;
+  heroRosterCount: number;
+  heroShards: number;
+  essence: number;
+  unlockedCount: number;
+  dailyLoginStreak: number;
 }
 
 export const ACHIEVEMENTS: Achievement[] = [
   { id: 'first_blood', name: 'First Blood', description: 'Defeat your first monster.', emoji: '🗡️', condition: s => s.totalKills >= 1 },
+  { id: 'kills_25', name: 'Skirmisher', description: 'Defeat 25 monsters.', emoji: '⚔️', condition: s => s.totalKills >= 25 },
   { id: 'kills_100', name: 'Monster Slayer', description: 'Defeat 100 monsters.', emoji: '☠️', condition: s => s.totalKills >= 100 },
+  { id: 'kills_500', name: 'Warpath', description: 'Defeat 500 monsters.', emoji: '🩸', condition: s => s.totalKills >= 500 },
+  { id: 'kills_2500', name: 'Apex Exterminator', description: 'Defeat 2,500 monsters.', emoji: '💀', condition: s => s.totalKills >= 2500 },
+  { id: 'wave_10', name: 'Gatebreaker', description: 'Reach wave 10.', emoji: '🚪', condition: s => s.wave >= 10 },
+  { id: 'wave_25', name: 'Frontline Surge', description: 'Reach wave 25.', emoji: '🌊', condition: s => s.wave >= 25 },
   { id: 'wave_50', name: 'Veteran Front', description: 'Reach wave 50.', emoji: '⚔️', condition: s => s.wave >= 50 },
+  { id: 'wave_100', name: 'Century Siege', description: 'Reach wave 100.', emoji: '🏰', condition: s => s.wave >= 100 },
+  { id: 'wave_250', name: 'Storm Marshal', description: 'Reach wave 250.', emoji: '🌩️', condition: s => s.wave >= 250 },
+  { id: 'level_10', name: 'Battle-Hardened', description: 'Reach level 10.', emoji: '🛡️', condition: s => s.level >= 10 },
   { id: 'level_25', name: 'Ascendant', description: 'Reach hero level 25.', emoji: '⭐', condition: s => s.level >= 25 },
+  { id: 'level_50', name: 'Myth Forged', description: 'Reach level 50.', emoji: '🌟', condition: s => s.level >= 50 },
+  { id: 'gold_100k', name: 'Coin Current', description: 'Earn 100,000 total gold.', emoji: '🪙', condition: s => s.totalGold >= 100_000 },
   { id: 'gold_1m', name: 'Gold Baron', description: 'Earn 1,000,000 total gold.', emoji: '💰', condition: s => s.totalGold >= 1_000_000 },
+  { id: 'gold_10m', name: 'Imperial Treasury', description: 'Earn 10,000,000 total gold.', emoji: '🏦', condition: s => s.totalGold >= 10_000_000 },
+  { id: 'summon_1', name: 'Recruitment Opened', description: 'Summon your first hero.', emoji: '📯', condition: s => s.totalSummons >= 1 },
   { id: 'summon_10', name: 'Collector', description: 'Summon 10 heroes.', emoji: '🎴', condition: s => s.totalSummons >= 10 },
+  { id: 'summon_50', name: 'Warband Architect', description: 'Summon 50 heroes.', emoji: '🧬', condition: s => s.totalSummons >= 50 },
+  { id: 'summon_200', name: 'Legion Broker', description: 'Summon 200 heroes.', emoji: '👑', condition: s => s.totalSummons >= 200 },
+  { id: 'roster_12', name: 'Field Locker', description: 'Own 12 heroes at once.', emoji: '🗃️', condition: s => s.heroRosterCount >= 12 },
+  { id: 'roster_30', name: 'Banner Hall', description: 'Own 30 heroes at once.', emoji: '🏳️', condition: s => s.heroRosterCount >= 30 },
   { id: 'equip_5', name: 'Dream Team', description: 'Equip 4 heroes.', emoji: '🧩', condition: s => s.equippedCount >= 4 },
+  { id: 'shards_1000', name: 'Shard Banker', description: 'Hold 1,000 hero shards at once.', emoji: '💎', condition: s => s.heroShards >= 1000 },
+  { id: 'essence_25', name: 'Essence Channel', description: 'Own 25 essence.', emoji: '🜂', condition: s => s.essence >= 25 },
+  { id: 'unlocks_3', name: 'Relic Keeper', description: 'Unlock all current permanent unlocks.', emoji: '🔓', condition: s => s.unlockedCount >= 3 },
+  { id: 'streak_7', name: 'Habit of Steel', description: 'Reach a 7-day login streak.', emoji: '📅', condition: s => s.dailyLoginStreak >= 7 },
   { id: 'rebirth_1', name: 'Reborn', description: 'Complete your first Rebirth.', emoji: '♾️', condition: s => s.prestigeCount >= 1 },
+  { id: 'rebirth_5', name: 'Soul Cycler', description: 'Complete 5 Rebirths.', emoji: '🌀', condition: s => s.prestigeCount >= 5 },
+  { id: 'rebirth_15', name: 'Eternal Cadence', description: 'Complete 15 Rebirths.', emoji: '🌌', condition: s => s.prestigeCount >= 15 },
+  { id: 'highest_wave_300', name: 'Last Bastion', description: 'Reach highest wave 300 in any run.', emoji: '🧱', condition: s => s.highestWaveReached >= 300 },
+  { id: 'legend_slate', name: 'Legend Slate', description: 'Unlock 20 achievements.', emoji: '📜', condition: s => s.unlockedCount >= 20 },
+];
+
+export interface StoryBeat {
+  id: string;
+  chapter: string;
+  title: string;
+  body: string;
+  unlockWave: number;
+  unlockPrestige?: number;
+}
+
+export const STORY_BEATS: StoryBeat[] = [
+  {
+    id: 'prologue_ash',
+    chapter: 'Prologue',
+    title: 'Ashen Signal',
+    body: 'The frontier beacons relight after years of silence. Your command seal activates and old war machines answer your name.',
+    unlockWave: 1,
+  },
+  {
+    id: 'chapter_1_raiders',
+    chapter: 'Chapter I',
+    title: 'The Raider Accord',
+    body: 'Scattered clans rally under a red standard. Every wave you clear denies their pact another foothold.',
+    unlockWave: 10,
+  },
+  {
+    id: 'chapter_2_verdant',
+    chapter: 'Chapter II',
+    title: 'Roots of the Citadel',
+    body: 'Ancient gardens overrun the old roads. Beneath the vines, imperial vault doors begin to open on their own.',
+    unlockWave: 20,
+  },
+  {
+    id: 'chapter_3_glass',
+    chapter: 'Chapter III',
+    title: 'Glass and Oathfire',
+    body: 'The crystal city fractures from within. Echoes of the first dynasty demand tribute in blood, gold, and memory.',
+    unlockWave: 30,
+  },
+  {
+    id: 'chapter_4_storm',
+    chapter: 'Chapter IV',
+    title: 'Storm Court',
+    body: 'A council of storm captains crowns a false sovereign. Their fleets ride lightning across the abyss horizon.',
+    unlockWave: 40,
+  },
+  {
+    id: 'chapter_5_crownfall',
+    chapter: 'Chapter V',
+    title: 'Crownfall Depths',
+    body: 'Sunken throne-ships awaken below black tide. Every captain you defeat restores one lost imperial oath.',
+    unlockWave: 50,
+  },
+  {
+    id: 'chapter_6_eclipse',
+    chapter: 'Chapter VI',
+    title: 'Eternal Eclipse',
+    body: 'Daylight dies over the campaign line. Your banner is now one of the final symbols of lawful command.',
+    unlockWave: 60,
+  },
+  {
+    id: 'ascension_first',
+    chapter: 'Ascension',
+    title: 'Rebirth Protocol',
+    body: 'Death no longer closes the ledger. You begin rewriting fate through controlled collapse and rebirth cores.',
+    unlockWave: 100,
+    unlockPrestige: 1,
+  },
+  {
+    id: 'ascension_empire',
+    chapter: 'Ascension',
+    title: 'Dynasty Engine',
+    body: 'Your cycles form a war-dynasty. Heroes no longer fight for survival alone, but for succession across eras.',
+    unlockWave: 180,
+    unlockPrestige: 5,
+  },
+  {
+    id: 'finale_voidthrone',
+    chapter: 'Finale',
+    title: 'The Empty Throne',
+    body: 'At the edge of eclipse, one throne remains unclaimed. The cults, captains, and dynasts now turn toward you.',
+    unlockWave: 300,
+    unlockPrestige: 10,
+  },
 ];
 
 export const COST_SCALE = 1.15;
