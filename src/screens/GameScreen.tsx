@@ -95,6 +95,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setAutoRecycleMaxRarity,
     setAutoRecycleEnabled,
     toggleEquipHero,
+    setHeroFormation,
     allocateStat,
     allocateStatMax,
     equipItem,
@@ -140,8 +141,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [equipmentSubTab, setEquipmentSubTab] = useState<EquipmentSubTab>('inventory');
   const [achievementsSubTab, setAchievementsSubTab] = useState<AchievementsSubTab>('overview');
   const [eventsOpen, setEventsOpen] = useState(false);
-  const [heroFormation, setHeroFormation] = useState<Record<string, 'front' | 'mid' | 'back'>>({});
   const [compareItemId, setCompareItemId] = useState<string | null>(null);
+  const [momentCue, setMomentCue] = useState<'none' | 'mythic' | 'boss' | 'rebirth'>('none');
   const [warPanels, setWarPanels] = useState({
     frontline: true,
     roster: true,
@@ -290,6 +291,17 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     return () => clearTimeout(timer);
   }, [rewardPopup, clearRewardPopup]);
 
+  useEffect(() => {
+    if (!rewardPopup) return;
+    const t = `${rewardPopup.title} ${rewardPopup.detail}`.toLowerCase();
+    if (t.includes('mythic drop')) setMomentCue('mythic');
+    else if (t.includes('boss defeated')) setMomentCue('boss');
+    else if (t.includes('rebirth complete') || t.includes('shockwave')) setMomentCue('rebirth');
+    else return;
+    const timer = setTimeout(() => setMomentCue('none'), 900);
+    return () => clearTimeout(timer);
+  }, [rewardPopup]);
+
   const onTabChange = (nextTab: Tab) => {
     setTab(nextTab);
     const eventMap: Record<Tab, TutorialEvent | null> = {
@@ -339,9 +351,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     });
   };
 
-  const seasonScore = (state.wave * 10) + ((state.prestigeCount ?? 0) * 500);
+  const seasonScore = state.seasonPoints;
   const seasonRank = seasonScore < 1000 ? '🥉 Bronze' : seasonScore < 5000 ? '🥈 Silver' : seasonScore < 15000 ? '🥇 Gold' : seasonScore < 40000 ? '💎 Diamond' : '👑 Legend';
-  const classMasteryLevel = Math.floor(state.wave / 100);
+  const classMasteryLevel = Math.floor((state.playerClass ? state.classMasteryXp[state.playerClass] : 0) / 100);
   const prestige1Done = (state.prestigeCount ?? 0) >= 1;
   const prestige5Done = (state.prestigeCount ?? 0) >= 5;
   const prestige10Done = (state.prestigeCount ?? 0) >= 10;
@@ -405,6 +417,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         <View style={styles.sceneOrbB} />
         <View style={styles.sceneGrid} />
       </View>
+      {momentCue !== 'none' && (
+        <View pointerEvents="none" style={[
+          styles.momentCueOverlay,
+          momentCue === 'mythic' ? styles.momentCueMythic : momentCue === 'boss' ? styles.momentCueBoss : styles.momentCueRebirth,
+        ]}>
+          <Text style={styles.momentCueText}>{momentCue === 'mythic' ? 'MYTHIC' : momentCue === 'boss' ? 'BOSS DOWN' : 'REBIRTH'}</Text>
+        </View>
+      )}
 
       {/* Header */}
       <View style={styles.header}>
@@ -599,15 +619,15 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     </View>
                     <Pressable
                       style={styles.formationBadge}
-                      onPress={() => setHeroFormation(prev => {
+                      onPress={() => {
                         const roles: Array<'front' | 'mid' | 'back'> = ['front', 'mid', 'back'];
-                        const cur = prev[heroId] ?? 'front';
+                        const cur = state.heroFormationByUid[heroId] ?? (hero.heroClass === 'warrior' || hero.heroClass === 'berserker' ? 'front' : hero.heroClass === 'archer' || hero.heroClass === 'mage' ? 'back' : 'mid');
                         const next = roles[(roles.indexOf(cur) + 1) % roles.length];
-                        return { ...prev, [heroId]: next };
-                      })}
+                        setHeroFormation(heroId, next);
+                      }}
                     >
                       <Text style={styles.formationBadgeText}>
-                        {(heroFormation[heroId] ?? 'front') === 'front' ? '🛡️ Front' : (heroFormation[heroId] ?? 'mid') === 'mid' ? '⚔️ Mid' : '🏹 Back'}
+                        {(state.heroFormationByUid[heroId] ?? (hero.heroClass === 'warrior' || hero.heroClass === 'berserker' ? 'front' : hero.heroClass === 'archer' || hero.heroClass === 'mage' ? 'back' : 'mid')) === 'front' ? '🛡️ Front' : (state.heroFormationByUid[heroId] ?? 'mid') === 'mid' ? '⚔️ Mid' : '🏹 Back'}
                       </Text>
                     </Pressable>
                   </View>
@@ -1397,11 +1417,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
             <View style={styles.masteryCard}>
               <Text style={styles.masteryTitle}>⚡ Class Mastery: {stats.className}</Text>
-              <Text style={styles.masteryLevel}>Mastery Level {classMasteryLevel} <Text style={styles.masteryLevelSub}>(1 level per 100 waves)</Text></Text>
+              <Text style={styles.masteryLevel}>Mastery Level {classMasteryLevel} <Text style={styles.masteryLevelSub}>(1 level per 100 mastery XP)</Text></Text>
               <View style={styles.hpBarBg}>
-                <View style={[styles.hpBarFill, { width: `${(state.wave % 100)}%`, backgroundColor: '#7BD9A8' }]} />
+                <View style={[styles.hpBarFill, { width: `${((state.playerClass ? state.classMasteryXp[state.playerClass] : 0) % 100)}%`, backgroundColor: '#7BD9A8' }]} />
               </View>
-              <Text style={styles.masteryHint}>{state.wave % 100}/100 waves to next level</Text>
+              <Text style={styles.masteryHint}>{(state.playerClass ? state.classMasteryXp[state.playerClass] : 0) % 100}/100 mastery XP to next level</Text>
               {[
                 { lvl: 1, perk: '+10% class stat bonus', done: classMasteryLevel >= 1 },
                 { lvl: 5, perk: '+5% gold gains', done: classMasteryLevel >= 5 },
@@ -1786,11 +1806,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <View style={styles.eventsCard}>
                 <Text style={styles.eventsCardTitle}>🔥 Login Streak</Text>
                 <Text style={styles.eventsStatLine}>Current Streak: {state.dailyLoginStreak ?? 0} days</Text>
-                <Text style={styles.eventsStatLine}>Streak Insurance: Active — miss 1 day without penalty</Text>
+                <Text style={styles.eventsStatLine}>Streak Insurance Charges: {state.streakInsuranceCharges}</Text>
                 <View style={styles.hpBarBg}>
                   <View style={[styles.hpBarFill, { width: `${Math.min(100, ((state.dailyLoginStreak ?? 0) / 30) * 100)}%`, backgroundColor: '#FFB347' }]} />
                 </View>
-                <Text style={styles.eventsHint}>{Math.max(0, 30 - (state.dailyLoginStreak ?? 0))} days to streak milestone (30 days)</Text>
+                <Text style={styles.eventsHint}>{Math.max(0, 30 - (state.dailyLoginStreak ?? 0))} days to streak milestone (30 days). Gain +1 insurance every 7-day streak.</Text>
               </View>
 
               {/* Daily Quest Chain */}
@@ -1835,6 +1855,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <View style={styles.eventsCard}>
                 <Text style={styles.eventsCardTitle}>🏆 Season Ladder</Text>
                 <Text style={styles.eventsSubtitle}>Season score: {fmt(seasonScore)} pts</Text>
+                <Text style={styles.eventsStatLine}>Best this season: {fmt(state.bestSeasonPoints)} pts</Text>
                 <Text style={[styles.seasonRankBadge]}>{seasonRank}</Text>
                 <Text style={styles.eventsHint}>Score based on wave progression + rebirths. Top ranks earn cosmetic banners at season end.</Text>
                 {[
@@ -2060,6 +2081,30 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#1A2A34',
     opacity: 0.2,
+  },
+  momentCueOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  momentCueMythic: {
+    backgroundColor: 'rgba(130, 60, 10, 0.28)',
+  },
+  momentCueBoss: {
+    backgroundColor: 'rgba(120, 10, 18, 0.25)',
+  },
+  momentCueRebirth: {
+    backgroundColor: 'rgba(255, 90, 138, 0.22)',
+  },
+  momentCueText: {
+    fontSize: 28,
+    color: '#FFF4D6',
+    fontWeight: '800',
+    letterSpacing: 2,
+    textShadowColor: '#000',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
   },
 
   // Character Creation

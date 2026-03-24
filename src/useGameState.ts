@@ -81,6 +81,8 @@ interface SummonHistoryEntry {
   pityTriggered: boolean;
 }
 
+type HeroFormationRole = 'front' | 'mid' | 'back';
+
 const ACHIEVEMENT_BONUS_PER_UNLOCK = 0.03;
 const ACHIEVEMENT_BONUS_CAP = 0.75;
 
@@ -123,8 +125,13 @@ export interface GameState {
   gachaPityCounter: number;
   summonHistory: SummonHistoryEntry[];
   teamLoadouts: string[][];
+  heroFormationByUid: Record<string, HeroFormationRole>;
+  classMasteryXp: Record<PlayerClass, number>;
+  seasonPoints: number;
+  bestSeasonPoints: number;
   dailyLoginStreak: number;
   lastDailyLoginDay: number | null;
+  streakInsuranceCharges: number;
   weeklyEventWeek: number;
   weeklyEventId: string;
   weeklyKills: number;
@@ -215,8 +222,19 @@ const DEFAULT_STATE: GameState = {
   gachaPityCounter: 0,
   summonHistory: [],
   teamLoadouts: [[], [], []],
+  heroFormationByUid: {},
+  classMasteryXp: {
+    warrior: 0,
+    berserker: 0,
+    archer: 0,
+    mage: 0,
+    monk: 0,
+  },
+  seasonPoints: 0,
+  bestSeasonPoints: 0,
   dailyLoginStreak: 0,
   lastDailyLoginDay: null,
+  streakInsuranceCharges: 1,
   weeklyEventWeek: weekNumberForTimestamp(Date.now()),
   weeklyEventId: getWeeklyEventForTimestamp(Date.now()).id,
   weeklyKills: 0,
@@ -367,6 +385,47 @@ function getTeamHeroBoost(state: GameState): number {
   return state.heroRoster
     .filter(h => activeTeam.has(h.uid))
     .reduce((sum, h) => sum + h.teamBoost, 0);
+}
+
+function getClassMasteryLevel(state: GameState, playerClass: PlayerClass | null): number {
+  if (!playerClass) return 0;
+  const xp = state.classMasteryXp[playerClass] ?? 0;
+  return Math.floor(xp / 100);
+}
+
+function defaultFormationForClass(playerClass: PlayerClass): HeroFormationRole {
+  if (playerClass === 'warrior' || playerClass === 'berserker') return 'front';
+  if (playerClass === 'mage' || playerClass === 'archer') return 'back';
+  return 'mid';
+}
+
+function getFormationRoleForHero(state: GameState, hero: HeroUnit): HeroFormationRole {
+  return state.heroFormationByUid[hero.uid] ?? defaultFormationForClass(hero.heroClass);
+}
+
+function getFormationMultipliers(state: GameState): {
+  dpsMult: number;
+  hpMult: number;
+  incomingMult: number;
+} {
+  const active = new Set(state.activeTeamHeroIds);
+  let front = 0;
+  let mid = 0;
+  let back = 0;
+
+  for (const hero of state.heroRoster) {
+    if (!active.has(hero.uid)) continue;
+    const role = getFormationRoleForHero(state, hero);
+    if (role === 'front') front += 1;
+    else if (role === 'mid') mid += 1;
+    else back += 1;
+  }
+
+  const dpsMult = 1 + (mid * 0.02) + (back * 0.035);
+  const hpMult = 1 + (front * 0.05) + (mid * 0.015);
+  const incomingMult = Math.max(0.74, 1 - (front * 0.05) - (mid * 0.01));
+
+  return { dpsMult, hpMult, incomingMult };
 }
 
 function rarityRank(rarity: Rarity): number {
@@ -651,7 +710,10 @@ function getTeamMaxHp(state: GameState): number {
   }
 
   const survivalMult = getMetaSurvivalMultiplier(state);
-  return Math.ceil(maxHp * survivalMult * getRebirthSurvivalMultiplier(state));
+  const formation = getFormationMultipliers(state);
+  const masteryLevel = getClassMasteryLevel(state, state.playerClass);
+  const masteryHpMult = 1 + Math.min(0.25, Math.floor(masteryLevel / 4) * 0.02);
+  return Math.ceil(maxHp * survivalMult * getRebirthSurvivalMultiplier(state) * formation.hpMult * masteryHpMult);
 }
 
 function getTeamDefense(state: GameState): number {
@@ -670,7 +732,8 @@ function getTeamDefense(state: GameState): number {
     }
   }
 
-  return Math.max(0, defense * getMetaSurvivalMultiplier(state) * getRebirthSurvivalMultiplier(state));
+  const formation = getFormationMultipliers(state);
+  return Math.max(0, defense * getMetaSurvivalMultiplier(state) * getRebirthSurvivalMultiplier(state) * formation.hpMult);
 }
 
 function getDps(state: GameState): number {
@@ -707,6 +770,9 @@ function getDps(state: GameState): number {
   const classPassiveMult = hasUnlock(state, 'class_passive') && passive ? passive.dpsMultiplier : 1;
   const heroPassive = getHeroPassiveMultipliers(state);
   const activeBuffMult = 1 + state.damageBuffPct;
+  const formation = getFormationMultipliers(state);
+  const masteryLevel = getClassMasteryLevel(state, state.playerClass);
+  const masteryDpsMult = 1 + Math.min(0.4, masteryLevel * 0.01);
   const totalDps = (playerDps + heroDps)
     * rebirthMult
     * getAchievementBonusMultiplier(state)
@@ -714,6 +780,8 @@ function getDps(state: GameState): number {
     * getRebirthDamageMultiplier(state)
     * classPassiveMult
     * heroPassive.dpsMult
+    * formation.dpsMult
+    * masteryDpsMult
     * activeBuffMult;
   return Math.max(1, totalDps);
 }
@@ -1025,7 +1093,9 @@ function killMonster(state: GameState): GameState {
   const achievementMult = getAchievementBonusMultiplier(state);
   const economyMult = getMetaEconomyMultiplier(state);
   const heroPassive = getHeroPassiveMultipliers(state);
-  const goldReward = Math.ceil(getMonsterGold(state.wave) * Math.pow(REBIRTH_BONUS, state.prestigeCount) * achievementMult * affix.goldMult * economyMult * getRebirthEconomyMultiplier(state) * heroPassive.goldMult * weekly.goldMultiplier);
+  const masteryLevel = getClassMasteryLevel(state, state.playerClass);
+  const masteryEconomyMult = 1 + Math.min(0.25, Math.floor(masteryLevel / 5) * 0.01);
+  const goldReward = Math.ceil(getMonsterGold(state.wave) * Math.pow(REBIRTH_BONUS, state.prestigeCount) * achievementMult * affix.goldMult * economyMult * getRebirthEconomyMultiplier(state) * heroPassive.goldMult * masteryEconomyMult * weekly.goldMultiplier);
   const expReward = Math.ceil(getMonsterExp(state.wave) * achievementMult * affix.expMult * heroPassive.expMult * weekly.expMultiplier);
   const lvl = processLevelUp(state.exp + expReward, state.level);
   const isBoss = state.wave % 10 === 0;
@@ -1057,6 +1127,8 @@ function killMonster(state: GameState): GameState {
     unspentStatPoints: state.unspentStatPoints + lvl.gainedLevels * STAT_POINTS_PER_LEVEL,
     totalKills: state.totalKills + 1,
     weeklyKills: state.weeklyKills + 1,
+    seasonPoints: state.seasonPoints + 12 + (isBoss ? 80 : 0),
+    bestSeasonPoints: Math.max(state.bestSeasonPoints, state.seasonPoints + 12 + (isBoss ? 80 : 0)),
     wave: newWave,
     monsterHp: nextMaxHp,
     monsterMaxHp: nextMaxHp,
@@ -1064,6 +1136,28 @@ function killMonster(state: GameState): GameState {
     teamMaxHp: newTeamMaxHp,
     heroRoster: updatedRoster,
   };
+
+  if (state.playerClass) {
+    const gain = isBoss ? 8 : 2;
+    const nextXp = (newState.classMasteryXp[state.playerClass] ?? 0) + gain;
+    const prevLevel = Math.floor((newState.classMasteryXp[state.playerClass] ?? 0) / 100);
+    const nextLevel = Math.floor(nextXp / 100);
+    newState = {
+      ...newState,
+      classMasteryXp: {
+        ...newState.classMasteryXp,
+        [state.playerClass]: nextXp,
+      },
+    };
+    if (nextLevel > prevLevel) {
+      newState = queueReward(newState, {
+        id: `mastery_${state.playerClass}_${Date.now()}`,
+        kind: 'system',
+        title: `${getClassConfig(state.playerClass).name} Mastery Up`,
+        detail: `Mastery Lv ${nextLevel}`,
+      });
+    }
+  }
   newState = queueCombatLog(newState, `Defeated ${getMonsterForWave(state.wave).name} • +${goldReward} gold +${expReward} EXP (${weekly.name})`);
 
   // Grant one free summon charge on first kill.
@@ -1101,6 +1195,14 @@ function killMonster(state: GameState): GameState {
           detail: `${equipmentRarityConfig(item.rarity).label} ${item.slot}`,
         });
         newState = queueCombatLog(newState, `Loot drop: ${item.emoji} ${item.name}`);
+        if (item.rarity === 'mythic') {
+          newState = queueReward(newState, {
+            id: `mythic_flash_${Date.now()}`,
+            kind: 'system',
+            title: 'MYTHIC DROP!',
+            detail: `${item.emoji} ${item.name} • Arc flash triggered`,
+          });
+        }
       } else {
         const duplicateScrap = equipmentScrapValue(item.rarity) + Math.floor(state.wave * 0.4);
         newState = queueReward({
@@ -1135,6 +1237,12 @@ function killMonster(state: GameState): GameState {
   }
 
   if (isBoss) {
+    newState = queueReward(newState, {
+      id: `boss_stinger_${Date.now()}`,
+      kind: 'system',
+      title: 'Boss Defeated',
+      detail: `${act.emoji} ${act.name} collapsed • Stinger triggered`,
+    });
     const unlock = getBossUnlockForWave(state.wave);
     if (unlock && !newState.permanentUnlocks.includes(unlock)) {
       newState = queueReward({
@@ -1205,6 +1313,7 @@ type Action =
   | { type: 'LOAD_TEAM_LOADOUT'; slot: number }
   | { type: 'TOGGLE_EQUIP_HERO'; uid: string }
   | { type: 'SET_ACTIVE_TEAM'; heroIds: string[] }
+  | { type: 'SET_HERO_FORMATION'; uid: string; role: HeroFormationRole }
   | { type: 'RECYCLE_HERO'; uid: string }
   | { type: 'AUTO_RECYCLE_HEROES' }
   | { type: 'SET_AUTO_RECYCLE_MAX_RARITY'; rarity: Rarity }
@@ -1290,11 +1399,13 @@ function reducer(state: GameState, action: Action): GameState {
         ? passive.incomingDamageMultiplier
         : 1;
       const heroPassive = getHeroPassiveMultipliers(working);
+      const formation = getFormationMultipliers(working);
       const activeReductionMult = 1 - Math.max(0, Math.min(0.7, working.damageReductionBuffPct));
       const actualEnemyDamage = enemyDmg
         * (1 - damageReduction)
         * passiveIncomingMult
         * heroPassive.incomingDmgMult
+        * formation.incomingMult
         * activeReductionMult
         * (action.elapsed / 1000);
       const teamHp = working.teamHp - actualEnemyDamage;
@@ -1896,7 +2007,9 @@ function reducer(state: GameState, action: Action): GameState {
 
       const seconds = Math.floor(elapsed / 1000);
       const achievementMult = getAchievementBonusMultiplier(state);
-      const goldGain = Math.floor(getMonsterGold(state.wave) * 0.35 * seconds * achievementMult * getMetaEconomyMultiplier(state) * getRebirthEconomyMultiplier(state));
+      const masteryLevel = getClassMasteryLevel(state, state.playerClass);
+      const masteryEconomyMult = 1 + Math.min(0.25, Math.floor(masteryLevel / 5) * 0.01);
+      const goldGain = Math.floor(getMonsterGold(state.wave) * 0.35 * seconds * achievementMult * getMetaEconomyMultiplier(state) * getRebirthEconomyMultiplier(state) * masteryEconomyMult);
       const expGain = Math.floor(getMonsterExp(state.wave) * 0.22 * seconds * achievementMult);
       const lvl = processLevelUp(state.exp + expGain, state.level);
 
@@ -1923,11 +2036,15 @@ function reducer(state: GameState, action: Action): GameState {
       const today = toDayNumber(action.nowMs);
       if (state.lastDailyLoginDay === today) return state;
 
-      const continued = state.lastDailyLoginDay !== null && state.lastDailyLoginDay === today - 1;
+      const daysSinceLast = state.lastDailyLoginDay === null ? null : today - state.lastDailyLoginDay;
+      const usedInsurance = daysSinceLast === 2 && state.streakInsuranceCharges > 0;
+      const continued = (daysSinceLast === 1) || usedInsurance;
       const streak = continued ? state.dailyLoginStreak + 1 : 1;
       const goldReward = 250 + Math.min(9, streak - 1) * 80;
       const shardReward = 20 + Math.min(9, streak - 1) * 6;
       const freeSummonBonus = streak % 3 === 0 ? 1 : 0;
+      const insuranceEarned = streak % 7 === 0 ? 1 : 0;
+      const nextInsurance = Math.min(3, state.streakInsuranceCharges - (usedInsurance ? 1 : 0) + insuranceEarned);
 
       const next = queueReward({
         ...state,
@@ -1937,11 +2054,12 @@ function reducer(state: GameState, action: Action): GameState {
         freeSummonCharges: state.freeSummonCharges + freeSummonBonus,
         dailyLoginStreak: streak,
         lastDailyLoginDay: today,
+        streakInsuranceCharges: nextInsurance,
       }, {
         id: `daily_login_${today}`,
         kind: 'system',
         title: `Daily Login • Day ${streak}`,
-        detail: `+${goldReward} gold, +${shardReward} shards${freeSummonBonus > 0 ? ', +1 free summon' : ''}`,
+        detail: `+${goldReward} gold, +${shardReward} shards${freeSummonBonus > 0 ? ', +1 free summon' : ''}${usedInsurance ? ', streak insurance consumed' : ''}${insuranceEarned > 0 ? ', +1 streak insurance' : ''}`,
       });
 
       return withAchievement(progressTutorial(next));
@@ -1972,12 +2090,14 @@ function reducer(state: GameState, action: Action): GameState {
         damageReductionBuffMs: 0,
         heroActiveCdMs: {},
         lastActiveAt: Date.now(),
+        seasonPoints: state.seasonPoints + 250,
+        bestSeasonPoints: Math.max(state.bestSeasonPoints, state.seasonPoints + 250),
         rebirthCores: state.rebirthCores + gainedCores,
       }, {
         id: `rebirth_cores_${Date.now()}`,
         kind: 'system',
         title: 'Rebirth Complete',
-        detail: `+${gainedCores} rebirth cores`,
+        detail: `+${gainedCores} rebirth cores • shockwave triggered`,
       });
     }
 
@@ -2045,6 +2165,17 @@ function reducer(state: GameState, action: Action): GameState {
       return {
         ...state,
         autoRecycleMaxRarity: action.rarity,
+      };
+    }
+
+    case 'SET_HERO_FORMATION': {
+      if (!state.heroRoster.some(h => h.uid === action.uid)) return state;
+      return {
+        ...state,
+        heroFormationByUid: {
+          ...state.heroFormationByUid,
+          [action.uid]: action.role,
+        },
       };
     }
 
@@ -2215,8 +2346,19 @@ function reducer(state: GameState, action: Action): GameState {
         gachaPityCounter: p.gachaPityCounter ?? 0,
         summonHistory: p.summonHistory ?? [],
         teamLoadouts: p.teamLoadouts ?? [[], [], []],
+        heroFormationByUid: p.heroFormationByUid ?? {},
+        classMasteryXp: {
+          warrior: p.classMasteryXp?.warrior ?? 0,
+          berserker: p.classMasteryXp?.berserker ?? 0,
+          archer: p.classMasteryXp?.archer ?? 0,
+          mage: p.classMasteryXp?.mage ?? 0,
+          monk: p.classMasteryXp?.monk ?? 0,
+        },
+        seasonPoints: p.seasonPoints ?? 0,
+        bestSeasonPoints: p.bestSeasonPoints ?? 0,
         dailyLoginStreak: p.dailyLoginStreak ?? 0,
         lastDailyLoginDay: p.lastDailyLoginDay ?? null,
+        streakInsuranceCharges: p.streakInsuranceCharges ?? 1,
         weeklyEventWeek: p.weeklyEventWeek ?? weekNumberForTimestamp(Date.now()),
         weeklyEventId: p.weeklyEventId ?? getWeeklyEventForTimestamp(Date.now()).id,
         weeklyKills: p.weeklyKills ?? 0,
@@ -2300,8 +2442,13 @@ interface SaveData {
   gachaPityCounter: number;
   summonHistory: SummonHistoryEntry[];
   teamLoadouts: string[][];
+  heroFormationByUid: Record<string, HeroFormationRole>;
+  classMasteryXp: Record<PlayerClass, number>;
+  seasonPoints: number;
+  bestSeasonPoints: number;
   dailyLoginStreak: number;
   lastDailyLoginDay: number | null;
+  streakInsuranceCharges: number;
   weeklyEventWeek: number;
   weeklyEventId: string;
   weeklyKills: number;
@@ -2377,8 +2524,13 @@ function serialize(state: GameState): SaveData {
     gachaPityCounter: state.gachaPityCounter,
     summonHistory: state.summonHistory,
     teamLoadouts: state.teamLoadouts,
+    heroFormationByUid: state.heroFormationByUid,
+    classMasteryXp: state.classMasteryXp,
+    seasonPoints: state.seasonPoints,
+    bestSeasonPoints: state.bestSeasonPoints,
     dailyLoginStreak: state.dailyLoginStreak,
     lastDailyLoginDay: state.lastDailyLoginDay,
+    streakInsuranceCharges: state.streakInsuranceCharges,
     weeklyEventWeek: state.weeklyEventWeek,
     weeklyEventId: state.weeklyEventId,
     weeklyKills: state.weeklyKills,
@@ -2495,6 +2647,9 @@ export function useGameState(saveSlot: string = 'default') {
   const loadTeamLoadout = useCallback((slot: number) => dispatch({ type: 'LOAD_TEAM_LOADOUT', slot }), []);
   const toggleEquipHero = useCallback((uid: string) => dispatch({ type: 'TOGGLE_EQUIP_HERO', uid }), []);
   const setActiveTeam = useCallback((heroIds: string[]) => dispatch({ type: 'SET_ACTIVE_TEAM', heroIds }), []);
+  const setHeroFormation = useCallback((uid: string, role: HeroFormationRole) => {
+    dispatch({ type: 'SET_HERO_FORMATION', uid, role });
+  }, []);
   const recycleHero = useCallback((uid: string) => dispatch({ type: 'RECYCLE_HERO', uid }), []);
   const autoRecycleHeroes = useCallback(() => dispatch({ type: 'AUTO_RECYCLE_HEROES' }), []);
   const setAutoRecycleMaxRarity = useCallback((rarity: Rarity) => {
@@ -2598,6 +2753,7 @@ export function useGameState(saveSlot: string = 'default') {
     loadTeamLoadout,
     toggleEquipHero,
     setActiveTeam,
+    setHeroFormation,
     recycleHero,
     autoRecycleHeroes,
     setAutoRecycleMaxRarity,
