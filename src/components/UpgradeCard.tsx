@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { SkillConfig } from '../gameConfig';
+import { SkillConfig } from '../gameConfig.ts';
 import { fmt } from '../utils';
 
 interface Props {

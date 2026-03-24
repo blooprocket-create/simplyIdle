@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
-import { REBIRTH_WAVE_THRESHOLD, REBIRTH_BONUS } from '../gameConfig';
+import { REBIRTH_WAVE_THRESHOLD, REBIRTH_BONUS } from '../gameConfig.ts';
 
 interface Props {
   visible: boolean;

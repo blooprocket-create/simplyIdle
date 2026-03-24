@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { PartyConfig } from '../gameConfig';
+import { PartyConfig } from '../gameConfig.ts';
 import { fmt } from '../utils';
 
 interface Props {

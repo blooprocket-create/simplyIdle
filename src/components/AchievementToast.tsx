@@ -7,7 +7,7 @@ import Animated, {
   withDelay,
   Easing,
 } from 'react-native-reanimated';
-import { ACHIEVEMENTS } from '../gameConfig';
+import { ACHIEVEMENTS } from '../gameConfig.ts';
 
 interface Props {
   achievementId: string | null;

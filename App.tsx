@@ -2,8 +2,8 @@ import 'react-native-reanimated';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import GameScreen from './src/screens/GameScreen';
-import AuthScreen, { AUTH_STORAGE_KEYS } from './src/screens/AuthScreen';
+import GameScreen from './src/screens/GameScreen.tsx';
+import AuthScreen, { AUTH_STORAGE_KEYS } from './src/screens/AuthScreen.tsx';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
