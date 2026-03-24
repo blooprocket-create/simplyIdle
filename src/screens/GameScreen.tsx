@@ -277,6 +277,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     return recs.slice(0, 3);
   }, [canRebirthNow, state.activeTeamHeroIds.length, state.unspentStatPoints, missionCards, currentAct.bossWave]);
   const nextGuidance = guidanceList[0];
+  const extraGuidanceCount = Math.max(0, guidanceList.length - 1);
   const equippedItemsForScore = useMemo(
     () => Object.values(state.equippedItems).map(id => (id ? getEquipmentItem(id) : null)).filter(Boolean),
     [state.equippedItems],
@@ -311,6 +312,18 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const claimableWeeklyMilestones = WEEKLY_TRACK_MILESTONES.filter(ms => state.weeklyKills >= ms && !state.weeklyTrackClaimed.includes(ms));
   const claimableMissionIds = missionCards.filter(m => !m.claimed && m.progress.done).map(m => m.mission.id);
   const hasClaimableRewards = claimableWeeklyMilestones.length > 0 || claimableMissionIds.length > 0;
+  const expPct = Math.floor((state.exp / Math.max(1, stats.expNeeded)) * 100);
+  const topStatChips = [
+    { id: 'gold', label: 'Gold', value: fmt(state.gold) },
+    { id: 'shards', label: 'Shards', value: fmt(state.heroShards) },
+    { id: 'essence', label: 'Essence', value: fmt(state.essence) },
+    { id: 'dps', label: 'DPS', value: fmt(stats.dps) },
+    { id: 'power', label: 'Power', value: fmt(teamPowerIndex) },
+    { id: 'gear', label: 'Gear', value: fmt(gearScore) },
+    { id: 'bonus', label: 'Bonus', value: `+${(stats.achievementBonusPercent * 100).toFixed(0)}%` },
+    { id: 'exp', label: 'EXP', value: `${expPct}%` },
+    { id: 'streak', label: 'Streak', value: `${state.dailyLoginStreak}` },
+  ];
 
   useEffect(() => {
     if (!rewardPopup) return;
@@ -524,37 +537,38 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       )}
 
       {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.gold}>💰 {fmt(state.gold)}</Text>
-          <Text style={styles.shardLabel}>💎 {fmt(state.heroShards)} shards</Text>
-          <Text style={styles.essenceLabel}>🜂 {fmt(state.essence)} essence</Text>
-          <Text style={styles.dpsLabel}>Team DPS {fmt(stats.dps)}</Text>
+      <View style={styles.headerCompact}>
+        <View style={styles.headerTopRow}>
+          <View style={styles.identityCluster}>
+            <Text style={styles.playerLabel}>{state.playerName}</Text>
+            <Text style={styles.classLabel}>{stats.className} • Lv {state.level} • @{accountName}</Text>
+          </View>
+          <View style={styles.headerActionRow}>
+            <Pressable style={styles.headerActionBtn} onPress={() => setEventsOpen(true)}>
+              <Text style={styles.headerActionBtnText}>🗓️</Text>
+            </Pressable>
+            <Pressable style={styles.headerActionBtn} onPress={() => setSettingsOpen(true)}>
+              <Text style={styles.headerActionBtnText}>⚙️</Text>
+            </Pressable>
+            <Pressable style={[styles.headerActionBtn, styles.headerActionBtnLogout]} onPress={onLogout}>
+              <Text style={styles.headerActionBtnText}>⎋</Text>
+            </Pressable>
+          </View>
         </View>
-        <View style={styles.headerCenter}>
-          <Text style={styles.playerLabel}>{state.playerName}</Text>
-          <Text style={styles.classLabel}>{stats.className} • Lv {state.level}</Text>
-        </View>
-        <View style={styles.headerRight}>
-          <Text style={styles.accountLabel}>@{accountName}</Text>
-          <Text style={styles.headerStat}>{fmt(state.exp)}/{fmt(stats.expNeeded)} EXP</Text>
-          <Text style={styles.headerStat}>🧱 Power {fmt(teamPowerIndex)}</Text>
-          <Text style={styles.headerStat}>🛠️ Gear {fmt(gearScore)}</Text>
-          <Text style={styles.headerStat}>🏆 Bonus +{(stats.achievementBonusPercent * 100).toFixed(0)}%</Text>
-          <Text style={styles.headerStat}>📅 Streak {state.dailyLoginStreak}</Text>
+        <ScrollView horizontal={true} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statChipRail}>
+          {topStatChips.map(chip => (
+            <View key={chip.id} style={styles.statChip}>
+              <Text style={styles.statChipLabel}>{chip.label}</Text>
+              <Text style={styles.statChipValue}>{chip.value}</Text>
+            </View>
+          ))}
           {state.unspentStatPoints > 0 && (
-            <Text style={styles.headerHighlight}>+{state.unspentStatPoints} Pts</Text>
+            <View style={[styles.statChip, styles.statChipHighlight]}>
+              <Text style={styles.statChipLabel}>Spend</Text>
+              <Text style={[styles.statChipValue, styles.statChipValueWarn]}>+{state.unspentStatPoints} Pts</Text>
+            </View>
           )}
-          <Pressable style={styles.eventsBtn} onPress={() => setEventsOpen(true)}>
-            <Text style={styles.eventsBtnText}>🗓️ Events</Text>
-          </Pressable>
-          <Pressable style={styles.settingsBtn} onPress={() => setSettingsOpen(true)}>
-            <Text style={styles.settingsBtnText}>⚙️ Settings</Text>
-          </Pressable>
-          <Pressable style={styles.logoutBtn} onPress={onLogout}>
-            <Text style={styles.logoutBtnText}>Logout</Text>
-          </Pressable>
-        </View>
+        </ScrollView>
       </View>
 
       {currentQuest && (
@@ -588,18 +602,24 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             <Text style={styles.nextStepBtnText}>Open</Text>
           </Pressable>
         </View>
-        {guidanceList.map((entry, idx) => (
-          <Pressable key={`${entry.title}_${idx}`} style={styles.nextStepItem} onPress={() => onTabChange(entry.tab)}>
-            <View style={styles.nextStepItemTop}>
-              <Text style={styles.nextStepItemIndex}>{idx + 1}</Text>
-              <Text style={styles.nextStepItemTitle}>{entry.title}</Text>
-            </View>
-            <Text style={styles.nextStepItemDetail}>{entry.detail}</Text>
-          </Pressable>
-        ))}
+        <Pressable style={styles.nextStepItem} onPress={() => onTabChange(nextGuidance.tab)}>
+          <View style={styles.nextStepItemTop}>
+            <Text style={styles.nextStepItemIndex}>1</Text>
+            <Text style={styles.nextStepItemTitle}>{nextGuidance.title}</Text>
+          </View>
+          <Text style={styles.nextStepItemDetail}>{nextGuidance.detail}</Text>
+        </Pressable>
+        {extraGuidanceCount > 0 && (
+          <Text style={styles.nextStepMore}>+{extraGuidanceCount} more recommendations available after this action.</Text>
+        )}
       </View>
 
-      <View style={styles.metaStrip}>
+      <ScrollView
+        horizontal={true}
+        showsHorizontalScrollIndicator={false}
+        style={styles.metaStripScroll}
+        contentContainerStyle={styles.metaStripRail}
+      >
         <View style={styles.metaChip}>
           <Text style={styles.metaChipLabel}>Campaign</Text>
           <Text style={styles.metaChipValue}>Ch {campaignChapter} • {campaignStage}/{campaignBossStage}</Text>
@@ -620,7 +640,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           <Text style={styles.metaChipLabel}>Campaign Map</Text>
           <Text style={styles.metaChipValue}>Open Route</Text>
         </Pressable>
-      </View>
+      </ScrollView>
 
       {/* Team HP Bar */}
       <View style={styles.hpSection}>
@@ -2547,6 +2567,80 @@ const styles = StyleSheet.create({
   },
 
   // Header
+  headerCompact: {
+    backgroundColor: '#0F1722',
+    borderBottomWidth: 1,
+    borderBottomColor: '#2F4358',
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 7,
+    zIndex: 1,
+    gap: 6,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  identityCluster: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  headerActionBtn: {
+    width: 28,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: '#1D2D41',
+    borderWidth: 1,
+    borderColor: '#345270',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerActionBtnLogout: {
+    backgroundColor: '#2C2338',
+    borderColor: '#614C84',
+  },
+  headerActionBtnText: {
+    fontSize: 12,
+    color: '#E6F1FF',
+    fontWeight: '700',
+  },
+  statChipRail: {
+    gap: 6,
+    paddingRight: 8,
+  },
+  statChip: {
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: '#2F4760',
+    backgroundColor: '#122131',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  statChipHighlight: {
+    borderColor: '#83602A',
+    backgroundColor: '#2C2412',
+  },
+  statChipLabel: {
+    fontSize: 9,
+    color: '#8DB4D2',
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+  },
+  statChipValue: {
+    fontSize: 11,
+    color: '#E3F4FF',
+    fontWeight: '700',
+  },
+  statChipValueWarn: {
+    color: '#FBD484',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2807,14 +2901,24 @@ const styles = StyleSheet.create({
     color: '#E3FFEF',
     fontWeight: '700',
   },
-  metaStrip: {
-    marginHorizontal: 12,
+  nextStepMore: {
+    marginTop: 5,
+    fontSize: 10,
+    color: '#8FC7AE',
+  },
+  metaStripScroll: {
+    flexGrow: 0,
     marginBottom: 8,
+  },
+  metaStripRail: {
+    marginHorizontal: 12,
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'flex-start',
     gap: 8,
+    paddingRight: 10,
   },
   metaChip: {
+    alignSelf: 'flex-start',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#345470',
