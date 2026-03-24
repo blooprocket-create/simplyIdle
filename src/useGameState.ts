@@ -96,6 +96,7 @@ export interface GameState {
   exp: number;
   totalExp: number;
   level: number;
+  highestWaveReached: number;
   unspentStatPoints: number;
   statsAlloc: StatBlock;
 
@@ -193,6 +194,7 @@ const DEFAULT_STATE: GameState = {
   exp: 0,
   totalExp: 0,
   level: 1,
+  highestWaveReached: 1,
   unspentStatPoints: 0,
   statsAlloc: blankStats,
 
@@ -1124,6 +1126,7 @@ function killMonster(state: GameState): GameState {
     exp: lvl.exp,
     totalExp: state.totalExp + expReward,
     level: lvl.level,
+    highestWaveReached: Math.max(state.highestWaveReached, newWave),
     unspentStatPoints: state.unspentStatPoints + lvl.gainedLevels * STAT_POINTS_PER_LEVEL,
     totalKills: state.totalKills + 1,
     weeklyKills: state.weeklyKills + 1,
@@ -2314,6 +2317,7 @@ function reducer(state: GameState, action: Action): GameState {
         exp: p.exp ?? 0,
         totalExp: p.totalExp ?? 0,
         level: p.level ?? 1,
+        highestWaveReached: Math.max(p.highestWaveReached ?? p.highestLevelReached ?? 1, p.wave ?? 1),
         unspentStatPoints: p.unspentStatPoints ?? 0,
         statsAlloc: {
           ...blankStats,
@@ -2415,6 +2419,8 @@ interface SaveData {
   exp: number;
   totalExp: number;
   level: number;
+  highestWaveReached: number;
+  highestLevelReached?: number;
   unspentStatPoints: number;
   statsAlloc: StatBlock;
 
@@ -2497,6 +2503,7 @@ function serialize(state: GameState): SaveData {
     exp: state.exp,
     totalExp: state.totalExp,
     level: state.level,
+    highestWaveReached: state.highestWaveReached,
     unspentStatPoints: state.unspentStatPoints,
     statsAlloc: state.statsAlloc,
 

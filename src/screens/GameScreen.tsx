@@ -323,6 +323,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     { id: 'bonus', label: 'Bonus', value: `+${(stats.achievementBonusPercent * 100).toFixed(0)}%` },
     { id: 'exp', label: 'EXP', value: `${expPct}%` },
     { id: 'streak', label: 'Streak', value: `${state.dailyLoginStreak}` },
+    { id: 'peakwave', label: 'Peak Wave', value: `${state.highestWaveReached}` },
   ];
 
   useEffect(() => {
@@ -427,6 +428,38 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const campaignBossStage = 20;
   const powerTier = teamPowerIndex < 12000 ? 'Recruit' : teamPowerIndex < 55000 ? 'Elite' : teamPowerIndex < 180000 ? 'Mythic' : 'Ascendant';
   const guildRank = state.totalKills < 500 ? 'Bronze Order' : state.totalKills < 2500 ? 'Silver Order' : state.totalKills < 9000 ? 'Gold Order' : 'Eternal Order';
+  const betaLeaderboardRows = useMemo(() => {
+    const playerBoardScore =
+      seasonScore
+      + Math.floor(state.bestSeasonPoints * 0.35)
+      + state.wave * 12
+      + state.highestWaveReached * 9
+      + state.prestigeCount * 280;
+
+    const seeded = [
+      { name: 'NovaMarshal', score: Math.floor(playerBoardScore * 1.22), badge: '👑', isYou: false },
+      { name: 'AsterVow', score: Math.floor(playerBoardScore * 1.14), badge: '💎', isYou: false },
+      { name: 'RiftKite', score: Math.floor(playerBoardScore * 1.07), badge: '🥇', isYou: false },
+      { name: 'NightRelay', score: Math.floor(playerBoardScore * 0.98), badge: '🥈', isYou: false },
+      { name: 'LumenForge', score: Math.floor(playerBoardScore * 0.9), badge: '🥉', isYou: false },
+      { name: 'ShardNomad', score: Math.floor(playerBoardScore * 0.83), badge: '⚔️', isYou: false },
+    ];
+
+    const allRows = [
+      ...seeded,
+      { name: state.playerName || 'You', score: playerBoardScore, badge: '🛰️', isYou: true },
+    ]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8)
+      .map((row, idx) => ({ ...row, rank: idx + 1 }));
+
+    const myRank = allRows.find(r => r.isYou)?.rank ?? allRows.length;
+    return {
+      rows: allRows,
+      myRank,
+      playerBoardScore,
+    };
+  }, [seasonScore, state.bestSeasonPoints, state.wave, state.highestWaveReached, state.prestigeCount, state.playerName]);
   const isBossImminent = state.wave % 10 >= 8;
   const burstChargePct = Math.min(100, (((state.totalKills % 25) + 1) / 25) * 100);
   const canBurst = burstChargePct >= 96;
@@ -635,6 +668,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         <View style={styles.metaChip}>
           <Text style={styles.metaChipLabel}>Power Tier</Text>
           <Text style={styles.metaChipValue}>{powerTier}</Text>
+        </View>
+        <View style={styles.metaChip}>
+          <Text style={styles.metaChipLabel}>Highest Wave</Text>
+          <Text style={styles.metaChipValue}>Wave {state.highestWaveReached}</Text>
         </View>
         <Pressable style={[styles.metaChip, styles.metaChipAction]} onPress={() => setChapterMapOpen(true)}>
           <Text style={styles.metaChipLabel}>Campaign Map</Text>
@@ -2178,6 +2215,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Text style={styles.eventsCardTitle}>🏆 Season Ladder</Text>
                 <Text style={styles.eventsSubtitle}>Season score: {fmt(seasonScore)} pts</Text>
                 <Text style={styles.eventsStatLine}>Best this season: {fmt(state.bestSeasonPoints)} pts</Text>
+                <Text style={styles.eventsStatLine}>Highest wave reached: Wave {state.highestWaveReached}</Text>
                 <Text style={[styles.seasonRankBadge]}>{seasonRank}</Text>
                 <Text style={styles.eventsHint}>Score based on wave progression + rebirths. Top ranks earn cosmetic banners at season end.</Text>
                 {[
@@ -2192,6 +2230,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     <Text style={styles.ladderTierInfo}>{tier.threshold > 0 ? `${fmt(tier.threshold)} pts` : 'Start'} — Banner: {tier.banner}</Text>
                   </View>
                 ))}
+              </View>
+
+              <View style={styles.eventsCard}>
+                <Text style={styles.eventsCardTitle}>🌐 Beta Leaderboard</Text>
+                <Text style={styles.eventsSubtitle}>Multiplayer snapshot rank: #{betaLeaderboardRows.myRank} • Score {fmt(betaLeaderboardRows.playerBoardScore)}</Text>
+                {betaLeaderboardRows.rows.map(row => (
+                  <View key={`${row.name}_${row.rank}`} style={[styles.betaBoardRow, row.isYou && styles.betaBoardRowYou]}>
+                    <Text style={styles.betaBoardRank}>#{row.rank}</Text>
+                    <Text style={styles.betaBoardName}>{row.badge} {row.name}{row.isYou ? ' (You)' : ''}</Text>
+                    <Text style={styles.betaBoardScore}>{fmt(row.score)}</Text>
+                  </View>
+                ))}
+                <Text style={styles.eventsHint}>Beta note: global server board will replace this local snapshot in public beta.</Text>
               </View>
 
               {/* Formation Info */}
@@ -5629,6 +5680,39 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#A4C0D8',
     flex: 1,
+  },
+  betaBoardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#28435D',
+    backgroundColor: '#102033',
+    marginBottom: 5,
+  },
+  betaBoardRowYou: {
+    borderColor: '#63A7D8',
+    backgroundColor: '#153048',
+  },
+  betaBoardRank: {
+    minWidth: 34,
+    fontSize: 10,
+    color: '#B6D0E7',
+    fontWeight: '700',
+  },
+  betaBoardName: {
+    flex: 1,
+    fontSize: 10,
+    color: '#E2F1FF',
+    fontWeight: '600',
+  },
+  betaBoardScore: {
+    fontSize: 10,
+    color: '#FFDB8F',
+    fontWeight: '800',
   },
 
   // Formation info (in events modal)
