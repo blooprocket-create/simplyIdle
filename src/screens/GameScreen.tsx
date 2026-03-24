@@ -133,6 +133,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [expandedHeroes, setExpandedHeroes] = useState<Set<string>>(new Set());
   const [recycleConfirmUid, setRecycleConfirmUid] = useState<string | null>(null);
   const [recycleDropdownOpen, setRecycleDropdownOpen] = useState(false);
+  const [guidedMode, setGuidedMode] = useState(true);
+  const [heroesAdvancedOpen, setHeroesAdvancedOpen] = useState(false);
+  const [equipmentToolsOpen, setEquipmentToolsOpen] = useState(false);
   const [warPanels, setWarPanels] = useState({
     frontline: true,
     roster: true,
@@ -218,22 +221,38 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const canRebirthNow = state.wave >= REBIRTH_WAVE_THRESHOLD;
   const rebirthProgressPct = Math.max(0, Math.min(1, state.wave / REBIRTH_WAVE_THRESHOLD)) * 100;
   const rebirthWavesLeft = Math.max(0, REBIRTH_WAVE_THRESHOLD - state.wave);
-  const nextGuidance = useMemo(() => {
+  const guidanceList = useMemo(() => {
+    const recs: Array<{ title: string; detail: string; tab: Tab }> = [];
     if (canRebirthNow) {
-      return { title: 'Rebirth Ready', detail: 'Open Battle and trigger Rebirth to reset for permanent power.', tab: 'battle' as Tab };
+      recs.push({ title: 'Rebirth Ready', detail: 'Reset now for permanent cores and stronger scaling.', tab: 'battle' });
     }
     if (state.activeTeamHeroIds.length < ACTIVE_TEAM_SIZE) {
-      return { title: 'Build Full Team', detail: 'Go to Heroes and equip 4 heroes for stable progression.', tab: 'heroes' as Tab };
+      recs.push({ title: 'Build Full Team', detail: 'Equip 4 heroes to stabilize damage and survival.', tab: 'heroes' });
     }
     if (state.unspentStatPoints > 0) {
-      return { title: 'Spend Stat Points', detail: 'Allocate your unspent points to keep scaling damage and survival.', tab: 'stats' as Tab };
+      recs.push({ title: 'Spend Stat Points', detail: 'Use unspent points to increase immediate power.', tab: 'stats' });
     }
     const firstUnclaimedMission = missionCards.find(m => !m.claimed && m.progress.done);
     if (firstUnclaimedMission) {
-      return { title: 'Claim Mission Reward', detail: `Claim \"${firstUnclaimedMission.mission.title}\" in Achievements.`, tab: 'achievements' as Tab };
+      recs.push({ title: 'Claim Mission Reward', detail: `Claim \"${firstUnclaimedMission.mission.title}\" for instant resources.`, tab: 'achievements' });
     }
-    return { title: 'Push Act Boss', detail: `Advance to Wave ${currentAct.bossWave} for permanent unlock progress.`, tab: 'battle' as Tab };
+    recs.push({ title: 'Push Act Boss', detail: `Advance to Wave ${currentAct.bossWave} for permanent unlock progress.`, tab: 'battle' });
+    return recs.slice(0, 3);
   }, [canRebirthNow, state.activeTeamHeroIds.length, state.unspentStatPoints, missionCards, currentAct.bossWave]);
+  const nextGuidance = guidanceList[0];
+  const equippedItemsForScore = useMemo(
+    () => Object.values(state.equippedItems).map(id => (id ? getEquipmentItem(id) : null)).filter(Boolean),
+    [state.equippedItems],
+  );
+  const gearScore = useMemo(() => {
+    const rarityPoints: Record<string, number> = { common: 40, rare: 90, epic: 170, legendary: 280, mythic: 430 };
+    return equippedItemsForScore.reduce((sum, item) => {
+      if (!item) return sum;
+      const statValue = Object.values(item.bonus).reduce((s, v) => s + (v ?? 0), 0);
+      return sum + (rarityPoints[item.rarity] ?? 0) + statValue * 12;
+    }, 0);
+  }, [equippedItemsForScore]);
+  const teamPowerIndex = Math.floor(stats.dps * 0.45 + state.teamMaxHp * 0.25 + stats.teamDefense * 7 + gearScore * 15);
   const effectiveTeamDps = Math.max(1, stats.dps / affixTotals.hpMult);
   const ttkSeconds = state.monsterHp / effectiveTeamDps;
   const baseEnemyDps = getMonsterDamage(state.wave) * affixTotals.dmgMult;
@@ -252,6 +271,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     equipment: `${state.inventoryItemIds.length}`,
     achievements: `${state.achievements.size}/${ACHIEVEMENTS.length}`,
   };
+  const claimableWeeklyMilestones = WEEKLY_TRACK_MILESTONES.filter(ms => state.weeklyKills >= ms && !state.weeklyTrackClaimed.includes(ms));
+  const claimableMissionIds = missionCards.filter(m => !m.claimed && m.progress.done).map(m => m.mission.id);
+  const hasClaimableRewards = claimableWeeklyMilestones.length > 0 || claimableMissionIds.length > 0;
 
   useEffect(() => {
     if (!rewardPopup) return;
@@ -277,6 +299,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   const toggleWarPanel = (key: keyof typeof warPanels) => {
     setWarPanels(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const claimAllRewards = () => {
+    claimableWeeklyMilestones.forEach(ms => claimWeeklyTrack(ms));
+    claimableMissionIds.forEach(id => claimMission(id));
   };
 
   // Character creation screen
@@ -352,6 +379,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         <View style={styles.headerRight}>
           <Text style={styles.accountLabel}>@{accountName}</Text>
           <Text style={styles.headerStat}>{fmt(state.exp)}/{fmt(stats.expNeeded)} EXP</Text>
+          <Text style={styles.headerStat}>🧱 Power {fmt(teamPowerIndex)}</Text>
+          <Text style={styles.headerStat}>🛠️ Gear {fmt(gearScore)}</Text>
           <Text style={styles.headerStat}>🏆 Bonus +{(stats.achievementBonusPercent * 100).toFixed(0)}%</Text>
           <Text style={styles.headerStat}>📅 Streak {state.dailyLoginStreak}</Text>
           {state.unspentStatPoints > 0 && (
@@ -389,12 +418,30 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
       <View style={styles.nextStepBanner}>
         <View style={styles.nextStepHeader}>
-          <Text style={styles.nextStepTitle}>Next Step: {nextGuidance.title}</Text>
+          <Text style={styles.nextStepTitle}>Command Recommendations</Text>
           <Pressable style={styles.nextStepBtn} onPress={() => onTabChange(nextGuidance.tab)}>
             <Text style={styles.nextStepBtnText}>Open</Text>
           </Pressable>
         </View>
-        <Text style={styles.nextStepDesc}>{nextGuidance.detail}</Text>
+        {guidanceList.map((entry, idx) => (
+          <Pressable key={`${entry.title}_${idx}`} style={styles.nextStepItem} onPress={() => onTabChange(entry.tab)}>
+            <View style={styles.nextStepItemTop}>
+              <Text style={styles.nextStepItemIndex}>{idx + 1}</Text>
+              <Text style={styles.nextStepItemTitle}>{entry.title}</Text>
+            </View>
+            <Text style={styles.nextStepItemDetail}>{entry.detail}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <View style={styles.uiModeCard}>
+        <View>
+          <Text style={styles.uiModeTitle}>Interface Mode</Text>
+          <Text style={styles.uiModeDesc}>{guidedMode ? 'Guided: only core controls shown.' : 'Full: show all controls and systems.'}</Text>
+        </View>
+        <Pressable style={[styles.uiModeBtn, !guidedMode && styles.uiModeBtnAlt]} onPress={() => setGuidedMode(!guidedMode)}>
+          <Text style={styles.uiModeBtnText}>{guidedMode ? 'Switch to Full' : 'Switch to Guided'}</Text>
+        </Pressable>
       </View>
 
       <View style={styles.rebirthBanner}>
@@ -673,9 +720,18 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Text style={styles.warPanelStat}>Weekly Kills: {state.weeklyKills}</Text>
                   <Text style={styles.warPanelStat}>Missions Ready: {missionCards.filter(m => !m.claimed && m.progress.done).length}</Text>
                   <Text style={styles.warPanelStat}>Current Event: {weeklyEvent.emoji} {weeklyEvent.name}</Text>
-                  <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('achievements')}>
-                    <Text style={styles.warPanelActionText}>Open Objectives</Text>
-                  </Pressable>
+                  <View style={styles.warPanelActionRow}>
+                    <Pressable
+                      style={[styles.warPanelActionBtn, !hasClaimableRewards && styles.warPanelActionBtnDisabled]}
+                      disabled={!hasClaimableRewards}
+                      onPress={claimAllRewards}
+                    >
+                      <Text style={styles.warPanelActionText}>Claim All ({claimableWeeklyMilestones.length + claimableMissionIds.length})</Text>
+                    </Pressable>
+                    <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('achievements')}>
+                      <Text style={styles.warPanelActionText}>Open Objectives</Text>
+                    </Pressable>
+                  </View>
                 </View>
               )}
             </View>
@@ -968,106 +1024,117 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 </Pressable>
               </View>
             </View>
-            <View style={styles.recyclePickerWrap}>
-              <Text style={styles.recyclePickerLabel}>Recycle rarity threshold (and below):</Text>
-              <View style={styles.recycleToggleRow}>
-                <Text style={styles.recycleToggleLabel}>Background Auto Recycle</Text>
-                <Pressable
-                  style={[styles.recycleToggleBtn, state.autoRecycleEnabled && styles.recycleToggleBtnActive]}
-                  onPress={() => setAutoRecycleEnabled(!state.autoRecycleEnabled)}
-                >
-                  <Text style={styles.recycleToggleBtnText}>{state.autoRecycleEnabled ? 'ON' : 'OFF'}</Text>
-                </Pressable>
-              </View>
-              <Pressable
-                style={styles.recyclePickerBtn}
-                onPress={() => setRecycleDropdownOpen(prev => !prev)}
-              >
-                <Text style={styles.recyclePickerBtnText}>▼ {state.autoRecycleMaxRarity.toUpperCase()}</Text>
-              </Pressable>
-              {recycleDropdownOpen && (
-                <View style={styles.recycleDropdown}>
-                  {RARITIES.map(r => (
+            <Pressable style={styles.sectionToggle} onPress={() => setHeroesAdvancedOpen(prev => !prev)}>
+              <Text style={styles.sectionToggleText}>
+                {heroesAdvancedOpen ? 'Hide Advanced Roster Controls' : 'Show Advanced Roster Controls'}
+              </Text>
+            </Pressable>
+            {(heroesAdvancedOpen || !guidedMode) && (
+              <>
+                <View style={styles.recyclePickerWrap}>
+                  <Text style={styles.recyclePickerLabel}>Recycle rarity threshold (and below):</Text>
+                  <View style={styles.recycleToggleRow}>
+                    <Text style={styles.recycleToggleLabel}>Background Auto Recycle</Text>
                     <Pressable
-                      key={r.id}
-                      style={[styles.recycleOption, state.autoRecycleMaxRarity === r.id && styles.recycleOptionActive]}
-                      onPress={() => {
-                        setAutoRecycleMaxRarity(r.id);
-                        setRecycleDropdownOpen(false);
-                      }}
+                      style={[styles.recycleToggleBtn, state.autoRecycleEnabled && styles.recycleToggleBtnActive]}
+                      onPress={() => setAutoRecycleEnabled(!state.autoRecycleEnabled)}
                     >
-                      <Text style={[styles.recycleOptionText, { color: r.color }]}>{r.label}</Text>
+                      <Text style={styles.recycleToggleBtnText}>{state.autoRecycleEnabled ? 'ON' : 'OFF'}</Text>
                     </Pressable>
-                  ))}
+                  </View>
+                  <Pressable
+                    style={styles.recyclePickerBtn}
+                    onPress={() => setRecycleDropdownOpen(prev => !prev)}
+                  >
+                    <Text style={styles.recyclePickerBtnText}>▼ {state.autoRecycleMaxRarity.toUpperCase()}</Text>
+                  </Pressable>
+                  {recycleDropdownOpen && (
+                    <View style={styles.recycleDropdown}>
+                      {RARITIES.map(r => (
+                        <Pressable
+                          key={r.id}
+                          style={[styles.recycleOption, state.autoRecycleMaxRarity === r.id && styles.recycleOptionActive]}
+                          onPress={() => {
+                            setAutoRecycleMaxRarity(r.id);
+                            setRecycleDropdownOpen(false);
+                          }}
+                        >
+                          <Text style={[styles.recycleOptionText, { color: r.color }]}>{r.label}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
 
-            <View style={styles.shardForgeCard}>
-              <Text style={styles.shardForgeTitle}>🔧 Shard Forge</Text>
-              <Text style={styles.shardForgeDesc}>Spend overflow shards for persistent value.</Text>
-              <View style={styles.shardForgeRow}>
-                <Pressable
-                  style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.essenceCost && styles.shardForgeBtnDisabled]}
-                  disabled={state.heroShards < shardForgeCosts.essenceCost}
-                  onPress={convertShardsToEssence}
-                >
-                  <Text style={styles.shardForgeBtnText}>{shardForgeCosts.essenceCost} 💎 → +1 🜂</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.scrapCost && styles.shardForgeBtnDisabled]}
-                  disabled={state.heroShards < shardForgeCosts.scrapCost}
-                  onPress={convertShardsToScrap}
-                >
-                  <Text style={styles.shardForgeBtnText}>{shardForgeCosts.scrapCost} 💎 → +140 🔩</Text>
-                </Pressable>
-              </View>
-            </View>
-
-            <View style={styles.autoSummonCard}>
-              <Text style={styles.shardForgeTitle}>🤖 Auto Summon Rules</Text>
-              <View style={styles.autoSummonTopRow}>
-                <Pressable
-                  style={[styles.autoSummonToggle, state.autoSummonEnabled && styles.autoSummonToggleActive]}
-                  onPress={() => setAutoSummonEnabled(!state.autoSummonEnabled)}
-                >
-                  <Text style={styles.autoSummonToggleText}>Auto Summon: {state.autoSummonEnabled ? 'ON' : 'OFF'}</Text>
-                </Pressable>
-                <Pressable
-                  style={styles.autoSummonModeBtn}
-                  onPress={() => setAutoSummonMode(state.autoSummonMode === 'single' ? 'x10' : 'single')}
-                >
-                  <Text style={styles.autoSummonModeText}>Mode: {state.autoSummonMode.toUpperCase()}</Text>
-                </Pressable>
-              </View>
-              <View style={styles.autoSummonReserveRow}>
-                <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoSummonReserveGold(state.autoSummonReserveGold - 1000)}>
-                  <Text style={styles.autoPotionAdjustText}>-</Text>
-                </Pressable>
-                <Text style={styles.autoSummonReserveText}>Reserve Gold: {fmt(state.autoSummonReserveGold)}</Text>
-                <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoSummonReserveGold(state.autoSummonReserveGold + 1000)}>
-                  <Text style={styles.autoPotionAdjustText}>+</Text>
-                </Pressable>
-              </View>
-            </View>
-            <Text style={styles.rosterCount}>
-              {state.heroRoster.length} heroes • {state.activeTeamHeroIds.length}/{ACTIVE_TEAM_SIZE} in active team
-            </Text>
-            <View style={styles.loadoutRow}>
-              {[0, 1, 2].map(slot => (
-                <View key={slot} style={styles.loadoutCell}>
-                  <Text style={styles.loadoutLabel}>L{slot + 1}</Text>
-                  <View style={styles.loadoutBtnsWrap}>
-                    <Pressable style={styles.loadoutSaveBtn} onPress={() => saveTeamLoadout(slot)}>
-                      <Text style={styles.loadoutBtnText}>Save</Text>
+                <View style={styles.shardForgeCard}>
+                  <Text style={styles.shardForgeTitle}>🔧 Shard Forge</Text>
+                  <Text style={styles.shardForgeDesc}>Spend overflow shards for persistent value.</Text>
+                  <View style={styles.shardForgeRow}>
+                    <Pressable
+                      style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.essenceCost && styles.shardForgeBtnDisabled]}
+                      disabled={state.heroShards < shardForgeCosts.essenceCost}
+                      onPress={convertShardsToEssence}
+                    >
+                      <Text style={styles.shardForgeBtnText}>{shardForgeCosts.essenceCost} 💎 → +1 🜂</Text>
                     </Pressable>
-                    <Pressable style={styles.loadoutLoadBtn} onPress={() => loadTeamLoadout(slot)}>
-                      <Text style={styles.loadoutBtnText}>Load</Text>
+                    <Pressable
+                      style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.scrapCost && styles.shardForgeBtnDisabled]}
+                      disabled={state.heroShards < shardForgeCosts.scrapCost}
+                      onPress={convertShardsToScrap}
+                    >
+                      <Text style={styles.shardForgeBtnText}>{shardForgeCosts.scrapCost} 💎 → +140 🔩</Text>
                     </Pressable>
                   </View>
                 </View>
-              ))}
-            </View>
+
+                <View style={styles.autoSummonCard}>
+                  <Text style={styles.shardForgeTitle}>🤖 Auto Summon Rules</Text>
+                  <View style={styles.autoSummonTopRow}>
+                    <Pressable
+                      style={[styles.autoSummonToggle, state.autoSummonEnabled && styles.autoSummonToggleActive]}
+                      onPress={() => setAutoSummonEnabled(!state.autoSummonEnabled)}
+                    >
+                      <Text style={styles.autoSummonToggleText}>Auto Summon: {state.autoSummonEnabled ? 'ON' : 'OFF'}</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.autoSummonModeBtn}
+                      onPress={() => setAutoSummonMode(state.autoSummonMode === 'single' ? 'x10' : 'single')}
+                    >
+                      <Text style={styles.autoSummonModeText}>Mode: {state.autoSummonMode.toUpperCase()}</Text>
+                    </Pressable>
+                  </View>
+                  <View style={styles.autoSummonReserveRow}>
+                    <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoSummonReserveGold(state.autoSummonReserveGold - 1000)}>
+                      <Text style={styles.autoPotionAdjustText}>-</Text>
+                    </Pressable>
+                    <Text style={styles.autoSummonReserveText}>Reserve Gold: {fmt(state.autoSummonReserveGold)}</Text>
+                    <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoSummonReserveGold(state.autoSummonReserveGold + 1000)}>
+                      <Text style={styles.autoPotionAdjustText}>+</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </>
+            )}
+            <Text style={styles.rosterCount}>
+              {state.heroRoster.length} heroes • {state.activeTeamHeroIds.length}/{ACTIVE_TEAM_SIZE} in active team
+            </Text>
+            {(heroesAdvancedOpen || !guidedMode) && (
+              <View style={styles.loadoutRow}>
+                {[0, 1, 2].map(slot => (
+                  <View key={slot} style={styles.loadoutCell}>
+                    <Text style={styles.loadoutLabel}>L{slot + 1}</Text>
+                    <View style={styles.loadoutBtnsWrap}>
+                      <Pressable style={styles.loadoutSaveBtn} onPress={() => saveTeamLoadout(slot)}>
+                        <Text style={styles.loadoutBtnText}>Save</Text>
+                      </Pressable>
+                      <Pressable style={styles.loadoutLoadBtn} onPress={() => loadTeamLoadout(slot)}>
+                        <Text style={styles.loadoutBtnText}>Load</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
             {state.heroRoster.length === 0 ? (
               <Text style={styles.emptyMsg}>Summon your first hero!</Text>
             ) : (
@@ -1358,23 +1425,30 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             <Text style={styles.mythicTierLabel}>
               Mythic Tier: {state.permanentUnlocks.includes('mythic_equipment') ? 'Unlocked' : 'Locked (Defeat Act 3 Boss)'}
             </Text>
-            <View style={styles.craftRow}>
-              {(['weapon', 'armor', 'accessory'] as EquipmentSlot[]).map(slot => {
-                const cost = slot === 'weapon' ? 130 : slot === 'armor' ? 120 : 100;
-                const canCraft = state.equipmentScrap >= cost;
-                return (
-                  <Pressable
-                    key={slot}
-                    style={[styles.craftBtn, !canCraft && styles.craftBtnDisabled]}
-                    disabled={!canCraft}
-                    onPress={() => craftEquipment(slot)}
-                  >
-                    <Text style={styles.craftBtnText}>{slot.toUpperCase()}</Text>
-                    <Text style={styles.craftCostText}>{cost}🔩</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <Pressable style={styles.sectionToggle} onPress={() => setEquipmentToolsOpen(prev => !prev)}>
+              <Text style={styles.sectionToggleText}>
+                {equipmentToolsOpen ? 'Hide Crafting / Dismantle Tools' : 'Show Crafting / Dismantle Tools'}
+              </Text>
+            </Pressable>
+            {(equipmentToolsOpen || !guidedMode) && (
+              <View style={styles.craftRow}>
+                {(['weapon', 'armor', 'accessory'] as EquipmentSlot[]).map(slot => {
+                  const cost = slot === 'weapon' ? 130 : slot === 'armor' ? 120 : 100;
+                  const canCraft = state.equipmentScrap >= cost;
+                  return (
+                    <Pressable
+                      key={slot}
+                      style={[styles.craftBtn, !canCraft && styles.craftBtnDisabled]}
+                      disabled={!canCraft}
+                      onPress={() => craftEquipment(slot)}
+                    >
+                      <Text style={styles.craftBtnText}>{slot.toUpperCase()}</Text>
+                      <Text style={styles.craftCostText}>{cost}🔩</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
             {state.inventoryItemIds.length === 0 ? (
               <Text style={styles.emptyMsg}>No equipment yet! Kill monsters to find better gear.</Text>
             ) : (
@@ -1418,7 +1492,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                           </Text>
                         </Pressable>
                       </View>
-                      {!isEquipped && (
+                      {!isEquipped && (equipmentToolsOpen || !guidedMode) && (
                         <Pressable style={styles.dismantleBtn} onPress={() => dismantleEquipment(item.id)}>
                           <Text style={styles.dismantleBtnText}>Dismantle</Text>
                         </Pressable>
@@ -1444,6 +1518,16 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <Text style={styles.achievementBonusDesc}>
                 Cap: +{ACH_BONUS_CAP_PCT}% • Unlocked: {state.achievements.size}/{ACHIEVEMENTS.length}
               </Text>
+              <View style={styles.claimAllRow}>
+                <Text style={styles.claimAllInfo}>Claimable: {claimableWeeklyMilestones.length + claimableMissionIds.length}</Text>
+                <Pressable
+                  style={[styles.claimAllBtn, !hasClaimableRewards && styles.claimAllBtnDisabled]}
+                  disabled={!hasClaimableRewards}
+                  onPress={claimAllRewards}
+                >
+                  <Text style={styles.claimAllBtnText}>Claim All Rewards</Text>
+                </Pressable>
+              </View>
             </View>
 
             <View style={styles.weeklyEventCard}>
@@ -1908,6 +1992,43 @@ const styles = StyleSheet.create({
     color: '#A8D8BF',
     lineHeight: 15,
   },
+  nextStepItem: {
+    marginTop: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#335646',
+    backgroundColor: '#132A21',
+  },
+  nextStepItemTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  nextStepItemIndex: {
+    width: 16,
+    height: 16,
+    textAlign: 'center',
+    lineHeight: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+    fontSize: 10,
+    color: '#E8FFF3',
+    backgroundColor: '#2D5744',
+    fontWeight: '700',
+  },
+  nextStepItemTitle: {
+    fontSize: 10,
+    color: '#D5FBE9',
+    fontWeight: '700',
+  },
+  nextStepItemDetail: {
+    fontSize: 10,
+    color: '#A6D9C2',
+    lineHeight: 14,
+  },
   nextStepBtn: {
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1958,6 +2079,61 @@ const styles = StyleSheet.create({
   rebirthBannerBtnText: {
     fontSize: 10,
     color: '#FFE7F1',
+    fontWeight: '700',
+  },
+  uiModeCard: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#36506A',
+    backgroundColor: '#111F2E',
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  uiModeTitle: {
+    fontSize: 11,
+    color: '#D8EEFF',
+    fontWeight: '700',
+  },
+  uiModeDesc: {
+    fontSize: 10,
+    color: '#9DBDD6',
+    marginTop: 2,
+  },
+  uiModeBtn: {
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#5F9FCF',
+    backgroundColor: '#23405A',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  uiModeBtnAlt: {
+    borderColor: '#7CB08E',
+    backgroundColor: '#2D5743',
+  },
+  uiModeBtnText: {
+    fontSize: 10,
+    color: '#E7F5FF',
+    fontWeight: '700',
+  },
+  sectionToggle: {
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#35516D',
+    backgroundColor: '#152536',
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  sectionToggleText: {
+    fontSize: 10,
+    color: '#CFE6FA',
     fontWeight: '700',
   },
 
@@ -3225,6 +3401,34 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#A6C8D4',
     lineHeight: 15,
+  },
+  claimAllRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  claimAllInfo: {
+    fontSize: 10,
+    color: '#B5D5E5',
+    fontWeight: '700',
+  },
+  claimAllBtn: {
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#6DA98B',
+    backgroundColor: '#264A3A',
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+  },
+  claimAllBtnDisabled: {
+    opacity: 0.5,
+  },
+  claimAllBtnText: {
+    fontSize: 10,
+    color: '#DBFFEC',
+    fontWeight: '700',
   },
   weeklyEventCard: {
     backgroundColor: '#121f2e',
