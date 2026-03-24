@@ -306,6 +306,79 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     claimableMissionIds.forEach(id => claimMission(id));
   };
 
+  const canCraftWeapon = state.equipmentScrap >= 130;
+
+  const renderPrimaryActions = () => {
+    type ActionChip = {
+      id: string;
+      label: string;
+      onPress: () => void;
+      disabled?: boolean;
+      emphasis?: 'default' | 'accent';
+    };
+
+    let actions: ActionChip[] = [];
+    if (tab === 'warroom') {
+      actions = [
+        { id: 'wr_claim', label: `Claim All (${claimableWeeklyMilestones.length + claimableMissionIds.length})`, onPress: claimAllRewards, disabled: !hasClaimableRewards, emphasis: 'accent' },
+        { id: 'wr_rebirth', label: canRebirthNow ? 'Rebirth' : `Rebirth @ W${REBIRTH_WAVE_THRESHOLD}`, onPress: () => setRebirthOpen(true), disabled: !canRebirthNow },
+        { id: 'wr_mode', label: guidedMode ? 'Full Mode' : 'Guided Mode', onPress: () => setGuidedMode(!guidedMode) },
+      ];
+    } else if (tab === 'battle') {
+      actions = [
+        { id: 'b_rebirth', label: canRebirthNow ? 'Rebirth' : `Rebirth @ W${REBIRTH_WAVE_THRESHOLD}`, onPress: () => setRebirthOpen(true), disabled: !canRebirthNow, emphasis: 'accent' },
+        { id: 'b_warroom', label: 'War Room', onPress: () => onTabChange('warroom') },
+        { id: 'b_objectives', label: 'Objectives', onPress: () => onTabChange('achievements') },
+      ];
+    } else if (tab === 'heroes') {
+      actions = [
+        { id: 'h_summon', label: state.freeSummonCharges > 0 ? 'Free Summon' : 'Summon', onPress: summonHero, disabled: !canGachaOnce, emphasis: 'accent' },
+        { id: 'h_auto', label: 'Auto Equip Best', onPress: autoEquipBestHeroes },
+        { id: 'h_adv', label: heroesAdvancedOpen ? 'Hide Advanced' : 'Advanced', onPress: () => setHeroesAdvancedOpen(prev => !prev) },
+      ];
+    } else if (tab === 'stats') {
+      actions = [
+        { id: 's_heroes', label: 'Roster', onPress: () => onTabChange('heroes') },
+        { id: 's_armory', label: 'Armory', onPress: () => onTabChange('equipment') },
+        { id: 's_legends', label: 'Legends', onPress: () => onTabChange('achievements') },
+      ];
+    } else if (tab === 'equipment') {
+      actions = [
+        { id: 'e_craft', label: 'Craft Weapon', onPress: () => craftEquipment('weapon'), disabled: !canCraftWeapon, emphasis: 'accent' },
+        { id: 'e_tools', label: equipmentToolsOpen ? 'Hide Tools' : 'Tools', onPress: () => setEquipmentToolsOpen(prev => !prev) },
+        { id: 'e_warroom', label: 'War Room', onPress: () => onTabChange('warroom') },
+      ];
+    } else if (tab === 'achievements') {
+      actions = [
+        { id: 'a_claim', label: `Claim All (${claimableWeeklyMilestones.length + claimableMissionIds.length})`, onPress: claimAllRewards, disabled: !hasClaimableRewards, emphasis: 'accent' },
+        { id: 'a_warroom', label: 'War Room', onPress: () => onTabChange('warroom') },
+        { id: 'a_battle', label: 'Warfront', onPress: () => onTabChange('battle') },
+      ];
+    }
+
+    return (
+      <View style={styles.primaryActionBar}>
+        <Text style={styles.primaryActionTitle}>Primary Actions</Text>
+        <View style={styles.primaryActionRow}>
+          {actions.map(action => (
+            <Pressable
+              key={action.id}
+              style={[
+                styles.primaryActionBtn,
+                action.emphasis === 'accent' && styles.primaryActionBtnAccent,
+                action.disabled && styles.primaryActionBtnDisabled,
+              ]}
+              disabled={action.disabled}
+              onPress={action.onPress}
+            >
+              <Text style={styles.primaryActionBtnText}>{action.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
   // Character creation screen
   if (!state.characterCreated) {
     return (
@@ -614,6 +687,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
       {/* Tab Content */}
       <ScrollView style={styles.tabContent}>
+        {renderPrimaryActions()}
+
         {tab === 'warroom' && (
           <View style={styles.warRoomTab}>
             <Text style={styles.sectionTitle}>🛰️ War Room Command</Text>
@@ -2420,6 +2495,45 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2B4258',
     backgroundColor: '#0C131D',
+  },
+  primaryActionBar: {
+    marginBottom: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#35516B',
+    backgroundColor: '#132132',
+    padding: 8,
+  },
+  primaryActionTitle: {
+    fontSize: 10,
+    color: '#B7D4EA',
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  primaryActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  primaryActionBtn: {
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#567A9A',
+    backgroundColor: '#1D3248',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  primaryActionBtnAccent: {
+    borderColor: '#71BF9A',
+    backgroundColor: '#214A3C',
+  },
+  primaryActionBtnDisabled: {
+    opacity: 0.45,
+  },
+  primaryActionBtnText: {
+    fontSize: 10,
+    color: '#E5F1FA',
+    fontWeight: '700',
   },
 
   // Battle Tab
