@@ -27,11 +27,20 @@ import {
   getEquipmentItem,
   equipmentRarityConfig,
   getMonsterForWave,
+  getActForWave,
+  getBossUnlockForWave,
+  unlockLabel,
   getMonsterAffixes,
   getMonsterGold,
   getMonsterExp,
+  getMonsterDamage,
   rarityConfig,
   getClassConfig,
+  getClassPassive,
+  getHeroPassiveTraitInfo,
+  getHeroActiveArchetypeInfo,
+  WEEKLY_TRACK_MILESTONES,
+  MISSION_BOARD_GOALS,
   calculateShardReward,
   getRankConfig,
   getUsableItem,
@@ -55,6 +64,13 @@ const STAT_LABELS = {
   spirit: 'SPR',
 } as const;
 
+const UPGRADE_COSTS: Record<string, { scrap: number; essence: number }> = {
+  common: { scrap: 80, essence: 0 },
+  rare: { scrap: 170, essence: 4 },
+  epic: { scrap: 300, essence: 8 },
+  legendary: { scrap: 500, essence: 14 },
+};
+
 export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const {
     state,
@@ -68,6 +84,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     saveTeamLoadout,
     loadTeamLoadout,
     autoRecycleHeroes,
+    setAutoRecycleMaxRarity,
     toggleEquipHero,
     allocateStat,
     allocateStatMax,
@@ -77,11 +94,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     useUsableItem,
     dismantleEquipment,
     craftEquipment,
+    upgradeEquipmentRarity,
     setAutoUsePotion,
     setAutoUsePotionThreshold,
+    spendEssenceUpgrade,
+    claimWeeklyTrack,
+    claimMission,
+    markHintSeen,
     clearAchievement,
     clearRewardPopup,
     rebirth,
+    getEssenceCost,
+    getWeeklyEvent,
+    getMissionProgress,
   } = useGameState(accountName);
 
   const [tab, setTab] = useState<Tab>('battle');
@@ -92,12 +117,21 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [tempTeam, setTempTeam] = useState<string[]>(state.activeTeamHeroIds);
   const [expandedHeroes, setExpandedHeroes] = useState<Set<string>>(new Set());
   const [recycleConfirmUid, setRecycleConfirmUid] = useState<string | null>(null);
+  const [recycleDropdownOpen, setRecycleDropdownOpen] = useState(false);
 
   const classConfig = getClassConfig(state.playerClass ?? 'warrior');
+  const classPassive = getClassPassive(state.playerClass ?? 'warrior');
 
   const monster = getMonsterForWave(state.wave);
   const monsterAffixes = getMonsterAffixes(state.wave);
+  const affixTotals = monsterAffixes.reduce((acc, affix) => ({
+    hpMult: acc.hpMult * affix.enemyHpMultiplier,
+    dmgMult: acc.dmgMult * affix.enemyDamageMultiplier,
+  }), { hpMult: 1, dmgMult: 1 });
   const isBoss = state.wave % 10 === 0;
+  const currentAct = getActForWave(state.wave);
+  const actProgressPct = Math.max(0, Math.min(1, (state.wave - currentAct.startWave + 1) / (currentAct.endWave - currentAct.startWave + 1))) * 100;
+  const nextBossUnlock = getBossUnlockForWave(currentAct.bossWave);
   const monsterHpPct = Math.max(0, Math.min(1, state.monsterHp / state.monsterMaxHp)) * 100;
   const teamHpPct = Math.max(0, Math.min(1, state.teamHp / state.teamMaxHp)) * 100;
   const activeTeamSet = useMemo(() => new Set(state.activeTeamHeroIds), [state.activeTeamHeroIds]);
@@ -123,9 +157,52 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const currentQuest = state.tutorialEnabled
     ? TUTORIAL_QUESTS[state.tutorialCurrentQuestIndex] ?? null
     : null;
+  const weeklyEvent = getWeeklyEvent();
+  const missionCards = MISSION_BOARD_GOALS.map(m => ({
+    mission: m,
+    progress: getMissionProgress(m),
+    claimed: state.claimedMissionIds.includes(m.id),
+  }));
+
+  const hintCandidates = useMemo(() => {
+    const list: Array<{ id: string; title: string; detail: string }> = [];
+    if (!state.seenHintIds.includes('hint_mission_board')) {
+      list.push({
+        id: 'hint_mission_board',
+        title: 'Mission Board Online',
+        detail: 'Check Achievements for short/medium/long goals and claim rewards when complete.',
+      });
+    }
+    if (state.permanentUnlocks.includes('advanced_consumables') && !state.seenHintIds.includes('hint_consumables')) {
+      list.push({
+        id: 'hint_consumables',
+        title: 'Advanced Consumables Unlocked',
+        detail: 'New consumables now drop in battles. Use them from the Battle tab.',
+      });
+    }
+    if (state.permanentUnlocks.includes('mythic_equipment') && !state.seenHintIds.includes('hint_mythic_tier')) {
+      list.push({
+        id: 'hint_mythic_tier',
+        title: 'Mythic Tier Online',
+        detail: 'You can now drop and upgrade into Mythic equipment in the Equipment tab.',
+      });
+    }
+    return list;
+  }, [state.permanentUnlocks, state.seenHintIds]);
+  const activeHint = hintCandidates[0] ?? null;
 
   const tutorialProgressLabel = `${Math.min(state.tutorialCurrentQuestIndex, TUTORIAL_QUESTS.length)}/${TUTORIAL_QUESTS.length}`;
   const rewardPopup = state.rewardQueue[0] ?? null;
+  const effectiveTeamDps = Math.max(1, stats.dps / affixTotals.hpMult);
+  const ttkSeconds = state.monsterHp / effectiveTeamDps;
+  const baseEnemyDps = getMonsterDamage(state.wave) * affixTotals.dmgMult;
+  const incomingAfterDefense = baseEnemyDps * (1 - Math.min(0.8, stats.teamDefense / (stats.teamDefense + 100)));
+  const incomingAfterBuffs = incomingAfterDefense * (1 - stats.damageReductionBuffPct);
+  const dangerScore = Math.max(0, Math.min(100, (incomingAfterBuffs / Math.max(1, state.teamHp)) * 120));
+  const dangerLabel = dangerScore < 25 ? 'Low' : dangerScore < 55 ? 'Moderate' : dangerScore < 80 ? 'High' : 'Critical';
+  const damageEssenceCost = getEssenceCost('damage');
+  const economyEssenceCost = getEssenceCost('economy');
+  const survivalEssenceCost = getEssenceCost('survival');
 
   useEffect(() => {
     if (!rewardPopup) return;
@@ -206,6 +283,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         <View>
           <Text style={styles.gold}>💰 {fmt(state.gold)}</Text>
           <Text style={styles.shardLabel}>💎 {fmt(state.heroShards)} shards</Text>
+          <Text style={styles.essenceLabel}>🜂 {fmt(state.essence)} essence</Text>
           <Text style={styles.dpsLabel}>Team DPS {fmt(stats.dps)}</Text>
         </View>
         <View style={styles.headerCenter}>
@@ -235,6 +313,18 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           <Text style={styles.questName}>{currentQuest.title}</Text>
           <Text style={styles.questDesc}>{currentQuest.description}</Text>
           <Text style={styles.questHint}>Go to: {currentQuest.targetTab.toUpperCase()} tab</Text>
+        </View>
+      )}
+
+      {activeHint && (
+        <View style={styles.hintBanner}>
+          <View style={styles.hintBannerTop}>
+            <Text style={styles.hintBannerTitle}>💡 {activeHint.title}</Text>
+            <Pressable onPress={() => markHintSeen(activeHint.id)} style={styles.hintDismissBtn}>
+              <Text style={styles.hintDismissBtnText}>Dismiss</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.hintBannerText}>{activeHint.detail}</Text>
         </View>
       )}
 
@@ -396,6 +486,24 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         {tab === 'battle' && (
           <View style={styles.battleTab}>
             <Text style={styles.sectionTitle}>⚔️ Battle Overview</Text>
+
+            <View style={styles.battleSection}>
+              <Text style={styles.battleSectionTitle}>Act Progression</Text>
+              <Text style={styles.actTitle}>{currentAct.emoji} Act {currentAct.id}: {currentAct.name}</Text>
+              <Text style={styles.actTheme}>{currentAct.theme}</Text>
+              <View style={styles.hpBarBg}>
+                <View style={[styles.hpBarFill, { width: `${actProgressPct}%`, backgroundColor: '#5DA8FF' }]} />
+              </View>
+              <Text style={styles.actProgress}>Wave {state.wave} • Boss at Wave {currentAct.bossWave}</Text>
+              {nextBossUnlock ? (
+                <Text style={styles.actUnlockHint}>Next boss unlock: {unlockLabel(nextBossUnlock)}</Text>
+              ) : (
+                <Text style={styles.actUnlockHint}>Boss reward: bonus essence cache</Text>
+              )}
+              <Text style={styles.actUnlockOwned}>
+                Unlocks: {state.permanentUnlocks.length === 0 ? 'None yet' : state.permanentUnlocks.map(unlockLabel).join(' • ')}
+              </Text>
+            </View>
             
             {/* Enemy Info */}
             <View style={styles.battleSection}>
@@ -455,6 +563,37 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <View style={styles.battleStatRow}>
                 <Text style={styles.battleStatLabel}>Enemy HP:</Text>
                 <Text style={styles.battleStatValue}>{Math.ceil(state.monsterHp)} / {state.monsterMaxHp}</Text>
+              </View>
+              {(stats.damageBuffPct > 0 || stats.damageReductionBuffPct > 0) && (
+                <Text style={styles.buffText}>
+                  Buffs: {stats.damageBuffPct > 0 ? `+${Math.round(stats.damageBuffPct * 100)}% DPS ` : ''}
+                  {stats.damageReductionBuffPct > 0 ? `• -${Math.round(stats.damageReductionBuffPct * 100)}% incoming` : ''}
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.battleSection}>
+              <Text style={styles.battleSectionTitle}>Forecast</Text>
+              <View style={styles.battleStatRow}>
+                <Text style={styles.battleStatLabel}>Expected TTK:</Text>
+                <Text style={styles.battleStatValue}>{ttkSeconds >= 99 ? '99s+' : `${ttkSeconds.toFixed(1)}s`}</Text>
+              </View>
+              <View style={styles.battleStatRow}>
+                <Text style={styles.battleStatLabel}>Danger:</Text>
+                <Text style={[styles.battleStatValue, dangerScore >= 80 ? styles.dangerCritical : dangerScore >= 55 ? styles.dangerHigh : styles.dangerLow]}>
+                  {dangerLabel} ({dangerScore.toFixed(0)}%)
+                </Text>
+              </View>
+              <View style={styles.hpBarBg}>
+                <View
+                  style={[
+                    styles.hpBarFill,
+                    {
+                      width: `${dangerScore}%`,
+                      backgroundColor: dangerScore >= 80 ? '#FF5B8A' : dangerScore >= 55 ? '#FFB347' : '#6DDB7B',
+                    },
+                  ]}
+                />
               </View>
             </View>
 
@@ -516,6 +655,17 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     </View>
                   );
                 })
+              )}
+            </View>
+
+            <View style={styles.battleSection}>
+              <Text style={styles.battleSectionTitle}>Live Combat Log</Text>
+              {state.combatLog.length === 0 ? (
+                <Text style={styles.emptyMsg}>No events yet. Start attacking to see crits and skill triggers.</Text>
+              ) : (
+                state.combatLog.slice(0, 8).map((line, idx) => (
+                  <Text key={`${idx}_${line}`} style={styles.combatLogLine}>{line}</Text>
+                ))
               )}
             </View>
 
@@ -596,12 +746,37 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <Text style={styles.sectionTitle}>📇 Hero Roster</Text>
               <View style={styles.heroRosterActions}>
                 <Pressable style={styles.autoRecycleBtn} onPress={autoRecycleHeroes}>
-                  <Text style={styles.autoRecycleBtnText}>Auto Recycle C/U</Text>
+                  <Text style={styles.autoRecycleBtnText}>Auto Recycle</Text>
                 </Pressable>
                 <Pressable style={styles.autoEquipBtn} onPress={autoEquipBestHeroes}>
                   <Text style={styles.autoEquipBtnText}>Auto Equip Best</Text>
                 </Pressable>
               </View>
+            </View>
+            <View style={styles.recyclePickerWrap}>
+              <Text style={styles.recyclePickerLabel}>Recycle rarity threshold (and below):</Text>
+              <Pressable
+                style={styles.recyclePickerBtn}
+                onPress={() => setRecycleDropdownOpen(prev => !prev)}
+              >
+                <Text style={styles.recyclePickerBtnText}>▼ {state.autoRecycleMaxRarity.toUpperCase()}</Text>
+              </Pressable>
+              {recycleDropdownOpen && (
+                <View style={styles.recycleDropdown}>
+                  {RARITIES.map(r => (
+                    <Pressable
+                      key={r.id}
+                      style={[styles.recycleOption, state.autoRecycleMaxRarity === r.id && styles.recycleOptionActive]}
+                      onPress={() => {
+                        setAutoRecycleMaxRarity(r.id);
+                        setRecycleDropdownOpen(false);
+                      }}
+                    >
+                      <Text style={[styles.recycleOptionText, { color: r.color }]}>{r.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
             </View>
             <Text style={styles.rosterCount}>
               {state.heroRoster.length} heroes • {state.activeTeamHeroIds.length}/{ACTIVE_TEAM_SIZE} in active team
@@ -633,6 +808,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 const shardValue = calculateShardReward(hero.rarity, hero.level);
                 const nextRankConfig = hero.rank < 10 ? getRankConfig(hero.rank + 1) : null;
                 const canRankUp = nextRankConfig && state.heroShards >= nextRankConfig.shardCostToRankUp;
+                const trait = getHeroPassiveTraitInfo(hero.passiveTrait);
+                const activeArchetype = getHeroActiveArchetypeInfo(hero.activeSkillArchetype);
                 return (
                   <View key={hero.uid} style={[styles.heroCard, inActiveTeam && styles.heroCardActive]}>
                     <View style={[styles.heroCardRarityBar, { backgroundColor: rarity.color }]} />
@@ -701,6 +878,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                           </Pressable>
                         </View>
                       )}
+
+                      <View style={styles.heroIdentityBox}>
+                        <Text style={styles.heroIdentityLine}>Passive: {trait.name}</Text>
+                        <Text style={styles.heroIdentitySub}>{trait.description}</Text>
+                        <Text style={styles.heroIdentityLine}>Active: {activeArchetype.name}</Text>
+                        <Text style={styles.heroIdentitySub}>{activeArchetype.description}</Text>
+                      </View>
 
                       {/* Expanded stat detail */}
                       {isExpanded && details && (
@@ -780,6 +964,60 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               </Text>
             </View>
 
+            <View style={styles.metaBox}>
+              <Text style={styles.sectionTitle}>🧭 Permanent Progression</Text>
+              <Text style={styles.metaEssence}>Essence: {fmt(state.essence)}</Text>
+              <View style={styles.passiveBanner}>
+                <Text style={styles.passiveTitle}>Class Passive: {classPassive.name}</Text>
+                <Text style={styles.passiveDesc}>{classPassive.description}</Text>
+                <Text style={styles.passiveState}>
+                  {state.permanentUnlocks.includes('class_passive') ? 'Unlocked' : 'Locked (Defeat Act 1 Boss)'}
+                </Text>
+              </View>
+
+              <View style={styles.metaUpgradeRow}>
+                <View style={styles.metaUpgradeInfo}>
+                  <Text style={styles.metaUpgradeName}>Damage Path Lv {state.metaDamageLevel}</Text>
+                  <Text style={styles.metaUpgradeDesc}>+5% all DPS per level</Text>
+                </View>
+                <Pressable
+                  style={[styles.metaUpgradeBtn, state.essence < damageEssenceCost && styles.metaUpgradeBtnDisabled]}
+                  disabled={state.essence < damageEssenceCost}
+                  onPress={() => spendEssenceUpgrade('damage')}
+                >
+                  <Text style={styles.metaUpgradeBtnText}>{damageEssenceCost} 🜂</Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.metaUpgradeRow}>
+                <View style={styles.metaUpgradeInfo}>
+                  <Text style={styles.metaUpgradeName}>Economy Path Lv {state.metaEconomyLevel}</Text>
+                  <Text style={styles.metaUpgradeDesc}>+5% gold gains per level</Text>
+                </View>
+                <Pressable
+                  style={[styles.metaUpgradeBtn, state.essence < economyEssenceCost && styles.metaUpgradeBtnDisabled]}
+                  disabled={state.essence < economyEssenceCost}
+                  onPress={() => spendEssenceUpgrade('economy')}
+                >
+                  <Text style={styles.metaUpgradeBtnText}>{economyEssenceCost} 🜂</Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.metaUpgradeRow}>
+                <View style={styles.metaUpgradeInfo}>
+                  <Text style={styles.metaUpgradeName}>Survival Path Lv {state.metaSurvivalLevel}</Text>
+                  <Text style={styles.metaUpgradeDesc}>+5% team HP/defense per level</Text>
+                </View>
+                <Pressable
+                  style={[styles.metaUpgradeBtn, state.essence < survivalEssenceCost && styles.metaUpgradeBtnDisabled]}
+                  disabled={state.essence < survivalEssenceCost}
+                  onPress={() => spendEssenceUpgrade('survival')}
+                >
+                  <Text style={styles.metaUpgradeBtnText}>{survivalEssenceCost} 🜂</Text>
+                </Pressable>
+              </View>
+            </View>
+
             <View style={styles.equipmentBox}>
               <Text style={styles.sectionTitle}>🧰 Equipment ({classConfig.name})</Text>
               <Text style={styles.equipmentDesc}>Equip one item per slot. Bonuses apply immediately.</Text>
@@ -836,6 +1074,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               Total: {state.inventoryItemIds.length} items • Shards: <Text style={{ color: '#FFB347' }}>{state.heroShards}</Text>
             </Text>
             <Text style={styles.scrapLabel}>🔩 Scrap: {fmt(state.equipmentScrap)}</Text>
+            <Text style={styles.mythicTierLabel}>
+              Mythic Tier: {state.permanentUnlocks.includes('mythic_equipment') ? 'Unlocked' : 'Locked (Defeat Act 3 Boss)'}
+            </Text>
             <View style={styles.craftRow}>
               {(['weapon', 'armor', 'accessory'] as EquipmentSlot[]).map(slot => {
                 const cost = slot === 'weapon' ? 130 : slot === 'armor' ? 120 : 100;
@@ -861,6 +1102,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 if (!item) return null;
                 const isEquipped = Object.values(state.equippedItems).includes(itemId);
                 const rarity = equipmentRarityConfig(item.rarity);
+                const upgradeCost = UPGRADE_COSTS[item.rarity];
+                const canUpgrade = !!upgradeCost
+                  && state.equipmentScrap >= upgradeCost.scrap
+                  && state.essence >= upgradeCost.essence
+                  && (item.rarity !== 'legendary' || state.permanentUnlocks.includes('mythic_equipment'));
                 return (
                   <View key={itemId} style={[styles.invEquipCard, isEquipped && styles.invEquipCardEquipped]}>
                     <View style={[styles.invEquipRarity, { backgroundColor: rarity.color }]} />
@@ -877,6 +1123,15 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                           .join(' • ')}
                       </Text>
                       {isEquipped && <Text style={styles.invEquipActive}>✓ Equipped</Text>}
+                      {upgradeCost && (
+                        <Pressable
+                          style={[styles.upgradeGearBtn, !canUpgrade && styles.upgradeGearBtnDisabled]}
+                          disabled={!canUpgrade}
+                          onPress={() => upgradeEquipmentRarity(item.id)}
+                        >
+                          <Text style={styles.upgradeGearBtnText}>Upgrade ({upgradeCost.scrap}🔩 {upgradeCost.essence}🜂)</Text>
+                        </Pressable>
+                      )}
                       {!isEquipped && (
                         <Pressable style={styles.dismantleBtn} onPress={() => dismantleEquipment(item.id)}>
                           <Text style={styles.dismantleBtnText}>Dismantle</Text>
@@ -892,6 +1147,51 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
         {tab === 'achievements' && (
           <View style={styles.achievementsTab}>
+            <View style={styles.weeklyEventCard}>
+              <Text style={styles.weeklyEventTitle}>{weeklyEvent.emoji} Weekly Event: {weeklyEvent.name}</Text>
+              <Text style={styles.weeklyEventDesc}>{weeklyEvent.description}</Text>
+              <Text style={styles.weeklyProgressLabel}>Weekly Kills: {state.weeklyKills}</Text>
+              {WEEKLY_TRACK_MILESTONES.map(ms => {
+                const done = state.weeklyKills >= ms;
+                const claimed = state.weeklyTrackClaimed.includes(ms);
+                return (
+                  <View key={ms} style={styles.weeklyTrackRow}>
+                    <Text style={styles.weeklyTrackText}>Milestone {ms}</Text>
+                    <Pressable
+                      style={[
+                        styles.weeklyClaimBtn,
+                        (!done || claimed) && styles.weeklyClaimBtnDisabled,
+                      ]}
+                      disabled={!done || claimed}
+                      onPress={() => claimWeeklyTrack(ms)}
+                    >
+                      <Text style={styles.weeklyClaimBtnText}>{claimed ? 'Claimed' : done ? 'Claim' : 'Locked'}</Text>
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </View>
+
+            <View style={styles.missionBoardCard}>
+              <Text style={styles.sectionTitle}>🎯 Mission Board</Text>
+              {missionCards.map(({ mission, progress, claimed }) => (
+                <View key={mission.id} style={styles.missionRow}>
+                  <View style={styles.missionInfo}>
+                    <Text style={styles.missionTitle}>{mission.title} ({mission.horizon})</Text>
+                    <Text style={styles.missionDesc}>{mission.description}</Text>
+                    <Text style={styles.missionProgress}>{Math.min(progress.value, mission.target)}/{mission.target}</Text>
+                  </View>
+                  <Pressable
+                    style={[styles.missionClaimBtn, (!progress.done || claimed) && styles.missionClaimBtnDisabled]}
+                    disabled={!progress.done || claimed}
+                    onPress={() => claimMission(mission.id)}
+                  >
+                    <Text style={styles.missionClaimBtnText}>{claimed ? 'Claimed' : progress.done ? 'Claim' : 'Locked'}</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+
             <Text style={styles.sectionTitle}>🏆 Achievements</Text>
             {ACHIEVEMENTS.map(ach => {
               const unlocked = state.achievements.has(ach.id);
@@ -1105,6 +1405,11 @@ const styles = StyleSheet.create({
     color: '#7ad1ff',
     marginBottom: 2,
   },
+  essenceLabel: {
+    fontSize: 11,
+    color: '#FF9F7A',
+    marginBottom: 2,
+  },
   dpsLabel: {
     fontSize: 11,
     color: '#AAA',
@@ -1117,6 +1422,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#FFF',
+  },
+  buffText: {
+    marginTop: 6,
+    fontSize: 10,
+    color: '#8BD39E',
+    fontWeight: '700',
+  },
+  dangerLow: {
+    color: '#8BDB9D',
+  },
+  dangerHigh: {
+    color: '#FFB347',
+  },
+  dangerCritical: {
+    color: '#FF6B86',
+  },
+  combatLogLine: {
+    fontSize: 10,
+    color: '#B3C2DA',
+    marginBottom: 4,
+    lineHeight: 14,
   },
   classLabel: {
     fontSize: 11,
@@ -1194,6 +1520,42 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#6DDB7B',
     marginTop: 4,
+  },
+  hintBanner: {
+    marginHorizontal: 12,
+    marginBottom: 6,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: '#1C1A2C',
+    borderLeftWidth: 3,
+    borderLeftColor: '#8DA7FF',
+  },
+  hintBannerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  hintBannerTitle: {
+    fontSize: 11,
+    color: '#D8E0FF',
+    fontWeight: '700',
+  },
+  hintBannerText: {
+    fontSize: 10,
+    color: '#A9B8DD',
+    lineHeight: 15,
+  },
+  hintDismissBtn: {
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    backgroundColor: '#32365A',
+  },
+  hintDismissBtnText: {
+    fontSize: 10,
+    color: '#EAF0FF',
+    fontWeight: '700',
   },
 
   // HP Section
@@ -1712,6 +2074,54 @@ const styles = StyleSheet.create({
     color: '#888',
     marginBottom: 8,
   },
+  recyclePickerWrap: {
+    marginBottom: 8,
+    backgroundColor: '#111728',
+    borderWidth: 1,
+    borderColor: '#2a3654',
+    borderRadius: 6,
+    padding: 8,
+  },
+  recyclePickerLabel: {
+    fontSize: 10,
+    color: '#99A9C9',
+    marginBottom: 6,
+  },
+  recyclePickerBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 5,
+    backgroundColor: '#1B2640',
+    borderWidth: 1,
+    borderColor: '#3a4f82',
+    alignSelf: 'flex-start',
+  },
+  recyclePickerBtnText: {
+    color: '#DCE8FF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  recycleDropdown: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#304062',
+    borderRadius: 5,
+    overflow: 'hidden',
+    backgroundColor: '#0F1524',
+  },
+  recycleOption: {
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1f2a43',
+  },
+  recycleOptionActive: {
+    backgroundColor: '#1b2a20',
+  },
+  recycleOptionText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
   loadoutRow: {
     flexDirection: 'row',
     gap: 8,
@@ -1839,6 +2249,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 8,
     gap: 6,
+  },
+  heroIdentityBox: {
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#2F3754',
+    backgroundColor: '#0D1121',
+  },
+  heroIdentityLine: {
+    fontSize: 10,
+    color: '#DCE6FF',
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  heroIdentitySub: {
+    fontSize: 10,
+    color: '#91A7CD',
+    marginBottom: 4,
+    lineHeight: 13,
   },
   heroStatItem: {
     flex: 1,
@@ -1975,6 +2406,85 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFB347',
   },
+  metaBox: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: '#16172A',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#303564',
+    gap: 8,
+  },
+  metaEssence: {
+    fontSize: 12,
+    color: '#FFB68D',
+    fontWeight: '700',
+  },
+  passiveBanner: {
+    backgroundColor: '#0E1120',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#2A335A',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  passiveTitle: {
+    fontSize: 11,
+    color: '#DCE6FF',
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  passiveDesc: {
+    fontSize: 10,
+    color: '#9CB0D4',
+    marginBottom: 4,
+  },
+  passiveState: {
+    fontSize: 10,
+    color: '#8bd39e',
+    fontWeight: '700',
+  },
+  metaUpgradeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0F1120',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#2C3158',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    gap: 8,
+  },
+  metaUpgradeInfo: {
+    flex: 1,
+  },
+  metaUpgradeName: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#E6EDFF',
+    marginBottom: 2,
+  },
+  metaUpgradeDesc: {
+    fontSize: 10,
+    color: '#9FB0D3',
+  },
+  metaUpgradeBtn: {
+    borderRadius: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#2f6d4f',
+    borderWidth: 1,
+    borderColor: '#5ea97b',
+  },
+  metaUpgradeBtnDisabled: {
+    opacity: 0.45,
+  },
+  metaUpgradeBtnText: {
+    fontSize: 11,
+    color: '#D6FFE7',
+    fontWeight: '700',
+  },
   equipmentBox: {
     paddingVertical: 12,
     paddingHorizontal: 12,
@@ -2037,6 +2547,109 @@ const styles = StyleSheet.create({
   // Achievements Tab
   achievementsTab: {
     gap: 8,
+  },
+  weeklyEventCard: {
+    backgroundColor: '#121f2e',
+    borderWidth: 1,
+    borderColor: '#2f4d71',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  weeklyEventTitle: {
+    fontSize: 12,
+    color: '#DCEFFF',
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  weeklyEventDesc: {
+    fontSize: 10,
+    color: '#AFC5DD',
+    marginBottom: 8,
+    lineHeight: 15,
+  },
+  weeklyProgressLabel: {
+    fontSize: 11,
+    color: '#90D0FF',
+    marginBottom: 6,
+    fontWeight: '700',
+  },
+  weeklyTrackRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 5,
+  },
+  weeklyTrackText: {
+    fontSize: 11,
+    color: '#D2E0F0',
+  },
+  weeklyClaimBtn: {
+    backgroundColor: '#2e6948',
+    borderWidth: 1,
+    borderColor: '#5ea280',
+    borderRadius: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+  },
+  weeklyClaimBtnDisabled: {
+    opacity: 0.45,
+  },
+  weeklyClaimBtnText: {
+    fontSize: 10,
+    color: '#d8ffeb',
+    fontWeight: '700',
+  },
+  missionBoardCard: {
+    backgroundColor: '#1A182B',
+    borderWidth: 1,
+    borderColor: '#3A3161',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  missionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2B254A',
+  },
+  missionInfo: {
+    flex: 1,
+  },
+  missionTitle: {
+    fontSize: 11,
+    color: '#E3DBFF',
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  missionDesc: {
+    fontSize: 10,
+    color: '#B7ADDC',
+    marginBottom: 2,
+  },
+  missionProgress: {
+    fontSize: 10,
+    color: '#8ED5FF',
+    fontWeight: '700',
+  },
+  missionClaimBtn: {
+    backgroundColor: '#3B3D73',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#7C82D3',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  missionClaimBtnDisabled: {
+    opacity: 0.45,
+  },
+  missionClaimBtnText: {
+    fontSize: 10,
+    color: '#E8E9FF',
+    fontWeight: '700',
   },
   achCard: {
     flexDirection: 'row',
@@ -2244,6 +2857,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 4,
   },
+  actTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#E8EEFF',
+    marginBottom: 2,
+  },
+  actTheme: {
+    fontSize: 10,
+    color: '#96a5bf',
+    marginBottom: 8,
+  },
+  actProgress: {
+    fontSize: 10,
+    color: '#c2d2f4',
+    marginTop: 6,
+  },
+  actUnlockHint: {
+    fontSize: 10,
+    color: '#8dd0ff',
+    marginTop: 3,
+  },
+  actUnlockOwned: {
+    fontSize: 10,
+    color: '#9fcf9d',
+    marginTop: 4,
+  },
 
   // Equipment Tab
   equipmentTab: {
@@ -2257,6 +2896,11 @@ const styles = StyleSheet.create({
   scrapLabel: {
     fontSize: 12,
     color: '#B6D6FF',
+    marginBottom: 8,
+  },
+  mythicTierLabel: {
+    fontSize: 11,
+    color: '#FF7EA1',
     marginBottom: 8,
   },
   craftRow: {
@@ -2337,6 +2981,24 @@ const styles = StyleSheet.create({
   invEquipActive: {
     fontSize: 10,
     color: '#6DDB7B',
+    fontWeight: '700',
+  },
+  upgradeGearBtn: {
+    marginTop: 6,
+    alignSelf: 'flex-start',
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    backgroundColor: '#294353',
+    borderWidth: 1,
+    borderColor: '#5b97c0',
+  },
+  upgradeGearBtnDisabled: {
+    opacity: 0.45,
+  },
+  upgradeGearBtnText: {
+    color: '#d8edff',
+    fontSize: 10,
     fontWeight: '700',
   },
   dismantleBtn: {

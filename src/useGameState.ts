@@ -16,29 +16,46 @@ import {
   HeroUnit,
   Rarity,
   TutorialEvent,
+  PermanentUnlockId,
+  HeroPassiveTraitId,
+  HeroActiveSkillArchetypeId,
   GACHA_SUMMON_COST,
   HERO_POOL,
   ACTIVE_TEAM_SIZE,
   HERO_LEVEL_EXP_FORMULA,
   HERO_LEVEL_CAP,
+  WeeklyEventConfig,
+  MissionBoardGoal,
   getMonsterMaxHp,
+  getMonsterForWave,
   getMonsterGold,
   getMonsterExp,
   getMonsterDamage,
+  WEEKLY_TRACK_MILESTONES,
+  MISSION_BOARD_GOALS,
+  getWeeklyEventByWeek,
+  getWeeklyEventForTimestamp,
+  weekNumberForTimestamp,
+  getActForWave,
+  getBossUnlockForWave,
+  getClassPassive,
+  getHeroActiveArchetypeInfo,
   getMonsterAffixes,
   expForLevel,
   getClassConfig,
   getEquipmentItem,
   getStarterEquipmentForClass,
+  getNextEquipmentRarity,
   EQUIPMENT_CATALOG,
   equipmentRarityConfig,
   getUsableItem,
   rollUsableItem,
-  rollEquipmentRarity,
+  rollEquipmentRarityByTier,
   rollRarity,
   rarityConfig,
   RANK_CONFIGS,
   calculateShardReward,
+  unlockLabel,
 } from './gameConfig';
 import { buildingCost, bulkCost } from './utils';
 
@@ -97,12 +114,24 @@ export interface GameState {
   firstSummonGiven: boolean;  // track if free summon given on first kill
   freeSummonCharges: number;
   heroShards: number;  // currency used to rank up heroes
+  essence: number;
+  autoRecycleMaxRarity: Rarity;
   equipmentScrap: number;
   gachaPityCounter: number;
   summonHistory: SummonHistoryEntry[];
   teamLoadouts: string[][];
   dailyLoginStreak: number;
   lastDailyLoginDay: number | null;
+  weeklyEventWeek: number;
+  weeklyEventId: string;
+  weeklyKills: number;
+  weeklyTrackClaimed: number[];
+  claimedMissionIds: string[];
+  seenHintIds: string[];
+  permanentUnlocks: PermanentUnlockId[];
+  metaDamageLevel: number;
+  metaEconomyLevel: number;
+  metaSurvivalLevel: number;
 
   inventoryItemIds: string[];
   equippedItems: Record<EquipmentSlot, string | null>;
@@ -120,6 +149,12 @@ export interface GameState {
   achievements: Set<string>;
   newAchievement: string | null;
   rewardQueue: RewardPopup[];
+  combatLog: string[];
+  damageBuffPct: number;
+  damageBuffMs: number;
+  damageReductionBuffPct: number;
+  damageReductionBuffMs: number;
+  heroActiveCdMs: Record<string, number>;
 }
 
 const initialParty = (): Record<PartyId, number> =>
@@ -162,12 +197,24 @@ const DEFAULT_STATE: GameState = {
   firstSummonGiven: false,
   freeSummonCharges: 0,
   heroShards: 0,
+  essence: 0,
+  autoRecycleMaxRarity: 'uncommon',
   equipmentScrap: 0,
   gachaPityCounter: 0,
   summonHistory: [],
   teamLoadouts: [[], [], []],
   dailyLoginStreak: 0,
   lastDailyLoginDay: null,
+  weeklyEventWeek: weekNumberForTimestamp(Date.now()),
+  weeklyEventId: getWeeklyEventForTimestamp(Date.now()).id,
+  weeklyKills: 0,
+  weeklyTrackClaimed: [],
+  claimedMissionIds: [],
+  seenHintIds: [],
+  permanentUnlocks: [],
+  metaDamageLevel: 0,
+  metaEconomyLevel: 0,
+  metaSurvivalLevel: 0,
 
   inventoryItemIds: [],
   equippedItems: {
@@ -189,6 +236,12 @@ const DEFAULT_STATE: GameState = {
   achievements: new Set(),
   newAchievement: null,
   rewardQueue: [],
+  combatLog: [],
+  damageBuffPct: 0,
+  damageBuffMs: 0,
+  damageReductionBuffPct: 0,
+  damageReductionBuffMs: 0,
+  heroActiveCdMs: {},
 };
 
 function sumStats(a: StatBlock, b: StatBlock): StatBlock {
@@ -318,6 +371,117 @@ function queueReward(state: GameState, reward: RewardPopup): GameState {
   };
 }
 
+function queueCombatLog(state: GameState, line: string): GameState {
+  return {
+    ...state,
+    combatLog: [`${new Date().toLocaleTimeString()} • ${line}`, ...state.combatLog].slice(0, 24),
+  };
+}
+
+function getHeroPassiveMultipliers(state: GameState): {
+  dpsMult: number;
+  goldMult: number;
+  expMult: number;
+  incomingDmgMult: number;
+} {
+  const team = new Set(state.activeTeamHeroIds);
+  let dpsMult = 1;
+  let goldMult = 1;
+  let expMult = 1;
+  let incomingDmgMult = 1;
+
+  for (const hero of state.heroRoster) {
+    if (!team.has(hero.uid)) continue;
+    const trait: HeroPassiveTraitId = hero.passiveTrait;
+    if (trait === 'warpath_instinct') dpsMult *= 1.03;
+    if (trait === 'fortune_hunter') goldMult *= 1.04;
+    if (trait === 'sage_instinct') expMult *= 1.03;
+    if (trait === 'bulwark_instinct') incomingDmgMult *= 0.98;
+  }
+
+  return {
+    dpsMult: Math.min(1.4, dpsMult),
+    goldMult: Math.min(1.6, goldMult),
+    expMult: Math.min(1.45, expMult),
+    incomingDmgMult: Math.max(0.72, incomingDmgMult),
+  };
+}
+
+function decayBuffs(state: GameState, elapsedMs: number): GameState {
+  const nextDmgMs = Math.max(0, state.damageBuffMs - elapsedMs);
+  const nextDrMs = Math.max(0, state.damageReductionBuffMs - elapsedMs);
+  return {
+    ...state,
+    damageBuffMs: nextDmgMs,
+    damageReductionBuffMs: nextDrMs,
+    damageBuffPct: nextDmgMs > 0 ? state.damageBuffPct : 0,
+    damageReductionBuffPct: nextDrMs > 0 ? state.damageReductionBuffPct : 0,
+  };
+}
+
+function tickHeroActives(state: GameState, elapsedMs: number): GameState {
+  const team = new Set(state.activeTeamHeroIds);
+  if (team.size === 0) return state;
+
+  let nextState = state;
+  const cooldowns: Record<string, number> = { ...state.heroActiveCdMs };
+
+  for (const hero of state.heroRoster) {
+    if (!team.has(hero.uid)) continue;
+    cooldowns[hero.uid] = Math.max(0, (cooldowns[hero.uid] ?? 0) - elapsedMs);
+    if (cooldowns[hero.uid] > 0) continue;
+
+    const triggerChance = Math.min(0.16, 0.015 + hero.level * 0.00012) * (elapsedMs / 1000);
+    if (Math.random() > triggerChance) continue;
+
+    const archetype: HeroActiveSkillArchetypeId = hero.activeSkillArchetype;
+    const info = getHeroActiveArchetypeInfo(archetype);
+
+    if (archetype === 'frontline_ward') {
+      nextState = {
+        ...nextState,
+        damageReductionBuffPct: Math.max(nextState.damageReductionBuffPct, 0.2),
+        damageReductionBuffMs: Math.max(nextState.damageReductionBuffMs, 3500),
+      };
+      nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} cast ${info.name} (team guard up)`);
+    }
+
+    if (archetype === 'burst_volley') {
+      const burst = Math.ceil(nextState.monsterMaxHp * 0.08);
+      nextState = {
+        ...nextState,
+        monsterHp: Math.max(1, nextState.monsterHp - burst),
+      };
+      nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} used ${info.name} for ${burst} burst`);
+    }
+
+    if (archetype === 'battle_chant') {
+      nextState = {
+        ...nextState,
+        damageBuffPct: Math.max(nextState.damageBuffPct, 0.18),
+        damageBuffMs: Math.max(nextState.damageBuffMs, 4200),
+      };
+      nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} activated ${info.name} (+DPS)`);
+    }
+
+    if (archetype === 'mending_pulse') {
+      const heal = Math.ceil(nextState.teamMaxHp * 0.1);
+      nextState = {
+        ...nextState,
+        teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + heal),
+      };
+      nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} triggered ${info.name} (+${heal} HP)`);
+    }
+
+    cooldowns[hero.uid] = 8000;
+  }
+
+  return {
+    ...nextState,
+    heroActiveCdMs: cooldowns,
+  };
+}
+
 function getTeamMaxHp(state: GameState): number {
   // Player character HP
   const playerStats = derivedStats(state);
@@ -334,7 +498,8 @@ function getTeamMaxHp(state: GameState): number {
     }
   }
 
-  return Math.ceil(maxHp);
+  const survivalMult = getMetaSurvivalMultiplier(state);
+  return Math.ceil(maxHp * survivalMult);
 }
 
 function getTeamDefense(state: GameState): number {
@@ -353,7 +518,7 @@ function getTeamDefense(state: GameState): number {
     }
   }
 
-  return Math.max(0, defense);
+  return Math.max(0, defense * getMetaSurvivalMultiplier(state));
 }
 
 function getDps(state: GameState): number {
@@ -386,7 +551,17 @@ function getDps(state: GameState): number {
     }
   }
 
-  const totalDps = (playerDps + heroDps) * rebirthMult * getAchievementBonusMultiplier(state);
+  const passive = state.playerClass ? getClassPassive(state.playerClass) : null;
+  const classPassiveMult = hasUnlock(state, 'class_passive') && passive ? passive.dpsMultiplier : 1;
+  const heroPassive = getHeroPassiveMultipliers(state);
+  const activeBuffMult = 1 + state.damageBuffPct;
+  const totalDps = (playerDps + heroDps)
+    * rebirthMult
+    * getAchievementBonusMultiplier(state)
+    * getMetaDamageMultiplier(state)
+    * classPassiveMult
+    * heroPassive.dpsMult
+    * activeBuffMult;
   return Math.max(1, totalDps);
 }
 
@@ -414,9 +589,72 @@ function getAchievementBonusMultiplier(state: GameState): number {
   return 1 + pct;
 }
 
+function hasUnlock(state: GameState, unlock: PermanentUnlockId): boolean {
+  return state.permanentUnlocks.includes(unlock);
+}
+
+function getMetaDamageMultiplier(state: GameState): number {
+  return 1 + state.metaDamageLevel * 0.05;
+}
+
+function getMetaEconomyMultiplier(state: GameState): number {
+  return 1 + state.metaEconomyLevel * 0.05;
+}
+
+function getMetaSurvivalMultiplier(state: GameState): number {
+  return 1 + state.metaSurvivalLevel * 0.05;
+}
+
+function getEssenceUpgradeCost(level: number): number {
+  return 20 + (level + 1) * (level + 1) * 12;
+}
+
+function getCurrentWeeklyEvent(state: GameState): WeeklyEventConfig {
+  return getWeeklyEventByWeek(state.weeklyEventWeek);
+}
+
+function getMissionProgressValue(state: GameState, mission: MissionBoardGoal): number {
+  if (mission.metric === 'wave') return state.wave;
+  if (mission.metric === 'kills') return state.totalKills;
+  if (mission.metric === 'summons') return state.totalSummons;
+  if (mission.metric === 'active_team') return state.activeTeamHeroIds.length;
+  if (mission.metric === 'hero_shards') return state.heroShards;
+  return state.essence;
+}
+
 function getRankMultiplier(rank: number): number {
   const cfg = RANK_CONFIGS.find(r => r.rankNumber === rank);
   return cfg?.statMultiplier ?? 1;
+}
+
+function defaultTraitForClass(playerClass: PlayerClass): HeroPassiveTraitId {
+  const map: Record<PlayerClass, HeroPassiveTraitId> = {
+    warrior: 'bulwark_instinct',
+    berserker: 'warpath_instinct',
+    archer: 'fortune_hunter',
+    mage: 'sage_instinct',
+    monk: 'sage_instinct',
+  };
+  return map[playerClass];
+}
+
+function defaultActiveForClass(playerClass: PlayerClass): HeroActiveSkillArchetypeId {
+  const map: Record<PlayerClass, HeroActiveSkillArchetypeId> = {
+    warrior: 'frontline_ward',
+    berserker: 'battle_chant',
+    archer: 'burst_volley',
+    mage: 'mending_pulse',
+    monk: 'mending_pulse',
+  };
+  return map[playerClass];
+}
+
+function normalizeHero(hero: HeroUnit): HeroUnit {
+  return {
+    ...hero,
+    passiveTrait: hero.passiveTrait ?? defaultTraitForClass(hero.heroClass),
+    activeSkillArchetype: hero.activeSkillArchetype ?? defaultActiveForClass(hero.heroClass),
+  };
 }
 
 export function computeStats(state: GameState) {
@@ -452,6 +690,9 @@ export function computeStats(state: GameState) {
   return {
     className: cls.name,
     dps: getDps(state),
+    teamDefense: getTeamDefense(state),
+    damageBuffPct: state.damageBuffMs > 0 ? state.damageBuffPct : 0,
+    damageReductionBuffPct: state.damageReductionBuffMs > 0 ? state.damageReductionBuffPct : 0,
     clickDmg: getClickDamage(state),
     achievementBonusPercent: getAchievementBonusMultiplier(state) - 1,
     expNeeded: expForLevel(state.level),
@@ -502,6 +743,7 @@ function equipmentScrapValue(rarity: ReturnType<typeof equipmentRarityConfig>['i
     rare: 24,
     epic: 60,
     legendary: 160,
+    mythic: 360,
   }[rarity] ?? 10;
 }
 
@@ -545,11 +787,17 @@ function toDayNumber(ts: number): number {
 }
 
 function killMonster(state: GameState): GameState {
+  const weekly = getCurrentWeeklyEvent(state);
   const affix = getMonsterAffixModifiers(state.wave);
   const achievementMult = getAchievementBonusMultiplier(state);
-  const goldReward = Math.ceil(getMonsterGold(state.wave) * Math.pow(REBIRTH_BONUS, state.prestigeCount) * achievementMult * affix.goldMult);
-  const expReward = Math.ceil(getMonsterExp(state.wave) * achievementMult * affix.expMult);
+  const economyMult = getMetaEconomyMultiplier(state);
+  const heroPassive = getHeroPassiveMultipliers(state);
+  const goldReward = Math.ceil(getMonsterGold(state.wave) * Math.pow(REBIRTH_BONUS, state.prestigeCount) * achievementMult * affix.goldMult * economyMult * heroPassive.goldMult * weekly.goldMultiplier);
+  const expReward = Math.ceil(getMonsterExp(state.wave) * achievementMult * affix.expMult * heroPassive.expMult * weekly.expMultiplier);
   const lvl = processLevelUp(state.exp + expReward, state.level);
+  const isBoss = state.wave % 10 === 0;
+  const act = getActForWave(state.wave);
+  const essenceReward = isBoss ? Math.max(2, act.id + Math.floor(state.wave / 20)) : 0;
 
   // Level up active team heroes
   let updatedRoster = state.heroRoster;
@@ -569,11 +817,13 @@ function killMonster(state: GameState): GameState {
     ...state,
     gold: state.gold + goldReward,
     totalGold: state.totalGold + goldReward,
+    essence: state.essence + essenceReward,
     exp: lvl.exp,
     totalExp: state.totalExp + expReward,
     level: lvl.level,
     unspentStatPoints: state.unspentStatPoints + lvl.gainedLevels * STAT_POINTS_PER_LEVEL,
     totalKills: state.totalKills + 1,
+    weeklyKills: state.weeklyKills + 1,
     wave: newWave,
     monsterHp: nextMaxHp,
     monsterMaxHp: nextMaxHp,
@@ -581,6 +831,7 @@ function killMonster(state: GameState): GameState {
     teamMaxHp: newTeamMaxHp,
     heroRoster: updatedRoster,
   };
+  newState = queueCombatLog(newState, `Defeated ${getMonsterForWave(state.wave).name} • +${goldReward} gold +${expReward} EXP (${weekly.name})`);
 
   // Grant one free summon charge on first kill.
   if (state.totalKills === 0 && !state.firstSummonGiven) {
@@ -592,10 +843,10 @@ function killMonster(state: GameState): GameState {
   }
 
   // Chance to drop class-compatible equipment on kill.
-  const isBoss = state.wave % 10 === 0;
+  const mythicUnlocked = hasUnlock(newState, 'mythic_equipment');
   const dropChance = Math.min(0.4, 0.10 + state.wave * 0.003 + (isBoss ? 0.12 : 0));
   if (newState.playerClass && Math.random() <= dropChance) {
-    const droppedRarity = rollEquipmentRarity(Math.random());
+    const droppedRarity = rollEquipmentRarityByTier(Math.random(), mythicUnlocked);
     const pool = EQUIPMENT_CATALOG.filter(item =>
       item.allowedClasses.includes(newState.playerClass as PlayerClass) &&
       item.rarity === droppedRarity,
@@ -616,6 +867,7 @@ function killMonster(state: GameState): GameState {
           title: `Equipment Drop: ${item.emoji} ${item.name}`,
           detail: `${equipmentRarityConfig(item.rarity).label} ${item.slot}`,
         });
+        newState = queueCombatLog(newState, `Loot drop: ${item.emoji} ${item.name}`);
       } else {
         const duplicateScrap = equipmentScrapValue(item.rarity) + Math.floor(state.wave * 0.4);
         newState = queueReward({
@@ -627,6 +879,7 @@ function killMonster(state: GameState): GameState {
           title: `Duplicate ${item.name}`,
           detail: `Converted to +${duplicateScrap} scrap`,
         });
+        newState = queueCombatLog(newState, `Duplicate ${item.name} converted into ${duplicateScrap} scrap`);
       }
     }
   }
@@ -634,7 +887,7 @@ function killMonster(state: GameState): GameState {
   // Chance to drop a usable consumable.
   const usableDropChance = Math.min(0.32, 0.12 + state.wave * 0.0015 + (isBoss ? 0.08 : 0));
   if (Math.random() <= usableDropChance) {
-    const usable = rollUsableItem(Math.random());
+    const usable = rollUsableItem(Math.random(), hasUnlock(newState, 'advanced_consumables'));
     const nextCounts = addUsableItemCount(newState.usableItemCounts, usable.id, 1);
     newState = queueReward({
       ...newState,
@@ -645,6 +898,30 @@ function killMonster(state: GameState): GameState {
       title: `Found ${usable.emoji} ${usable.name}`,
       detail: usable.description,
     });
+    newState = queueCombatLog(newState, `Item drop: ${usable.emoji} ${usable.name}`);
+  }
+
+  if (isBoss) {
+    const unlock = getBossUnlockForWave(state.wave);
+    if (unlock && !newState.permanentUnlocks.includes(unlock)) {
+      newState = queueReward({
+        ...newState,
+        permanentUnlocks: [...newState.permanentUnlocks, unlock],
+      }, {
+        id: `unlock_${unlock}_${Date.now()}`,
+        kind: 'system',
+        title: `Act Boss Defeated • ${act.name}`,
+        detail: unlockLabel(unlock),
+      });
+    }
+
+    newState = queueReward(newState, {
+      id: `essence_${Date.now()}`,
+      kind: 'system',
+      title: 'Boss Essence Acquired',
+      detail: `+${essenceReward} essence`,
+    });
+    newState = queueCombatLog(newState, `Boss reward: +${essenceReward} essence`);
   }
 
   return withAchievement(progressTutorial(newState));
@@ -697,12 +974,19 @@ type Action =
   | { type: 'SET_ACTIVE_TEAM'; heroIds: string[] }
   | { type: 'RECYCLE_HERO'; uid: string }
   | { type: 'AUTO_RECYCLE_HEROES' }
+  | { type: 'SET_AUTO_RECYCLE_MAX_RARITY'; rarity: Rarity }
   | { type: 'RANK_UP_HERO'; uid: string }
   | { type: 'USE_USABLE_ITEM'; itemId: string }
   | { type: 'DISMANTLE_EQUIPMENT'; itemId: string }
   | { type: 'CRAFT_EQUIPMENT'; slot: EquipmentSlot }
+  | { type: 'UPGRADE_EQUIPMENT_RARITY'; itemId: string }
   | { type: 'SET_AUTO_USE_POTION'; enabled: boolean }
   | { type: 'SET_AUTO_USE_POTION_THRESHOLD'; thresholdPct: number }
+  | { type: 'SPEND_ESSENCE_UPGRADE'; path: 'damage' | 'economy' | 'survival' }
+  | { type: 'APPLY_WEEKLY_ROLLOVER'; nowMs: number }
+  | { type: 'CLAIM_WEEKLY_TRACK'; milestone: number }
+  | { type: 'CLAIM_MISSION'; missionId: string }
+  | { type: 'MARK_HINT_SEEN'; hintId: string }
   | { type: 'APPLY_OFFLINE_PROGRESS'; elapsedMs: number }
   | { type: 'APPLY_DAILY_LOGIN'; nowMs: number }
   | { type: 'REBIRTH' }
@@ -745,49 +1029,67 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'TICK': {
       if (!state.characterCreated) return state;
-      const dps = getDps(state);
+      let working = decayBuffs(state, action.elapsed);
+      working = tickHeroActives(working, action.elapsed);
+      const weekly = getCurrentWeeklyEvent(working);
+
+      const dps = getDps(working);
       if (dps <= 0) return state;
-      const affix = getMonsterAffixModifiers(state.wave);
+      const affix = getMonsterAffixModifiers(working.wave);
 
       // Team deals damage to enemy
-      const damage = (dps * (action.elapsed / 1000)) / affix.hpMult;
-      const hp = state.monsterHp - damage;
+      const damage = (dps * (action.elapsed / 1000)) / (affix.hpMult * weekly.enemyHpMultiplier);
+      const hp = working.monsterHp - damage;
 
       // Enemy deals damage to team (reduced by defense)
-      const enemyDmg = getMonsterDamage(state.wave) * affix.dmgMult;
-      const defense = getTeamDefense(state);
+      const enemyDmg = getMonsterDamage(working.wave) * affix.dmgMult * weekly.enemyDamageMultiplier;
+      const defense = getTeamDefense(working);
       const damageReduction = Math.min(0.8, defense / (defense + 100));  // max 80% reduction
-      const actualEnemyDamage = enemyDmg * (1 - damageReduction) * (action.elapsed / 1000);
-      const teamHp = state.teamHp - actualEnemyDamage;
+      const passive = working.playerClass ? getClassPassive(working.playerClass) : null;
+      const passiveIncomingMult = hasUnlock(working, 'class_passive') && passive
+        ? passive.incomingDamageMultiplier
+        : 1;
+      const heroPassive = getHeroPassiveMultipliers(working);
+      const activeReductionMult = 1 - Math.max(0, Math.min(0.7, working.damageReductionBuffPct));
+      const actualEnemyDamage = enemyDmg
+        * (1 - damageReduction)
+        * passiveIncomingMult
+        * heroPassive.incomingDmgMult
+        * activeReductionMult
+        * (action.elapsed / 1000);
+      const teamHp = working.teamHp - actualEnemyDamage;
 
       // Check if monster is defeated
-      if (hp <= 0) return withAchievement(killMonster(state));
+      if (hp <= 0) return withAchievement(killMonster(working));
 
       // Check if team dies
       if (teamHp <= 0) {
         // Retreat to wave 1, lose 50% of current gold, keep exp and heroes
         return {
-          ...state,
+          ...working,
           wave: 1,
           monsterHp: getMonsterMaxHp(1),
           monsterMaxHp: getMonsterMaxHp(1),
-          teamHp: getTeamMaxHp(state),
-          teamMaxHp: getTeamMaxHp(state),
-          gold: Math.floor(state.gold * 0.5),
+          teamHp: getTeamMaxHp(working),
+          teamMaxHp: getTeamMaxHp(working),
+          gold: Math.floor(working.gold * 0.5),
           lastActiveAt: Date.now(),
+          combatLog: [`${new Date().toLocaleTimeString()} • Team collapsed and retreated to Wave 1`, ...working.combatLog].slice(0, 24),
         };
       }
 
-      return maybeAutoUsePotion({ ...state, monsterHp: hp, teamHp, lastActiveAt: Date.now() });
+      return maybeAutoUsePotion({ ...working, monsterHp: hp, teamHp, lastActiveAt: Date.now() });
     }
 
     case 'ATTACK': {
       if (!state.characterCreated) return state;
       const affix = getMonsterAffixModifiers(state.wave);
-      const dmg = getClickDamage(state) / affix.hpMult;
+      const crit = Math.random() < 0.2;
+      const dmg = (getClickDamage(state) * (crit ? 1.8 : 1)) / affix.hpMult;
       const hp = state.monsterHp - dmg;
-      if (hp <= 0) return withAchievement(killMonster(state));
-      return { ...state, monsterHp: hp };
+      const logged = queueCombatLog(state, `${crit ? 'CRIT' : 'Hit'} for ${Math.ceil(dmg)} dmg`);
+      if (hp <= 0) return withAchievement(killMonster(logged));
+      return { ...logged, monsterHp: hp };
     }
 
     case 'BUY_PARTY': {
@@ -1103,7 +1405,8 @@ function reducer(state: GameState, action: Action): GameState {
       }
 
       if (item.effect === 'gain_shards_flat') {
-        const gain = Math.ceil(item.value * (1 + nextState.prestigeCount * 0.04));
+        const weekly = getCurrentWeeklyEvent(nextState);
+        const gain = Math.ceil(item.value * (1 + nextState.prestigeCount * 0.04) * weekly.shardMultiplier);
         nextState = queueReward({
           ...nextState,
           heroShards: nextState.heroShards + gain,
@@ -1151,7 +1454,7 @@ function reducer(state: GameState, action: Action): GameState {
       );
       if (classSlotItems.length === 0) return state;
 
-      const rolledRarity = rollEquipmentRarity(Math.random());
+      const rolledRarity = rollEquipmentRarityByTier(Math.random(), hasUnlock(state, 'mythic_equipment'));
       const rarityPool = classSlotItems.filter(i => i.rarity === rolledRarity);
       const source = rarityPool.length > 0 ? rarityPool : classSlotItems;
       const item = source[Math.floor(Math.random() * source.length)];
@@ -1182,6 +1485,53 @@ function reducer(state: GameState, action: Action): GameState {
       });
     }
 
+    case 'UPGRADE_EQUIPMENT_RARITY': {
+      if (!state.inventoryItemIds.includes(action.itemId)) return state;
+      const item = getEquipmentItem(action.itemId);
+      if (!item) return state;
+      const nextRarity = getNextEquipmentRarity(item.rarity);
+      if (!nextRarity) return state;
+      if (nextRarity === 'mythic' && !hasUnlock(state, 'mythic_equipment')) return state;
+
+      const upgradeCostByRarity: Record<string, { scrap: number; essence: number }> = {
+        common: { scrap: 80, essence: 0 },
+        rare: { scrap: 170, essence: 4 },
+        epic: { scrap: 300, essence: 8 },
+        legendary: { scrap: 500, essence: 14 },
+      };
+      const cost = upgradeCostByRarity[item.rarity];
+      if (!cost) return state;
+      if (state.equipmentScrap < cost.scrap || state.essence < cost.essence) return state;
+
+      const pool = EQUIPMENT_CATALOG.filter(candidate =>
+        candidate.slot === item.slot
+        && candidate.rarity === nextRarity
+        && candidate.allowedClasses.some(cls => item.allowedClasses.includes(cls)),
+      );
+      if (pool.length === 0) return state;
+
+      const target = pool[Math.floor(Math.random() * pool.length)];
+      const alreadyOwned = state.inventoryItemIds.includes(target.id);
+      const withReplacedInventory = state.inventoryItemIds.filter(id => id !== item.id);
+      const nextInventory = alreadyOwned ? withReplacedInventory : [...withReplacedInventory, target.id];
+      const refund = alreadyOwned ? Math.floor(equipmentScrapValue(target.rarity) * 0.8) : 0;
+
+      return queueReward({
+        ...state,
+        inventoryItemIds: nextInventory,
+        equipmentScrap: state.equipmentScrap - cost.scrap + refund,
+        essence: state.essence - cost.essence,
+        equippedItems: Object.fromEntries(
+          Object.entries(state.equippedItems).map(([slot, equippedId]) => [slot, equippedId === item.id ? target.id : equippedId]),
+        ) as Record<EquipmentSlot, string | null>,
+      }, {
+        id: `upgrade_${item.id}_${Date.now()}`,
+        kind: 'item',
+        title: `Upgraded ${item.name}`,
+        detail: `Now ${target.emoji} ${target.name} (${nextRarity.toUpperCase()})`,
+      });
+    }
+
     case 'SET_AUTO_USE_POTION': {
       return {
         ...state,
@@ -1197,6 +1547,122 @@ function reducer(state: GameState, action: Action): GameState {
       };
     }
 
+    case 'SPEND_ESSENCE_UPGRADE': {
+      const currentLevel = action.path === 'damage'
+        ? state.metaDamageLevel
+        : action.path === 'economy'
+          ? state.metaEconomyLevel
+          : state.metaSurvivalLevel;
+      const cost = getEssenceUpgradeCost(currentLevel);
+      if (state.essence < cost) return state;
+
+      const base = {
+        ...state,
+        essence: state.essence - cost,
+      };
+
+      if (action.path === 'damage') {
+        return queueReward({ ...base, metaDamageLevel: state.metaDamageLevel + 1 }, {
+          id: `meta_damage_${Date.now()}`,
+          kind: 'system',
+          title: 'Meta Upgrade: Damage Path',
+          detail: `Level ${state.metaDamageLevel + 1}`,
+        });
+      }
+
+      if (action.path === 'economy') {
+        return queueReward({ ...base, metaEconomyLevel: state.metaEconomyLevel + 1 }, {
+          id: `meta_econ_${Date.now()}`,
+          kind: 'system',
+          title: 'Meta Upgrade: Economy Path',
+          detail: `Level ${state.metaEconomyLevel + 1}`,
+        });
+      }
+
+      return queueReward({ ...base, metaSurvivalLevel: state.metaSurvivalLevel + 1 }, {
+        id: `meta_survival_${Date.now()}`,
+        kind: 'system',
+        title: 'Meta Upgrade: Survival Path',
+        detail: `Level ${state.metaSurvivalLevel + 1}`,
+      });
+    }
+
+    case 'APPLY_WEEKLY_ROLLOVER': {
+      if (!state.characterCreated) return state;
+      const week = weekNumberForTimestamp(action.nowMs);
+      if (week === state.weeklyEventWeek) return state;
+      const event = getWeeklyEventByWeek(week);
+      return queueReward({
+        ...state,
+        weeklyEventWeek: week,
+        weeklyEventId: event.id,
+        weeklyKills: 0,
+        weeklyTrackClaimed: [],
+      }, {
+        id: `weekly_rollover_${week}`,
+        kind: 'system',
+        title: `Weekly Event: ${event.name}`,
+        detail: event.description,
+      });
+    }
+
+    case 'CLAIM_WEEKLY_TRACK': {
+      if (state.weeklyTrackClaimed.includes(action.milestone)) return state;
+      if (!WEEKLY_TRACK_MILESTONES.includes(action.milestone)) return state;
+      if (state.weeklyKills < action.milestone) return state;
+
+      const gold = 220 + action.milestone * 12;
+      const shards = 18 + Math.floor(action.milestone * 1.8);
+      const essence = action.milestone >= 150 ? 4 : action.milestone >= 75 ? 2 : 1;
+
+      return queueReward({
+        ...state,
+        weeklyTrackClaimed: [...state.weeklyTrackClaimed, action.milestone],
+        gold: state.gold + gold,
+        totalGold: state.totalGold + gold,
+        heroShards: state.heroShards + shards,
+        essence: state.essence + essence,
+      }, {
+        id: `weekly_track_${action.milestone}_${Date.now()}`,
+        kind: 'system',
+        title: 'Weekly Track Claimed',
+        detail: `+${gold} gold, +${shards} shards, +${essence} essence`,
+      });
+    }
+
+    case 'CLAIM_MISSION': {
+      if (state.claimedMissionIds.includes(action.missionId)) return state;
+      const mission = MISSION_BOARD_GOALS.find(m => m.id === action.missionId);
+      if (!mission) return state;
+      const progress = getMissionProgressValue(state, mission);
+      if (progress < mission.target) return state;
+
+      const rewardGold = mission.rewardGold ?? 0;
+      const rewardShards = mission.rewardShards ?? 0;
+      const rewardEssence = mission.rewardEssence ?? 0;
+      return queueReward({
+        ...state,
+        claimedMissionIds: [...state.claimedMissionIds, mission.id],
+        gold: state.gold + rewardGold,
+        totalGold: state.totalGold + rewardGold,
+        heroShards: state.heroShards + rewardShards,
+        essence: state.essence + rewardEssence,
+      }, {
+        id: `mission_${mission.id}_${Date.now()}`,
+        kind: 'system',
+        title: `Mission Complete: ${mission.title}`,
+        detail: `+${rewardGold} gold, +${rewardShards} shards, +${rewardEssence} essence`,
+      });
+    }
+
+    case 'MARK_HINT_SEEN': {
+      if (state.seenHintIds.includes(action.hintId)) return state;
+      return {
+        ...state,
+        seenHintIds: [...state.seenHintIds, action.hintId],
+      };
+    }
+
     case 'APPLY_OFFLINE_PROGRESS': {
       if (!state.characterCreated) return state;
       const elapsed = Math.max(0, Math.min(action.elapsedMs, OFFLINE_PROGRESS_CAP_MS));
@@ -1204,7 +1670,7 @@ function reducer(state: GameState, action: Action): GameState {
 
       const seconds = Math.floor(elapsed / 1000);
       const achievementMult = getAchievementBonusMultiplier(state);
-      const goldGain = Math.floor(getMonsterGold(state.wave) * 0.35 * seconds * achievementMult);
+      const goldGain = Math.floor(getMonsterGold(state.wave) * 0.35 * seconds * achievementMult * getMetaEconomyMultiplier(state));
       const expGain = Math.floor(getMonsterExp(state.wave) * 0.22 * seconds * achievementMult);
       const lvl = processLevelUp(state.exp + expGain, state.level);
 
@@ -1273,6 +1739,11 @@ function reducer(state: GameState, action: Action): GameState {
         activeTeamHeroIds: [],
         prestigeCount: state.prestigeCount + 1,
         newAchievement: null,
+        damageBuffPct: 0,
+        damageBuffMs: 0,
+        damageReductionBuffPct: 0,
+        damageReductionBuffMs: 0,
+        heroActiveCdMs: {},
         lastActiveAt: Date.now(),
       };
     }
@@ -1291,7 +1762,8 @@ function reducer(state: GameState, action: Action): GameState {
       if (!hero) return state;
       
       // Calculate shard reward and remove hero from roster
-      const shardReward = calculateShardReward(hero.rarity, hero.level);
+      const weekly = getCurrentWeeklyEvent(state);
+      const shardReward = Math.ceil(calculateShardReward(hero.rarity, hero.level) * weekly.shardMultiplier);
       const newRoster = state.heroRoster.filter(h => h.uid !== action.uid);
       const newActiveTeam = state.activeTeamHeroIds.filter(id => id !== action.uid);
       const newMaxHp = getTeamMaxHp({ ...state, heroRoster: newRoster, activeTeamHeroIds: newActiveTeam });
@@ -1308,13 +1780,15 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'AUTO_RECYCLE_HEROES': {
       const activeTeam = new Set(state.activeTeamHeroIds);
+      const maxRank = rarityRank(state.autoRecycleMaxRarity);
       const toRecycle = state.heroRoster.filter(
-        h => !activeTeam.has(h.uid) && (h.rarity === 'common' || h.rarity === 'uncommon'),
+        h => !activeTeam.has(h.uid) && rarityRank(h.rarity) <= maxRank,
       );
       if (toRecycle.length === 0) return state;
 
       const recycledIds = new Set(toRecycle.map(h => h.uid));
-      const shardReward = toRecycle.reduce((sum, hero) => sum + calculateShardReward(hero.rarity, hero.level), 0);
+      const weekly = getCurrentWeeklyEvent(state);
+      const shardReward = Math.ceil(toRecycle.reduce((sum, hero) => sum + calculateShardReward(hero.rarity, hero.level), 0) * weekly.shardMultiplier);
       const newRoster = state.heroRoster.filter(h => !recycledIds.has(h.uid));
       const newMaxHp = getTeamMaxHp({ ...state, heroRoster: newRoster });
 
@@ -1330,8 +1804,15 @@ function reducer(state: GameState, action: Action): GameState {
         id: `auto_recycle_${Date.now()}`,
         kind: 'shard',
         title: 'Auto Recycle Complete',
-        detail: `+${shardReward} shards from ${toRecycle.length} heroes`,
+        detail: `+${shardReward} shards from ${toRecycle.length} heroes (${state.autoRecycleMaxRarity} and below)`,
       });
+    }
+
+    case 'SET_AUTO_RECYCLE_MAX_RARITY': {
+      return {
+        ...state,
+        autoRecycleMaxRarity: action.rarity,
+      };
     }
 
     case 'RANK_UP_HERO': {
@@ -1389,18 +1870,30 @@ function reducer(state: GameState, action: Action): GameState {
         party: { ...initialParty(), ...(p.party ?? {}) },
         skills: new Set(p.skills ?? []),
 
-        heroRoster: p.heroRoster ?? [],
+        heroRoster: (p.heroRoster ?? []).map(normalizeHero),
         activeTeamHeroIds: p.activeTeamHeroIds ?? [],
         totalSummons: p.totalSummons ?? 0,
         firstSummonGiven: p.firstSummonGiven ?? false,
         freeSummonCharges: p.freeSummonCharges ?? 0,
         heroShards: p.heroShards ?? 0,
+        essence: p.essence ?? 0,
+        autoRecycleMaxRarity: p.autoRecycleMaxRarity ?? 'uncommon',
         equipmentScrap: p.equipmentScrap ?? 0,
         gachaPityCounter: p.gachaPityCounter ?? 0,
         summonHistory: p.summonHistory ?? [],
         teamLoadouts: p.teamLoadouts ?? [[], [], []],
         dailyLoginStreak: p.dailyLoginStreak ?? 0,
         lastDailyLoginDay: p.lastDailyLoginDay ?? null,
+        weeklyEventWeek: p.weeklyEventWeek ?? weekNumberForTimestamp(Date.now()),
+        weeklyEventId: p.weeklyEventId ?? getWeeklyEventForTimestamp(Date.now()).id,
+        weeklyKills: p.weeklyKills ?? 0,
+        weeklyTrackClaimed: p.weeklyTrackClaimed ?? [],
+        claimedMissionIds: p.claimedMissionIds ?? [],
+        seenHintIds: p.seenHintIds ?? [],
+        permanentUnlocks: p.permanentUnlocks ?? [],
+        metaDamageLevel: p.metaDamageLevel ?? 0,
+        metaEconomyLevel: p.metaEconomyLevel ?? 0,
+        metaSurvivalLevel: p.metaSurvivalLevel ?? 0,
 
         inventoryItemIds: p.inventoryItemIds ?? [],
         equippedItems: loadedEquippedItems,
@@ -1418,6 +1911,12 @@ function reducer(state: GameState, action: Action): GameState {
         achievements: new Set(p.achievements ?? []),
         newAchievement: null,
         rewardQueue: [],
+        combatLog: p.combatLog ?? [],
+        damageBuffPct: p.damageBuffPct ?? 0,
+        damageBuffMs: p.damageBuffMs ?? 0,
+        damageReductionBuffPct: p.damageReductionBuffPct ?? 0,
+        damageReductionBuffMs: p.damageReductionBuffMs ?? 0,
+        heroActiveCdMs: p.heroActiveCdMs ?? {},
       };
     }
 
@@ -1453,12 +1952,24 @@ interface SaveData {
   firstSummonGiven: boolean;
   freeSummonCharges: number;
   heroShards: number;
+  essence: number;
+  autoRecycleMaxRarity: Rarity;
   equipmentScrap: number;
   gachaPityCounter: number;
   summonHistory: SummonHistoryEntry[];
   teamLoadouts: string[][];
   dailyLoginStreak: number;
   lastDailyLoginDay: number | null;
+  weeklyEventWeek: number;
+  weeklyEventId: string;
+  weeklyKills: number;
+  weeklyTrackClaimed: number[];
+  claimedMissionIds: string[];
+  seenHintIds: string[];
+  permanentUnlocks: PermanentUnlockId[];
+  metaDamageLevel: number;
+  metaEconomyLevel: number;
+  metaSurvivalLevel: number;
 
   inventoryItemIds: string[];
   equippedItems: Record<EquipmentSlot, string | null>;
@@ -1474,6 +1985,12 @@ interface SaveData {
 
   prestigeCount: number;
   achievements: string[];
+  combatLog: string[];
+  damageBuffPct: number;
+  damageBuffMs: number;
+  damageReductionBuffPct: number;
+  damageReductionBuffMs: number;
+  heroActiveCdMs: Record<string, number>;
 }
 
 function serialize(state: GameState): SaveData {
@@ -1504,12 +2021,24 @@ function serialize(state: GameState): SaveData {
     firstSummonGiven: state.firstSummonGiven,
     freeSummonCharges: state.freeSummonCharges,
     heroShards: state.heroShards,
+    essence: state.essence,
+    autoRecycleMaxRarity: state.autoRecycleMaxRarity,
     equipmentScrap: state.equipmentScrap,
     gachaPityCounter: state.gachaPityCounter,
     summonHistory: state.summonHistory,
     teamLoadouts: state.teamLoadouts,
     dailyLoginStreak: state.dailyLoginStreak,
     lastDailyLoginDay: state.lastDailyLoginDay,
+    weeklyEventWeek: state.weeklyEventWeek,
+    weeklyEventId: state.weeklyEventId,
+    weeklyKills: state.weeklyKills,
+    weeklyTrackClaimed: state.weeklyTrackClaimed,
+    claimedMissionIds: state.claimedMissionIds,
+    seenHintIds: state.seenHintIds,
+    permanentUnlocks: state.permanentUnlocks,
+    metaDamageLevel: state.metaDamageLevel,
+    metaEconomyLevel: state.metaEconomyLevel,
+    metaSurvivalLevel: state.metaSurvivalLevel,
 
     inventoryItemIds: state.inventoryItemIds,
     equippedItems: state.equippedItems,
@@ -1525,6 +2054,12 @@ function serialize(state: GameState): SaveData {
 
     prestigeCount: state.prestigeCount,
     achievements: Array.from(state.achievements),
+    combatLog: state.combatLog,
+    damageBuffPct: state.damageBuffPct,
+    damageBuffMs: state.damageBuffMs,
+    damageReductionBuffPct: state.damageReductionBuffPct,
+    damageReductionBuffMs: state.damageReductionBuffMs,
+    heroActiveCdMs: state.heroActiveCdMs,
   };
 }
 
@@ -1545,6 +2080,7 @@ export function useGameState(saveSlot: string = 'default') {
         const elapsed = Date.now() - (data.lastActiveAt ?? Date.now());
         dispatch({ type: 'APPLY_OFFLINE_PROGRESS', elapsedMs: elapsed });
         dispatch({ type: 'APPLY_DAILY_LOGIN', nowMs: Date.now() });
+        dispatch({ type: 'APPLY_WEEKLY_ROLLOVER', nowMs: Date.now() });
       } catch {
         // Ignore corrupted save and continue fresh.
       }
@@ -1558,6 +2094,14 @@ export function useGameState(saveSlot: string = 'default') {
       dispatch({ type: 'APPLY_DAILY_LOGIN', nowMs: Date.now() });
     }
   }, [state.characterCreated, state.lastDailyLoginDay]);
+
+  useEffect(() => {
+    if (!state.characterCreated) return;
+    const week = weekNumberForTimestamp(Date.now());
+    if (state.weeklyEventWeek !== week) {
+      dispatch({ type: 'APPLY_WEEKLY_ROLLOVER', nowMs: Date.now() });
+    }
+  }, [state.characterCreated, state.weeklyEventWeek]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -1599,12 +2143,28 @@ export function useGameState(saveSlot: string = 'default') {
   const setActiveTeam = useCallback((heroIds: string[]) => dispatch({ type: 'SET_ACTIVE_TEAM', heroIds }), []);
   const recycleHero = useCallback((uid: string) => dispatch({ type: 'RECYCLE_HERO', uid }), []);
   const autoRecycleHeroes = useCallback(() => dispatch({ type: 'AUTO_RECYCLE_HEROES' }), []);
+  const setAutoRecycleMaxRarity = useCallback((rarity: Rarity) => {
+    dispatch({ type: 'SET_AUTO_RECYCLE_MAX_RARITY', rarity });
+  }, []);
   const rankUpHero = useCallback((uid: string) => dispatch({ type: 'RANK_UP_HERO', uid }), []);
   const useUsableItem = useCallback((itemId: string) => dispatch({ type: 'USE_USABLE_ITEM', itemId }), []);
   const dismantleEquipment = useCallback((itemId: string) => dispatch({ type: 'DISMANTLE_EQUIPMENT', itemId }), []);
   const craftEquipment = useCallback((slot: EquipmentSlot) => dispatch({ type: 'CRAFT_EQUIPMENT', slot }), []);
+  const upgradeEquipmentRarity = useCallback((itemId: string) => dispatch({ type: 'UPGRADE_EQUIPMENT_RARITY', itemId }), []);
   const setAutoUsePotion = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_USE_POTION', enabled }), []);
   const setAutoUsePotionThreshold = useCallback((thresholdPct: number) => dispatch({ type: 'SET_AUTO_USE_POTION_THRESHOLD', thresholdPct }), []);
+  const spendEssenceUpgrade = useCallback((path: 'damage' | 'economy' | 'survival') => {
+    dispatch({ type: 'SPEND_ESSENCE_UPGRADE', path });
+  }, []);
+  const claimWeeklyTrack = useCallback((milestone: number) => {
+    dispatch({ type: 'CLAIM_WEEKLY_TRACK', milestone });
+  }, []);
+  const claimMission = useCallback((missionId: string) => {
+    dispatch({ type: 'CLAIM_MISSION', missionId });
+  }, []);
+  const markHintSeen = useCallback((hintId: string) => {
+    dispatch({ type: 'MARK_HINT_SEEN', hintId });
+  }, []);
   const rebirth = useCallback(() => dispatch({ type: 'REBIRTH' }), []);
   const clearAchievement = useCallback(() => dispatch({ type: 'CLEAR_ACHIEVEMENT' }), []);
   const clearRewardPopup = useCallback(() => dispatch({ type: 'CLEAR_REWARD_POPUP' }), []);
@@ -1616,6 +2176,24 @@ export function useGameState(saveSlot: string = 'default') {
       ? buildingCost(cfg.baseCost, owned, COST_SCALE)
       : bulkCost(cfg.baseCost, owned, amount, COST_SCALE);
   }, [state.party]);
+
+  const getEssenceCost = useCallback((path: 'damage' | 'economy' | 'survival') => {
+    const currentLevel = path === 'damage'
+      ? state.metaDamageLevel
+      : path === 'economy'
+        ? state.metaEconomyLevel
+        : state.metaSurvivalLevel;
+    return getEssenceUpgradeCost(currentLevel);
+  }, [state.metaDamageLevel, state.metaEconomyLevel, state.metaSurvivalLevel]);
+
+  const getWeeklyEvent = useCallback(() => getCurrentWeeklyEvent(state), [state]);
+  const getMissionProgress = useCallback((mission: MissionBoardGoal) => {
+    const value = getMissionProgressValue(state, mission);
+    return {
+      value,
+      done: value >= mission.target,
+    };
+  }, [state]);
 
   const stats = computeStats(state);
 
@@ -1639,15 +2217,24 @@ export function useGameState(saveSlot: string = 'default') {
     setActiveTeam,
     recycleHero,
     autoRecycleHeroes,
+    setAutoRecycleMaxRarity,
     rankUpHero,
     useUsableItem,
     dismantleEquipment,
     craftEquipment,
+    upgradeEquipmentRarity,
     setAutoUsePotion,
     setAutoUsePotionThreshold,
+    spendEssenceUpgrade,
+    claimWeeklyTrack,
+    claimMission,
+    markHintSeen,
     rebirth,
     clearAchievement,
     clearRewardPopup,
     getPartyCost,
+    getEssenceCost,
+    getWeeklyEvent,
+    getMissionProgress,
   };
 }

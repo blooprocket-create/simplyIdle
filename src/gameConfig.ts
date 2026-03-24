@@ -219,7 +219,150 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
 // ── Equipment ──────────────────────────────────────────────────────────────
 
 export type EquipmentSlot = 'weapon' | 'armor' | 'accessory';
-export type EquipmentRarity = 'common' | 'rare' | 'epic' | 'legendary';
+export type EquipmentRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
+
+export type PermanentUnlockId = 'class_passive' | 'advanced_consumables' | 'mythic_equipment';
+
+export interface ActConfig {
+  id: number;
+  name: string;
+  emoji: string;
+  theme: string;
+  startWave: number;
+  endWave: number;
+  bossWave: number;
+  unlock: PermanentUnlockId | null;
+}
+
+export const ACTS: ActConfig[] = [
+  {
+    id: 1,
+    name: 'Ashen Frontier',
+    emoji: '🌋',
+    theme: 'Scorched plains and raider warbands.',
+    startWave: 1,
+    endWave: 10,
+    bossWave: 10,
+    unlock: 'class_passive',
+  },
+  {
+    id: 2,
+    name: 'Verdant Ruin',
+    emoji: '🌿',
+    theme: 'Ancient overgrowth crawling with relic guardians.',
+    startWave: 11,
+    endWave: 20,
+    bossWave: 20,
+    unlock: 'advanced_consumables',
+  },
+  {
+    id: 3,
+    name: 'Glass Citadel',
+    emoji: '🏰',
+    theme: 'Fractured crystal halls and elite sentinels.',
+    startWave: 21,
+    endWave: 30,
+    bossWave: 30,
+    unlock: 'mythic_equipment',
+  },
+  {
+    id: 4,
+    name: 'Storm Abyss',
+    emoji: '🌩️',
+    theme: 'Tempest-choked void where captains become legends.',
+    startWave: 31,
+    endWave: 40,
+    bossWave: 40,
+    unlock: null,
+  },
+  {
+    id: 5,
+    name: 'Crownfall Depths',
+    emoji: '👑',
+    theme: 'Sunken imperial vaults guarded by ancient kings.',
+    startWave: 41,
+    endWave: 50,
+    bossWave: 50,
+    unlock: null,
+  },
+  {
+    id: 6,
+    name: 'Eternal Eclipse',
+    emoji: '🌑',
+    theme: 'The horizon where mythic armies march forever.',
+    startWave: 51,
+    endWave: Number.MAX_SAFE_INTEGER,
+    bossWave: 60,
+    unlock: null,
+  },
+];
+
+export function getActForWave(wave: number): ActConfig {
+  return ACTS.find(act => wave >= act.startWave && wave <= act.endWave) ?? ACTS[ACTS.length - 1];
+}
+
+export function getBossUnlockForWave(wave: number): PermanentUnlockId | null {
+  const act = ACTS.find(a => a.bossWave === wave);
+  return act?.unlock ?? null;
+}
+
+export function unlockLabel(unlock: PermanentUnlockId): string {
+  return {
+    class_passive: 'Class Passive Unlocked',
+    advanced_consumables: 'Advanced Consumables Unlocked',
+    mythic_equipment: 'Mythic Equipment Tier Unlocked',
+  }[unlock];
+}
+
+export interface ClassPassive {
+  id: string;
+  name: string;
+  description: string;
+  dpsMultiplier: number;
+  incomingDamageMultiplier: number;
+}
+
+export const CLASS_PASSIVES: Record<PlayerClass, ClassPassive> = {
+  warrior: {
+    id: 'frontline_ward',
+    name: 'Frontline Ward',
+    description: 'Hardened formation reduces all incoming team damage by 10%.',
+    dpsMultiplier: 1.04,
+    incomingDamageMultiplier: 0.9,
+  },
+  berserker: {
+    id: 'blood_frenzy',
+    name: 'Blood Frenzy',
+    description: 'Relentless assault amplifies total team DPS by 9%.',
+    dpsMultiplier: 1.09,
+    incomingDamageMultiplier: 0.98,
+  },
+  archer: {
+    id: 'marking_volley',
+    name: 'Marking Volley',
+    description: 'Precision fire boosts team DPS by 8%.',
+    dpsMultiplier: 1.08,
+    incomingDamageMultiplier: 0.98,
+  },
+  mage: {
+    id: 'arcane_barrier',
+    name: 'Arcane Barrier',
+    description: 'Protective weave cuts incoming damage by 8% and boosts DPS by 4%.',
+    dpsMultiplier: 1.04,
+    incomingDamageMultiplier: 0.92,
+  },
+  monk: {
+    id: 'tranquil_aura',
+    name: 'Tranquil Aura',
+    description: 'Balanced stance grants 6% DPS and 6% mitigation.',
+    dpsMultiplier: 1.06,
+    incomingDamageMultiplier: 0.94,
+  },
+};
+
+export function getClassPassive(playerClass: PlayerClass): ClassPassive {
+  return CLASS_PASSIVES[playerClass];
+}
 
 export interface EquipmentItem {
   id: string;
@@ -244,6 +387,7 @@ export const EQUIPMENT_RARITIES: EquipmentRarityConfig[] = [
   { id: 'rare', label: 'Rare', color: '#5DA8FF', dropWeight: 26 },
   { id: 'epic', label: 'Epic', color: '#B66BFF', dropWeight: 11 },
   { id: 'legendary', label: 'Legendary', color: '#FFB347', dropWeight: 3 },
+  { id: 'mythic', label: 'Mythic', color: '#FF5B8A', dropWeight: 1 },
 ];
 
 export const EQUIPMENT_CATALOG: EquipmentItem[] = [
@@ -257,6 +401,11 @@ export const EQUIPMENT_CATALOG: EquipmentItem[] = [
   { id: 'w_mage_codex', name: 'Void Codex', emoji: '📘', slot: 'weapon', rarity: 'epic', allowedClasses: ['mage'], description: 'Whispers forbidden equations of power.', bonus: { intelligence: 6, spirit: 2 } },
   { id: 'w_monk_focus', name: 'Prayer Beads', emoji: '📿', slot: 'weapon', rarity: 'rare', allowedClasses: ['monk'], description: 'Focuses inner current.', bonus: { spirit: 3, intelligence: 1 } },
   { id: 'w_monk_katar', name: 'Zen Katar', emoji: '🗡️', slot: 'weapon', rarity: 'epic', allowedClasses: ['monk'], description: 'Silent blades guided by calm breath.', bonus: { agility: 3, spirit: 4 } },
+  { id: 'w_warrior_sunbreaker', name: 'Sunbreaker Claymore', emoji: '🗡️', slot: 'weapon', rarity: 'mythic', allowedClasses: ['warrior'], description: 'A royal blade that shatters siege lines.', bonus: { strength: 9, vitality: 4 } },
+  { id: 'w_berserker_worldrend', name: 'Worldrend Axe', emoji: '🪓', slot: 'weapon', rarity: 'mythic', allowedClasses: ['berserker'], description: 'A hunger-forged axe of catastrophic swings.', bonus: { strength: 10, agility: 3 } },
+  { id: 'w_archer_starfall', name: 'Starfall Bow', emoji: '🏹', slot: 'weapon', rarity: 'mythic', allowedClasses: ['archer'], description: 'Each arrow leaves a comet trail.', bonus: { agility: 9, spirit: 3 } },
+  { id: 'w_mage_nullspire', name: 'Nullspire Staff', emoji: '🔮', slot: 'weapon', rarity: 'mythic', allowedClasses: ['mage'], description: 'Converts silence into annihilation.', bonus: { intelligence: 10, spirit: 5 } },
+  { id: 'w_monk_heavensplit', name: 'Heavensplit Katar', emoji: '🗡️', slot: 'weapon', rarity: 'mythic', allowedClasses: ['monk'], description: 'A sacred edge that hums with calm fury.', bonus: { spirit: 9, agility: 4 } },
 
   { id: 'a_plate', name: 'Knight Plate', emoji: '🛡️', slot: 'armor', rarity: 'common', allowedClasses: ['warrior'], description: 'Reinforced armor for long fights.', bonus: { vitality: 3, spirit: 1 } },
   { id: 'a_bulwark', name: 'Bulwark Aegis', emoji: '🧿', slot: 'armor', rarity: 'epic', allowedClasses: ['warrior'], description: 'A legendary shell that refuses to break.', bonus: { vitality: 7, spirit: 2 } },
@@ -268,6 +417,11 @@ export const EQUIPMENT_CATALOG: EquipmentItem[] = [
   { id: 'a_starweave', name: 'Starweave Mantle', emoji: '🌌', slot: 'armor', rarity: 'legendary', allowedClasses: ['mage'], description: 'Threads stitched from dying stars.', bonus: { intelligence: 7, spirit: 4 } },
   { id: 'a_wraps', name: 'Temple Wraps', emoji: '🥋', slot: 'armor', rarity: 'rare', allowedClasses: ['monk'], description: 'Flexible defense for body and mind.', bonus: { vitality: 2, spirit: 2 } },
   { id: 'a_lotusguard', name: 'Lotusguard Vest', emoji: '🌸', slot: 'armor', rarity: 'epic', allowedClasses: ['monk'], description: 'Balanced defense in every stance.', bonus: { vitality: 4, spirit: 3 } },
+  { id: 'a_warrior_aurum', name: 'Aurum Bastion Plate', emoji: '🛡️', slot: 'armor', rarity: 'mythic', allowedClasses: ['warrior'], description: 'Imperial wallplate from a lost dynasty.', bonus: { vitality: 10, spirit: 4 } },
+  { id: 'a_berserker_rampart', name: 'Rampart Hide', emoji: '🧱', slot: 'armor', rarity: 'mythic', allowedClasses: ['berserker'], description: 'Stitched with battle oaths and scars.', bonus: { vitality: 9, strength: 4 } },
+  { id: 'a_archer_galeveil', name: 'Galeveil Cloak', emoji: '🕶️', slot: 'armor', rarity: 'mythic', allowedClasses: ['archer'], description: 'Turns pressure fronts into cover.', bonus: { agility: 9, vitality: 3 } },
+  { id: 'a_mage_starvault', name: 'Starvault Mantle', emoji: '🌌', slot: 'armor', rarity: 'mythic', allowedClasses: ['mage'], description: 'Threaded with an unbroken night sky.', bonus: { intelligence: 9, spirit: 5 } },
+  { id: 'a_monk_moonward', name: 'Moonward Vestments', emoji: '🌙', slot: 'armor', rarity: 'mythic', allowedClasses: ['monk'], description: 'Ceremonial robes that bend impact.', bonus: { spirit: 8, vitality: 5 } },
 
   { id: 'x_warrior_signet', name: 'Lioncrest Signet', emoji: '💍', slot: 'accessory', rarity: 'rare', allowedClasses: ['warrior'], description: 'Symbol of command.', bonus: { strength: 1, vitality: 1 } },
   { id: 'x_warrior_banner', name: 'Warlord Banner Pin', emoji: '🚩', slot: 'accessory', rarity: 'epic', allowedClasses: ['warrior'], description: 'Inspires nearby allies to hold.', bonus: { vitality: 3, spirit: 2 } },
@@ -279,6 +433,11 @@ export const EQUIPMENT_CATALOG: EquipmentItem[] = [
   { id: 'x_mage_seal', name: 'Chronoseal', emoji: '⌛', slot: 'accessory', rarity: 'legendary', allowedClasses: ['mage'], description: 'Bends moments between spells.', bonus: { intelligence: 5, spirit: 3 } },
   { id: 'x_monk_talisman', name: 'Lotus Talisman', emoji: '🪷', slot: 'accessory', rarity: 'epic', allowedClasses: ['monk'], description: 'Calm aura under pressure.', bonus: { spirit: 2 } },
   { id: 'x_monk_knot', name: 'Celestial Knot', emoji: '🪢', slot: 'accessory', rarity: 'legendary', allowedClasses: ['monk'], description: 'A sacred knot with perfect tension.', bonus: { spirit: 5, vitality: 2 } },
+  { id: 'x_warrior_kingshard', name: 'Kingshard Sigil', emoji: '💠', slot: 'accessory', rarity: 'mythic', allowedClasses: ['warrior'], description: 'A shard of old coronation steel.', bonus: { vitality: 6, strength: 4 } },
+  { id: 'x_berserker_heartfire', name: 'Heartfire Fang', emoji: '🔥', slot: 'accessory', rarity: 'mythic', allowedClasses: ['berserker'], description: 'Feeds on momentum and pain.', bonus: { strength: 6, agility: 3 } },
+  { id: 'x_archer_skylens', name: 'Skylens Pendant', emoji: '🔭', slot: 'accessory', rarity: 'mythic', allowedClasses: ['archer'], description: 'Finds weak points before they exist.', bonus: { agility: 7, spirit: 2 } },
+  { id: 'x_mage_voidtear', name: 'Voidtear Orb', emoji: '🌀', slot: 'accessory', rarity: 'mythic', allowedClasses: ['mage'], description: 'A hollow star that amplifies spells.', bonus: { intelligence: 7, spirit: 4 } },
+  { id: 'x_monk_sunsigil', name: 'Sunsigil Charm', emoji: '☀️', slot: 'accessory', rarity: 'mythic', allowedClasses: ['monk'], description: 'Anchors the breath in radiant rhythm.', bonus: { spirit: 7, vitality: 3 } },
 ];
 
 export function getEquipmentItem(id: string): EquipmentItem | undefined {
@@ -299,12 +458,37 @@ export function rollEquipmentRarity(random: number): EquipmentRarity {
   return 'common';
 }
 
+export function rollEquipmentRarityByTier(random: number, mythicUnlocked: boolean): EquipmentRarity {
+  const pool = mythicUnlocked
+    ? EQUIPMENT_RARITIES
+    : EQUIPMENT_RARITIES.filter(r => r.id !== 'mythic');
+  const totalWeight = pool.reduce((sum, r) => sum + r.dropWeight, 0);
+  let cursor = random * totalWeight;
+  for (const r of pool) {
+    cursor -= r.dropWeight;
+    if (cursor <= 0) return r.id;
+  }
+  return 'common';
+}
+
+export function getNextEquipmentRarity(rarity: EquipmentRarity): EquipmentRarity | null {
+  const chain: Record<EquipmentRarity, EquipmentRarity | null> = {
+    common: 'rare',
+    rare: 'epic',
+    epic: 'legendary',
+    legendary: 'mythic',
+    mythic: null,
+  };
+  return chain[rarity];
+}
+
 export function getStarterEquipmentForClass(playerClass: PlayerClass): string[] {
   const rank: Record<EquipmentRarity, number> = {
     common: 0,
     rare: 1,
     epic: 2,
     legendary: 3,
+    mythic: 4,
   };
 
   const classItems = EQUIPMENT_CATALOG.filter(item => item.allowedClasses.includes(playerClass));
@@ -321,12 +505,14 @@ export function getStarterEquipmentForClass(playerClass: PlayerClass): string[] 
 }
 
 export type UsableItemEffect = 'heal_team_percent' | 'gain_gold_flat' | 'gain_exp_flat' | 'gain_shards_flat';
+export type UsableItemType = 'basic' | 'advanced';
 
 export interface UsableItem {
   id: string;
   name: string;
   emoji: string;
   description: string;
+  itemType: UsableItemType;
   effect: UsableItemEffect;
   value: number;
   dropWeight: number;
@@ -338,6 +524,7 @@ export const USABLE_ITEMS: UsableItem[] = [
     name: 'Small Vital Potion',
     emoji: '🧪',
     description: 'Restore 35% team HP instantly.',
+    itemType: 'basic',
     effect: 'heal_team_percent',
     value: 0.35,
     dropWeight: 45,
@@ -347,6 +534,7 @@ export const USABLE_ITEMS: UsableItem[] = [
     name: 'Gold Cache',
     emoji: '💰',
     description: 'Instantly grants 350 gold.',
+    itemType: 'basic',
     effect: 'gain_gold_flat',
     value: 350,
     dropWeight: 28,
@@ -356,6 +544,7 @@ export const USABLE_ITEMS: UsableItem[] = [
     name: 'Training Scroll',
     emoji: '📜',
     description: 'Instantly grants 220 EXP.',
+    itemType: 'basic',
     effect: 'gain_exp_flat',
     value: 220,
     dropWeight: 20,
@@ -365,9 +554,30 @@ export const USABLE_ITEMS: UsableItem[] = [
     name: 'Shard Cluster',
     emoji: '💠',
     description: 'Instantly grants 60 hero shards.',
+    itemType: 'basic',
     effect: 'gain_shards_flat',
     value: 60,
     dropWeight: 7,
+  },
+  {
+    id: 'grand_potion',
+    name: 'Grand Vital Elixir',
+    emoji: '🧴',
+    description: 'Restore 65% team HP instantly.',
+    itemType: 'advanced',
+    effect: 'heal_team_percent',
+    value: 0.65,
+    dropWeight: 26,
+  },
+  {
+    id: 'vault_cache',
+    name: 'Imperial Vault Cache',
+    emoji: '🏦',
+    description: 'Instantly grants 1200 gold.',
+    itemType: 'advanced',
+    effect: 'gain_gold_flat',
+    value: 1200,
+    dropWeight: 14,
   },
 ];
 
@@ -375,14 +585,15 @@ export function getUsableItem(id: string): UsableItem | undefined {
   return USABLE_ITEMS.find(item => item.id === id);
 }
 
-export function rollUsableItem(random: number): UsableItem {
-  const totalWeight = USABLE_ITEMS.reduce((sum, item) => sum + item.dropWeight, 0);
+export function rollUsableItem(random: number, advancedUnlocked: boolean): UsableItem {
+  const pool = advancedUnlocked ? USABLE_ITEMS : USABLE_ITEMS.filter(item => item.itemType === 'basic');
+  const totalWeight = pool.reduce((sum, item) => sum + item.dropWeight, 0);
   let cursor = random * totalWeight;
-  for (const item of USABLE_ITEMS) {
+  for (const item of pool) {
     cursor -= item.dropWeight;
     if (cursor <= 0) return item;
   }
-  return USABLE_ITEMS[0];
+  return pool[0];
 }
 
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic' | 'godly';
@@ -410,7 +621,63 @@ export interface HeroTemplate {
   name: string;
   heroClass: PlayerClass;
   emoji: string;
+  passiveTrait: HeroPassiveTraitId;
+  activeSkillArchetype: HeroActiveSkillArchetypeId;
   baseTeamBoost: number; // decimal (0.06 = +6% base)
+}
+
+export type HeroPassiveTraitId =
+  | 'bulwark_instinct'
+  | 'warpath_instinct'
+  | 'fortune_hunter'
+  | 'sage_instinct';
+
+export type HeroActiveSkillArchetypeId =
+  | 'frontline_ward'
+  | 'burst_volley'
+  | 'battle_chant'
+  | 'mending_pulse';
+
+export function getHeroPassiveTraitInfo(id: HeroPassiveTraitId): { name: string; description: string } {
+  return {
+    bulwark_instinct: {
+      name: 'Bulwark Instinct',
+      description: '-2% incoming team damage while in active team.',
+    },
+    warpath_instinct: {
+      name: 'Warpath Instinct',
+      description: '+3% team DPS while in active team.',
+    },
+    fortune_hunter: {
+      name: 'Fortune Hunter',
+      description: '+4% gold gain while in active team.',
+    },
+    sage_instinct: {
+      name: 'Sage Instinct',
+      description: '+3% EXP gain while in active team.',
+    },
+  }[id];
+}
+
+export function getHeroActiveArchetypeInfo(id: HeroActiveSkillArchetypeId): { name: string; description: string } {
+  return {
+    frontline_ward: {
+      name: 'Frontline Ward',
+      description: 'Triggers a short team damage reduction shield.',
+    },
+    burst_volley: {
+      name: 'Burst Volley',
+      description: 'Deals instant burst damage based on enemy max HP.',
+    },
+    battle_chant: {
+      name: 'Battle Chant',
+      description: 'Boosts team DPS for a short duration.',
+    },
+    mending_pulse: {
+      name: 'Mending Pulse',
+      description: 'Heals a percent of team max HP instantly.',
+    },
+  }[id];
 }
 
 export interface HeroUnit extends HeroTemplate {
@@ -462,21 +729,21 @@ export function calculateShardReward(rarity: Rarity, level: number): number {
 }
 
 export const HERO_POOL: HeroTemplate[] = [
-  { id: 'h1', name: 'Kael Ironheart', heroClass: 'warrior', emoji: '⚔️', baseTeamBoost: 0.05 },
-  { id: 'h2', name: 'Mira Oathguard', heroClass: 'warrior', emoji: '🛡️', baseTeamBoost: 0.055 },
-  { id: 'h3', name: 'Drogan Ashfury', heroClass: 'berserker', emoji: '🪓', baseTeamBoost: 0.06 },
-  { id: 'h4', name: 'Thorn Bloodhide', heroClass: 'berserker', emoji: '🧱', baseTeamBoost: 0.05 },
-  { id: 'h5', name: 'Sylvi Windmark', heroClass: 'archer', emoji: '🏹', baseTeamBoost: 0.055 },
-  { id: 'h6', name: 'Riven Hawkeye', heroClass: 'archer', emoji: '🎯', baseTeamBoost: 0.06 },
-  { id: 'h7', name: 'Lunara Frostweave', heroClass: 'mage', emoji: '❄️', baseTeamBoost: 0.065 },
-  { id: 'h8', name: 'Aziel Embermind', heroClass: 'mage', emoji: '🔥', baseTeamBoost: 0.06 },
-  { id: 'h9', name: 'Shen Dawnfist', heroClass: 'monk', emoji: '👊', baseTeamBoost: 0.055 },
-  { id: 'h10', name: 'Iria Lotusveil', heroClass: 'monk', emoji: '🪷', baseTeamBoost: 0.06 },
-  { id: 'h11', name: 'Borin Stonewall', heroClass: 'warrior', emoji: '⛰️', baseTeamBoost: 0.05 },
-  { id: 'h12', name: 'Karra Rageborn', heroClass: 'berserker', emoji: '🩸', baseTeamBoost: 0.065 },
-  { id: 'h13', name: 'Nyx Whisperleaf', heroClass: 'archer', emoji: '🌿', baseTeamBoost: 0.055 },
-  { id: 'h14', name: 'Vex Starchant', heroClass: 'mage', emoji: '✨', baseTeamBoost: 0.07 },
-  { id: 'h15', name: 'Tarin Sunstep', heroClass: 'monk', emoji: '☀️', baseTeamBoost: 0.06 },
+  { id: 'h1', name: 'Kael Ironheart', heroClass: 'warrior', emoji: '⚔️', passiveTrait: 'bulwark_instinct', activeSkillArchetype: 'frontline_ward', baseTeamBoost: 0.05 },
+  { id: 'h2', name: 'Mira Oathguard', heroClass: 'warrior', emoji: '🛡️', passiveTrait: 'fortune_hunter', activeSkillArchetype: 'frontline_ward', baseTeamBoost: 0.055 },
+  { id: 'h3', name: 'Drogan Ashfury', heroClass: 'berserker', emoji: '🪓', passiveTrait: 'warpath_instinct', activeSkillArchetype: 'battle_chant', baseTeamBoost: 0.06 },
+  { id: 'h4', name: 'Thorn Bloodhide', heroClass: 'berserker', emoji: '🧱', passiveTrait: 'bulwark_instinct', activeSkillArchetype: 'battle_chant', baseTeamBoost: 0.05 },
+  { id: 'h5', name: 'Sylvi Windmark', heroClass: 'archer', emoji: '🏹', passiveTrait: 'warpath_instinct', activeSkillArchetype: 'burst_volley', baseTeamBoost: 0.055 },
+  { id: 'h6', name: 'Riven Hawkeye', heroClass: 'archer', emoji: '🎯', passiveTrait: 'fortune_hunter', activeSkillArchetype: 'burst_volley', baseTeamBoost: 0.06 },
+  { id: 'h7', name: 'Lunara Frostweave', heroClass: 'mage', emoji: '❄️', passiveTrait: 'sage_instinct', activeSkillArchetype: 'mending_pulse', baseTeamBoost: 0.065 },
+  { id: 'h8', name: 'Aziel Embermind', heroClass: 'mage', emoji: '🔥', passiveTrait: 'warpath_instinct', activeSkillArchetype: 'burst_volley', baseTeamBoost: 0.06 },
+  { id: 'h9', name: 'Shen Dawnfist', heroClass: 'monk', emoji: '👊', passiveTrait: 'bulwark_instinct', activeSkillArchetype: 'mending_pulse', baseTeamBoost: 0.055 },
+  { id: 'h10', name: 'Iria Lotusveil', heroClass: 'monk', emoji: '🪷', passiveTrait: 'sage_instinct', activeSkillArchetype: 'frontline_ward', baseTeamBoost: 0.06 },
+  { id: 'h11', name: 'Borin Stonewall', heroClass: 'warrior', emoji: '⛰️', passiveTrait: 'bulwark_instinct', activeSkillArchetype: 'frontline_ward', baseTeamBoost: 0.05 },
+  { id: 'h12', name: 'Karra Rageborn', heroClass: 'berserker', emoji: '🩸', passiveTrait: 'warpath_instinct', activeSkillArchetype: 'battle_chant', baseTeamBoost: 0.065 },
+  { id: 'h13', name: 'Nyx Whisperleaf', heroClass: 'archer', emoji: '🌿', passiveTrait: 'fortune_hunter', activeSkillArchetype: 'burst_volley', baseTeamBoost: 0.055 },
+  { id: 'h14', name: 'Vex Starchant', heroClass: 'mage', emoji: '✨', passiveTrait: 'sage_instinct', activeSkillArchetype: 'mending_pulse', baseTeamBoost: 0.07 },
+  { id: 'h15', name: 'Tarin Sunstep', heroClass: 'monk', emoji: '☀️', passiveTrait: 'sage_instinct', activeSkillArchetype: 'battle_chant', baseTeamBoost: 0.06 },
 ];
 
 export const MAX_EQUIPPED_HEROES = 5;
@@ -711,3 +978,141 @@ export const ACHIEVEMENTS: Achievement[] = [
 export const COST_SCALE = 1.15;
 export const REBIRTH_BONUS = 1.5;
 export const REBIRTH_WAVE_THRESHOLD = 100;
+
+// ── Weekly Events / Mission Board ──────────────────────────────────────────
+
+export interface WeeklyEventConfig {
+  id: string;
+  name: string;
+  description: string;
+  emoji: string;
+  enemyHpMultiplier: number;
+  enemyDamageMultiplier: number;
+  goldMultiplier: number;
+  expMultiplier: number;
+  shardMultiplier: number;
+}
+
+export const WEEKLY_EVENTS: WeeklyEventConfig[] = [
+  {
+    id: 'no_armor_week',
+    name: 'No Armor Week',
+    description: 'Enemies lose heavy defenses. Faster clears, lighter resistance.',
+    emoji: '🪓',
+    enemyHpMultiplier: 0.85,
+    enemyDamageMultiplier: 1,
+    goldMultiplier: 1.05,
+    expMultiplier: 1,
+    shardMultiplier: 1,
+  },
+  {
+    id: 'double_shard_drops',
+    name: 'Double Shard Drops',
+    description: 'Shard income surges from recycling and shard rewards.',
+    emoji: '💎',
+    enemyHpMultiplier: 1,
+    enemyDamageMultiplier: 1,
+    goldMultiplier: 1,
+    expMultiplier: 1,
+    shardMultiplier: 2,
+  },
+  {
+    id: 'elite_waves_only',
+    name: 'Elite Waves Only',
+    description: 'Every wave is dangerous, but rewards are amplified.',
+    emoji: '👹',
+    enemyHpMultiplier: 1.2,
+    enemyDamageMultiplier: 1.22,
+    goldMultiplier: 1.25,
+    expMultiplier: 1.25,
+    shardMultiplier: 1.15,
+  },
+];
+
+export const WEEKLY_TRACK_MILESTONES = [25, 75, 150, 260];
+
+export function weekNumberForTimestamp(ts: number): number {
+  return Math.floor(ts / (7 * 24 * 60 * 60 * 1000));
+}
+
+export function getWeeklyEventByWeek(weekNumber: number): WeeklyEventConfig {
+  return WEEKLY_EVENTS[Math.abs(weekNumber) % WEEKLY_EVENTS.length];
+}
+
+export function getWeeklyEventForTimestamp(ts: number): WeeklyEventConfig {
+  return getWeeklyEventByWeek(weekNumberForTimestamp(ts));
+}
+
+export interface MissionBoardGoal {
+  id: string;
+  horizon: 'short' | 'medium' | 'long';
+  title: string;
+  description: string;
+  metric: 'wave' | 'kills' | 'summons' | 'active_team' | 'hero_shards' | 'essence';
+  target: number;
+  rewardGold?: number;
+  rewardShards?: number;
+  rewardEssence?: number;
+}
+
+export const MISSION_BOARD_GOALS: MissionBoardGoal[] = [
+  {
+    id: 'm_short_wave_20',
+    horizon: 'short',
+    title: 'Frontline Sprint',
+    description: 'Reach Wave 20 this run.',
+    metric: 'wave',
+    target: 20,
+    rewardGold: 1200,
+    rewardShards: 80,
+  },
+  {
+    id: 'm_short_team_4',
+    horizon: 'short',
+    title: 'Full Squad',
+    description: 'Field 4 heroes in your active team.',
+    metric: 'active_team',
+    target: 4,
+    rewardGold: 900,
+  },
+  {
+    id: 'm_medium_kills_250',
+    horizon: 'medium',
+    title: 'Campaign Attrition',
+    description: 'Defeat 250 monsters total.',
+    metric: 'kills',
+    target: 250,
+    rewardGold: 3200,
+    rewardShards: 160,
+  },
+  {
+    id: 'm_medium_summons_40',
+    horizon: 'medium',
+    title: 'Roster Architect',
+    description: 'Complete 40 hero summons.',
+    metric: 'summons',
+    target: 40,
+    rewardShards: 220,
+    rewardEssence: 6,
+  },
+  {
+    id: 'm_long_essence_60',
+    horizon: 'long',
+    title: 'Core Resonance',
+    description: 'Accumulate 60 essence.',
+    metric: 'essence',
+    target: 60,
+    rewardGold: 6000,
+    rewardEssence: 10,
+  },
+  {
+    id: 'm_long_shards_2000',
+    horizon: 'long',
+    title: 'Shard Dominion',
+    description: 'Own 2,000 hero shards at once.',
+    metric: 'hero_shards',
+    target: 2000,
+    rewardShards: 300,
+    rewardEssence: 8,
+  },
+];
