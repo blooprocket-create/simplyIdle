@@ -642,142 +642,146 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         </Pressable>
       </ScrollView>
 
-      {/* Team HP Bar */}
-      <View style={styles.hpSection}>
-        <View style={styles.hpRow}>
-          <Text style={styles.hpLabel}>💪 Team</Text>
-          <View style={styles.hpBarBg}>
-            <View
-              style={[
-                styles.hpBarFill,
-                { 
-                  width: `${teamHpPct}%`,
-                  backgroundColor: teamHpPct > 30 ? '#33CC55' : '#EE3333',
-                },
-              ]}
-            />
+      {tab === 'battle' && (
+        <>
+          {/* Team HP Bar */}
+          <View style={styles.hpSection}>
+            <View style={styles.hpRow}>
+              <Text style={styles.hpLabel}>💪 Team</Text>
+              <View style={styles.hpBarBg}>
+                <View
+                  style={[
+                    styles.hpBarFill,
+                    {
+                      width: `${teamHpPct}%`,
+                      backgroundColor: teamHpPct > 30 ? '#33CC55' : '#EE3333',
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.hpText}>{Math.ceil(state.teamHp)}/{Math.ceil(state.teamMaxHp)}</Text>
+            </View>
           </View>
-          <Text style={styles.hpText}>{Math.ceil(state.teamHp)}/{Math.ceil(state.teamMaxHp)}</Text>
-        </View>
-      </View>
 
-      {/* Monster Zone */}
-      <View style={styles.monsterZone}>
-        <Text style={styles.waveLabel}>Wave {state.wave} {isBoss ? '👑' : ''}</Text>
-        {isBossImminent && !isBoss && <Text style={styles.bossImminentText}>⚠️ Boss Approaching</Text>}
-        <Text style={styles.monsterEmoji}>{monster.emoji}</Text>
-        <Text style={styles.monsterName}>{monster.name}</Text>
-        <View style={styles.hpBarBg}>
-          <View
-            style={[
-              styles.hpBarFill,
-              {
-                width: `${monsterHpPct}%`,
-                backgroundColor: monsterHpPct > 50 ? '#33CC55' : monsterHpPct > 25 ? '#FFCC00' : '#EE3333',
-              },
-            ]}
-          />
-        </View>
-        <Text style={styles.hpText}>{Math.ceil(state.monsterHp)}/{Math.ceil(state.monsterMaxHp)} HP</Text>
-      </View>
-
-      {/* Team Selection */}
-      <View style={styles.teamInfo}>
-        <View style={styles.teamHeader}>
-          <Text style={styles.teamTitle}>⚔️ Active Team (+ You)</Text>
-          <Pressable
-            onPress={() => {
-              setTempTeam([...state.activeTeamHeroIds]);
-              setTeamSelectionMode(!teamSelectionMode);
-            }}
-            style={styles.editBtn}
-          >
-            <Text style={styles.editBtnText}>{teamSelectionMode ? 'Cancel' : 'Edit'}</Text>
-          </Pressable>
-        </View>
-
-        {teamSelectionMode ? (
-          <View>
-            <Text style={styles.selectMsg}>Select up to {ACTIVE_TEAM_SIZE} heroes ({tempTeam.length}/{ACTIVE_TEAM_SIZE})</Text>
-            <ScrollView style={styles.heroSelector}>
-              {state.heroRoster.map(hero => {
-                const isSelected = tempTeam.includes(hero.uid);
-                return (
-                  <Pressable
-                    key={hero.uid}
-                    style={[styles.heroSelectCard, isSelected && styles.heroSelectCardSelected]}
-                    onPress={() => {
-                      setTempTeam(prev => {
-                        if (prev.includes(hero.uid)) {
-                          return prev.filter(id => id !== hero.uid);
-                        } else if (prev.length < ACTIVE_TEAM_SIZE) {
-                          return [...prev, hero.uid];
-                        }
-                        return prev;
-                      });
-                    }}
-                  >
-                    <View style={[styles.selectCheckbox, isSelected && styles.selectCheckboxChecked]} />
-                    <View style={styles.heroSelectInfo}>
-                      <Text style={styles.heroSelectName}>{hero.emoji} {hero.name} Lv{hero.level}</Text>
-                      <Text style={{ color: rarityConfig(hero.rarity).color, fontSize: 12 }}>
-                        {hero.rarity} • {hero.heroClass}
-                      </Text>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-            <Pressable
-              style={styles.confirmBtn}
-              onPress={() => {
-                setActiveTeam(tempTeam);
-                setTeamSelectionMode(false);
-              }}
-            >
-              <Text style={styles.confirmBtnText}>Confirm Team ({tempTeam.length})</Text>
-            </Pressable>
+          {/* Monster Zone */}
+          <View style={styles.monsterZone}>
+            <Text style={styles.waveLabel}>Wave {state.wave} {isBoss ? '👑' : ''}</Text>
+            {isBossImminent && !isBoss && <Text style={styles.bossImminentText}>⚠️ Boss Approaching</Text>}
+            <Text style={styles.monsterEmoji}>{monster.emoji}</Text>
+            <Text style={styles.monsterName}>{monster.name}</Text>
+            <View style={styles.hpBarBg}>
+              <View
+                style={[
+                  styles.hpBarFill,
+                  {
+                    width: `${monsterHpPct}%`,
+                    backgroundColor: monsterHpPct > 50 ? '#33CC55' : monsterHpPct > 25 ? '#FFCC00' : '#EE3333',
+                  },
+                ]}
+              />
+            </View>
+            <Text style={styles.hpText}>{Math.ceil(state.monsterHp)}/{Math.ceil(state.monsterMaxHp)} HP</Text>
           </View>
-        ) : (
-          <View style={styles.activeTeamDisplay}>
-            {state.activeTeamHeroIds.length === 0 ? (
-              <Text style={styles.noTeamMsg}>No heroes selected. Tap Edit to choose your team.</Text>
+
+          {/* Team Selection */}
+          <View style={styles.teamInfo}>
+            <View style={styles.teamHeader}>
+              <Text style={styles.teamTitle}>⚔️ Active Team (+ You)</Text>
+              <Pressable
+                onPress={() => {
+                  setTempTeam([...state.activeTeamHeroIds]);
+                  setTeamSelectionMode(!teamSelectionMode);
+                }}
+                style={styles.editBtn}
+              >
+                <Text style={styles.editBtnText}>{teamSelectionMode ? 'Cancel' : 'Edit'}</Text>
+              </Pressable>
+            </View>
+
+            {teamSelectionMode ? (
+              <View>
+                <Text style={styles.selectMsg}>Select up to {ACTIVE_TEAM_SIZE} heroes ({tempTeam.length}/{ACTIVE_TEAM_SIZE})</Text>
+                <ScrollView style={styles.heroSelector}>
+                  {state.heroRoster.map(hero => {
+                    const isSelected = tempTeam.includes(hero.uid);
+                    return (
+                      <Pressable
+                        key={hero.uid}
+                        style={[styles.heroSelectCard, isSelected && styles.heroSelectCardSelected]}
+                        onPress={() => {
+                          setTempTeam(prev => {
+                            if (prev.includes(hero.uid)) {
+                              return prev.filter(id => id !== hero.uid);
+                            } else if (prev.length < ACTIVE_TEAM_SIZE) {
+                              return [...prev, hero.uid];
+                            }
+                            return prev;
+                          });
+                        }}
+                      >
+                        <View style={[styles.selectCheckbox, isSelected && styles.selectCheckboxChecked]} />
+                        <View style={styles.heroSelectInfo}>
+                          <Text style={styles.heroSelectName}>{hero.emoji} {hero.name} Lv{hero.level}</Text>
+                          <Text style={{ color: rarityConfig(hero.rarity).color, fontSize: 12 }}>
+                            {hero.rarity} • {hero.heroClass}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+                <Pressable
+                  style={styles.confirmBtn}
+                  onPress={() => {
+                    setActiveTeam(tempTeam);
+                    setTeamSelectionMode(false);
+                  }}
+                >
+                  <Text style={styles.confirmBtnText}>Confirm Team ({tempTeam.length})</Text>
+                </Pressable>
+              </View>
             ) : (
-              state.activeTeamHeroIds.map((heroId, idx) => {
-                const hero = state.heroRoster.find(h => h.uid === heroId);
-                if (!hero) return null;
-                const cls = getClassConfig(hero.heroClass);
-                return (
-                  <View key={heroId} style={styles.activeTeamCard}>
-                    <Text style={styles.slotIdx}>#{idx + 1}</Text>
-                    <View style={styles.activeTeamCardContent}>
-                      <Text style={styles.activeTeamHeroName}>{hero.emoji} {hero.name}</Text>
-                      <Text style={styles.activeTeamHeroClass}>
-                        <Text style={{ color: rarityConfig(hero.rarity).color }}>{hero.rarity}</Text>
-                        {' • '}
-                        {cls.name} Lv{hero.level}
-                      </Text>
-                    </View>
-                    <Pressable
-                      style={styles.formationBadge}
-                      onPress={() => {
-                        const roles: Array<'front' | 'mid' | 'back'> = ['front', 'mid', 'back'];
-                        const cur = state.heroFormationByUid[heroId] ?? (hero.heroClass === 'warrior' || hero.heroClass === 'berserker' ? 'front' : hero.heroClass === 'archer' || hero.heroClass === 'mage' ? 'back' : 'mid');
-                        const next = roles[(roles.indexOf(cur) + 1) % roles.length];
-                        setHeroFormation(heroId, next);
-                      }}
-                    >
-                      <Text style={styles.formationBadgeText}>
-                        {(state.heroFormationByUid[heroId] ?? (hero.heroClass === 'warrior' || hero.heroClass === 'berserker' ? 'front' : hero.heroClass === 'archer' || hero.heroClass === 'mage' ? 'back' : 'mid')) === 'front' ? '🛡️ Front' : (state.heroFormationByUid[heroId] ?? 'mid') === 'mid' ? '⚔️ Mid' : '🏹 Back'}
-                      </Text>
-                    </Pressable>
-                  </View>
-                );
-              })
+              <View style={styles.activeTeamDisplay}>
+                {state.activeTeamHeroIds.length === 0 ? (
+                  <Text style={styles.noTeamMsg}>No heroes selected. Tap Edit to choose your team.</Text>
+                ) : (
+                  state.activeTeamHeroIds.map((heroId, idx) => {
+                    const hero = state.heroRoster.find(h => h.uid === heroId);
+                    if (!hero) return null;
+                    const cls = getClassConfig(hero.heroClass);
+                    return (
+                      <View key={heroId} style={styles.activeTeamCard}>
+                        <Text style={styles.slotIdx}>#{idx + 1}</Text>
+                        <View style={styles.activeTeamCardContent}>
+                          <Text style={styles.activeTeamHeroName}>{hero.emoji} {hero.name}</Text>
+                          <Text style={styles.activeTeamHeroClass}>
+                            <Text style={{ color: rarityConfig(hero.rarity).color }}>{hero.rarity}</Text>
+                            {' • '}
+                            {cls.name} Lv{hero.level}
+                          </Text>
+                        </View>
+                        <Pressable
+                          style={styles.formationBadge}
+                          onPress={() => {
+                            const roles: Array<'front' | 'mid' | 'back'> = ['front', 'mid', 'back'];
+                            const cur = state.heroFormationByUid[heroId] ?? (hero.heroClass === 'warrior' || hero.heroClass === 'berserker' ? 'front' : hero.heroClass === 'archer' || hero.heroClass === 'mage' ? 'back' : 'mid');
+                            const next = roles[(roles.indexOf(cur) + 1) % roles.length];
+                            setHeroFormation(heroId, next);
+                          }}
+                        >
+                          <Text style={styles.formationBadgeText}>
+                            {(state.heroFormationByUid[heroId] ?? (hero.heroClass === 'warrior' || hero.heroClass === 'berserker' ? 'front' : hero.heroClass === 'archer' || hero.heroClass === 'mage' ? 'back' : 'mid')) === 'front' ? '🛡️ Front' : (state.heroFormationByUid[heroId] ?? 'mid') === 'mid' ? '⚔️ Mid' : '🏹 Back'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })
+                )}
+              </View>
             )}
           </View>
-        )}
-      </View>
+        </>
+      )}
 
       {/* Command Deck */}
       <View style={styles.tabBar}>
@@ -2112,13 +2116,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.eventsModalBox}>
-            <View style={styles.settingsHeaderRow}>
-              <Text style={styles.modalTitle}>🗓️ Events & Seasons</Text>
+            <View style={styles.eventsHeaderRow}>
+              <Text style={styles.eventsModalTitle}>🗓️ Events & Seasons</Text>
               <Pressable style={styles.settingsCloseBtn} onPress={() => setEventsOpen(false)}>
                 <Text style={styles.settingsCloseBtnText}>Close</Text>
               </Pressable>
             </View>
-            <ScrollView style={styles.settingsScroll}>
+            <ScrollView style={styles.eventsScroll} contentContainerStyle={styles.eventsScrollContent}>
 
               {/* Streak Insurance */}
               <View style={styles.eventsCard}>
@@ -5479,42 +5483,58 @@ const styles = StyleSheet.create({
 
   // Events modal
   eventsModalBox: {
-    backgroundColor: '#0F1A2A',
-    borderRadius: 14,
+    backgroundColor: '#121A26',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#3A5278',
-    width: '94%',
-    maxHeight: '88%',
-    paddingTop: 4,
-    overflow: 'hidden',
+    borderColor: '#2E425A',
+    width: '88%',
+    maxHeight: '80%',
+    padding: 14,
+  },
+  eventsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  eventsModalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  eventsScroll: {
+    maxHeight: 520,
+  },
+  eventsScrollContent: {
+    paddingBottom: 6,
+    gap: 8,
   },
   eventsCard: {
-    backgroundColor: '#131F30',
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2E4563',
-    padding: 12,
-    marginBottom: 10,
+    borderColor: '#304761',
+    backgroundColor: '#162336',
+    padding: 10,
   },
   eventsCardTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#E6F0FF',
+    color: '#D8EDFF',
     marginBottom: 6,
   },
   eventsSubtitle: {
     fontSize: 10,
-    color: '#8BAEC8',
+    color: '#A9C4DB',
     marginBottom: 8,
   },
   eventsStatLine: {
     fontSize: 11,
-    color: '#B3CCE5',
+    color: '#B9D4EA',
     marginBottom: 4,
   },
   eventsHint: {
     fontSize: 10,
-    color: '#7899B5',
+    color: '#88A9C4',
     fontStyle: 'italic',
     marginTop: 4,
     marginBottom: 6,
