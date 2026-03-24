@@ -85,6 +85,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     stats,
     createCharacter,
     notifyQuestEvent,
+    attack,
     setActiveTeam,
     summonHero,
     summonHeroX10,
@@ -141,8 +142,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [equipmentSubTab, setEquipmentSubTab] = useState<EquipmentSubTab>('inventory');
   const [achievementsSubTab, setAchievementsSubTab] = useState<AchievementsSubTab>('overview');
   const [eventsOpen, setEventsOpen] = useState(false);
+  const [chapterMapOpen, setChapterMapOpen] = useState(false);
   const [compareItemId, setCompareItemId] = useState<string | null>(null);
   const [momentCue, setMomentCue] = useState<'none' | 'mythic' | 'boss' | 'rebirth'>('none');
+  const [battleSpeed, setBattleSpeed] = useState<1 | 2 | 4>(1);
   const [warPanels, setWarPanels] = useState({
     frontline: true,
     roster: true,
@@ -354,6 +357,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const seasonScore = state.seasonPoints;
   const seasonRank = seasonScore < 1000 ? '🥉 Bronze' : seasonScore < 5000 ? '🥈 Silver' : seasonScore < 15000 ? '🥇 Gold' : seasonScore < 40000 ? '💎 Diamond' : '👑 Legend';
   const classMasteryLevel = Math.floor((state.playerClass ? state.classMasteryXp[state.playerClass] : 0) / 100);
+  const campaignChapter = Math.floor((Math.max(1, state.wave) - 1) / 20) + 1;
+  const campaignStage = ((Math.max(1, state.wave) - 1) % 20) + 1;
+  const campaignBossStage = 20;
+  const powerTier = teamPowerIndex < 12000 ? 'Recruit' : teamPowerIndex < 55000 ? 'Elite' : teamPowerIndex < 180000 ? 'Mythic' : 'Ascendant';
+  const guildRank = state.totalKills < 500 ? 'Bronze Order' : state.totalKills < 2500 ? 'Silver Order' : state.totalKills < 9000 ? 'Gold Order' : 'Eternal Order';
+  const isBossImminent = state.wave % 10 >= 8;
+  const burstChargePct = Math.min(100, (((state.totalKills % 25) + 1) / 25) * 100);
+  const canBurst = burstChargePct >= 96;
   const prestige1Done = (state.prestigeCount ?? 0) >= 1;
   const prestige5Done = (state.prestigeCount ?? 0) >= 5;
   const prestige10Done = (state.prestigeCount ?? 0) >= 10;
@@ -502,6 +513,29 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         ))}
       </View>
 
+      <View style={styles.metaStrip}>
+        <View style={styles.metaChip}>
+          <Text style={styles.metaChipLabel}>Campaign</Text>
+          <Text style={styles.metaChipValue}>Ch {campaignChapter} • {campaignStage}/{campaignBossStage}</Text>
+        </View>
+        <View style={styles.metaChip}>
+          <Text style={styles.metaChipLabel}>Season</Text>
+          <Text style={styles.metaChipValue}>{seasonRank} • {fmt(seasonScore)}</Text>
+        </View>
+        <View style={styles.metaChip}>
+          <Text style={styles.metaChipLabel}>Order</Text>
+          <Text style={styles.metaChipValue}>{guildRank}</Text>
+        </View>
+        <View style={styles.metaChip}>
+          <Text style={styles.metaChipLabel}>Power Tier</Text>
+          <Text style={styles.metaChipValue}>{powerTier}</Text>
+        </View>
+        <Pressable style={[styles.metaChip, styles.metaChipAction]} onPress={() => setChapterMapOpen(true)}>
+          <Text style={styles.metaChipLabel}>Campaign Map</Text>
+          <Text style={styles.metaChipValue}>Open Route</Text>
+        </Pressable>
+      </View>
+
       {/* Team HP Bar */}
       <View style={styles.hpSection}>
         <View style={styles.hpRow}>
@@ -524,6 +558,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       {/* Monster Zone */}
       <View style={styles.monsterZone}>
         <Text style={styles.waveLabel}>Wave {state.wave} {isBoss ? '👑' : ''}</Text>
+        {isBossImminent && !isBoss && <Text style={styles.bossImminentText}>⚠️ Boss Approaching</Text>}
         <Text style={styles.monsterEmoji}>{monster.emoji}</Text>
         <Text style={styles.monsterName}>{monster.name}</Text>
         <View style={styles.hpBarBg}>
@@ -668,6 +703,26 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           <View style={styles.warRoomTab}>
             <Text style={styles.sectionTitle}>🛰️ War Room Command</Text>
             <Text style={styles.warRoomIntro}>One-screen operations hub. Expand panels for details, jump to deep tabs when needed.</Text>
+
+            <View style={styles.campaignRail}>
+              <View style={styles.campaignRailCard}>
+                <Text style={styles.campaignRailLabel}>Campaign</Text>
+                <Text style={styles.campaignRailValue}>Chapter {campaignChapter} • Stage {campaignStage}</Text>
+                <View style={styles.hpBarBg}>
+                  <View style={[styles.hpBarFill, { width: `${(campaignStage / campaignBossStage) * 100}%`, backgroundColor: '#5DA8FF' }]} />
+                </View>
+              </View>
+              <View style={styles.campaignRailCard}>
+                <Text style={styles.campaignRailLabel}>Boss Gate</Text>
+                <Text style={styles.campaignRailValue}>Stage {campaignBossStage} • Every 10 Waves</Text>
+                <Text style={styles.campaignRailHint}>{isBossImminent ? 'Pressure Rising' : 'Stabilize & Push'}</Text>
+              </View>
+              <View style={styles.campaignRailCard}>
+                <Text style={styles.campaignRailLabel}>Legion Score</Text>
+                <Text style={styles.campaignRailValue}>{fmt(teamPowerIndex)} ({powerTier})</Text>
+                <Text style={styles.campaignRailHint}>Aim for next tier via gear + mastery</Text>
+              </View>
+            </View>
 
             <View style={styles.warPanel}>
               <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('frontline')}>
@@ -827,6 +882,44 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         {tab === 'battle' && (
           <View style={styles.battleTab}>
             <Text style={styles.sectionTitle}>⚔️ Battle Overview</Text>
+
+            <View style={styles.battleTempoCard}>
+              <View style={styles.battleTempoHeader}>
+                <Text style={styles.battleTempoTitle}>Combat Tempo</Text>
+                <View style={styles.battleTempoRow}>
+                  {([1, 2, 4] as const).map(mult => (
+                    <Pressable
+                      key={mult}
+                      style={[styles.battleTempoBtn, battleSpeed === mult && styles.battleTempoBtnActive]}
+                      onPress={() => setBattleSpeed(mult)}
+                    >
+                      <Text style={[styles.battleTempoBtnText, battleSpeed === mult && styles.battleTempoBtnTextActive]}>{mult}x</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+              <View style={styles.burstRow}>
+                <View style={styles.burstInfo}>
+                  <Text style={styles.burstTitle}>Burst Gauge</Text>
+                  <Text style={styles.burstSub}>Charge from kills • consume for rapid strikes</Text>
+                </View>
+                <Pressable
+                  style={[styles.burstBtn, !canBurst && styles.burstBtnDisabled]}
+                  disabled={!canBurst}
+                  onPress={() => {
+                    const hits = 4 * battleSpeed;
+                    for (let i = 0; i < hits; i += 1) attack();
+                    setMomentCue('boss');
+                    setTimeout(() => setMomentCue('none'), 500);
+                  }}
+                >
+                  <Text style={styles.burstBtnText}>{canBurst ? `Burst x${4 * battleSpeed}` : 'Charging'}</Text>
+                </Pressable>
+              </View>
+              <View style={styles.hpBarBg}>
+                <View style={[styles.hpBarFill, { width: `${burstChargePct}%`, backgroundColor: '#FFB347' }]} />
+              </View>
+            </View>
 
             <View style={styles.battleSection}>
               <Text style={styles.battleSectionTitle}>♾️ Rebirth</Text>
@@ -1025,6 +1118,24 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             {heroesSubTab === 'summon' && (
               <View style={styles.gachaSection}>
                 <Text style={styles.sectionTitle}>✨ Gacha Summon</Text>
+                <View style={styles.featuredSummonCard}>
+                  <Text style={styles.featuredSummonTitle}>🌌 Featured Banner: Astral Vanguard</Text>
+                  <Text style={styles.featuredSummonDesc}>Higher odds for EPIC+ drops during this rotation. Mythic trigger creates full-screen flash.</Text>
+                  <View style={styles.featuredSummonMeterRow}>
+                    <Text style={styles.featuredSummonMeterLabel}>Legendary Pity</Text>
+                    <Text style={styles.featuredSummonMeterValue}>{state.gachaPityCounter}/30</Text>
+                  </View>
+                  <View style={styles.hpBarBg}>
+                    <View style={[styles.hpBarFill, { width: `${Math.min(100, (state.gachaPityCounter / 30) * 100)}%`, backgroundColor: '#C77DFF' }]} />
+                  </View>
+                  <Pressable
+                    style={[styles.featuredSummonBtn, !canGachaX10 && styles.featuredSummonBtnDisabled]}
+                    disabled={!canGachaX10}
+                    onPress={summonHeroX10}
+                  >
+                    <Text style={styles.featuredSummonBtnText}>Cinematic x10 Summon</Text>
+                  </Pressable>
+                </View>
                 <Text style={styles.pityLabel}>Pity: {state.gachaPityCounter}/30 • {pityRemaining} until guaranteed Legendary+</Text>
                 {state.freeSummonCharges > 0 ? (
                   <Text style={styles.gachaFree}>Free Summon Ready ({state.freeSummonCharges})</Text>
@@ -1149,19 +1260,32 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 const canRankUp = nextRankConfig && state.heroShards >= nextRankConfig.shardCostToRankUp;
                 const trait = getHeroPassiveTraitInfo(hero.passiveTrait);
                 const activeArchetype = getHeroActiveArchetypeInfo(hero.activeSkillArchetype);
+                const faction = hero.heroClass === 'warrior' || hero.heroClass === 'berserker'
+                  ? 'Vanguard'
+                  : hero.heroClass === 'archer'
+                    ? 'Ranger'
+                    : hero.heroClass === 'mage'
+                      ? 'Arcanum'
+                      : 'Aegis';
                     return (
                       <View key={hero.uid} style={[styles.heroCard, inActiveTeam && styles.heroCardActive]}>
                     <View style={[styles.heroCardRarityBar, { backgroundColor: rarity.color }]} />
                     <View style={styles.heroCardBody}>
                       {/* Main row */}
                       <View style={styles.heroCardTopRow}>
-                        <Text style={styles.heroEmoji}>{hero.emoji}</Text>
+                        <View style={[styles.heroPortraitFrame, { borderColor: rarity.color }]}>
+                          <Text style={styles.heroEmoji}>{hero.emoji}</Text>
+                        </View>
                         <View style={styles.heroCardInfo}>
                           <Text style={styles.heroName}>{hero.name}</Text>
                           <Text style={styles.heroDetail}>
                             <Text style={{ color: rarity.color }}>{hero.rarity}</Text>
                             {' • '}{cls.name}
                           </Text>
+                          <View style={styles.heroTagRow}>
+                            <Text style={styles.heroFactionTag}>{faction}</Text>
+                            <Text style={styles.heroArchetypeTag}>{activeArchetype.name}</Text>
+                          </View>
                           <Text style={styles.heroRank}>⭐ Rank {hero.rank}/10</Text>
                         </View>
                         <View style={styles.heroCardRight}>
@@ -1784,6 +1908,47 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         achievementId={state.newAchievement}
         onDismiss={clearAchievement}
       />
+
+      <Modal
+        visible={chapterMapOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setChapterMapOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.chapterMapModalBox}>
+            <View style={styles.settingsHeaderRow}>
+              <Text style={styles.modalTitle}>🧭 Campaign Route</Text>
+              <Pressable style={styles.settingsCloseBtn} onPress={() => setChapterMapOpen(false)}>
+                <Text style={styles.settingsCloseBtnText}>Close</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.chapterMapSubtitle}>Chapter {campaignChapter} • Stage {campaignStage}/{campaignBossStage}</Text>
+            <View style={styles.chapterNodesWrap}>
+              {Array.from({ length: campaignBossStage }, (_, i) => i + 1).map(stage => {
+                const done = stage < campaignStage;
+                const active = stage === campaignStage;
+                const boss = stage === campaignBossStage;
+                const chest = !boss && stage % 5 === 0;
+                return (
+                  <View
+                    key={stage}
+                    style={[
+                      styles.chapterNode,
+                      done && styles.chapterNodeDone,
+                      active && styles.chapterNodeActive,
+                      boss && styles.chapterNodeBoss,
+                    ]}
+                  >
+                    <Text style={styles.chapterNodeText}>{boss ? '👑' : chest ? '🎁' : stage}</Text>
+                  </View>
+                );
+              })}
+            </View>
+            <Text style={styles.chapterMapHint}>Every 5 stages: chest node • Stage 20: boss gate</Text>
+          </View>
+        </View>
+      </Modal>
 
       {/* Events Modal */}
       <Modal
@@ -2451,6 +2616,37 @@ const styles = StyleSheet.create({
     color: '#E3FFEF',
     fontWeight: '700',
   },
+  metaStrip: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  metaChip: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#345470',
+    backgroundColor: '#122131',
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+  },
+  metaChipLabel: {
+    fontSize: 9,
+    color: '#8DB4D2',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 2,
+  },
+  metaChipValue: {
+    fontSize: 10,
+    color: '#E3F4FF',
+    fontWeight: '700',
+  },
+  metaChipAction: {
+    borderColor: '#5D7EA0',
+    backgroundColor: '#1A3048',
+  },
   rebirthBanner: {
     marginHorizontal: 12,
     marginBottom: 8,
@@ -2597,6 +2793,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#888',
     marginBottom: 4,
+  },
+  bossImminentText: {
+    fontSize: 11,
+    color: '#FF8FA6',
+    fontWeight: '800',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.9,
   },
   monsterEmoji: {
     fontSize: 48,
@@ -2913,6 +3117,35 @@ const styles = StyleSheet.create({
     marginTop: -6,
     marginBottom: 4,
   },
+  campaignRail: {
+    gap: 8,
+    marginBottom: 2,
+  },
+  campaignRailCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#39597A',
+    backgroundColor: '#0F1E2E',
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+  },
+  campaignRailLabel: {
+    fontSize: 10,
+    color: '#9ABED9',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 3,
+  },
+  campaignRailValue: {
+    fontSize: 12,
+    color: '#E5F4FF',
+    fontWeight: '700',
+    marginBottom: 5,
+  },
+  campaignRailHint: {
+    fontSize: 10,
+    color: '#78A6C9',
+  },
   warPanel: {
     borderRadius: 8,
     borderWidth: 1,
@@ -2970,6 +3203,83 @@ const styles = StyleSheet.create({
   },
   battleTab: {
     gap: 12,
+  },
+  battleTempoCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#5C6F87',
+    backgroundColor: '#172432',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    gap: 6,
+  },
+  battleTempoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  battleTempoTitle: {
+    fontSize: 11,
+    color: '#D9ECFF',
+    fontWeight: '700',
+  },
+  battleTempoRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  battleTempoBtn: {
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#536B86',
+    backgroundColor: '#22364C',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  battleTempoBtnActive: {
+    borderColor: '#8FD2FF',
+    backgroundColor: '#2F5275',
+  },
+  battleTempoBtnText: {
+    fontSize: 10,
+    color: '#BFD7EC',
+    fontWeight: '700',
+  },
+  battleTempoBtnTextActive: {
+    color: '#EDFAFF',
+  },
+  burstRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  burstInfo: {
+    flex: 1,
+  },
+  burstTitle: {
+    fontSize: 10,
+    color: '#FFDFA8',
+    fontWeight: '700',
+  },
+  burstSub: {
+    fontSize: 10,
+    color: '#A7BDD4',
+  },
+  burstBtn: {
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#D18F45',
+    backgroundColor: '#6C4323',
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+  },
+  burstBtnDisabled: {
+    opacity: 0.45,
+  },
+  burstBtnText: {
+    fontSize: 10,
+    color: '#FFECD0',
+    fontWeight: '800',
   },
   warningBox: {
     paddingVertical: 12,
@@ -3160,6 +3470,60 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#DCE6FF',
     marginBottom: 6,
+  },
+  featuredSummonCard: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#694AA8',
+    backgroundColor: '#1B1532',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  featuredSummonTitle: {
+    fontSize: 12,
+    color: '#E8D9FF',
+    fontWeight: '700',
+    marginBottom: 3,
+  },
+  featuredSummonDesc: {
+    fontSize: 10,
+    color: '#B7A5D7',
+    marginBottom: 8,
+  },
+  featuredSummonMeterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  featuredSummonMeterLabel: {
+    fontSize: 10,
+    color: '#C9B6F0',
+    fontWeight: '600',
+  },
+  featuredSummonMeterValue: {
+    fontSize: 10,
+    color: '#F0E4FF',
+    fontWeight: '700',
+  },
+  featuredSummonBtn: {
+    marginTop: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A785E8',
+    backgroundColor: '#4A2F7A',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  featuredSummonBtnDisabled: {
+    opacity: 0.45,
+  },
+  featuredSummonBtnText: {
+    fontSize: 11,
+    color: '#F6ECFF',
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
   timelineRow: {
     flexDirection: 'row',
@@ -3486,6 +3850,42 @@ const styles = StyleSheet.create({
   },
   heroCardInfo: {
     flex: 1,
+  },
+  heroPortraitFrame: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0D1523',
+  },
+  heroTagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+    marginTop: 2,
+    marginBottom: 2,
+  },
+  heroFactionTag: {
+    fontSize: 9,
+    color: '#DDF0FF',
+    backgroundColor: '#27435F',
+    borderRadius: 9,
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    overflow: 'hidden',
+    fontWeight: '700',
+  },
+  heroArchetypeTag: {
+    fontSize: 9,
+    color: '#EFE1FF',
+    backgroundColor: '#4D3A67',
+    borderRadius: 9,
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    overflow: 'hidden',
+    fontWeight: '700',
   },
   heroCardRight: {
     alignItems: 'flex-end',
@@ -4632,6 +5032,62 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#CFE6FF',
     fontWeight: '700',
+  },
+  chapterMapModalBox: {
+    backgroundColor: '#0F1A2A',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#3A5278',
+    width: '92%',
+    maxHeight: '70%',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  chapterMapSubtitle: {
+    fontSize: 11,
+    color: '#B9D4E9',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  chapterNodesWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  chapterNode: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: '#4B6684',
+    backgroundColor: '#1B2C40',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chapterNodeDone: {
+    borderColor: '#67AE7A',
+    backgroundColor: '#234632',
+  },
+  chapterNodeActive: {
+    borderColor: '#99D2FF',
+    backgroundColor: '#2F5376',
+    transform: [{ scale: 1.06 }],
+  },
+  chapterNodeBoss: {
+    borderColor: '#D98DAA',
+    backgroundColor: '#4A2E40',
+  },
+  chapterNodeText: {
+    fontSize: 11,
+    color: '#EFF7FF',
+    fontWeight: '700',
+  },
+  chapterMapHint: {
+    fontSize: 10,
+    color: '#8FAECC',
+    textAlign: 'center',
   },
 
   // Events button
