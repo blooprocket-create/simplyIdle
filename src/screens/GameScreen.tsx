@@ -49,7 +49,7 @@ import { fmt } from '../utils';
 import AchievementToast from '../components/AchievementToast';
 import RebirthModal from '../components/PrestigeModal';
 
-type Tab = 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment';
+type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment';
 
 interface GameScreenProps {
   accountName: string;
@@ -64,12 +64,17 @@ const STAT_LABELS = {
   spirit: 'SPR',
 } as const;
 
-const UPGRADE_COSTS: Record<string, { scrap: number; essence: number }> = {
-  common: { scrap: 80, essence: 0 },
-  rare: { scrap: 170, essence: 4 },
-  epic: { scrap: 300, essence: 8 },
-  legendary: { scrap: 500, essence: 14 },
+const TAB_META: Record<Tab, { icon: string; label: string; mood: string }> = {
+  warroom: { icon: '🛰️', label: 'War Room', mood: 'All Systems' },
+  battle: { icon: '⚔️', label: 'Warfront', mood: 'Push Waves' },
+  heroes: { icon: '👥', label: 'Roster', mood: 'Squad Ops' },
+  stats: { icon: '📊', label: 'Growth', mood: 'Power Grid' },
+  equipment: { icon: '🎒', label: 'Armory', mood: 'Forge Gear' },
+  achievements: { icon: '🏆', label: 'Legends', mood: 'Milestones' },
 };
+
+const ACH_BONUS_PER_UNLOCK_PCT = 3;
+const ACH_BONUS_CAP_PCT = 75;
 
 export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const {
@@ -85,18 +90,25 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     loadTeamLoadout,
     autoRecycleHeroes,
     setAutoRecycleMaxRarity,
+    setAutoRecycleEnabled,
     toggleEquipHero,
     allocateStat,
     allocateStatMax,
     equipItem,
     recycleHero,
     rankUpHero,
+    convertShardsToEssence,
+    convertShardsToScrap,
+    spendRebirthCore,
     useUsableItem,
     dismantleEquipment,
     craftEquipment,
     upgradeEquipmentRarity,
     setAutoUsePotion,
     setAutoUsePotionThreshold,
+    setAutoSummonEnabled,
+    setAutoSummonMode,
+    setAutoSummonReserveGold,
     spendEssenceUpgrade,
     claimWeeklyTrack,
     claimMission,
@@ -105,11 +117,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     clearRewardPopup,
     rebirth,
     getEssenceCost,
+    getRebirthCoreCost,
+    getShardForgeCosts,
+    getUpgradePlan,
     getWeeklyEvent,
     getMissionProgress,
   } = useGameState(accountName);
 
-  const [tab, setTab] = useState<Tab>('battle');
+  const [tab, setTab] = useState<Tab>('warroom');
   const [rebirthOpen, setRebirthOpen] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [draftClass, setDraftClass] = useState<PlayerClass>('warrior');
@@ -118,6 +133,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [expandedHeroes, setExpandedHeroes] = useState<Set<string>>(new Set());
   const [recycleConfirmUid, setRecycleConfirmUid] = useState<string | null>(null);
   const [recycleDropdownOpen, setRecycleDropdownOpen] = useState(false);
+  const [warPanels, setWarPanels] = useState({
+    frontline: true,
+    roster: true,
+    armory: false,
+    growth: false,
+    objectives: true,
+  });
 
   const classConfig = getClassConfig(state.playerClass ?? 'warrior');
   const classPassive = getClassPassive(state.playerClass ?? 'warrior');
@@ -135,10 +157,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const monsterHpPct = Math.max(0, Math.min(1, state.monsterHp / state.monsterMaxHp)) * 100;
   const teamHpPct = Math.max(0, Math.min(1, state.teamHp / state.teamMaxHp)) * 100;
   const activeTeamSet = useMemo(() => new Set(state.activeTeamHeroIds), [state.activeTeamHeroIds]);
-  const inventoryItems = useMemo(
-    () => state.inventoryItemIds.map(id => getEquipmentItem(id)).filter(Boolean),
-    [state.inventoryItemIds],
-  );
   const usableInventory = useMemo(
     () => Object.entries(state.usableItemCounts)
       .map(([id, count]) => ({ item: getUsableItem(id), count }))
@@ -158,6 +176,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     ? TUTORIAL_QUESTS[state.tutorialCurrentQuestIndex] ?? null
     : null;
   const weeklyEvent = getWeeklyEvent();
+  const shardForgeCosts = getShardForgeCosts();
+  const rebirthDamageCost = getRebirthCoreCost('damage');
+  const rebirthEconomyCost = getRebirthCoreCost('economy');
+  const rebirthSurvivalCost = getRebirthCoreCost('survival');
   const missionCards = MISSION_BOARD_GOALS.map(m => ({
     mission: m,
     progress: getMissionProgress(m),
@@ -193,6 +215,25 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   const tutorialProgressLabel = `${Math.min(state.tutorialCurrentQuestIndex, TUTORIAL_QUESTS.length)}/${TUTORIAL_QUESTS.length}`;
   const rewardPopup = state.rewardQueue[0] ?? null;
+  const canRebirthNow = state.wave >= REBIRTH_WAVE_THRESHOLD;
+  const rebirthProgressPct = Math.max(0, Math.min(1, state.wave / REBIRTH_WAVE_THRESHOLD)) * 100;
+  const rebirthWavesLeft = Math.max(0, REBIRTH_WAVE_THRESHOLD - state.wave);
+  const nextGuidance = useMemo(() => {
+    if (canRebirthNow) {
+      return { title: 'Rebirth Ready', detail: 'Open Battle and trigger Rebirth to reset for permanent power.', tab: 'battle' as Tab };
+    }
+    if (state.activeTeamHeroIds.length < ACTIVE_TEAM_SIZE) {
+      return { title: 'Build Full Team', detail: 'Go to Heroes and equip 4 heroes for stable progression.', tab: 'heroes' as Tab };
+    }
+    if (state.unspentStatPoints > 0) {
+      return { title: 'Spend Stat Points', detail: 'Allocate your unspent points to keep scaling damage and survival.', tab: 'stats' as Tab };
+    }
+    const firstUnclaimedMission = missionCards.find(m => !m.claimed && m.progress.done);
+    if (firstUnclaimedMission) {
+      return { title: 'Claim Mission Reward', detail: `Claim \"${firstUnclaimedMission.mission.title}\" in Achievements.`, tab: 'achievements' as Tab };
+    }
+    return { title: 'Push Act Boss', detail: `Advance to Wave ${currentAct.bossWave} for permanent unlock progress.`, tab: 'battle' as Tab };
+  }, [canRebirthNow, state.activeTeamHeroIds.length, state.unspentStatPoints, missionCards, currentAct.bossWave]);
   const effectiveTeamDps = Math.max(1, stats.dps / affixTotals.hpMult);
   const ttkSeconds = state.monsterHp / effectiveTeamDps;
   const baseEnemyDps = getMonsterDamage(state.wave) * affixTotals.dmgMult;
@@ -203,6 +244,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const damageEssenceCost = getEssenceCost('damage');
   const economyEssenceCost = getEssenceCost('economy');
   const survivalEssenceCost = getEssenceCost('survival');
+  const tabSignals: Record<Tab, string> = {
+    warroom: canRebirthNow ? 'READY' : 'LIVE',
+    battle: `W${state.wave}`,
+    heroes: `${state.heroRoster.length}`,
+    stats: state.unspentStatPoints > 0 ? `+${state.unspentStatPoints}` : 'OK',
+    equipment: `${state.inventoryItemIds.length}`,
+    achievements: `${state.achievements.size}/${ACHIEVEMENTS.length}`,
+  };
 
   useEffect(() => {
     if (!rewardPopup) return;
@@ -215,6 +264,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const onTabChange = (nextTab: Tab) => {
     setTab(nextTab);
     const eventMap: Record<Tab, TutorialEvent | null> = {
+      warroom: null,
       battle: 'open_battle_tab',
       heroes: 'open_heroes_tab',
       stats: 'open_stats_tab',
@@ -223,6 +273,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     };
     const event = eventMap[nextTab];
     if (event) notifyQuestEvent(event);
+  };
+
+  const toggleWarPanel = (key: keyof typeof warPanels) => {
+    setWarPanels(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   // Character creation screen
@@ -277,6 +331,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#0A0A18" />
+      <View pointerEvents="none" style={styles.sceneDecor}>
+        <View style={styles.sceneOrbA} />
+        <View style={styles.sceneOrbB} />
+        <View style={styles.sceneGrid} />
+      </View>
 
       {/* Header */}
       <View style={styles.header}>
@@ -327,6 +386,38 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           <Text style={styles.hintBannerText}>{activeHint.detail}</Text>
         </View>
       )}
+
+      <View style={styles.nextStepBanner}>
+        <View style={styles.nextStepHeader}>
+          <Text style={styles.nextStepTitle}>Next Step: {nextGuidance.title}</Text>
+          <Pressable style={styles.nextStepBtn} onPress={() => onTabChange(nextGuidance.tab)}>
+            <Text style={styles.nextStepBtnText}>Open</Text>
+          </Pressable>
+        </View>
+        <Text style={styles.nextStepDesc}>{nextGuidance.detail}</Text>
+      </View>
+
+      <View style={styles.rebirthBanner}>
+        <View style={styles.rebirthBannerTop}>
+          <Text style={styles.rebirthBannerTitle}>Ascension Status</Text>
+          <Pressable
+            style={[styles.rebirthBannerBtn, !canRebirthNow && styles.rebirthBannerBtnDisabled]}
+            disabled={!canRebirthNow}
+            onPress={() => {
+              onTabChange('battle');
+              setRebirthOpen(true);
+            }}
+          >
+            <Text style={styles.rebirthBannerBtnText}>{canRebirthNow ? 'Rebirth Now' : 'Locked'}</Text>
+          </Pressable>
+        </View>
+        <Text style={styles.rebirthBannerInfo}>
+          {canRebirthNow ? `Ready at Wave ${state.wave}. Use Rebirth for permanent cores.` : `${rebirthWavesLeft} waves until Rebirth unlock (Wave ${REBIRTH_WAVE_THRESHOLD}).`}
+        </Text>
+        <View style={styles.hpBarBg}>
+          <View style={[styles.hpBarFill, { width: `${rebirthProgressPct}%`, backgroundColor: canRebirthNow ? '#FF5B8A' : '#6E7EA8' }]} />
+        </View>
+      </View>
 
       {/* Team HP Bar */}
       <View style={styles.hpSection}>
@@ -451,28 +542,21 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         )}
       </View>
 
-      {/* Tabs */}
+      {/* Command Deck */}
       <View style={styles.tabBar}>
-        {(['battle', 'heroes', 'stats', 'equipment', 'achievements'] as const).map(t => (
+        {(['warroom', 'battle', 'heroes', 'stats', 'equipment', 'achievements'] as const).map(t => (
           <Pressable
             key={t}
             style={[styles.tab, tab === t && styles.tabActive]}
             onPress={() => onTabChange(t)}
           >
             <View style={styles.tabIconWrap}>
-              <Text
-                style={[
-                  styles.tabText,
-                  tab === t && styles.tabTextActive,
-                  t === 'achievements' && styles.smallText,
-                ]}
-              >
-                {t === 'battle' && '⚔️'}
-                {t === 'heroes' && '👥'}
-                {t === 'stats' && '📊'}
-                {t === 'equipment' && '🎒'}
-                {t === 'achievements' && '🏆'}
-              </Text>
+              <Text style={[styles.tabIcon, tab === t && styles.tabIconActive]}>{TAB_META[t].icon}</Text>
+              <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{TAB_META[t].label}</Text>
+              <Text style={[styles.tabSubText, tab === t && styles.tabSubTextActive]}>{TAB_META[t].mood}</Text>
+              <View style={styles.tabSignalPill}>
+                <Text style={styles.tabSignalText}>{tabSignals[t]}</Text>
+              </View>
               {((t === 'stats' && hasStatsNotification) || (t === 'heroes' && hasGachaNotification)) && (
                 <View style={styles.redDot} />
               )}
@@ -483,9 +567,140 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
       {/* Tab Content */}
       <ScrollView style={styles.tabContent}>
+        {tab === 'warroom' && (
+          <View style={styles.warRoomTab}>
+            <Text style={styles.sectionTitle}>🛰️ War Room Command</Text>
+            <Text style={styles.warRoomIntro}>One-screen operations hub. Expand panels for details, jump to deep tabs when needed.</Text>
+
+            <View style={styles.warPanel}>
+              <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('frontline')}>
+                <Text style={styles.warPanelTitle}>⚔️ Frontline</Text>
+                <Text style={styles.warPanelChevron}>{warPanels.frontline ? '−' : '+'}</Text>
+              </Pressable>
+              {warPanels.frontline && (
+                <View style={styles.warPanelBody}>
+                  <Text style={styles.warPanelStat}>Wave {state.wave} • {monster.name} {isBoss ? '(Boss)' : ''}</Text>
+                  <Text style={styles.warPanelStat}>Team HP: {Math.ceil(state.teamHp)} / {state.teamMaxHp}</Text>
+                  <Text style={styles.warPanelStat}>Danger: {dangerLabel} ({dangerScore.toFixed(0)}%)</Text>
+                  <View style={styles.warPanelActionRow}>
+                    <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('battle')}>
+                      <Text style={styles.warPanelActionText}>Open Warfront</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.warPanelActionBtn, !canRebirthNow && styles.warPanelActionBtnDisabled]}
+                      disabled={!canRebirthNow}
+                      onPress={() => setRebirthOpen(true)}
+                    >
+                      <Text style={styles.warPanelActionText}>{canRebirthNow ? 'Rebirth' : `Rebirth @ W${REBIRTH_WAVE_THRESHOLD}`}</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.warPanel}>
+              <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('roster')}>
+                <Text style={styles.warPanelTitle}>👥 Roster</Text>
+                <Text style={styles.warPanelChevron}>{warPanels.roster ? '−' : '+'}</Text>
+              </Pressable>
+              {warPanels.roster && (
+                <View style={styles.warPanelBody}>
+                  <Text style={styles.warPanelStat}>Active Team: {state.activeTeamHeroIds.length}/{ACTIVE_TEAM_SIZE}</Text>
+                  <Text style={styles.warPanelStat}>Total Heroes: {state.heroRoster.length}</Text>
+                  <Text style={styles.warPanelStat}>Shards: {fmt(state.heroShards)}</Text>
+                  <View style={styles.warPanelActionRow}>
+                    <Pressable style={styles.warPanelActionBtn} onPress={autoEquipBestHeroes}>
+                      <Text style={styles.warPanelActionText}>Auto Equip</Text>
+                    </Pressable>
+                    <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('heroes')}>
+                      <Text style={styles.warPanelActionText}>Manage Roster</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.warPanel}>
+              <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('armory')}>
+                <Text style={styles.warPanelTitle}>🎒 Armory</Text>
+                <Text style={styles.warPanelChevron}>{warPanels.armory ? '−' : '+'}</Text>
+              </Pressable>
+              {warPanels.armory && (
+                <View style={styles.warPanelBody}>
+                  <Text style={styles.warPanelStat}>Items: {state.inventoryItemIds.length}</Text>
+                  <Text style={styles.warPanelStat}>Scrap: {fmt(state.equipmentScrap)} • Essence: {fmt(state.essence)}</Text>
+                  <View style={styles.warPanelActionRow}>
+                    <Pressable style={styles.warPanelActionBtn} onPress={() => craftEquipment('weapon')}>
+                      <Text style={styles.warPanelActionText}>Craft Weapon</Text>
+                    </Pressable>
+                    <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('equipment')}>
+                      <Text style={styles.warPanelActionText}>Open Armory</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.warPanel}>
+              <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('growth')}>
+                <Text style={styles.warPanelTitle}>📈 Growth</Text>
+                <Text style={styles.warPanelChevron}>{warPanels.growth ? '−' : '+'}</Text>
+              </Pressable>
+              {warPanels.growth && (
+                <View style={styles.warPanelBody}>
+                  <Text style={styles.warPanelStat}>Level {state.level} • Unspent: {state.unspentStatPoints}</Text>
+                  <Text style={styles.warPanelStat}>Achievement Bonus: +{(stats.achievementBonusPercent * 100).toFixed(0)}%</Text>
+                  <Text style={styles.warPanelStat}>Rebirth Cores: {state.rebirthCores}</Text>
+                  <View style={styles.warPanelActionRow}>
+                    <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('stats')}>
+                      <Text style={styles.warPanelActionText}>Power Grid</Text>
+                    </Pressable>
+                    <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('achievements')}>
+                      <Text style={styles.warPanelActionText}>Legends</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.warPanel}>
+              <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('objectives')}>
+                <Text style={styles.warPanelTitle}>🎯 Objectives</Text>
+                <Text style={styles.warPanelChevron}>{warPanels.objectives ? '−' : '+'}</Text>
+              </Pressable>
+              {warPanels.objectives && (
+                <View style={styles.warPanelBody}>
+                  <Text style={styles.warPanelStat}>Weekly Kills: {state.weeklyKills}</Text>
+                  <Text style={styles.warPanelStat}>Missions Ready: {missionCards.filter(m => !m.claimed && m.progress.done).length}</Text>
+                  <Text style={styles.warPanelStat}>Current Event: {weeklyEvent.emoji} {weeklyEvent.name}</Text>
+                  <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('achievements')}>
+                    <Text style={styles.warPanelActionText}>Open Objectives</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
         {tab === 'battle' && (
           <View style={styles.battleTab}>
             <Text style={styles.sectionTitle}>⚔️ Battle Overview</Text>
+
+            <View style={styles.battleSection}>
+              <Text style={styles.battleSectionTitle}>♾️ Rebirth</Text>
+              <Text style={styles.rebirthInlineText}>
+                {canRebirthNow
+                  ? 'You can rebirth now. This resets run progress for permanent cores and scaling.'
+                  : `Reach Wave ${REBIRTH_WAVE_THRESHOLD} to unlock rebirth. ${rebirthWavesLeft} waves remaining.`}
+              </Text>
+              <Pressable
+                style={[styles.rebirthInlineBtn, !canRebirthNow && styles.rebirthInlineBtnDisabled]}
+                disabled={!canRebirthNow}
+                onPress={() => setRebirthOpen(true)}
+              >
+                <Text style={styles.rebirthInlineBtnText}>{canRebirthNow ? 'Open Rebirth' : 'Rebirth Locked'}</Text>
+              </Pressable>
+            </View>
 
             <View style={styles.battleSection}>
               <Text style={styles.battleSectionTitle}>Act Progression</Text>
@@ -755,6 +970,15 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             </View>
             <View style={styles.recyclePickerWrap}>
               <Text style={styles.recyclePickerLabel}>Recycle rarity threshold (and below):</Text>
+              <View style={styles.recycleToggleRow}>
+                <Text style={styles.recycleToggleLabel}>Background Auto Recycle</Text>
+                <Pressable
+                  style={[styles.recycleToggleBtn, state.autoRecycleEnabled && styles.recycleToggleBtnActive]}
+                  onPress={() => setAutoRecycleEnabled(!state.autoRecycleEnabled)}
+                >
+                  <Text style={styles.recycleToggleBtnText}>{state.autoRecycleEnabled ? 'ON' : 'OFF'}</Text>
+                </Pressable>
+              </View>
               <Pressable
                 style={styles.recyclePickerBtn}
                 onPress={() => setRecycleDropdownOpen(prev => !prev)}
@@ -777,6 +1001,54 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   ))}
                 </View>
               )}
+            </View>
+
+            <View style={styles.shardForgeCard}>
+              <Text style={styles.shardForgeTitle}>🔧 Shard Forge</Text>
+              <Text style={styles.shardForgeDesc}>Spend overflow shards for persistent value.</Text>
+              <View style={styles.shardForgeRow}>
+                <Pressable
+                  style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.essenceCost && styles.shardForgeBtnDisabled]}
+                  disabled={state.heroShards < shardForgeCosts.essenceCost}
+                  onPress={convertShardsToEssence}
+                >
+                  <Text style={styles.shardForgeBtnText}>{shardForgeCosts.essenceCost} 💎 → +1 🜂</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.scrapCost && styles.shardForgeBtnDisabled]}
+                  disabled={state.heroShards < shardForgeCosts.scrapCost}
+                  onPress={convertShardsToScrap}
+                >
+                  <Text style={styles.shardForgeBtnText}>{shardForgeCosts.scrapCost} 💎 → +140 🔩</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={styles.autoSummonCard}>
+              <Text style={styles.shardForgeTitle}>🤖 Auto Summon Rules</Text>
+              <View style={styles.autoSummonTopRow}>
+                <Pressable
+                  style={[styles.autoSummonToggle, state.autoSummonEnabled && styles.autoSummonToggleActive]}
+                  onPress={() => setAutoSummonEnabled(!state.autoSummonEnabled)}
+                >
+                  <Text style={styles.autoSummonToggleText}>Auto Summon: {state.autoSummonEnabled ? 'ON' : 'OFF'}</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.autoSummonModeBtn}
+                  onPress={() => setAutoSummonMode(state.autoSummonMode === 'single' ? 'x10' : 'single')}
+                >
+                  <Text style={styles.autoSummonModeText}>Mode: {state.autoSummonMode.toUpperCase()}</Text>
+                </Pressable>
+              </View>
+              <View style={styles.autoSummonReserveRow}>
+                <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoSummonReserveGold(state.autoSummonReserveGold - 1000)}>
+                  <Text style={styles.autoPotionAdjustText}>-</Text>
+                </Pressable>
+                <Text style={styles.autoSummonReserveText}>Reserve Gold: {fmt(state.autoSummonReserveGold)}</Text>
+                <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoSummonReserveGold(state.autoSummonReserveGold + 1000)}>
+                  <Text style={styles.autoPotionAdjustText}>+</Text>
+                </Pressable>
+              </View>
             </View>
             <Text style={styles.rosterCount}>
               {state.heroRoster.length} heroes • {state.activeTeamHeroIds.length}/{ACTIVE_TEAM_SIZE} in active team
@@ -1016,46 +1288,55 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Text style={styles.metaUpgradeBtnText}>{survivalEssenceCost} 🜂</Text>
                 </Pressable>
               </View>
+
+              <View style={styles.rebirthTreeCard}>
+                <Text style={styles.rebirthTreeTitle}>♾️ Rebirth Tree</Text>
+                <Text style={styles.rebirthTreeCores}>Cores: {state.rebirthCores}</Text>
+                <View style={styles.metaUpgradeRow}>
+                  <View style={styles.metaUpgradeInfo}>
+                    <Text style={styles.metaUpgradeName}>Damage Branch Lv {state.rebirthDamagePath}</Text>
+                    <Text style={styles.metaUpgradeDesc}>+7% DPS per level</Text>
+                  </View>
+                  <Pressable
+                    style={[styles.metaUpgradeBtn, state.rebirthCores < rebirthDamageCost && styles.metaUpgradeBtnDisabled]}
+                    disabled={state.rebirthCores < rebirthDamageCost}
+                    onPress={() => spendRebirthCore('damage')}
+                  >
+                    <Text style={styles.metaUpgradeBtnText}>{rebirthDamageCost} Core</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.metaUpgradeRow}>
+                  <View style={styles.metaUpgradeInfo}>
+                    <Text style={styles.metaUpgradeName}>Economy Branch Lv {state.rebirthEconomyPath}</Text>
+                    <Text style={styles.metaUpgradeDesc}>+7% gold per level</Text>
+                  </View>
+                  <Pressable
+                    style={[styles.metaUpgradeBtn, state.rebirthCores < rebirthEconomyCost && styles.metaUpgradeBtnDisabled]}
+                    disabled={state.rebirthCores < rebirthEconomyCost}
+                    onPress={() => spendRebirthCore('economy')}
+                  >
+                    <Text style={styles.metaUpgradeBtnText}>{rebirthEconomyCost} Core</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.metaUpgradeRow}>
+                  <View style={styles.metaUpgradeInfo}>
+                    <Text style={styles.metaUpgradeName}>Survival Branch Lv {state.rebirthSurvivalPath}</Text>
+                    <Text style={styles.metaUpgradeDesc}>+7% HP/defense per level</Text>
+                  </View>
+                  <Pressable
+                    style={[styles.metaUpgradeBtn, state.rebirthCores < rebirthSurvivalCost && styles.metaUpgradeBtnDisabled]}
+                    disabled={state.rebirthCores < rebirthSurvivalCost}
+                    onPress={() => spendRebirthCore('survival')}
+                  >
+                    <Text style={styles.metaUpgradeBtnText}>{rebirthSurvivalCost} Core</Text>
+                  </Pressable>
+                </View>
+              </View>
             </View>
 
             <View style={styles.equipmentBox}>
-              <Text style={styles.sectionTitle}>🧰 Equipment ({classConfig.name})</Text>
-              <Text style={styles.equipmentDesc}>Equip one item per slot. Bonuses apply immediately.</Text>
-
-              {(['weapon', 'armor', 'accessory'] as EquipmentSlot[]).map(slot => {
-                const slotItems = inventoryItems.filter(item => item?.slot === slot);
-                const equippedId = state.equippedItems[slot];
-                return (
-                  <View key={slot} style={styles.equipSlotRow}>
-                    <Text style={styles.equipSlotTitle}>{slot.toUpperCase()}</Text>
-                    <Text style={styles.equipSlotCurrent}>
-                      {equippedId ? `${getEquipmentItem(equippedId)?.emoji ?? ''} ${getEquipmentItem(equippedId)?.name ?? 'Unknown'}` : 'None'}
-                    </Text>
-                    <View style={styles.equipChoices}>
-                      {slotItems.map(item => {
-                        if (!item) return null;
-                        const isEquipped = equippedId === item.id;
-                        return (
-                          <Pressable
-                            key={item.id}
-                            style={[
-                              styles.equipChoiceBtn,
-                              { borderColor: equipmentRarityConfig(item.rarity).color },
-                              isEquipped && styles.equipChoiceBtnActive,
-                            ]}
-                            onPress={() => equipItem(item.id)}
-                          >
-                            <Text style={styles.equipChoiceText}>
-                              {item.emoji} {item.name} • {equipmentRarityConfig(item.rarity).label}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  </View>
-                );
-              })}
-
+              <Text style={styles.sectionTitle}>🧰 Equipment Bonuses</Text>
+              <Text style={styles.equipmentDesc}>Manage equip/upgrade actions in the Equipment tab.</Text>
               <View style={styles.equipmentBonusRow}>
                 <Text style={styles.equipmentBonusText}>+STR {stats.equipmentBonus.strength}</Text>
                 <Text style={styles.equipmentBonusText}>+VIT {stats.equipmentBonus.vitality}</Text>
@@ -1102,11 +1383,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 if (!item) return null;
                 const isEquipped = Object.values(state.equippedItems).includes(itemId);
                 const rarity = equipmentRarityConfig(item.rarity);
-                const upgradeCost = UPGRADE_COSTS[item.rarity];
-                const canUpgrade = !!upgradeCost
-                  && state.equipmentScrap >= upgradeCost.scrap
-                  && state.essence >= upgradeCost.essence
-                  && (item.rarity !== 'legendary' || state.permanentUnlocks.includes('mythic_equipment'));
+                const upgradePlan = getUpgradePlan(item.id);
                 return (
                   <View key={itemId} style={[styles.invEquipCard, isEquipped && styles.invEquipCardEquipped]}>
                     <View style={[styles.invEquipRarity, { backgroundColor: rarity.color }]} />
@@ -1123,15 +1400,24 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                           .join(' • ')}
                       </Text>
                       {isEquipped && <Text style={styles.invEquipActive}>✓ Equipped</Text>}
-                      {upgradeCost && (
+                      <View style={styles.equipActionRow}>
+                        {!isEquipped && (
+                          <Pressable style={styles.equipNowBtn} onPress={() => equipItem(item.id)}>
+                            <Text style={styles.equipNowBtnText}>Equip</Text>
+                          </Pressable>
+                        )}
                         <Pressable
-                          style={[styles.upgradeGearBtn, !canUpgrade && styles.upgradeGearBtnDisabled]}
-                          disabled={!canUpgrade}
+                          style={[styles.upgradeGearBtn, !upgradePlan.canUpgrade && styles.upgradeGearBtnDisabled]}
+                          disabled={!upgradePlan.canUpgrade}
                           onPress={() => upgradeEquipmentRarity(item.id)}
                         >
-                          <Text style={styles.upgradeGearBtnText}>Upgrade ({upgradeCost.scrap}🔩 {upgradeCost.essence}🜂)</Text>
+                          <Text style={styles.upgradeGearBtnText}>
+                            {upgradePlan.targetRarity
+                              ? `Upgrade → ${upgradePlan.targetRarity.toUpperCase()} (${upgradePlan.scrapCost}🔩 ${upgradePlan.essenceCost}🜂)`
+                              : 'Upgrade Unavailable'}
+                          </Text>
                         </Pressable>
-                      )}
+                      </View>
                       {!isEquipped && (
                         <Pressable style={styles.dismantleBtn} onPress={() => dismantleEquipment(item.id)}>
                           <Text style={styles.dismantleBtnText}>Dismantle</Text>
@@ -1147,6 +1433,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
         {tab === 'achievements' && (
           <View style={styles.achievementsTab}>
+            <View style={styles.achievementBonusCard}>
+              <View style={styles.achievementBonusHeader}>
+                <Text style={styles.achievementBonusTitle}>Legacy Bonus Engine</Text>
+                <Text style={styles.achievementBonusValue}>+{(stats.achievementBonusPercent * 100).toFixed(0)}%</Text>
+              </View>
+              <Text style={styles.achievementBonusDesc}>
+                Each unlocked achievement grants +{ACH_BONUS_PER_UNLOCK_PCT}% global combat/economy power.
+              </Text>
+              <Text style={styles.achievementBonusDesc}>
+                Cap: +{ACH_BONUS_CAP_PCT}% • Unlocked: {state.achievements.size}/{ACHIEVEMENTS.length}
+              </Text>
+            </View>
+
             <View style={styles.weeklyEventCard}>
               <Text style={styles.weeklyEventTitle}>{weeklyEvent.emoji} Weekly Event: {weeklyEvent.name}</Text>
               <Text style={styles.weeklyEventDesc}>{weeklyEvent.description}</Text>
@@ -1201,6 +1500,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <View style={styles.achCardInfo}>
                     <Text style={[styles.achName, unlocked && styles.achNameUnlocked]}>{ach.name}</Text>
                     <Text style={styles.achDesc}>{ach.description}</Text>
+                    <Text style={[styles.achBonusLine, unlocked && styles.achBonusLineUnlocked]}>
+                      {unlocked ? `+${ACH_BONUS_PER_UNLOCK_PCT}% Applied` : `+${ACH_BONUS_PER_UNLOCK_PCT}% on Unlock`}
+                    </Text>
                   </View>
                 </View>
               );
@@ -1208,13 +1510,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           </View>
         )}
       </ScrollView>
-
-      {/* Rebirth Button */}
-      {state.wave >= REBIRTH_WAVE_THRESHOLD && (
-        <Pressable style={styles.rebirthBtn} onPress={() => setRebirthOpen(true)}>
-          <Text style={styles.rebirthBtnText}>♾️ Rebirth</Text>
-        </Pressable>
-      )}
 
       {rewardPopup && (
         <Pressable style={[styles.rewardToast, styles.rewardToastActive]} onPress={clearRewardPopup}>
@@ -1296,7 +1591,37 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#0A0A18',
+    backgroundColor: '#060B12',
+  },
+  sceneDecor: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+  },
+  sceneOrbA: {
+    position: 'absolute',
+    top: -80,
+    left: -40,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: '#18455D',
+    opacity: 0.28,
+  },
+  sceneOrbB: {
+    position: 'absolute',
+    top: 90,
+    right: -60,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: '#7A3F1F',
+    opacity: 0.22,
+  },
+  sceneGrid: {
+    ...StyleSheet.absoluteFillObject,
+    borderTopWidth: 1,
+    borderTopColor: '#1A2A34',
+    opacity: 0.2,
   },
 
   // Character Creation
@@ -1387,12 +1712,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#10101C',
+    backgroundColor: '#0F1722',
     borderBottomWidth: 1,
-    borderBottomColor: '#2A2A4A',
+    borderBottomColor: '#2F4358',
     paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 8,
+    zIndex: 1,
   },
   gold: {
     fontSize: 13,
@@ -1412,7 +1738,7 @@ const styles = StyleSheet.create({
   },
   dpsLabel: {
     fontSize: 11,
-    color: '#AAA',
+    color: '#9bb9d1',
   },
   headerCenter: {
     flex: 1,
@@ -1446,7 +1772,7 @@ const styles = StyleSheet.create({
   },
   classLabel: {
     fontSize: 11,
-    color: '#888',
+    color: '#9BB3C6',
   },
   headerRight: {
     alignItems: 'flex-end',
@@ -1458,7 +1784,7 @@ const styles = StyleSheet.create({
   },
   headerStat: {
     fontSize: 11,
-    color: '#AAA',
+    color: '#A5BED1',
     marginBottom: 2,
   },
   headerHighlight: {
@@ -1555,6 +1881,83 @@ const styles = StyleSheet.create({
   hintDismissBtnText: {
     fontSize: 10,
     color: '#EAF0FF',
+    fontWeight: '700',
+  },
+  nextStepBanner: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: '#1A2226',
+    borderLeftWidth: 3,
+    borderLeftColor: '#7BD9A8',
+  },
+  nextStepHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  nextStepTitle: {
+    fontSize: 11,
+    color: '#CFFFE4',
+    fontWeight: '700',
+  },
+  nextStepDesc: {
+    fontSize: 10,
+    color: '#A8D8BF',
+    lineHeight: 15,
+  },
+  nextStepBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: '#2E5843',
+  },
+  nextStepBtnText: {
+    fontSize: 10,
+    color: '#E3FFEF',
+    fontWeight: '700',
+  },
+  rebirthBanner: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#5E3B56',
+    backgroundColor: '#231926',
+  },
+  rebirthBannerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  rebirthBannerTitle: {
+    fontSize: 11,
+    color: '#FFD2E2',
+    fontWeight: '700',
+  },
+  rebirthBannerInfo: {
+    fontSize: 10,
+    color: '#D5B2C2',
+    marginBottom: 6,
+  },
+  rebirthBannerBtn: {
+    borderRadius: 4,
+    backgroundColor: '#6A2E4A',
+    borderWidth: 1,
+    borderColor: '#C17295',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  rebirthBannerBtnDisabled: {
+    opacity: 0.5,
+  },
+  rebirthBannerBtnText: {
+    fontSize: 10,
+    color: '#FFE7F1',
     fontWeight: '700',
   },
 
@@ -1750,42 +2153,77 @@ const styles = StyleSheet.create({
   // Tab Bar
   tabBar: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#10101C',
+    backgroundColor: '#0E1622',
     borderTopWidth: 1,
-    borderTopColor: '#2A2A4A',
-    paddingVertical: 8,
-    marginTop: 8,
+    borderTopColor: '#2A4055',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    marginTop: 6,
+    gap: 6,
+    zIndex: 1,
   },
   tab: {
     flex: 1,
-    paddingVertical: 8,
+    minHeight: 72,
+    paddingVertical: 7,
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#2C3D4E',
+    borderRadius: 8,
+    backgroundColor: '#101B29',
   },
   tabActive: {
-    borderBottomColor: '#6DDB7B',
+    borderColor: '#8FD2FF',
+    backgroundColor: '#15334A',
+  },
+  tabIcon: {
+    fontSize: 16,
+    marginBottom: 2,
+  },
+  tabIconActive: {
+    transform: [{ scale: 1.05 }],
   },
   tabText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#777',
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#8FA7BC',
   },
   tabTextActive: {
-    color: '#FFF',
-    fontWeight: '600',
+    color: '#E6F8FF',
+  },
+  tabSubText: {
+    fontSize: 9,
+    color: '#6F8BA1',
+    marginTop: 1,
+  },
+  tabSubTextActive: {
+    color: '#BFE9FF',
   },
   tabIconWrap: {
     position: 'relative',
     minWidth: 22,
     alignItems: 'center',
   },
+  tabSignalPill: {
+    marginTop: 5,
+    borderRadius: 10,
+    backgroundColor: '#1F2F40',
+    borderWidth: 1,
+    borderColor: '#3E5C77',
+    paddingHorizontal: 8,
+    paddingVertical: 1,
+  },
+  tabSignalText: {
+    fontSize: 9,
+    color: '#CDE5F7',
+    fontWeight: '700',
+  },
   redDot: {
     position: 'absolute',
-    top: -5,
-    right: -6,
+    top: -1,
+    right: -4,
     width: 8,
     height: 8,
     borderRadius: 4,
@@ -1799,9 +2237,80 @@ const styles = StyleSheet.create({
   tabContent: {
     flex: 1,
     padding: 12,
+    marginHorizontal: 10,
+    marginBottom: 10,
+    marginTop: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#2B4258',
+    backgroundColor: '#0C131D',
   },
 
   // Battle Tab
+  warRoomTab: {
+    gap: 10,
+  },
+  warRoomIntro: {
+    fontSize: 11,
+    color: '#9EB6C8',
+    marginTop: -6,
+    marginBottom: 4,
+  },
+  warPanel: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#31506A',
+    backgroundColor: '#101C2A',
+    overflow: 'hidden',
+  },
+  warPanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    backgroundColor: '#162839',
+  },
+  warPanelTitle: {
+    fontSize: 12,
+    color: '#D6ECFF',
+    fontWeight: '700',
+  },
+  warPanelChevron: {
+    fontSize: 16,
+    color: '#99C4E1',
+    fontWeight: '700',
+  },
+  warPanelBody: {
+    padding: 10,
+    gap: 6,
+  },
+  warPanelStat: {
+    fontSize: 11,
+    color: '#B3CADB',
+  },
+  warPanelActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 2,
+  },
+  warPanelActionBtn: {
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#5D88AD',
+    backgroundColor: '#21364A',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    alignSelf: 'flex-start',
+  },
+  warPanelActionBtnDisabled: {
+    opacity: 0.5,
+  },
+  warPanelActionText: {
+    fontSize: 10,
+    color: '#D9ECFB',
+    fontWeight: '700',
+  },
   battleTab: {
     gap: 12,
   },
@@ -2087,6 +2596,30 @@ const styles = StyleSheet.create({
     color: '#99A9C9',
     marginBottom: 6,
   },
+  recycleToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  recycleToggleLabel: {
+    fontSize: 10,
+    color: '#AFC4EA',
+  },
+  recycleToggleBtn: {
+    borderRadius: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: '#2D3550',
+  },
+  recycleToggleBtnActive: {
+    backgroundColor: '#2d5b3e',
+  },
+  recycleToggleBtnText: {
+    fontSize: 10,
+    color: '#E8F0FF',
+    fontWeight: '700',
+  },
   recyclePickerBtn: {
     paddingVertical: 8,
     paddingHorizontal: 10,
@@ -2120,6 +2653,103 @@ const styles = StyleSheet.create({
   },
   recycleOptionText: {
     fontSize: 11,
+    fontWeight: '700',
+  },
+  shardForgeCard: {
+    marginBottom: 8,
+    backgroundColor: '#1B2132',
+    borderWidth: 1,
+    borderColor: '#394971',
+    borderRadius: 6,
+    padding: 8,
+  },
+  shardForgeTitle: {
+    fontSize: 11,
+    color: '#DCE8FF',
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  shardForgeDesc: {
+    fontSize: 10,
+    color: '#A4B6D8',
+    marginBottom: 6,
+  },
+  shardForgeRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  shardForgeBtn: {
+    flex: 1,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#6382B4',
+    backgroundColor: '#253957',
+    paddingVertical: 7,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+  },
+  shardForgeBtnDisabled: {
+    opacity: 0.45,
+  },
+  shardForgeBtnText: {
+    fontSize: 10,
+    color: '#E3EEFF',
+    fontWeight: '700',
+  },
+  autoSummonCard: {
+    marginBottom: 8,
+    backgroundColor: '#15282B',
+    borderWidth: 1,
+    borderColor: '#2B5960',
+    borderRadius: 6,
+    padding: 8,
+  },
+  autoSummonTopRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  autoSummonToggle: {
+    flex: 1,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#426E78',
+    backgroundColor: '#1D3940',
+    paddingVertical: 7,
+    alignItems: 'center',
+  },
+  autoSummonToggleActive: {
+    backgroundColor: '#2c6a55',
+    borderColor: '#5bb58f',
+  },
+  autoSummonToggleText: {
+    color: '#D8FFF0',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  autoSummonModeBtn: {
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#617CA3',
+    backgroundColor: '#2A3956',
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  autoSummonModeText: {
+    color: '#E4ECFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  autoSummonReserveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  autoSummonReserveText: {
+    fontSize: 10,
+    color: '#BBE9DF',
     fontWeight: '700',
   },
   loadoutRow: {
@@ -2485,6 +3115,25 @@ const styles = StyleSheet.create({
     color: '#D6FFE7',
     fontWeight: '700',
   },
+  rebirthTreeCard: {
+    marginTop: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#4A3664',
+    backgroundColor: '#191227',
+    padding: 8,
+    gap: 6,
+  },
+  rebirthTreeTitle: {
+    fontSize: 11,
+    color: '#E9D6FF',
+    fontWeight: '700',
+  },
+  rebirthTreeCores: {
+    fontSize: 10,
+    color: '#D9B6FF',
+    fontWeight: '700',
+  },
   equipmentBox: {
     paddingVertical: 12,
     paddingHorizontal: 12,
@@ -2547,6 +3196,35 @@ const styles = StyleSheet.create({
   // Achievements Tab
   achievementsTab: {
     gap: 8,
+  },
+  achievementBonusCard: {
+    backgroundColor: '#17232B',
+    borderWidth: 1,
+    borderColor: '#385A66',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  achievementBonusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  achievementBonusTitle: {
+    fontSize: 12,
+    color: '#D5F2FF',
+    fontWeight: '700',
+  },
+  achievementBonusValue: {
+    fontSize: 14,
+    color: '#7EE2A9',
+    fontWeight: '800',
+  },
+  achievementBonusDesc: {
+    fontSize: 10,
+    color: '#A6C8D4',
+    lineHeight: 15,
   },
   weeklyEventCard: {
     backgroundColor: '#121f2e',
@@ -2657,17 +3335,17 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 10,
     paddingHorizontal: 10,
-    backgroundColor: '#15151F',
-    borderRadius: 6,
+    backgroundColor: '#121B28',
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2A2A4A',
+    borderColor: '#2A4257',
     marginBottom: 8,
-    opacity: 0.5,
+    opacity: 0.6,
   },
   achCardUnlocked: {
     opacity: 1,
-    borderColor: '#FFB347',
-    backgroundColor: '#1a1a28',
+    borderColor: '#68D69D',
+    backgroundColor: '#152723',
   },
   achEmoji: {
     fontSize: 20,
@@ -2678,18 +3356,50 @@ const styles = StyleSheet.create({
   achName: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#666',
+    color: '#95A8B7',
     marginBottom: 2,
   },
   achNameUnlocked: {
-    color: '#FFF',
+    color: '#EDFFF6',
   },
   achDesc: {
     fontSize: 10,
-    color: '#777',
+    color: '#8DA3B5',
+  },
+  achBonusLine: {
+    marginTop: 3,
+    fontSize: 10,
+    color: '#8CB2C4',
+    fontWeight: '700',
+  },
+  achBonusLineUnlocked: {
+    color: '#79D89F',
   },
 
   // Rebirth
+  rebirthInlineText: {
+    fontSize: 11,
+    color: '#D0C2E8',
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  rebirthInlineBtn: {
+    alignSelf: 'flex-start',
+    borderRadius: 5,
+    backgroundColor: '#6A2E4A',
+    borderWidth: 1,
+    borderColor: '#C17295',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  rebirthInlineBtnDisabled: {
+    opacity: 0.5,
+  },
+  rebirthInlineBtnText: {
+    fontSize: 11,
+    color: '#FFE7F1',
+    fontWeight: '700',
+  },
   rewardToast: {
     marginHorizontal: 12,
     marginBottom: 8,
@@ -2723,21 +3433,6 @@ const styles = StyleSheet.create({
     color: '#B7D0BB',
     fontSize: 11,
   },
-  rebirthBtn: {
-    marginHorizontal: 12,
-    marginBottom: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#FF5B8A',
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  rebirthBtnText: {
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-
   // Sections
   sectionTitle: {
     fontSize: 14,
@@ -2754,12 +3449,12 @@ const styles = StyleSheet.create({
 
   // Battle Tab  
   battleSection: {
-    backgroundColor: '#15151F',
-    borderRadius: 6,
+    backgroundColor: '#121C29',
+    borderRadius: 8,
     padding: 10,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#2A2A4A',
+    borderColor: '#2C4156',
   },
   battleSectionTitle: {
     fontSize: 12,
@@ -2981,6 +3676,26 @@ const styles = StyleSheet.create({
   invEquipActive: {
     fontSize: 10,
     color: '#6DDB7B',
+    fontWeight: '700',
+  },
+  equipActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+    flexWrap: 'wrap',
+  },
+  equipNowBtn: {
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+    borderRadius: 4,
+    backgroundColor: '#2E5A38',
+    borderWidth: 1,
+    borderColor: '#6DBB83',
+  },
+  equipNowBtnText: {
+    fontSize: 10,
+    color: '#DFFFE8',
     fontWeight: '700',
   },
   upgradeGearBtn: {

@@ -45,7 +45,6 @@ import {
   getClassConfig,
   getEquipmentItem,
   getStarterEquipmentForClass,
-  getNextEquipmentRarity,
   EQUIPMENT_CATALOG,
   equipmentRarityConfig,
   getUsableItem,
@@ -115,6 +114,10 @@ export interface GameState {
   freeSummonCharges: number;
   heroShards: number;  // currency used to rank up heroes
   essence: number;
+  rebirthCores: number;
+  rebirthDamagePath: number;
+  rebirthEconomyPath: number;
+  rebirthSurvivalPath: number;
   autoRecycleMaxRarity: Rarity;
   equipmentScrap: number;
   gachaPityCounter: number;
@@ -138,6 +141,11 @@ export interface GameState {
   usableItemCounts: Record<string, number>;
   autoUsePotionEnabled: boolean;
   autoUsePotionThresholdPct: number;
+  autoRecycleEnabled: boolean;
+  autoSummonEnabled: boolean;
+  autoSummonMode: 'single' | 'x10';
+  autoSummonReserveGold: number;
+  autoSummonCooldownMs: number;
   lastActiveAt: number;
 
   tutorialEnabled: boolean;
@@ -198,6 +206,10 @@ const DEFAULT_STATE: GameState = {
   freeSummonCharges: 0,
   heroShards: 0,
   essence: 0,
+  rebirthCores: 0,
+  rebirthDamagePath: 0,
+  rebirthEconomyPath: 0,
+  rebirthSurvivalPath: 0,
   autoRecycleMaxRarity: 'uncommon',
   equipmentScrap: 0,
   gachaPityCounter: 0,
@@ -225,6 +237,11 @@ const DEFAULT_STATE: GameState = {
   usableItemCounts: {},
   autoUsePotionEnabled: false,
   autoUsePotionThresholdPct: 0.35,
+  autoRecycleEnabled: false,
+  autoSummonEnabled: false,
+  autoSummonMode: 'single',
+  autoSummonReserveGold: 5000,
+  autoSummonCooldownMs: 0,
   lastActiveAt: Date.now(),
 
   tutorialEnabled: true,
@@ -410,13 +427,148 @@ function getHeroPassiveMultipliers(state: GameState): {
 function decayBuffs(state: GameState, elapsedMs: number): GameState {
   const nextDmgMs = Math.max(0, state.damageBuffMs - elapsedMs);
   const nextDrMs = Math.max(0, state.damageReductionBuffMs - elapsedMs);
+  const nextAutoSummonCd = Math.max(0, state.autoSummonCooldownMs - elapsedMs);
   return {
     ...state,
     damageBuffMs: nextDmgMs,
     damageReductionBuffMs: nextDrMs,
     damageBuffPct: nextDmgMs > 0 ? state.damageBuffPct : 0,
     damageReductionBuffPct: nextDrMs > 0 ? state.damageReductionBuffPct : 0,
+    autoSummonCooldownMs: nextAutoSummonCd,
   };
+}
+
+function maybeAutoRecycleBackground(state: GameState): GameState {
+  if (!state.autoRecycleEnabled) return state;
+  const activeTeam = new Set(state.activeTeamHeroIds);
+  const maxRank = rarityRank(state.autoRecycleMaxRarity);
+  const toRecycle = state.heroRoster.filter(h => !activeTeam.has(h.uid) && rarityRank(h.rarity) <= maxRank);
+  if (toRecycle.length === 0) return state;
+
+  const recycledIds = new Set(toRecycle.map(h => h.uid));
+  const weekly = getCurrentWeeklyEvent(state);
+  const shardReward = Math.ceil(toRecycle.reduce((sum, hero) => sum + calculateShardReward(hero.rarity, hero.level), 0) * weekly.shardMultiplier);
+  const newRoster = state.heroRoster.filter(h => !recycledIds.has(h.uid));
+  const newMaxHp = getTeamMaxHp({ ...state, heroRoster: newRoster });
+
+  return queueReward({
+    ...state,
+    heroRoster: newRoster,
+    heroShards: state.heroShards + shardReward,
+    teamMaxHp: newMaxHp,
+    teamHp: Math.min(state.teamHp, newMaxHp),
+  }, {
+    id: `bg_auto_recycle_${Date.now()}`,
+    kind: 'shard',
+    title: 'Auto Recycle (Background)',
+    detail: `+${shardReward} shards from ${toRecycle.length} heroes`,
+  });
+}
+
+function maybeAutoSummonTick(state: GameState): GameState {
+  if (!state.autoSummonEnabled) return state;
+  if (state.autoSummonCooldownMs > 0) return state;
+
+  const availableGold = Math.max(0, state.gold - state.autoSummonReserveGold);
+  const trySingle = (): GameState | null => {
+    const canUseFree = state.freeSummonCharges > 0;
+    if (!canUseFree && availableGold < GACHA_SUMMON_COST) return null;
+
+    const template = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
+    const roll = rollRarityWithPity(state.gachaPityCounter);
+    const rarity = roll.rarity;
+    const rarityMult = rarityConfig(rarity).boostMultiplier;
+    const uid = `${template.id}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    const hero: HeroUnit = {
+      ...template,
+      uid,
+      rarity,
+      level: 1,
+      rank: 1,
+      teamBoost: Number((template.baseTeamBoost * rarityMult).toFixed(4)),
+    };
+    const historyEntry: SummonHistoryEntry = {
+      id: `hist_${uid}`,
+      heroName: hero.name,
+      heroEmoji: hero.emoji,
+      rarity: hero.rarity,
+      ts: Date.now(),
+      pityTriggered: roll.pityTriggered,
+    };
+    let nextState = withAchievement(progressTutorial({
+      ...state,
+      gold: canUseFree ? state.gold : state.gold - GACHA_SUMMON_COST,
+      heroRoster: [hero, ...state.heroRoster],
+      summonHistory: [historyEntry, ...state.summonHistory].slice(0, 60),
+      totalSummons: state.totalSummons + 1,
+      freeSummonCharges: canUseFree ? state.freeSummonCharges - 1 : state.freeSummonCharges,
+      gachaPityCounter: roll.nextCounter,
+      autoSummonCooldownMs: 1200,
+    }));
+    nextState = queueCombatLog(nextState, `Auto Summon: ${hero.emoji} ${hero.name} (${hero.rarity})`);
+    return nextState;
+  };
+
+  const tryX10 = (): GameState | null => {
+    const totalPulls = 10;
+    const freeUses = Math.min(state.freeSummonCharges, totalPulls);
+    const paidUses = totalPulls - freeUses;
+    const totalCost = paidUses * GACHA_SUMMON_COST;
+    if (availableGold < totalCost) return null;
+
+    const summoned: HeroUnit[] = [];
+    const historyBatch: SummonHistoryEntry[] = [];
+    let pityCounter = state.gachaPityCounter;
+    for (let i = 0; i < totalPulls; i++) {
+      const template = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
+      const roll = rollRarityWithPity(pityCounter);
+      pityCounter = roll.nextCounter;
+      const rarity = roll.rarity;
+      const rarityMult = rarityConfig(rarity).boostMultiplier;
+      const uid = `${template.id}_${Date.now()}_${i}_${Math.floor(Math.random() * 10000)}`;
+      const summonedHero: HeroUnit = {
+        ...template,
+        uid,
+        rarity,
+        level: 1,
+        rank: 1,
+        teamBoost: Number((template.baseTeamBoost * rarityMult).toFixed(4)),
+      };
+      summoned.push(summonedHero);
+      historyBatch.push({
+        id: `hist_${uid}`,
+        heroName: summonedHero.name,
+        heroEmoji: summonedHero.emoji,
+        rarity: summonedHero.rarity,
+        ts: Date.now(),
+        pityTriggered: roll.pityTriggered,
+      });
+    }
+
+    let nextState = withAchievement(progressTutorial({
+      ...state,
+      gold: state.gold - totalCost,
+      heroRoster: [...summoned, ...state.heroRoster],
+      summonHistory: [...historyBatch, ...state.summonHistory].slice(0, 60),
+      totalSummons: state.totalSummons + totalPulls,
+      freeSummonCharges: state.freeSummonCharges - freeUses,
+      gachaPityCounter: pityCounter,
+      autoSummonCooldownMs: 1800,
+    }));
+    nextState = queueCombatLog(nextState, `Auto Summon x10 completed`);
+    return nextState;
+  };
+
+  if (state.autoSummonMode === 'x10') {
+    const x10 = tryX10();
+    if (x10) return x10;
+    const single = trySingle();
+    if (single) return single;
+    return state;
+  }
+
+  const single = trySingle();
+  return single ?? state;
 }
 
 function tickHeroActives(state: GameState, elapsedMs: number): GameState {
@@ -499,7 +651,7 @@ function getTeamMaxHp(state: GameState): number {
   }
 
   const survivalMult = getMetaSurvivalMultiplier(state);
-  return Math.ceil(maxHp * survivalMult);
+  return Math.ceil(maxHp * survivalMult * getRebirthSurvivalMultiplier(state));
 }
 
 function getTeamDefense(state: GameState): number {
@@ -518,7 +670,7 @@ function getTeamDefense(state: GameState): number {
     }
   }
 
-  return Math.max(0, defense * getMetaSurvivalMultiplier(state));
+  return Math.max(0, defense * getMetaSurvivalMultiplier(state) * getRebirthSurvivalMultiplier(state));
 }
 
 function getDps(state: GameState): number {
@@ -559,6 +711,7 @@ function getDps(state: GameState): number {
     * rebirthMult
     * getAchievementBonusMultiplier(state)
     * getMetaDamageMultiplier(state)
+    * getRebirthDamageMultiplier(state)
     * classPassiveMult
     * heroPassive.dpsMult
     * activeBuffMult;
@@ -607,6 +760,86 @@ function getMetaSurvivalMultiplier(state: GameState): number {
 
 function getEssenceUpgradeCost(level: number): number {
   return 20 + (level + 1) * (level + 1) * 12;
+}
+
+function getRebirthPathCost(level: number): number {
+  return 1 + Math.floor(level * 0.8) + Math.floor((level * level) / 8);
+}
+
+function getRebirthDamageMultiplier(state: GameState): number {
+  return 1 + state.rebirthDamagePath * 0.07;
+}
+
+function getRebirthEconomyMultiplier(state: GameState): number {
+  return 1 + state.rebirthEconomyPath * 0.07;
+}
+
+function getRebirthSurvivalMultiplier(state: GameState): number {
+  return 1 + state.rebirthSurvivalPath * 0.07;
+}
+
+const EQUIP_RARITY_ORDER: Array<'common' | 'rare' | 'epic' | 'legendary' | 'mythic'> = ['common', 'rare', 'epic', 'legendary', 'mythic'];
+
+function getEquipmentUpgradePlan(state: GameState, itemId: string): {
+  canUpgrade: boolean;
+  targetItemId: string | null;
+  targetRarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythic' | null;
+  scrapCost: number;
+  essenceCost: number;
+  reason?: string;
+} {
+  const item = getEquipmentItem(itemId);
+  if (!item) {
+    return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, reason: 'Missing item' };
+  }
+
+  const idx = EQUIP_RARITY_ORDER.indexOf(item.rarity);
+  if (idx < 0 || idx >= EQUIP_RARITY_ORDER.length - 1) {
+    return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, reason: 'At max rarity' };
+  }
+
+  let step = 0;
+  for (let i = idx + 1; i < EQUIP_RARITY_ORDER.length; i++) {
+    const rarity = EQUIP_RARITY_ORDER[i];
+    if (rarity === 'mythic' && !hasUnlock(state, 'mythic_equipment')) {
+      return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, reason: 'Mythic tier locked' };
+    }
+    const pool = EQUIPMENT_CATALOG.filter(candidate =>
+      candidate.slot === item.slot
+      && candidate.rarity === rarity
+      && candidate.allowedClasses.some(cls => item.allowedClasses.includes(cls)),
+    );
+    step++;
+    if (pool.length > 0) {
+      const baseCostByRarity: Record<string, { scrap: number; essence: number }> = {
+        common: { scrap: 80, essence: 0 },
+        rare: { scrap: 170, essence: 4 },
+        epic: { scrap: 300, essence: 8 },
+        legendary: { scrap: 500, essence: 14 },
+      };
+      const base = baseCostByRarity[item.rarity] ?? { scrap: 0, essence: 0 };
+      const scrapCost = Math.ceil(base.scrap * (1 + (step - 1) * 0.55));
+      const essenceCost = Math.ceil(base.essence * (1 + (step - 1) * 0.5));
+      const candidate = pool[Math.floor(Math.random() * pool.length)];
+      return {
+        canUpgrade: state.equipmentScrap >= scrapCost && state.essence >= essenceCost,
+        targetItemId: candidate.id,
+        targetRarity: rarity,
+        scrapCost,
+        essenceCost,
+      };
+    }
+  }
+
+  return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, reason: 'No higher tier candidate' };
+}
+
+function getShardToEssenceCost(state: GameState): number {
+  return 600 + state.metaDamageLevel * 40 + state.metaEconomyLevel * 40 + state.metaSurvivalLevel * 40;
+}
+
+function getShardToScrapCost(): number {
+  return 180;
 }
 
 function getCurrentWeeklyEvent(state: GameState): WeeklyEventConfig {
@@ -792,7 +1025,7 @@ function killMonster(state: GameState): GameState {
   const achievementMult = getAchievementBonusMultiplier(state);
   const economyMult = getMetaEconomyMultiplier(state);
   const heroPassive = getHeroPassiveMultipliers(state);
-  const goldReward = Math.ceil(getMonsterGold(state.wave) * Math.pow(REBIRTH_BONUS, state.prestigeCount) * achievementMult * affix.goldMult * economyMult * heroPassive.goldMult * weekly.goldMultiplier);
+  const goldReward = Math.ceil(getMonsterGold(state.wave) * Math.pow(REBIRTH_BONUS, state.prestigeCount) * achievementMult * affix.goldMult * economyMult * getRebirthEconomyMultiplier(state) * heroPassive.goldMult * weekly.goldMultiplier);
   const expReward = Math.ceil(getMonsterExp(state.wave) * achievementMult * affix.expMult * heroPassive.expMult * weekly.expMultiplier);
   const lvl = processLevelUp(state.exp + expReward, state.level);
   const isBoss = state.wave % 10 === 0;
@@ -975,7 +1208,14 @@ type Action =
   | { type: 'RECYCLE_HERO'; uid: string }
   | { type: 'AUTO_RECYCLE_HEROES' }
   | { type: 'SET_AUTO_RECYCLE_MAX_RARITY'; rarity: Rarity }
+  | { type: 'SET_AUTO_RECYCLE_ENABLED'; enabled: boolean }
   | { type: 'RANK_UP_HERO'; uid: string }
+  | { type: 'CONVERT_SHARDS_TO_ESSENCE' }
+  | { type: 'CONVERT_SHARDS_TO_SCRAP' }
+  | { type: 'SPEND_REBIRTH_CORE'; path: 'damage' | 'economy' | 'survival' }
+  | { type: 'SET_AUTO_SUMMON_ENABLED'; enabled: boolean }
+  | { type: 'SET_AUTO_SUMMON_MODE'; mode: 'single' | 'x10' }
+  | { type: 'SET_AUTO_SUMMON_RESERVE_GOLD'; reserveGold: number }
   | { type: 'USE_USABLE_ITEM'; itemId: string }
   | { type: 'DISMANTLE_EQUIPMENT'; itemId: string }
   | { type: 'CRAFT_EQUIPMENT'; slot: EquipmentSlot }
@@ -1078,7 +1318,9 @@ function reducer(state: GameState, action: Action): GameState {
         };
       }
 
-      return maybeAutoUsePotion({ ...working, monsterHp: hp, teamHp, lastActiveAt: Date.now() });
+      const withPotions = maybeAutoUsePotion({ ...working, monsterHp: hp, teamHp, lastActiveAt: Date.now() });
+      const withRecycle = maybeAutoRecycleBackground(withPotions);
+      return maybeAutoSummonTick(withRecycle);
     }
 
     case 'ATTACK': {
@@ -1489,28 +1731,12 @@ function reducer(state: GameState, action: Action): GameState {
       if (!state.inventoryItemIds.includes(action.itemId)) return state;
       const item = getEquipmentItem(action.itemId);
       if (!item) return state;
-      const nextRarity = getNextEquipmentRarity(item.rarity);
-      if (!nextRarity) return state;
-      if (nextRarity === 'mythic' && !hasUnlock(state, 'mythic_equipment')) return state;
+      const plan = getEquipmentUpgradePlan(state, action.itemId);
+      if (!plan.targetItemId || !plan.targetRarity) return state;
+      if (state.equipmentScrap < plan.scrapCost || state.essence < plan.essenceCost) return state;
+      const target = getEquipmentItem(plan.targetItemId);
+      if (!target) return state;
 
-      const upgradeCostByRarity: Record<string, { scrap: number; essence: number }> = {
-        common: { scrap: 80, essence: 0 },
-        rare: { scrap: 170, essence: 4 },
-        epic: { scrap: 300, essence: 8 },
-        legendary: { scrap: 500, essence: 14 },
-      };
-      const cost = upgradeCostByRarity[item.rarity];
-      if (!cost) return state;
-      if (state.equipmentScrap < cost.scrap || state.essence < cost.essence) return state;
-
-      const pool = EQUIPMENT_CATALOG.filter(candidate =>
-        candidate.slot === item.slot
-        && candidate.rarity === nextRarity
-        && candidate.allowedClasses.some(cls => item.allowedClasses.includes(cls)),
-      );
-      if (pool.length === 0) return state;
-
-      const target = pool[Math.floor(Math.random() * pool.length)];
       const alreadyOwned = state.inventoryItemIds.includes(target.id);
       const withReplacedInventory = state.inventoryItemIds.filter(id => id !== item.id);
       const nextInventory = alreadyOwned ? withReplacedInventory : [...withReplacedInventory, target.id];
@@ -1519,8 +1745,8 @@ function reducer(state: GameState, action: Action): GameState {
       return queueReward({
         ...state,
         inventoryItemIds: nextInventory,
-        equipmentScrap: state.equipmentScrap - cost.scrap + refund,
-        essence: state.essence - cost.essence,
+        equipmentScrap: state.equipmentScrap - plan.scrapCost + refund,
+        essence: state.essence - plan.essenceCost,
         equippedItems: Object.fromEntries(
           Object.entries(state.equippedItems).map(([slot, equippedId]) => [slot, equippedId === item.id ? target.id : equippedId]),
         ) as Record<EquipmentSlot, string | null>,
@@ -1528,7 +1754,7 @@ function reducer(state: GameState, action: Action): GameState {
         id: `upgrade_${item.id}_${Date.now()}`,
         kind: 'item',
         title: `Upgraded ${item.name}`,
-        detail: `Now ${target.emoji} ${target.name} (${nextRarity.toUpperCase()})`,
+        detail: `Now ${target.emoji} ${target.name} (${plan.targetRarity.toUpperCase()})`,
       });
     }
 
@@ -1670,7 +1896,7 @@ function reducer(state: GameState, action: Action): GameState {
 
       const seconds = Math.floor(elapsed / 1000);
       const achievementMult = getAchievementBonusMultiplier(state);
-      const goldGain = Math.floor(getMonsterGold(state.wave) * 0.35 * seconds * achievementMult * getMetaEconomyMultiplier(state));
+      const goldGain = Math.floor(getMonsterGold(state.wave) * 0.35 * seconds * achievementMult * getMetaEconomyMultiplier(state) * getRebirthEconomyMultiplier(state));
       const expGain = Math.floor(getMonsterExp(state.wave) * 0.22 * seconds * achievementMult);
       const lvl = processLevelUp(state.exp + expGain, state.level);
 
@@ -1723,7 +1949,8 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'REBIRTH': {
       if (state.wave < REBIRTH_WAVE_THRESHOLD) return state;
-      return {
+      const gainedCores = Math.max(1, Math.floor((state.wave - REBIRTH_WAVE_THRESHOLD) / 25) + 1);
+      return queueReward({
         ...state,
         gold: 0,
         exp: 0,
@@ -1745,7 +1972,13 @@ function reducer(state: GameState, action: Action): GameState {
         damageReductionBuffMs: 0,
         heroActiveCdMs: {},
         lastActiveAt: Date.now(),
-      };
+        rebirthCores: state.rebirthCores + gainedCores,
+      }, {
+        id: `rebirth_cores_${Date.now()}`,
+        kind: 'system',
+        title: 'Rebirth Complete',
+        detail: `+${gainedCores} rebirth cores`,
+      });
     }
 
     case 'CLEAR_ACHIEVEMENT':
@@ -1815,6 +2048,13 @@ function reducer(state: GameState, action: Action): GameState {
       };
     }
 
+    case 'SET_AUTO_RECYCLE_ENABLED': {
+      return {
+        ...state,
+        autoRecycleEnabled: action.enabled,
+      };
+    }
+
     case 'RANK_UP_HERO': {
       const hero = state.heroRoster.find(h => h.uid === action.uid);
       if (!hero || hero.rank >= 10) return state;
@@ -1830,6 +2070,95 @@ function reducer(state: GameState, action: Action): GameState {
         ...state,
         heroRoster: newRoster,
         heroShards: state.heroShards - nextRankConfig.shardCostToRankUp,
+      };
+    }
+
+    case 'CONVERT_SHARDS_TO_ESSENCE': {
+      const cost = getShardToEssenceCost(state);
+      if (state.heroShards < cost) return state;
+      return queueReward({
+        ...state,
+        heroShards: state.heroShards - cost,
+        essence: state.essence + 1,
+      }, {
+        id: `shard_to_essence_${Date.now()}`,
+        kind: 'system',
+        title: 'Shard Forge',
+        detail: `Converted ${cost} shards into +1 essence`,
+      });
+    }
+
+    case 'CONVERT_SHARDS_TO_SCRAP': {
+      const cost = getShardToScrapCost();
+      if (state.heroShards < cost) return state;
+      return queueReward({
+        ...state,
+        heroShards: state.heroShards - cost,
+        equipmentScrap: state.equipmentScrap + 140,
+      }, {
+        id: `shard_to_scrap_${Date.now()}`,
+        kind: 'system',
+        title: 'Shard Forge',
+        detail: `Converted ${cost} shards into +140 scrap`,
+      });
+    }
+
+    case 'SPEND_REBIRTH_CORE': {
+      const currentLevel = action.path === 'damage'
+        ? state.rebirthDamagePath
+        : action.path === 'economy'
+          ? state.rebirthEconomyPath
+          : state.rebirthSurvivalPath;
+      const cost = getRebirthPathCost(currentLevel);
+      if (state.rebirthCores < cost) return state;
+
+      const base = {
+        ...state,
+        rebirthCores: state.rebirthCores - cost,
+      };
+
+      if (action.path === 'damage') {
+        return queueReward({ ...base, rebirthDamagePath: state.rebirthDamagePath + 1 }, {
+          id: `rebirth_path_dmg_${Date.now()}`,
+          kind: 'system',
+          title: 'Rebirth Tree: Damage Path',
+          detail: `Level ${state.rebirthDamagePath + 1}`,
+        });
+      }
+      if (action.path === 'economy') {
+        return queueReward({ ...base, rebirthEconomyPath: state.rebirthEconomyPath + 1 }, {
+          id: `rebirth_path_econ_${Date.now()}`,
+          kind: 'system',
+          title: 'Rebirth Tree: Economy Path',
+          detail: `Level ${state.rebirthEconomyPath + 1}`,
+        });
+      }
+      return queueReward({ ...base, rebirthSurvivalPath: state.rebirthSurvivalPath + 1 }, {
+        id: `rebirth_path_surv_${Date.now()}`,
+        kind: 'system',
+        title: 'Rebirth Tree: Survival Path',
+        detail: `Level ${state.rebirthSurvivalPath + 1}`,
+      });
+    }
+
+    case 'SET_AUTO_SUMMON_ENABLED': {
+      return {
+        ...state,
+        autoSummonEnabled: action.enabled,
+      };
+    }
+
+    case 'SET_AUTO_SUMMON_MODE': {
+      return {
+        ...state,
+        autoSummonMode: action.mode,
+      };
+    }
+
+    case 'SET_AUTO_SUMMON_RESERVE_GOLD': {
+      return {
+        ...state,
+        autoSummonReserveGold: Math.max(0, action.reserveGold),
       };
     }
 
@@ -1877,6 +2206,10 @@ function reducer(state: GameState, action: Action): GameState {
         freeSummonCharges: p.freeSummonCharges ?? 0,
         heroShards: p.heroShards ?? 0,
         essence: p.essence ?? 0,
+        rebirthCores: p.rebirthCores ?? 0,
+        rebirthDamagePath: p.rebirthDamagePath ?? 0,
+        rebirthEconomyPath: p.rebirthEconomyPath ?? 0,
+        rebirthSurvivalPath: p.rebirthSurvivalPath ?? 0,
         autoRecycleMaxRarity: p.autoRecycleMaxRarity ?? 'uncommon',
         equipmentScrap: p.equipmentScrap ?? 0,
         gachaPityCounter: p.gachaPityCounter ?? 0,
@@ -1900,6 +2233,11 @@ function reducer(state: GameState, action: Action): GameState {
         usableItemCounts: p.usableItemCounts ?? {},
         autoUsePotionEnabled: p.autoUsePotionEnabled ?? false,
         autoUsePotionThresholdPct: p.autoUsePotionThresholdPct ?? 0.35,
+        autoRecycleEnabled: p.autoRecycleEnabled ?? false,
+        autoSummonEnabled: p.autoSummonEnabled ?? false,
+        autoSummonMode: p.autoSummonMode ?? 'single',
+        autoSummonReserveGold: p.autoSummonReserveGold ?? 5000,
+        autoSummonCooldownMs: 0,
         lastActiveAt: p.lastActiveAt ?? Date.now(),
 
         tutorialEnabled: p.tutorialEnabled ?? true,
@@ -1953,6 +2291,10 @@ interface SaveData {
   freeSummonCharges: number;
   heroShards: number;
   essence: number;
+  rebirthCores: number;
+  rebirthDamagePath: number;
+  rebirthEconomyPath: number;
+  rebirthSurvivalPath: number;
   autoRecycleMaxRarity: Rarity;
   equipmentScrap: number;
   gachaPityCounter: number;
@@ -1976,6 +2318,10 @@ interface SaveData {
   usableItemCounts: Record<string, number>;
   autoUsePotionEnabled: boolean;
   autoUsePotionThresholdPct: number;
+  autoRecycleEnabled: boolean;
+  autoSummonEnabled: boolean;
+  autoSummonMode: 'single' | 'x10';
+  autoSummonReserveGold: number;
   lastActiveAt: number;
 
   tutorialEnabled: boolean;
@@ -2022,6 +2368,10 @@ function serialize(state: GameState): SaveData {
     freeSummonCharges: state.freeSummonCharges,
     heroShards: state.heroShards,
     essence: state.essence,
+    rebirthCores: state.rebirthCores,
+    rebirthDamagePath: state.rebirthDamagePath,
+    rebirthEconomyPath: state.rebirthEconomyPath,
+    rebirthSurvivalPath: state.rebirthSurvivalPath,
     autoRecycleMaxRarity: state.autoRecycleMaxRarity,
     equipmentScrap: state.equipmentScrap,
     gachaPityCounter: state.gachaPityCounter,
@@ -2045,6 +2395,10 @@ function serialize(state: GameState): SaveData {
     usableItemCounts: state.usableItemCounts,
     autoUsePotionEnabled: state.autoUsePotionEnabled,
     autoUsePotionThresholdPct: state.autoUsePotionThresholdPct,
+    autoRecycleEnabled: state.autoRecycleEnabled,
+    autoSummonEnabled: state.autoSummonEnabled,
+    autoSummonMode: state.autoSummonMode,
+    autoSummonReserveGold: state.autoSummonReserveGold,
     lastActiveAt: Date.now(),
 
     tutorialEnabled: state.tutorialEnabled,
@@ -2146,13 +2500,26 @@ export function useGameState(saveSlot: string = 'default') {
   const setAutoRecycleMaxRarity = useCallback((rarity: Rarity) => {
     dispatch({ type: 'SET_AUTO_RECYCLE_MAX_RARITY', rarity });
   }, []);
+  const setAutoRecycleEnabled = useCallback((enabled: boolean) => {
+    dispatch({ type: 'SET_AUTO_RECYCLE_ENABLED', enabled });
+  }, []);
   const rankUpHero = useCallback((uid: string) => dispatch({ type: 'RANK_UP_HERO', uid }), []);
+  const convertShardsToEssence = useCallback(() => dispatch({ type: 'CONVERT_SHARDS_TO_ESSENCE' }), []);
+  const convertShardsToScrap = useCallback(() => dispatch({ type: 'CONVERT_SHARDS_TO_SCRAP' }), []);
+  const spendRebirthCore = useCallback((path: 'damage' | 'economy' | 'survival') => {
+    dispatch({ type: 'SPEND_REBIRTH_CORE', path });
+  }, []);
   const useUsableItem = useCallback((itemId: string) => dispatch({ type: 'USE_USABLE_ITEM', itemId }), []);
   const dismantleEquipment = useCallback((itemId: string) => dispatch({ type: 'DISMANTLE_EQUIPMENT', itemId }), []);
   const craftEquipment = useCallback((slot: EquipmentSlot) => dispatch({ type: 'CRAFT_EQUIPMENT', slot }), []);
   const upgradeEquipmentRarity = useCallback((itemId: string) => dispatch({ type: 'UPGRADE_EQUIPMENT_RARITY', itemId }), []);
   const setAutoUsePotion = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_USE_POTION', enabled }), []);
   const setAutoUsePotionThreshold = useCallback((thresholdPct: number) => dispatch({ type: 'SET_AUTO_USE_POTION_THRESHOLD', thresholdPct }), []);
+  const setAutoSummonEnabled = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_SUMMON_ENABLED', enabled }), []);
+  const setAutoSummonMode = useCallback((mode: 'single' | 'x10') => dispatch({ type: 'SET_AUTO_SUMMON_MODE', mode }), []);
+  const setAutoSummonReserveGold = useCallback((reserveGold: number) => {
+    dispatch({ type: 'SET_AUTO_SUMMON_RESERVE_GOLD', reserveGold });
+  }, []);
   const spendEssenceUpgrade = useCallback((path: 'damage' | 'economy' | 'survival') => {
     dispatch({ type: 'SPEND_ESSENCE_UPGRADE', path });
   }, []);
@@ -2186,6 +2553,22 @@ export function useGameState(saveSlot: string = 'default') {
     return getEssenceUpgradeCost(currentLevel);
   }, [state.metaDamageLevel, state.metaEconomyLevel, state.metaSurvivalLevel]);
 
+  const getRebirthCoreCost = useCallback((path: 'damage' | 'economy' | 'survival') => {
+    const level = path === 'damage'
+      ? state.rebirthDamagePath
+      : path === 'economy'
+        ? state.rebirthEconomyPath
+        : state.rebirthSurvivalPath;
+    return getRebirthPathCost(level);
+  }, [state.rebirthDamagePath, state.rebirthEconomyPath, state.rebirthSurvivalPath]);
+
+  const getShardForgeCosts = useCallback(() => ({
+    essenceCost: getShardToEssenceCost(state),
+    scrapCost: getShardToScrapCost(),
+  }), [state]);
+
+  const getUpgradePlan = useCallback((itemId: string) => getEquipmentUpgradePlan(state, itemId), [state]);
+
   const getWeeklyEvent = useCallback(() => getCurrentWeeklyEvent(state), [state]);
   const getMissionProgress = useCallback((mission: MissionBoardGoal) => {
     const value = getMissionProgressValue(state, mission);
@@ -2218,13 +2601,20 @@ export function useGameState(saveSlot: string = 'default') {
     recycleHero,
     autoRecycleHeroes,
     setAutoRecycleMaxRarity,
+    setAutoRecycleEnabled,
     rankUpHero,
+    convertShardsToEssence,
+    convertShardsToScrap,
+    spendRebirthCore,
     useUsableItem,
     dismantleEquipment,
     craftEquipment,
     upgradeEquipmentRarity,
     setAutoUsePotion,
     setAutoUsePotionThreshold,
+    setAutoSummonEnabled,
+    setAutoSummonMode,
+    setAutoSummonReserveGold,
     spendEssenceUpgrade,
     claimWeeklyTrack,
     claimMission,
@@ -2234,6 +2624,9 @@ export function useGameState(saveSlot: string = 'default') {
     clearRewardPopup,
     getPartyCost,
     getEssenceCost,
+    getRebirthCoreCost,
+    getShardForgeCosts,
+    getUpgradePlan,
     getWeeklyEvent,
     getMissionProgress,
   };
