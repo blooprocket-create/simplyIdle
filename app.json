@@ -2,6 +2,7 @@
   "expo": {
     "name": "Simply Idle",
     "slug": "SimplyIdle",
+    "scheme": "simplyidle",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,9 +13,13 @@
       "backgroundColor": "#0B0B1A"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.blooprocketcreate.simplyidle",
+      "buildNumber": "1"
     },
     "android": {
+      "package": "com.blooprocketcreate.simplyidle",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",

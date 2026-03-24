@@ -11,6 +11,7 @@ import {
   TextInput,
   Modal,
   Linking,
+  useWindowDimensions,
 } from 'react-native';
 import { useGameState } from '../useGameState';
 import { trackEvent } from '../telemetry';
@@ -166,6 +167,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [idleChestReward, setIdleChestReward] = useState<{ title: string; detail: string } | null>(null);
   const [battleSpeed, setBattleSpeed] = useState<1 | 2 | 4>(1);
   const [storyUnlockToast, setStoryUnlockToast] = useState<{ id: string; title: string; chapter: string } | null>(null);
+  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const lastSummonIdRef = useRef<string | null>(null);
   const storyUnlockInitRef = useRef(false);
   const seenStoryUnlockIdsRef = useRef<Set<string>>(new Set());
@@ -328,6 +330,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     equipment: `${state.inventoryItemIds.length}`,
     achievements: `${state.achievements.size}/${ACHIEVEMENTS.length}`,
   };
+  const isNativeApp = Platform.OS !== 'web';
+  const isCompactPhone = viewportWidth < 430;
+  const isShortPhone = viewportHeight < 780;
+  const compactCommandTabWidth = viewportWidth < 390 ? 96 : 112;
+  const compactSubTabMinWidth = viewportWidth < 390 ? 92 : 108;
   const claimableWeeklyMilestones = WEEKLY_TRACK_MILESTONES.filter(ms => state.weeklyKills >= ms && !state.weeklyTrackClaimed.includes(ms));
   const claimableMissionIds = missionCards.filter(m => !m.claimed && m.progress.done).map(m => m.mission.id);
   const hasClaimableRewards = claimableWeeklyMilestones.length > 0 || claimableMissionIds.length > 0;
@@ -542,6 +549,97 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       })[0];
       if (best) equipItem(best.id);
     });
+  };
+
+  const renderSubTabBar = (items: Array<{
+    id: string;
+    label: string;
+    active: boolean;
+    onPress: () => void;
+    disabled?: boolean;
+    pulse?: boolean;
+  }>) => {
+    const buttons = items.map(item => (
+      <Pressable
+        key={item.id}
+        style={[
+          styles.subTabBtn,
+          item.active && styles.subTabBtnActive,
+          item.disabled && styles.subTabBtnLocked,
+          item.pulse && styles.tutorialPulse,
+          isCompactPhone && styles.subTabBtnCompact,
+          isCompactPhone && { minWidth: compactSubTabMinWidth },
+        ]}
+        onPress={item.onPress}
+        disabled={item.disabled}
+      >
+        <Text style={[styles.subTabBtnText, item.active && styles.subTabBtnTextActive]}>{item.label}</Text>
+      </Pressable>
+    ));
+
+    if (isCompactPhone) {
+      return (
+        <ScrollView
+          horizontal={true}
+          showsHorizontalScrollIndicator={false}
+          style={styles.subTabScroll}
+          contentContainerStyle={styles.subTabBarCompact}
+        >
+          {buttons}
+        </ScrollView>
+      );
+    }
+
+    return <View style={styles.subTabBar}>{buttons}</View>;
+  };
+
+  const renderCommandDeck = () => {
+    const buttons = (['warroom', 'battle', 'heroes', 'stats', 'equipment', 'achievements'] as const).map(t => {
+      const lockedOut = !!tutorialTargetTab && t !== tutorialTargetTab;
+      const tutorialTarget = !!tutorialTargetTab && t === tutorialTargetTab;
+      return (
+        <Pressable
+          key={t}
+          style={[
+            styles.tab,
+            tab === t && styles.tabActive,
+            lockedOut && styles.tabLocked,
+            tutorialTarget && styles.tutorialPulse,
+            isCompactPhone && styles.tabCompact,
+            isCompactPhone && { width: compactCommandTabWidth },
+          ]}
+          onPress={() => onTabChange(t)}
+          disabled={lockedOut}
+        >
+          <View style={styles.tabIconWrap}>
+            <Text style={[styles.tabIcon, tab === t && styles.tabIconActive]}>{TAB_META[t].icon}</Text>
+            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{TAB_META[t].label}</Text>
+            <Text style={[styles.tabSubText, tab === t && styles.tabSubTextActive]}>{TAB_META[t].mood}</Text>
+            <View style={styles.tabSignalPill}>
+              <Text style={styles.tabSignalText}>{tabSignals[t]}</Text>
+            </View>
+            {((t === 'stats' && hasStatsNotification) || (t === 'heroes' && hasGachaNotification)) && (
+              <View style={styles.redDot} />
+            )}
+          </View>
+        </Pressable>
+      );
+    });
+
+    if (isCompactPhone) {
+      return (
+        <ScrollView
+          horizontal={true}
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabBarScroll}
+          contentContainerStyle={styles.tabBarCompact}
+        >
+          {buttons}
+        </ScrollView>
+      );
+    }
+
+    return <View style={styles.tabBar}>{buttons}</View>;
   };
 
   const seasonScore = state.seasonPoints;
@@ -959,40 +1057,20 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       )}
 
       {/* Command Deck */}
-      <View style={styles.tabBar}>
-        {(['warroom', 'battle', 'heroes', 'stats', 'equipment', 'achievements'] as const).map(t => {
-          const lockedOut = !!tutorialTargetTab && t !== tutorialTargetTab;
-          const tutorialTarget = !!tutorialTargetTab && t === tutorialTargetTab;
-          return (
-            <Pressable
-              key={t}
-              style={[
-                styles.tab,
-                tab === t && styles.tabActive,
-                lockedOut && styles.tabLocked,
-                tutorialTarget && styles.tutorialPulse,
-              ]}
-              onPress={() => onTabChange(t)}
-              disabled={lockedOut}
-            >
-              <View style={styles.tabIconWrap}>
-                <Text style={[styles.tabIcon, tab === t && styles.tabIconActive]}>{TAB_META[t].icon}</Text>
-                <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{TAB_META[t].label}</Text>
-                <Text style={[styles.tabSubText, tab === t && styles.tabSubTextActive]}>{TAB_META[t].mood}</Text>
-                <View style={styles.tabSignalPill}>
-                  <Text style={styles.tabSignalText}>{tabSignals[t]}</Text>
-                </View>
-                {((t === 'stats' && hasStatsNotification) || (t === 'heroes' && hasGachaNotification)) && (
-                  <View style={styles.redDot} />
-                )}
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
+      {renderCommandDeck()}
 
       {/* Tab Content */}
-      <ScrollView style={styles.tabContent}>
+      <ScrollView
+        style={[
+          styles.tabContent,
+          isCompactPhone && styles.tabContentCompact,
+          isShortPhone && styles.tabContentShort,
+        ]}
+        contentContainerStyle={[
+          styles.tabContentInner,
+          isNativeApp && styles.tabContentInnerNative,
+        ]}
+      >
 
         {tab === 'warroom' && (
           <View style={styles.warRoomTab}>
@@ -1438,25 +1516,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
         {tab === 'heroes' && (
           <View style={styles.heroesTab}>
-            <View style={styles.subTabBar}>
-              {(['summon', 'roster', 'forge'] as const).map(st => (
-                <Pressable
-                  key={st}
-                  style={[
-                    styles.subTabBtn,
-                    heroesSubTab === st && styles.subTabBtnActive,
-                    ((forceFreeSummonStep && st !== 'summon') || (forceBuildTeamStep && st !== 'roster')) && styles.subTabBtnLocked,
-                    ((forceFreeSummonStep && st === 'summon') || (forceBuildTeamStep && st === 'roster')) && styles.tutorialPulse,
-                  ]}
-                  onPress={() => setHeroesSubTab(st)}
-                  disabled={(forceFreeSummonStep && st !== 'summon') || (forceBuildTeamStep && st !== 'roster')}
-                >
-                  <Text style={[styles.subTabBtnText, heroesSubTab === st && styles.subTabBtnTextActive]}>
-                    {st === 'summon' ? 'Summon Bay' : st === 'roster' ? 'Roster' : 'Forge'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+            {renderSubTabBar((['summon', 'roster', 'forge'] as const).map(st => ({
+              id: st,
+              label: st === 'summon' ? 'Summon Bay' : st === 'roster' ? 'Roster' : 'Forge',
+              active: heroesSubTab === st,
+              onPress: () => setHeroesSubTab(st),
+              disabled: (forceFreeSummonStep && st !== 'summon') || (forceBuildTeamStep && st !== 'roster'),
+              pulse: (forceFreeSummonStep && st === 'summon') || (forceBuildTeamStep && st === 'roster'),
+            })))}
 
             {heroesSubTab === 'summon' && (
               <View style={styles.gachaSection}>
@@ -1542,42 +1609,16 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               </View>
             )}
 
-            {heroesSubTab === 'forge' && (
-              <>
-                <View style={styles.shardForgeCard}>
-                  <Text style={styles.shardForgeTitle}>🔧 Shard Forge</Text>
-                  <Text style={styles.shardForgeDesc}>Spend overflow shards for persistent value.</Text>
-                  <View style={styles.shardForgeRow}>
-                    <Pressable
-                      style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.essenceCost && styles.shardForgeBtnDisabled]}
-                      disabled={state.heroShards < shardForgeCosts.essenceCost}
-                      onPress={convertShardsToEssence}
-                    >
-                      <Text style={styles.shardForgeBtnText}>{shardForgeCosts.essenceCost} 💎 → +1 🜂</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.scrapCost && styles.shardForgeBtnDisabled]}
-                      disabled={state.heroShards < shardForgeCosts.scrapCost}
-                      onPress={convertShardsToScrap}
-                    >
-                      <Text style={styles.shardForgeBtnText}>{shardForgeCosts.scrapCost} 💎 → +140 🔩</Text>
-                    </Pressable>
-                  </View>
-                </View>
-                <Text style={styles.sectionHelperText}>All automation toggles are in ⚙️ Settings.</Text>
-              </>
-            )}
-
             {heroesSubTab === 'roster' && (
               <>
                 <View style={styles.heroRosterHeader}>
-                  <Text style={styles.sectionTitle}>📇 Hero Roster</Text>
+                  <Text style={styles.sectionTitle}>👥 Roster Command</Text>
                   <View style={styles.heroRosterActions}>
-                    <Pressable style={styles.autoRecycleBtn} onPress={autoRecycleHeroes}>
-                      <Text style={styles.autoRecycleBtnText}>Auto Recycle</Text>
-                    </Pressable>
                     <Pressable style={styles.autoEquipBtn} onPress={autoEquipBestHeroes}>
-                      <Text style={styles.autoEquipBtnText}>Auto Equip Best</Text>
+                      <Text style={styles.autoEquipBtnText}>⚡ Auto Equip</Text>
+                    </Pressable>
+                    <Pressable style={styles.autoRecycleBtn} onPress={autoRecycleHeroes}>
+                      <Text style={styles.autoRecycleBtnText}>♻ Auto Recycle</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -1585,150 +1626,214 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   {state.heroRoster.length} heroes • {state.activeTeamHeroIds.length}/{ACTIVE_TEAM_SIZE} in active team
                 </Text>
                 <View style={styles.loadoutRow}>
-                    {[0, 1, 2].map(slot => (
-                      <View key={slot} style={styles.loadoutCell}>
-                        <Text style={styles.loadoutLabel}>L{slot + 1}</Text>
-                        <View style={styles.loadoutBtnsWrap}>
-                          <Pressable style={styles.loadoutSaveBtn} onPress={() => saveTeamLoadout(slot)}>
-                            <Text style={styles.loadoutBtnText}>Save</Text>
-                          </Pressable>
-                          <Pressable style={styles.loadoutLoadBtn} onPress={() => loadTeamLoadout(slot)}>
-                            <Text style={styles.loadoutBtnText}>Load</Text>
-                          </Pressable>
-                        </View>
+                  {[0, 1, 2].map(slot => (
+                    <View key={slot} style={styles.loadoutCell}>
+                      <Text style={styles.loadoutLabel}>L{slot + 1}</Text>
+                      <View style={styles.loadoutBtnsWrap}>
+                        <Pressable style={styles.loadoutSaveBtn} onPress={() => saveTeamLoadout(slot)}>
+                          <Text style={styles.loadoutBtnText}>Save</Text>
+                        </Pressable>
+                        <Pressable style={styles.loadoutLoadBtn} onPress={() => loadTeamLoadout(slot)}>
+                          <Text style={styles.loadoutBtnText}>Load</Text>
+                        </Pressable>
                       </View>
-                    ))}
+                    </View>
+                  ))}
                 </View>
                 {state.heroRoster.length === 0 ? (
                   <Text style={styles.emptyMsg}>Summon your first hero!</Text>
                 ) : (
                   state.heroRoster.map(hero => {
-                const inActiveTeam = activeTeamSet.has(hero.uid);
-                const cls = getClassConfig(hero.heroClass);
-                const rarity = rarityConfig(hero.rarity);
-                const details = stats.heroDetails[hero.uid];
-                const isExpanded = expandedHeroes.has(hero.uid);
-                const shardValue = calculateShardReward(hero.rarity, hero.level);
-                const nextRankCost = hero.rank < 10 ? getRankUpShardCost(hero.rarity, hero.rank + 1) : null;
-                const canRankUp = !!nextRankCost && state.heroShards >= nextRankCost;
-                const trait = getHeroPassiveTraitInfo(hero.passiveTrait);
-                const activeArchetype = getHeroActiveArchetypeInfo(hero.activeSkillArchetype);
-                const faction = hero.heroClass === 'warrior' || hero.heroClass === 'berserker'
-                  ? 'Vanguard'
-                  : hero.heroClass === 'archer'
-                    ? 'Ranger'
-                    : hero.heroClass === 'mage'
-                      ? 'Arcanum'
-                      : 'Aegis';
+                    const inActiveTeam = activeTeamSet.has(hero.uid);
+                    const cls = getClassConfig(hero.heroClass);
+                    const rarity = rarityConfig(hero.rarity);
+                    const details = stats.heroDetails[hero.uid];
+                    const isExpanded = expandedHeroes.has(hero.uid);
+                    const shardValue = calculateShardReward(hero.rarity, hero.level);
+                    const nextRankCost = hero.rank < 10 ? getRankUpShardCost(hero.rarity, hero.rank + 1) : null;
+                    const canRankUp = !!nextRankCost && state.heroShards >= nextRankCost;
+                    const trait = getHeroPassiveTraitInfo(hero.passiveTrait);
+                    const activeArchetype = getHeroActiveArchetypeInfo(hero.activeSkillArchetype);
+                    const faction = hero.heroClass === 'warrior' || hero.heroClass === 'berserker'
+                      ? 'Vanguard'
+                      : hero.heroClass === 'archer'
+                        ? 'Ranger'
+                        : hero.heroClass === 'mage'
+                          ? 'Arcanum'
+                          : 'Aegis';
+
                     return (
                       <View key={hero.uid} style={[styles.heroCard, inActiveTeam && styles.heroCardActive]}>
-                    <View style={[styles.heroCardRarityBar, { backgroundColor: rarity.color }]} />
-                    <View style={styles.heroCardBody}>
-                      {/* Main row */}
-                      <View style={styles.heroCardTopRow}>
-                        <View style={[styles.heroPortraitFrame, { borderColor: rarity.color }]}>
-                          <Text style={styles.heroEmoji}>{hero.emoji}</Text>
-                        </View>
-                        <View style={styles.heroCardInfo}>
-                          <Text style={styles.heroName}>{hero.name}</Text>
-                          <Text style={styles.heroDetail}>
-                            <Text style={{ color: rarity.color }}>{hero.rarity}</Text>
-                            {' • '}{cls.name}
-                          </Text>
-                          <View style={styles.heroTagRow}>
-                            <Text style={styles.heroFactionTag}>{faction}</Text>
-                            <Text style={styles.heroArchetypeTag}>{activeArchetype.name}</Text>
-                          </View>
-                          <Text style={styles.heroRank}>⭐ Rank {hero.rank}/10</Text>
-                        </View>
-                        <View style={styles.heroCardRight}>
-                          <Text style={styles.heroLevel}>Lv {hero.level}</Text>
-                          <Pressable
-                            style={[styles.toggleBtn, inActiveTeam && styles.toggleBtnActive]}
-                            onPress={() => toggleEquipHero(hero.uid)}
-                          >
-                            <Text style={styles.toggleBtnText}>{inActiveTeam ? '✔ Team' : '+ Add'}</Text>
-                          </Pressable>
-                        </View>
-                      </View>
-
-                      {/* Rank up section */}
-                      {nextRankCost && (
-                        <View style={styles.rankUpSection}>
-                          <Text style={styles.rankUpLabel}>Rank Up Cost: {nextRankCost} 💎</Text>
-                          <Pressable
-                            style={[styles.rankUpBtn, !canRankUp && styles.rankUpBtnDisabled]}
-                            disabled={!canRankUp}
-                            onPress={() => rankUpHero(hero.uid)}
-                          >
-                            <Text style={styles.rankUpBtnText}>{canRankUp ? 'Rank Up' : `Need ${nextRankCost - state.heroShards} more`}</Text>
-                          </Pressable>
-                        </View>
-                      )}
-                      {hero.rank === 10 && <Text style={styles.maxRankMsg}>✓ Max Rank!</Text>}
-
-                      {/* Stats badges */}
-                      {details && (
-                        <View style={styles.heroStatsRow}>
-                          <View style={styles.heroStatBadge}>
-                            <Text style={styles.heroStatBadgeLabel}>DPS</Text>
-                            <Text style={styles.heroStatBadgeValue}>{details.dps.toFixed(1)}</Text>
-                          </View>
-                          <View style={styles.heroStatBadge}>
-                            <Text style={styles.heroStatBadgeLabel}>HP</Text>
-                            <Text style={styles.heroStatBadgeValue}>{details.hp}</Text>
-                          </View>
-                          <View style={styles.heroStatBadge}>
-                            <Text style={styles.heroStatBadgeLabel}>Boost</Text>
-                            <Text style={styles.heroStatBadgeValue}>+{(hero.teamBoost * 100).toFixed(1)}%</Text>
-                          </View>
-                          <Pressable
-                            style={styles.expandBtn}
-                            onPress={() => setExpandedHeroes(prev => {
-                              const s = new Set(prev);
-                              if (s.has(hero.uid)) s.delete(hero.uid); else s.add(hero.uid);
-                              return s;
-                            })}
-                          >
-                            <Text style={styles.expandBtnText}>{isExpanded ? '▲' : '▼'}</Text>
-                          </Pressable>
-                        </View>
-                      )}
-
-                      <View style={styles.heroIdentityBox}>
-                        <Text style={styles.heroIdentityLine}>Passive: {trait.name}</Text>
-                        <Text style={styles.heroIdentitySub}>{trait.description}</Text>
-                        <Text style={styles.heroIdentityLine}>Active: {activeArchetype.name}</Text>
-                        <Text style={styles.heroIdentitySub}>{activeArchetype.description}</Text>
-                      </View>
-
-                      {/* Expanded stat detail */}
-                      {isExpanded && details && (
-                        <View style={styles.heroExpandedStats}>
-                          {(['STR', 'VIT', 'AGI', 'INT', 'SPR'] as const).map((lbl, i) => {
-                            const val = [details.str, details.vit, details.agi, details.int, details.spr][i];
-                            return (
-                              <View key={lbl} style={styles.heroStatItem}>
-                                <Text style={styles.heroStatItemLabel}>{lbl}</Text>
-                                <Text style={styles.heroStatItemValue}>{val}</Text>
+                        <View style={[styles.heroCardRarityBar, { backgroundColor: rarity.color }]} />
+                        <View style={styles.heroCardBody}>
+                          <View style={styles.heroCardTopRow}>
+                            <View style={[styles.heroPortraitFrame, { borderColor: rarity.color }]}>
+                              <Text style={styles.heroEmoji}>{hero.emoji}</Text>
+                            </View>
+                            <View style={styles.heroCardInfo}>
+                              <Text style={styles.heroName}>{hero.name}</Text>
+                              <Text style={styles.heroDetail}>
+                                <Text style={{ color: rarity.color }}>{hero.rarity}</Text>
+                                {' • '}{cls.name}
+                              </Text>
+                              <View style={styles.heroTagRow}>
+                                <Text style={styles.heroFactionTag}>{faction}</Text>
+                                <Text style={styles.heroArchetypeTag}>{activeArchetype.name}</Text>
                               </View>
-                            );
-                          })}
-                        </View>
-                      )}
+                              <Text style={styles.heroRank}>⭐ Rank {hero.rank}/10</Text>
+                            </View>
+                            <View style={styles.heroCardRight}>
+                              <Text style={styles.heroLevel}>Lv {hero.level}</Text>
+                              <Pressable
+                                style={[styles.toggleBtn, inActiveTeam && styles.toggleBtnActive]}
+                                onPress={() => toggleEquipHero(hero.uid)}
+                              >
+                                <Text style={styles.toggleBtnText}>{inActiveTeam ? '✔ Team' : '+ Add'}</Text>
+                              </Pressable>
+                            </View>
+                          </View>
 
-                      {/* Recycle button */}
-                      <Pressable
-                        style={styles.recycleBtn}
-                        onPress={() => setRecycleConfirmUid(hero.uid)}
-                      >
-                        <Text style={styles.recycleBtnText}>♻️ Recycle for {shardValue} 💎</Text>
-                      </Pressable>
-                    </View>
+                          {nextRankCost && (
+                            <View style={styles.rankUpSection}>
+                              <Text style={styles.rankUpLabel}>Rank Up Cost: {nextRankCost} 💎</Text>
+                              <Pressable
+                                style={[styles.rankUpBtn, !canRankUp && styles.rankUpBtnDisabled]}
+                                disabled={!canRankUp}
+                                onPress={() => rankUpHero(hero.uid)}
+                              >
+                                <Text style={styles.rankUpBtnText}>{canRankUp ? 'Rank Up' : `Need ${nextRankCost - state.heroShards} more`}</Text>
+                              </Pressable>
+                            </View>
+                          )}
+                          {hero.rank === 10 && <Text style={styles.maxRankMsg}>✓ Max Rank!</Text>}
+
+                          {details && (
+                            <View style={styles.heroStatsRow}>
+                              <View style={styles.heroStatBadge}>
+                                <Text style={styles.heroStatBadgeLabel}>DPS</Text>
+                                <Text style={styles.heroStatBadgeValue}>{details.dps.toFixed(1)}</Text>
+                              </View>
+                              <View style={styles.heroStatBadge}>
+                                <Text style={styles.heroStatBadgeLabel}>HP</Text>
+                                <Text style={styles.heroStatBadgeValue}>{details.hp}</Text>
+                              </View>
+                              <View style={styles.heroStatBadge}>
+                                <Text style={styles.heroStatBadgeLabel}>Boost</Text>
+                                <Text style={styles.heroStatBadgeValue}>+{(hero.teamBoost * 100).toFixed(1)}%</Text>
+                              </View>
+                              <Pressable
+                                style={styles.expandBtn}
+                                onPress={() => setExpandedHeroes(prev => {
+                                  const s = new Set(prev);
+                                  if (s.has(hero.uid)) s.delete(hero.uid); else s.add(hero.uid);
+                                  return s;
+                                })}
+                              >
+                                <Text style={styles.expandBtnText}>{isExpanded ? '▲' : '▼'}</Text>
+                              </Pressable>
+                            </View>
+                          )}
+
+                          <View style={styles.heroIdentityBox}>
+                            <Text style={styles.heroIdentityLine}>Passive: {trait.name}</Text>
+                            <Text style={styles.heroIdentitySub}>{trait.description}</Text>
+                            <Text style={styles.heroIdentityLine}>Active: {activeArchetype.name}</Text>
+                            <Text style={styles.heroIdentitySub}>{activeArchetype.description}</Text>
+                          </View>
+
+                          {isExpanded && details && (
+                            <View style={styles.heroExpandedStats}>
+                              {(['STR', 'VIT', 'AGI', 'INT', 'SPR'] as const).map((lbl, i) => {
+                                const val = [details.str, details.vit, details.agi, details.int, details.spr][i];
+                                return (
+                                  <View key={lbl} style={styles.heroStatItem}>
+                                    <Text style={styles.heroStatItemLabel}>{lbl}</Text>
+                                    <Text style={styles.heroStatItemValue}>{val}</Text>
+                                  </View>
+                                );
+                              })}
+                            </View>
+                          )}
+
+                          <Pressable
+                            style={styles.recycleBtn}
+                            onPress={() => setRecycleConfirmUid(hero.uid)}
+                          >
+                            <Text style={styles.recycleBtnText}>♻️ Recycle for {shardValue} 💎</Text>
+                          </Pressable>
+                        </View>
                       </View>
                     );
                   })
                 )}
+              </>
+            )}
+
+            {heroesSubTab === 'forge' && (
+              <>
+                <View style={styles.shardForgeCard}>
+                  <Text style={styles.shardForgeTitle}>Shard Forge</Text>
+                  <Text style={styles.shardForgeDesc}>Spend overflow shards for persistent value and keep the roster economy under control.</Text>
+                  <View style={styles.shardForgeRow}>
+                    <Pressable
+                      style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.essenceCost && styles.shardForgeBtnDisabled]}
+                      disabled={state.heroShards < shardForgeCosts.essenceCost}
+                      onPress={convertShardsToEssence}
+                    >
+                      <Text style={styles.shardForgeBtnText}>Essence • {shardForgeCosts.essenceCost} 💎</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.scrapCost && styles.shardForgeBtnDisabled]}
+                      disabled={state.heroShards < shardForgeCosts.scrapCost}
+                      onPress={convertShardsToScrap}
+                    >
+                      <Text style={styles.shardForgeBtnText}>Scrap • {shardForgeCosts.scrapCost} 💎</Text>
+                    </Pressable>
+                  </View>
+                </View>
+
+                <View style={styles.autoSummonCard}>
+                  <Text style={styles.shardForgeTitle}>Automation</Text>
+                  <Text style={styles.shardForgeDesc}>Tune summon and recycle behavior for longer idle sessions on mobile.</Text>
+                  <View style={styles.autoSummonTopRow}>
+                    <Pressable
+                      style={[styles.autoSummonToggle, state.autoSummonEnabled && styles.autoSummonToggleActive]}
+                      onPress={() => setAutoSummonEnabled(!state.autoSummonEnabled)}
+                    >
+                      <Text style={styles.autoSummonToggleText}>Auto Summon {state.autoSummonEnabled ? 'ON' : 'OFF'}</Text>
+                    </Pressable>
+                    <Pressable style={styles.autoSummonModeBtn} onPress={() => setAutoSummonMode(state.autoSummonMode === 'single' ? 'x10' : 'single')}>
+                      <Text style={styles.autoSummonModeText}>Mode: {state.autoSummonMode === 'single' ? 'Single' : 'x10'}</Text>
+                    </Pressable>
+                  </View>
+                  <View style={styles.autoSummonReserveRow}>
+                    <Text style={styles.autoSummonReserveText}>Reserve Gold: {fmt(state.autoSummonReserveGold)}</Text>
+                    <View style={styles.autoPotionThresholdWrap}>
+                      <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoSummonReserveGold(Math.max(0, state.autoSummonReserveGold - 1000))}>
+                        <Text style={styles.autoPotionAdjustText}>-</Text>
+                      </Pressable>
+                      <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoSummonReserveGold(state.autoSummonReserveGold + 1000)}>
+                        <Text style={styles.autoPotionAdjustText}>+</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.recyclePickerWrap}>
+                  <View style={styles.recycleToggleRow}>
+                    <Text style={styles.recycleToggleLabel}>Auto Recycle</Text>
+                    <Pressable
+                      style={[styles.recycleToggleBtn, state.autoRecycleEnabled && styles.recycleToggleBtnActive]}
+                      onPress={() => setAutoRecycleEnabled(!state.autoRecycleEnabled)}
+                    >
+                      <Text style={styles.recycleToggleBtnText}>{state.autoRecycleEnabled ? 'ON' : 'OFF'}</Text>
+                    </Pressable>
+                  </View>
+                  <Text style={styles.recyclePickerLabel}>Current max rarity to recycle automatically</Text>
+                  <Pressable style={styles.recyclePickerBtn} onPress={cycleAutoRecycleRarity}>
+                    <Text style={styles.recyclePickerBtnText}>{state.autoRecycleMaxRarity.toUpperCase()}</Text>
+                  </Pressable>
+                </View>
               </>
             )}
           </View>
@@ -1931,15 +2036,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Text style={styles.equipOptimizeBtnHeaderText}>⚡ Optimize</Text>
               </Pressable>
             </View>
-            <View style={styles.subTabBar}>
-              {(['inventory', 'craft'] as const).map(st => (
-                <Pressable key={st} style={[styles.subTabBtn, equipmentSubTab === st && styles.subTabBtnActive]} onPress={() => setEquipmentSubTab(st)}>
-                  <Text style={[styles.subTabBtnText, equipmentSubTab === st && styles.subTabBtnTextActive]}>
-                    {st === 'inventory' ? 'Inventory' : 'Crafting'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+            {renderSubTabBar((['inventory', 'craft'] as const).map(st => ({
+              id: st,
+              label: st === 'inventory' ? 'Inventory' : 'Crafting',
+              active: equipmentSubTab === st,
+              onPress: () => setEquipmentSubTab(st),
+            })))}
             <Text style={styles.equipInventoryCount}>
               Total: {state.inventoryItemIds.length} items • Shards: <Text style={{ color: '#FFB347' }}>{state.heroShards}</Text>
             </Text>
@@ -2065,15 +2167,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
         {tab === 'achievements' && (
           <View style={styles.achievementsTab}>
-            <View style={styles.subTabBar}>
-              {(['overview', 'weekly', 'missions', 'achievements', 'collection', 'codex'] as const).map(st => (
-                <Pressable key={st} style={[styles.subTabBtn, achievementsSubTab === st && styles.subTabBtnActive]} onPress={() => setAchievementsSubTab(st)}>
-                  <Text style={[styles.subTabBtnText, achievementsSubTab === st && styles.subTabBtnTextActive]}>
-                    {st === 'overview' ? 'Overview' : st === 'weekly' ? 'Weekly' : st === 'missions' ? 'Missions' : st === 'achievements' ? 'Records' : st === 'collection' ? 'Collection' : 'Codex'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+            {renderSubTabBar((['overview', 'weekly', 'missions', 'achievements', 'collection', 'codex'] as const).map(st => ({
+              id: st,
+              label: st === 'overview' ? 'Overview' : st === 'weekly' ? 'Weekly' : st === 'missions' ? 'Missions' : st === 'achievements' ? 'Records' : st === 'collection' ? 'Collection' : 'Codex',
+              active: achievementsSubTab === st,
+              onPress: () => setAchievementsSubTab(st),
+            })))}
 
             {(achievementsSubTab === 'overview' || achievementsSubTab === 'weekly' || achievementsSubTab === 'missions') && (
               <View style={styles.achievementBonusCard}>
@@ -3577,6 +3676,14 @@ const styles = StyleSheet.create({
     gap: 6,
     zIndex: 1,
   },
+  tabBarScroll: {
+    flexGrow: 0,
+    marginTop: 6,
+  },
+  tabBarCompact: {
+    paddingHorizontal: 8,
+    gap: 8,
+  },
   tab: {
     flex: 1,
     minHeight: 72,
@@ -3586,6 +3693,11 @@ const styles = StyleSheet.create({
     borderColor: '#2C3D4E',
     borderRadius: 8,
     backgroundColor: '#101B29',
+  },
+  tabCompact: {
+    flex: 0,
+    minHeight: 76,
+    paddingHorizontal: 12,
   },
   tabActive: {
     borderColor: '#8FD2FF',
@@ -3669,11 +3781,32 @@ const styles = StyleSheet.create({
     borderColor: '#2B4258',
     backgroundColor: '#0C131D',
   },
+  tabContentCompact: {
+    marginHorizontal: 6,
+    padding: 10,
+  },
+  tabContentShort: {
+    marginBottom: 6,
+  },
+  tabContentInner: {
+    paddingBottom: 12,
+  },
+  tabContentInnerNative: {
+    paddingBottom: 32,
+  },
+  subTabScroll: {
+    flexGrow: 0,
+    marginBottom: 8,
+  },
   subTabBar: {
     flexDirection: 'row',
     gap: 8,
     marginBottom: 8,
     flexWrap: 'wrap',
+  },
+  subTabBarCompact: {
+    gap: 8,
+    paddingRight: 12,
   },
   subTabBtn: {
     borderRadius: 6,
@@ -3682,6 +3815,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#16283B',
     paddingVertical: 6,
     paddingHorizontal: 10,
+  },
+  subTabBtnCompact: {
+    minHeight: 38,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
   },
   subTabBtnActive: {
     borderColor: '#7fd0a6',
