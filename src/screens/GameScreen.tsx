@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -44,6 +44,7 @@ import {
   calculateShardReward,
   getRankConfig,
   getUsableItem,
+  Rarity,
 } from '../gameConfig';
 import { fmt } from '../utils';
 import AchievementToast from '../components/AchievementToast';
@@ -53,6 +54,15 @@ type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipme
 type HeroesSubTab = 'summon' | 'roster' | 'forge';
 type EquipmentSubTab = 'inventory' | 'craft';
 type AchievementsSubTab = 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex';
+
+type MomentCue = 'none' | 'mythic' | 'boss' | 'rebirth' | 'ultimate';
+
+type SummonReveal = {
+  id: string;
+  heroName: string;
+  emoji: string;
+  rarity: Rarity;
+};
 
 interface GameScreenProps {
   accountName: string;
@@ -144,8 +154,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [eventsOpen, setEventsOpen] = useState(false);
   const [chapterMapOpen, setChapterMapOpen] = useState(false);
   const [compareItemId, setCompareItemId] = useState<string | null>(null);
-  const [momentCue, setMomentCue] = useState<'none' | 'mythic' | 'boss' | 'rebirth'>('none');
+  const [momentCue, setMomentCue] = useState<MomentCue>('none');
+  const [ultimateTagline, setUltimateTagline] = useState('LIMIT BREAK');
+  const [summonReveal, setSummonReveal] = useState<SummonReveal | null>(null);
+  const [idleChestReady, setIdleChestReady] = useState(false);
+  const [idleChestOpen, setIdleChestOpen] = useState(false);
+  const [idleChestReward, setIdleChestReward] = useState<{ title: string; detail: string } | null>(null);
   const [battleSpeed, setBattleSpeed] = useState<1 | 2 | 4>(1);
+  const lastSummonIdRef = useRef<string | null>(null);
   const [warPanels, setWarPanels] = useState({
     frontline: true,
     roster: true,
@@ -229,6 +245,16 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   const tutorialProgressLabel = `${Math.min(state.tutorialCurrentQuestIndex, TUTORIAL_QUESTS.length)}/${TUTORIAL_QUESTS.length}`;
   const rewardPopup = state.rewardQueue[0] ?? null;
+  const classCutinTone = useMemo(() => {
+    const byClass: Record<PlayerClass, { stripe: string; glow: string; callout: string }> = {
+      warrior: { stripe: '#6E7FA8', glow: '#9AB3E6', callout: 'Aegis Impact' },
+      berserker: { stripe: '#A0472A', glow: '#E77A50', callout: 'Rage Breaker' },
+      archer: { stripe: '#3C8C63', glow: '#7FD7A6', callout: 'Skyline Volley' },
+      mage: { stripe: '#5B4AA6', glow: '#A993F0', callout: 'Astral Collapse' },
+      monk: { stripe: '#B19135', glow: '#EACE77', callout: 'Zen Tempest' },
+    };
+    return byClass[state.playerClass ?? 'warrior'];
+  }, [state.playerClass]);
   const canRebirthNow = state.wave >= REBIRTH_WAVE_THRESHOLD;
   const rebirthProgressPct = Math.max(0, Math.min(1, state.wave / REBIRTH_WAVE_THRESHOLD)) * 100;
   const rebirthWavesLeft = Math.max(0, REBIRTH_WAVE_THRESHOLD - state.wave);
@@ -288,6 +314,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   useEffect(() => {
     if (!rewardPopup) return;
+    const text = `${rewardPopup.title} ${rewardPopup.detail}`.toLowerCase();
+    if (text.includes('offline progress')) return;
     const timer = setTimeout(() => {
       clearRewardPopup();
     }, 3200);
@@ -299,11 +327,35 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     const t = `${rewardPopup.title} ${rewardPopup.detail}`.toLowerCase();
     if (t.includes('mythic drop')) setMomentCue('mythic');
     else if (t.includes('boss defeated')) setMomentCue('boss');
-    else if (t.includes('rebirth complete') || t.includes('shockwave')) setMomentCue('rebirth');
+    else if (t.includes('rebirth complete') || t.includes('shockwave')) {
+      setUltimateTagline('REBIRTH ASCENSION');
+      setMomentCue('ultimate');
+    } else if (t.includes('offline progress')) {
+      setIdleChestReward(rewardPopup);
+      setIdleChestReady(true);
+      return;
+    }
     else return;
     const timer = setTimeout(() => setMomentCue('none'), 900);
     return () => clearTimeout(timer);
   }, [rewardPopup]);
+
+  useEffect(() => {
+    const latest = state.summonHistory[0];
+    if (!latest) return;
+    if (lastSummonIdRef.current === latest.id) return;
+    lastSummonIdRef.current = latest.id;
+    setSummonReveal({ id: latest.id, heroName: latest.heroName, emoji: latest.heroEmoji, rarity: latest.rarity });
+    const timer = setTimeout(() => setSummonReveal(null), 2000);
+    return () => clearTimeout(timer);
+  }, [state.summonHistory]);
+
+  useEffect(() => {
+    if (!rewardPopup && !idleChestOpen) {
+      setIdleChestReady(false);
+      setIdleChestReward(null);
+    }
+  }, [rewardPopup, idleChestOpen]);
 
   const onTabChange = (nextTab: Tab) => {
     setTab(nextTab);
@@ -428,12 +480,46 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         <View style={styles.sceneOrbB} />
         <View style={styles.sceneGrid} />
       </View>
+      {summonReveal && (
+        <View pointerEvents="none" style={styles.summonRevealOverlay}>
+          <View style={[
+            styles.summonRevealCard,
+            {
+              borderColor: rarityConfig(summonReveal.rarity).color,
+              shadowColor: rarityConfig(summonReveal.rarity).color,
+            },
+          ]}>
+            <Text style={styles.summonRevealLabel}>{rarityConfig(summonReveal.rarity).label.toUpperCase()} RECRUIT</Text>
+            <Text style={styles.summonRevealEmoji}>{summonReveal.emoji}</Text>
+            <Text style={styles.summonRevealName}>{summonReveal.heroName}</Text>
+            <Text style={styles.summonRevealSub}>Joined your squad</Text>
+          </View>
+        </View>
+      )}
       {momentCue !== 'none' && (
         <View pointerEvents="none" style={[
           styles.momentCueOverlay,
-          momentCue === 'mythic' ? styles.momentCueMythic : momentCue === 'boss' ? styles.momentCueBoss : styles.momentCueRebirth,
+          momentCue === 'mythic'
+            ? styles.momentCueMythic
+            : momentCue === 'boss'
+              ? styles.momentCueBoss
+              : momentCue === 'ultimate'
+                ? styles.momentCueUltimate
+                : styles.momentCueRebirth,
         ]}>
-          <Text style={styles.momentCueText}>{momentCue === 'mythic' ? 'MYTHIC' : momentCue === 'boss' ? 'BOSS DOWN' : 'REBIRTH'}</Text>
+          {momentCue === 'ultimate' && <View style={[styles.momentCueSlash, { backgroundColor: classCutinTone.stripe }]} />}
+          <Text style={styles.momentCueText}>
+            {momentCue === 'mythic'
+              ? 'MYTHIC'
+              : momentCue === 'boss'
+                ? 'BOSS DOWN'
+                : momentCue === 'ultimate'
+                  ? `${classConfig.name.toUpperCase()} ULT`
+                  : 'REBIRTH'}
+          </Text>
+          {momentCue === 'ultimate' && (
+            <Text style={[styles.momentCueSubText, { color: classCutinTone.glow }]}>{ultimateTagline} • {classCutinTone.callout}</Text>
+          )}
         </View>
       )}
 
@@ -909,8 +995,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   onPress={() => {
                     const hits = 4 * battleSpeed;
                     for (let i = 0; i < hits; i += 1) attack();
-                    setMomentCue('boss');
-                    setTimeout(() => setMomentCue('none'), 500);
+                    setUltimateTagline('LIMIT BREAK');
+                    setMomentCue('ultimate');
+                    setTimeout(() => setMomentCue('none'), 700);
                   }}
                 >
                   <Text style={styles.burstBtnText}>{canBurst ? `Burst x${4 * battleSpeed}` : 'Charging'}</Text>
@@ -1892,7 +1979,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         )}
       </ScrollView>
 
-      {rewardPopup && (
+      {rewardPopup && !idleChestReady && (
         <Pressable style={[styles.rewardToast, styles.rewardToastActive]} onPress={clearRewardPopup}>
           <Text style={styles.rewardToastSparkle}>✨</Text>
           <View>
@@ -1900,6 +1987,23 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             <Text style={styles.rewardToastDetail}>{rewardPopup.detail}</Text>
           </View>
           <Text style={styles.rewardToastSparkle}>✨</Text>
+        </Pressable>
+      )}
+
+      {idleChestReady && idleChestReward && (
+        <Pressable
+          style={styles.idleChestPopIn}
+          onPress={() => {
+            setIdleChestOpen(true);
+            setIdleChestReady(false);
+          }}
+        >
+          <Text style={styles.idleChestEmoji}>🎁</Text>
+          <View style={styles.idleChestInfo}>
+            <Text style={styles.idleChestTitle}>Idle Rewards Ready</Text>
+            <Text style={styles.idleChestDetail}>Tap to open your return chest</Text>
+          </View>
+          <Text style={styles.idleChestOpenText}>Open</Text>
         </Pressable>
       )}
 
@@ -1946,6 +2050,35 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               })}
             </View>
             <Text style={styles.chapterMapHint}>Every 5 stages: chest node • Stage 20: boss gate</Text>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={idleChestOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setIdleChestOpen(false);
+          setIdleChestReward(null);
+          clearRewardPopup();
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.idleChestModalBox}>
+            <Text style={styles.idleChestModalTitle}>🎁 Return Chest</Text>
+            <Text style={styles.idleChestModalLine}>{idleChestReward?.title ?? 'Offline Progress'}</Text>
+            <Text style={styles.idleChestModalLine}>{idleChestReward?.detail ?? ''}</Text>
+            <Pressable
+              style={styles.idleChestClaimBtn}
+              onPress={() => {
+                setIdleChestOpen(false);
+                setIdleChestReward(null);
+                clearRewardPopup();
+              }}
+            >
+              <Text style={styles.idleChestClaimText}>Claim Rewards</Text>
+            </Pressable>
           </View>
         </View>
       </Modal>
@@ -2262,6 +2395,17 @@ const styles = StyleSheet.create({
   momentCueRebirth: {
     backgroundColor: 'rgba(255, 90, 138, 0.22)',
   },
+  momentCueUltimate: {
+    backgroundColor: 'rgba(20, 28, 44, 0.5)',
+  },
+  momentCueSlash: {
+    width: 240,
+    height: 12,
+    transform: [{ rotate: '-11deg' }],
+    borderRadius: 12,
+    marginBottom: 8,
+    opacity: 0.88,
+  },
   momentCueText: {
     fontSize: 28,
     color: '#FFF4D6',
@@ -2270,6 +2414,53 @@ const styles = StyleSheet.create({
     textShadowColor: '#000',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 6,
+  },
+  momentCueSubText: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.7,
+  },
+  summonRevealOverlay: {
+    position: 'absolute',
+    top: 88,
+    left: 14,
+    right: 14,
+    zIndex: 5,
+    alignItems: 'center',
+  },
+  summonRevealCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 12,
+    borderWidth: 2,
+    backgroundColor: '#101828',
+    alignItems: 'center',
+    paddingVertical: 10,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  summonRevealLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+    color: '#DCE8FF',
+  },
+  summonRevealEmoji: {
+    fontSize: 28,
+    marginTop: 2,
+  },
+  summonRevealName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#F6F8FF',
+  },
+  summonRevealSub: {
+    fontSize: 11,
+    color: '#A9C0E8',
+    marginTop: 2,
   },
 
   // Character Creation
@@ -4517,6 +4708,82 @@ const styles = StyleSheet.create({
   rewardToastDetail: {
     color: '#B7D0BB',
     fontSize: 11,
+  },
+  idleChestPopIn: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#7A6231',
+    backgroundColor: '#2A2111',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    shadowColor: '#E6B75D',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  idleChestEmoji: {
+    fontSize: 20,
+  },
+  idleChestInfo: {
+    flex: 1,
+  },
+  idleChestTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFEFC3',
+  },
+  idleChestDetail: {
+    fontSize: 11,
+    color: '#D9C68F',
+  },
+  idleChestOpenText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#F8D985',
+  },
+  idleChestModalBox: {
+    width: '82%',
+    maxWidth: 380,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#8A6A2A',
+    backgroundColor: '#1B1408',
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+  },
+  idleChestModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFE6A6',
+    marginBottom: 10,
+  },
+  idleChestModalLine: {
+    fontSize: 12,
+    color: '#E8D7AC',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  idleChestClaimBtn: {
+    marginTop: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D7B56D',
+    backgroundColor: '#5A4519',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  idleChestClaimText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFF1CA',
+    letterSpacing: 0.5,
   },
   // Sections
   sectionTitle: {
