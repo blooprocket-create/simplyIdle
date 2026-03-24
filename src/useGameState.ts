@@ -57,6 +57,7 @@ import {
   unlockLabel,
 } from './gameConfig';
 import { buildingCost, bulkCost } from './utils';
+import { trackEvent } from './telemetry';
 
 const SAVE_KEY = 'idlerpg_save_v3';
 const TICK_MS = 100;
@@ -2582,6 +2583,12 @@ export function useGameState(saveSlot: string = 'default') {
   const lastTickRef = useRef(Date.now());
   const lastSaveRef = useRef(Date.now());
   const stateRef = useRef(state);
+  const sessionStartedRef = useRef(false);
+  const sessionStartedAtRef = useRef(0);
+  const prevSummonsRef = useRef(0);
+  const prevHighestWaveRef = useRef(1);
+  const prevPrestigeRef = useRef(0);
+  const prevFtueCountRef = useRef(0);
   stateRef.current = state;
 
   useEffect(() => {
@@ -2630,6 +2637,75 @@ export function useGameState(saveSlot: string = 'default') {
     }, TICK_MS);
     return () => clearInterval(id);
   }, [saveKey]);
+
+  useEffect(() => {
+    if (!state.characterCreated || sessionStartedRef.current) return;
+    sessionStartedRef.current = true;
+    sessionStartedAtRef.current = Date.now();
+    prevSummonsRef.current = state.totalSummons;
+    prevHighestWaveRef.current = state.highestWaveReached;
+    prevPrestigeRef.current = state.prestigeCount;
+    prevFtueCountRef.current = state.tutorialCompletedQuestIds.length;
+    void trackEvent('session_start', {
+      saveSlot,
+      level: state.level,
+      wave: state.wave,
+      highestWave: state.highestWaveReached,
+    });
+  }, [state.characterCreated, state.level, state.wave, state.highestWaveReached, state.prestigeCount, state.totalSummons, state.tutorialCompletedQuestIds.length, saveSlot]);
+
+  useEffect(() => {
+    return () => {
+      if (!sessionStartedRef.current) return;
+      const durationSec = Math.max(1, Math.floor((Date.now() - sessionStartedAtRef.current) / 1000));
+      void trackEvent('session_end', {
+        saveSlot,
+        durationSec,
+        level: stateRef.current.level,
+        wave: stateRef.current.wave,
+        highestWave: stateRef.current.highestWaveReached,
+      });
+    };
+  }, [saveSlot]);
+
+  useEffect(() => {
+    if (!sessionStartedRef.current) return;
+
+    if (state.totalSummons > prevSummonsRef.current) {
+      const delta = state.totalSummons - prevSummonsRef.current;
+      prevSummonsRef.current = state.totalSummons;
+      void trackEvent('summon_used', {
+        count: delta,
+        totalSummons: state.totalSummons,
+      });
+    }
+
+    if (state.highestWaveReached > prevHighestWaveRef.current) {
+      prevHighestWaveRef.current = state.highestWaveReached;
+      void trackEvent('wave_reached', {
+        wave: state.highestWaveReached,
+      });
+    }
+
+    if (state.prestigeCount > prevPrestigeRef.current) {
+      prevPrestigeRef.current = state.prestigeCount;
+      void trackEvent('rebirth_done', {
+        prestigeCount: state.prestigeCount,
+        wave: state.wave,
+      });
+    }
+
+    if (state.tutorialCompletedQuestIds.length > prevFtueCountRef.current) {
+      const newQuestIds = state.tutorialCompletedQuestIds.slice(prevFtueCountRef.current);
+      prevFtueCountRef.current = state.tutorialCompletedQuestIds.length;
+      newQuestIds.forEach(questId => {
+        void trackEvent('ftue_step_completed', {
+          questId,
+          stepIndex: state.tutorialCompletedQuestIds.indexOf(questId) + 1,
+        });
+      });
+    }
+  }, [state.totalSummons, state.highestWaveReached, state.prestigeCount, state.wave, state.tutorialCompletedQuestIds]);
 
   const createCharacter = useCallback((name: string, playerClass: PlayerClass) => {
     dispatch({ type: 'CREATE_CHARACTER', name, playerClass });

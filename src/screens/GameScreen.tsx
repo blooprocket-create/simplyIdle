@@ -10,8 +10,10 @@ import {
   StatusBar,
   TextInput,
   Modal,
+  Linking,
 } from 'react-native';
 import { useGameState } from '../useGameState';
+import { trackEvent } from '../telemetry';
 import {
   ACHIEVEMENTS,
   CLASSES,
@@ -88,6 +90,7 @@ const TAB_META: Record<Tab, { icon: string; label: string; mood: string }> = {
 
 const ACH_BONUS_PER_UNLOCK_PCT = 3;
 const ACH_BONUS_CAP_PCT = 75;
+const FEEDBACK_FORM_URL = 'https://forms.gle/replace-with-your-beta-form';
 
 export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const {
@@ -460,6 +463,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       playerBoardScore,
     };
   }, [seasonScore, state.bestSeasonPoints, state.wave, state.highestWaveReached, state.prestigeCount, state.playerName]);
+
+  useEffect(() => {
+    if (!eventsOpen) return;
+    void trackEvent('leaderboard_viewed', {
+      rank: betaLeaderboardRows.myRank,
+      score: betaLeaderboardRows.playerBoardScore,
+    });
+    void trackEvent('leaderboard_rank', {
+      rank: betaLeaderboardRows.myRank,
+      score: betaLeaderboardRows.playerBoardScore,
+    });
+  }, [eventsOpen, betaLeaderboardRows.myRank, betaLeaderboardRows.playerBoardScore]);
+
   const isBossImminent = state.wave % 10 >= 8;
   const burstChargePct = Math.min(100, (((state.totalKills % 25) + 1) / 25) * 100);
   const canBurst = burstChargePct >= 96;
@@ -2325,6 +2341,20 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               </Pressable>
             </View>
             <ScrollView style={styles.settingsScroll}>
+              <View style={styles.settingsCard}>
+                <Text style={styles.settingsCardTitle}>Beta Feedback</Text>
+                <Text style={styles.settingsLabel}>Send bugs, balance notes, and QoL requests to the beta board.</Text>
+                <Pressable
+                  style={styles.settingsCycleBtn}
+                  onPress={() => {
+                    void trackEvent('feedback_link_opened', { source: 'settings' });
+                    void Linking.openURL(FEEDBACK_FORM_URL);
+                  }}
+                >
+                  <Text style={styles.settingsCycleBtnText}>Open Feedback Form</Text>
+                </Pressable>
+              </View>
+
               <View style={styles.settingsCard}>
                 <Text style={styles.settingsCardTitle}>Auto Potion</Text>
                 <View style={styles.settingsRowBetween}>

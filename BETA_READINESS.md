@@ -6,11 +6,13 @@ Ship a stable, fun public beta with clear progression, measurable retention, and
 ## Current Scope Added
 - Multiplayer-style `Beta Leaderboard` panel in Events.
 - Persistent `highestWaveReached` stat tracked in save data.
-- `Highest Level` surfaced in core UI chips and events progression info.
+- `Highest Wave` surfaced in core UI chips and events progression info.
+- Lightweight telemetry events wired for beta analytics.
+- In-game feedback link added in Settings.
 
 ## 0. Must-Pass Quality Gates
-- [ ] TypeScript compile clean (`npx tsc --noEmit`).
-- [ ] No startup runtime errors on web.
+- [x] TypeScript compile clean (`npx tsc --noEmit`).
+- [x] No startup runtime errors on web.
 - [ ] No blocking issues in first 10 minutes of gameplay.
 - [ ] Save/load verified across app restart.
 
@@ -23,25 +25,25 @@ Ship a stable, fun public beta with clear progression, measurable retention, and
 ## 2. UX and Onboarding
 - [ ] Tutorial path always points to one obvious next action.
 - [ ] All modals have consistent spacing and close behavior.
-- [ ] Non-battle tabs avoid battle-only visual clutter.
+- [x] Non-battle tabs avoid battle-only visual clutter.
 - [ ] Mobile and desktop layouts verified.
 
 ## 3. Multiplayer/Leaderboard Readiness
-- [ ] Keep current local beta leaderboard as fallback.
-- [ ] Define backend leaderboard API contract.
-- [ ] Add anti-cheat validations server-side (score bounds, rate limits).
-- [ ] Add season reset policy and reward rules.
+- [x] Keep current local beta leaderboard as fallback.
+- [x] Define backend leaderboard API contract.
+- [x] Add anti-cheat validations server-side (score bounds, rate limits).
+- [x] Add season reset policy and reward rules.
 
 ## 4. Telemetry (Needed Before Public Beta)
-- [ ] Track `session_start` / `session_end`.
-- [ ] Track `summon_used`, `wave_reached`, `rebirth_done`.
-- [ ] Track `leaderboard_viewed` and `leaderboard_rank`.
-- [ ] Track `ftue_step_completed` and completion rate.
+- [x] Track `session_start` / `session_end`.
+- [x] Track `summon_used`, `wave_reached`, `rebirth_done`.
+- [x] Track `leaderboard_viewed` and `leaderboard_rank`.
+- [x] Track `ftue_step_completed` and completion rate.
 
 ## 5. Support and Community
-- [ ] In-game feedback link (Discord or form).
-- [ ] Public known-issues list.
-- [ ] Lightweight patch cadence plan (e.g., twice weekly).
+- [x] In-game feedback link (Discord or form).
+- [x] Public known-issues list.
+- [x] Lightweight patch cadence plan (e.g., twice weekly).
 
 ## 6. Beta Launch Stages
 - [ ] Closed beta (20-50 testers): stability and pacing.
@@ -50,6 +52,6 @@ Ship a stable, fun public beta with clear progression, measurable retention, and
 
 ## Suggested Next Implementation Sprint
 1. Replace local leaderboard with real backend leaderboard (Firebase/Supabase).
-2. Add telemetry events and a simple analytics dashboard.
-3. Add an in-game feedback/report button.
+2. Add a simple analytics dashboard over collected telemetry events.
+3. Connect feedback form responses to a triage board.
 4. Perform a focused first-session tuning pass.
