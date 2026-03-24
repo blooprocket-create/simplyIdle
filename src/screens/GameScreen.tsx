@@ -3782,6 +3782,72 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#78A6C9',
   },
+  warNearUnlockCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#356251',
+    backgroundColor: '#0F2219',
+    padding: 10,
+    gap: 8,
+  },
+  warNearUnlockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  warNearUnlockTitle: {
+    fontSize: 12,
+    color: '#D8F7E7',
+    fontWeight: '700',
+  },
+  warNearUnlockBtn: {
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#5C9D80',
+    backgroundColor: '#1E4535',
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+  },
+  warNearUnlockBtnText: {
+    fontSize: 10,
+    color: '#DDF7EA',
+    fontWeight: '700',
+  },
+  warNearUnlockEmpty: {
+    fontSize: 11,
+    color: '#A5C8B6',
+  },
+  warNearUnlockRow: {
+    gap: 4,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1F3A2F',
+  },
+  warNearUnlockTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  warNearUnlockName: {
+    flex: 1,
+    fontSize: 11,
+    color: '#D2F0DF',
+    fontWeight: '700',
+  },
+  warNearUnlockPct: {
+    fontSize: 10,
+    color: '#9CDEC0',
+    fontWeight: '700',
+  },
+  warNearUnlockDesc: {
+    fontSize: 10,
+    color: '#9EC1AF',
+  },
+  warNearUnlockProgress: {
+    fontSize: 10,
+    color: '#7FC39F',
+  },
   warPanel: {
     borderRadius: 8,
     borderWidth: 1,
@@ -5119,6 +5185,47 @@ const styles = StyleSheet.create({
   rebirthInlineBtnText: {
     fontSize: 11,
     color: '#FFE7F1',
+    fontWeight: '700',
+  },
+  storyToast: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: '#1D2232',
+    borderLeftWidth: 3,
+    borderLeftColor: '#7EA7FF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  storyToastActive: {
+    shadowColor: '#7EA7FF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  storyToastIcon: {
+    fontSize: 16,
+  },
+  storyToastContent: {
+    flex: 1,
+  },
+  storyToastTitle: {
+    color: '#E6EEFF',
+    fontWeight: '700',
+    fontSize: 12,
+    marginBottom: 2,
+  },
+  storyToastDetail: {
+    color: '#B7C6E8',
+    fontSize: 11,
+  },
+  storyToastHint: {
+    color: '#D1DEFF',
+    fontSize: 10,
     fontWeight: '700',
   },
   rewardToast: {
