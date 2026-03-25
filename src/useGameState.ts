@@ -3340,6 +3340,7 @@ export function useGameState(saveSlot: string = 'default') {
   const lastTickRef = useRef(Date.now());
   const lastSaveRef = useRef(Date.now());
   const stateRef = useRef(state);
+  const claimFingerprintRef = useRef('');
   const sessionStartedRef = useRef(false);
   const sessionStartedAtRef = useRef(0);
   const prevSummonsRef = useRef(0);
@@ -3357,6 +3358,7 @@ export function useGameState(saveSlot: string = 'default') {
     prevHighestWaveRef.current = 1;
     prevPrestigeRef.current = 0;
     prevFtueCountRef.current = 0;
+    claimFingerprintRef.current = '';
     lastTickRef.current = Date.now();
     lastSaveRef.current = Date.now();
 
@@ -3392,6 +3394,15 @@ export function useGameState(saveSlot: string = 'default') {
       dispatch({ type: 'APPLY_WEEKLY_ROLLOVER', nowMs: Date.now() });
     }
   }, [state.characterCreated, state.weeklyEventWeek]);
+
+  useEffect(() => {
+    if (!hydrated || !state.characterCreated) return;
+    const fingerprint = `${state.weeklyTrackClaimed.join(',')}|${state.claimedMissionIds.join(',')}`;
+    if (fingerprint === claimFingerprintRef.current) return;
+    claimFingerprintRef.current = fingerprint;
+    lastSaveRef.current = Date.now();
+    void AsyncStorage.setItem(saveKey, JSON.stringify(serialize(stateRef.current)));
+  }, [hydrated, state.characterCreated, state.weeklyTrackClaimed, state.claimedMissionIds, saveKey]);
 
   useEffect(() => {
     const id = setInterval(() => {
