@@ -291,6 +291,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [riftBonusRound, setRiftBonusRound] = useState(0);
   const [riftSelectedBonuses, setRiftSelectedBonuses] = useState<RiftBuffChoice[]>([]);
   const [riftCurrentBonuses, setRiftCurrentBonuses] = useState<RiftBuffChoice[]>([]);
+  const [riftWavePredictions, setRiftWavePredictions] = useState<number[]>([]);
 
   // Timer tick for expedition countdown display
   const [timerTick, setTimerTick] = useState(0);
@@ -858,8 +859,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   };
 
   const getDiceOutcome = (roll: number) => {
+    // Exact same formula as reducer for consistency
     const diamonds = roll === 20 ? 30 : roll >= 17 ? 18 : roll >= 13 ? 12 : roll >= 9 ? 8 : 5;
-    const shards = roll >= 15 ? Math.ceil(roll * 12) : 0;
+    const shards = roll >= 15 ? Math.floor(roll * 1.5 * 8) : 0;  // More generous shard scaling
     return { roll, diamonds, shards };
   };
 
@@ -908,6 +910,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setRiftDungeonResult(null);
     setRiftIsSimulating(false);
     setRiftSelectedBonuses([]);
+    setRiftWavePredictions([]);
     setRiftBonusRound(1);
     setRiftCurrentBonuses(buildRiftChoices(1));
     setRiftDungeonModalOpen(true);
@@ -919,6 +922,21 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     const nextBonuses = [...riftSelectedBonuses, choice];
     setRiftSelectedBonuses(nextBonuses);
 
+    // Calculate wave outcome with accumulated buffs for THIS wave
+    const baseDps = Number.isFinite(dpsBreakdown.finalDps) && dpsBreakdown.finalDps > 0 ? dpsBreakdown.finalDps : Math.max(1, stats.dps);
+    const cumulativeBonusMultiplier = nextBonuses.reduce((acc, b) => acc * b.dpsMult, 1);
+    const teamPower = Math.max(1, baseDps) * cumulativeBonusMultiplier;
+    const monsterMaxHpCalc = Math.max(1, state.monsterMaxHp);
+    const expected = Math.min(5, Math.max(1, Math.floor((teamPower / (monsterMaxHpCalc * 0.12)) * 2)));
+    
+    // Use same small variance as reducer for predictability
+    const variance = Math.floor(Math.random() * 3) - 1;
+    const predictedWaves = Math.max(1, Math.min(5, expected + variance));
+    
+    // Track the prediction for this wave
+    const newPredictions = [...riftWavePredictions, predictedWaves];
+    setRiftWavePredictions(newPredictions);
+
     if (riftBonusRound < 5) {
       const nextRound = riftBonusRound + 1;
       setRiftBonusRound(nextRound);
@@ -926,26 +944,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       return;
     }
 
-    const baseDps = Number.isFinite(dpsBreakdown.finalDps) && dpsBreakdown.finalDps > 0 ? dpsBreakdown.finalDps : Math.max(1, stats.dps);
-    const baseHp = Number.isFinite(state.teamMaxHp) && state.teamMaxHp > 0 ? state.teamMaxHp : 100;
-    const baseDefense = Number.isFinite(stats.teamDefense) && stats.teamDefense > 0 ? stats.teamDefense : 1;
-    const monsterDps = Math.max(1, getMonsterDamage(state.wave));
-    const monsterHp = Math.max(1, state.monsterMaxHp);
-
-    const finalDps = nextBonuses.reduce((acc, b) => acc * b.dpsMult, baseDps);
-    const finalHp = nextBonuses.reduce((acc, b) => acc * b.hpMult, baseHp);
-    const finalDefense = nextBonuses.reduce((acc, b) => acc * b.defenseMult, baseDefense);
-
-    const offenseScore = finalDps / (monsterHp * 0.08);
-    const survivalScore = (finalHp / (monsterDps * 6)) + (finalDefense / 200);
-    const combined = offenseScore * 0.7 + survivalScore * 0.3;
-    const variance = (Math.random() - 0.5) * 0.6;
-    const waves = Math.max(1, Math.min(5, Math.floor(combined + variance)));
-
-    const diamonds = Math.max(8, Math.floor(8 + waves * 4 + (waves === 5 ? 8 : 0)));
-    const shards = Math.max(40, Math.floor(waves * 90 * (1 + state.highestWaveReached / 250)));
-    const essence = waves >= 4 ? 1 : 0;
-    setRiftDungeonResult({ waves, diamonds, shards, essence });
+    // All 5 buffs selected - finalize outcome with final prediction
+    const diamonds = Math.max(8, Math.floor(8 + predictedWaves * 4 + (predictedWaves === 5 ? 8 : 0)));
+    const shards = Math.max(40, Math.floor(predictedWaves * 90 * (1 + state.highestWaveReached / 250)));
+    const essence = predictedWaves >= 4 ? 1 : 0;
+    setRiftDungeonResult({ waves: predictedWaves, diamonds, shards, essence });
   };
 
   const startDiceRoll = () => {
@@ -4114,6 +4117,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             setRiftDungeonResult(null);
             setRiftSelectedBonuses([]);
             setRiftCurrentBonuses([]);
+            setRiftWavePredictions([]);
             setRiftBonusRound(0);
           }
         }}
@@ -4151,6 +4155,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     setRiftDungeonResult(null);
                     setRiftSelectedBonuses([]);
                     setRiftCurrentBonuses([]);
+                    setRiftWavePredictions([]);
                     setRiftBonusRound(0);
                   }}
                 >
@@ -4203,7 +4208,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 </View>
 
                 {riftSelectedBonuses.length > 0 && (
-                  <Text style={styles.riftPickedCount}>Chosen buffs: {riftSelectedBonuses.length}/5</Text>
+                  <>
+                    <Text style={styles.riftPickedCount}>Chosen buffs: {riftSelectedBonuses.length}/5</Text>
+                    {riftWavePredictions.length > 0 && (
+                      <Text style={styles.riftWavePredictionFeedback}>
+                        Predicted outcome: {riftWavePredictions[riftWavePredictions.length - 1]}/5 waves cleared
+                      </Text>
+                    )}
+                  </>
                 )}
               </>
             )}
@@ -8456,6 +8468,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#A4C6DE',
     fontWeight: '700',
+  },
+  riftWavePredictionFeedback: {
+    fontSize: 12,
+    color: '#FFD700',
+    fontWeight: '700',
+    marginTop: 8,
+    textAlign: 'center',
   },
   waveBar: {
     width: 40,

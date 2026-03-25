@@ -3317,8 +3317,9 @@ function reducer(state: GameState, action: Action): GameState {
         ? Math.floor(action.forcedRoll)
         : null;
       const roll = forcedRoll == null ? 1 + Math.floor(Math.random() * 20) : Math.max(1, Math.min(20, forcedRoll));
+      // Exact same formula as UI for consistency
       const diamonds = roll === 20 ? 30 : roll >= 17 ? 18 : roll >= 13 ? 12 : roll >= 9 ? 8 : 5;
-      const shardBonus = roll >= 15 ? Math.ceil(roll * 12) : 0;
+      const shardBonus = roll >= 15 ? Math.floor(roll * 1.5 * 8) : 0;
 
       return queueReward({
         ...state,
@@ -3345,7 +3346,8 @@ function reducer(state: GameState, action: Action): GameState {
         typeof action.forcedEssence === 'number' && Number.isFinite(action.forcedEssence);
 
       const teamPower = Math.max(1, getDps(state));
-      const expected = Math.min(5, Math.max(1, Math.floor((teamPower / Math.max(1, getMonsterMaxHp(state.wave) * 0.12)) * 2)));
+      const monsterMaxHpHere = Math.max(1, getMonsterMaxHp(state.wave));
+      const expected = Math.min(5, Math.max(1, Math.floor((teamPower / (monsterMaxHpHere * 0.12)) * 2)));
       const variance = Math.floor(Math.random() * 3) - 1;
       const fallbackWaves = Math.max(1, Math.min(5, expected + variance));
 
@@ -3354,10 +3356,10 @@ function reducer(state: GameState, action: Action): GameState {
         : fallbackWaves;
       const diamonds = hasForcedOutcome
         ? Math.max(0, Math.floor(action.forcedDiamonds!))
-        : 8 + clearedWaves * 4 + (clearedWaves === 5 ? 8 : 0);
+        : Math.max(8, Math.floor(8 + clearedWaves * 4 + (clearedWaves === 5 ? 8 : 0)));
       const shardReward = hasForcedOutcome
         ? Math.max(0, Math.floor(action.forcedShards!))
-        : Math.ceil(clearedWaves * 90 * (1 + state.highestWaveReached / 250));
+        : Math.max(40, Math.floor(clearedWaves * 90 * (1 + state.highestWaveReached / 250)));
       const essenceReward = hasForcedOutcome
         ? Math.max(0, Math.floor(action.forcedEssence!))
         : (clearedWaves >= 4 ? 1 : 0);
