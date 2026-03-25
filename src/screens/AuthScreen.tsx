@@ -31,6 +31,10 @@ const ACCOUNTS_KEY = 'idlerpg_accounts_v1';
 const SESSION_KEY = 'idlerpg_current_account_v1';
 const STORAGE_PREFIXES_TO_CLEAR = ['idlerpg_', 'simplyidle_'];
 const HASH_ROUNDS = 12000;
+const USERNAME_MIN_LENGTH = 3;
+const USERNAME_MAX_LENGTH = 24;
+const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MAX_LENGTH = 32;
 
 async function randomSalt(): Promise<string> {
   const bytes = await Crypto.getRandomBytesAsync(24);
@@ -109,17 +113,34 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [knownUsernames, setKnownUsernames] = useState<string[]>([]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    void loadAccounts().then(accounts => {
+      if (cancelled) return;
+      setKnownUsernames(accounts.map(account => account.username));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const cleanUsername = username.trim().toLowerCase();
+  const isUsernameTaken = mode === 'register'
+    && cleanUsername.length >= USERNAME_MIN_LENGTH
+    && knownUsernames.includes(cleanUsername);
 
   const canSubmit = useMemo(() => {
     if (busy) return false;
-    if (username.trim().length < 3) return false;
-    if (password.length < 8) return false;
+    if (username.trim().length < USERNAME_MIN_LENGTH) return false;
+    if (password.length < PASSWORD_MIN_LENGTH) return false;
     if (mode === 'register' && password !== confirmPassword) return false;
+    if (isUsernameTaken) return false;
     return true;
-  }, [busy, username, password, confirmPassword, mode]);
+  }, [busy, username, password, confirmPassword, mode, isUsernameTaken]);
 
   async function handleSubmit() {
-    const cleanUsername = username.trim().toLowerCase();
     if (!canSubmit) return;
 
     setBusy(true);
@@ -148,6 +169,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           },
         ];
         await saveAccounts(nextAccounts);
+        setKnownUsernames(nextAccounts.map(account => account.username));
         await AsyncStorage.setItem(SESSION_KEY, cleanUsername);
         onAuthenticated(cleanUsername);
         return;
@@ -191,6 +213,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               if (scopedKeys.length > 0) {
                 await AsyncStorage.multiRemove(scopedKeys);
               }
+              setKnownUsernames([]);
               setUsername('');
               setPassword('');
               setConfirmPassword('');
@@ -243,8 +266,11 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           autoCapitalize="none"
           placeholder="Username"
           placeholderTextColor="#777"
-          maxLength={24}
+          maxLength={USERNAME_MAX_LENGTH}
         />
+        <Text style={[styles.requirementText, isUsernameTaken && styles.requirementTextError]}>
+          Username: {USERNAME_MIN_LENGTH}-{USERNAME_MAX_LENGTH} chars, lowercase letters/numbers recommended.{isUsernameTaken ? ' This username is already taken.' : ''}
+        </Text>
         <TextInput
           value={password}
           onChangeText={setPassword}
@@ -252,19 +278,27 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           secureTextEntry
           placeholder="Password"
           placeholderTextColor="#777"
-          maxLength={32}
+          maxLength={PASSWORD_MAX_LENGTH}
         />
+        <Text style={styles.requirementText}>Password: at least {PASSWORD_MIN_LENGTH} characters. Max {PASSWORD_MAX_LENGTH}.</Text>
 
         {mode === 'register' && (
-          <TextInput
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            style={styles.input}
-            secureTextEntry
-            placeholder="Confirm Password"
-            placeholderTextColor="#777"
-            maxLength={32}
-          />
+          <>
+            <TextInput
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              style={styles.input}
+              secureTextEntry
+              placeholder="Confirm Password"
+              placeholderTextColor="#777"
+              maxLength={PASSWORD_MAX_LENGTH}
+            />
+            <Text style={[styles.requirementText, confirmPassword.length > 0 && password !== confirmPassword && styles.requirementTextError]}>
+              {confirmPassword.length === 0 || password === confirmPassword
+                ? 'Confirm password must match exactly.'
+                : 'Passwords do not match.'}
+            </Text>
+          </>
         )}
 
         {error && <Text style={styles.error}>{error}</Text>}
@@ -320,6 +354,15 @@ const styles = StyleSheet.create({
     color: '#C2A96A',
     lineHeight: 18,
     marginBottom: 20,
+  },
+  requirementText: {
+    fontSize: 11,
+    color: '#8F95B2',
+    marginBottom: 10,
+    lineHeight: 16,
+  },
+  requirementTextError: {
+    color: '#FF9B9B',
   },
   modeRow: {
     flexDirection: 'row',

@@ -13,7 +13,8 @@ import {
   Linking,
   useWindowDimensions,
 } from 'react-native';
-import { useGameState } from '../useGameState';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCharacterSaveSlot, getEquipmentCraftCost, getHeroGoldLevelCost, getSaveStorageKey, useGameState } from '../useGameState';
 import { trackEvent } from '../telemetry';
 import {
   ACHIEVEMENTS,
@@ -94,8 +95,24 @@ const ACH_BONUS_PER_UNLOCK_PCT = 3;
 const ACH_BONUS_CAP_PCT = 75;
 const FEEDBACK_FORM_URL = 'https://forms.gle/replace-with-your-beta-form';
 
+interface CharacterSlotSummary {
+  classId: PlayerClass;
+  playerName: string | null;
+  level: number;
+  highestWaveReached: number;
+  occupied: boolean;
+}
+
+function getLastCharacterSlotKey(accountName: string): string {
+  return `idlerpg_last_character_slot_v1_${accountName}`;
+}
+
 export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
+  const [selectedCharacterClass, setSelectedCharacterClass] = useState<PlayerClass | null>(null);
+  const [slotSummaries, setSlotSummaries] = useState<CharacterSlotSummary[]>([]);
+  const [slotListLoading, setSlotListLoading] = useState(true);
   const {
+    hydrated,
     state,
     stats,
     createCharacter,
@@ -114,9 +131,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setHeroFormation,
     allocateStat,
     allocateStatMax,
+    allocateStatN,
     equipItem,
     recycleHero,
     rankUpHero,
+    levelUpHeroGold,
     convertShardsToEssence,
     convertShardsToScrap,
     spendRebirthCore,
@@ -142,7 +161,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     getUpgradePlan,
     getWeeklyEvent,
     getMissionProgress,
-  } = useGameState(accountName);
+  } = useGameState(selectedCharacterClass ? getCharacterSaveSlot(accountName, selectedCharacterClass) : '__character_slot_preview__');
 
   const [tab, setTab] = useState<Tab>('warroom');
   const [rebirthOpen, setRebirthOpen] = useState(false);
@@ -179,6 +198,107 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     objectives: true,
     prestige: false,
   });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCharacterSlots() {
+      setSlotListLoading(true);
+      const summaries = await Promise.all(CLASSES.map(async cls => {
+        const raw = await AsyncStorage.getItem(getSaveStorageKey(getCharacterSaveSlot(accountName, cls.id)));
+        if (!raw) {
+          return {
+            classId: cls.id,
+            playerName: null,
+            level: 1,
+            highestWaveReached: 1,
+            occupied: false,
+          } satisfies CharacterSlotSummary;
+        }
+
+        try {
+          const parsed = JSON.parse(raw) as {
+            playerName?: string;
+            level?: number;
+            highestWaveReached?: number;
+            wave?: number;
+            characterCreated?: boolean;
+          };
+          const playerName = typeof parsed.playerName === 'string' ? parsed.playerName.trim().slice(0, 24) : '';
+          const occupied = !!playerName && parsed.characterCreated === true;
+          return {
+            classId: cls.id,
+            playerName: occupied ? playerName : null,
+            level: typeof parsed.level === 'number' && Number.isFinite(parsed.level) ? Math.max(1, Math.floor(parsed.level)) : 1,
+            highestWaveReached: typeof parsed.highestWaveReached === 'number' && Number.isFinite(parsed.highestWaveReached)
+              ? Math.max(1, Math.floor(parsed.highestWaveReached))
+              : typeof parsed.wave === 'number' && Number.isFinite(parsed.wave)
+                ? Math.max(1, Math.floor(parsed.wave))
+                : 1,
+            occupied,
+          } satisfies CharacterSlotSummary;
+        } catch {
+          return {
+            classId: cls.id,
+            playerName: null,
+            level: 1,
+            highestWaveReached: 1,
+            occupied: false,
+          } satisfies CharacterSlotSummary;
+        }
+      }));
+
+      if (cancelled) return;
+      setSlotSummaries(summaries);
+
+      const occupiedClasses = summaries.filter(slot => slot.occupied).map(slot => slot.classId);
+      const lastSelected = await AsyncStorage.getItem(getLastCharacterSlotKey(accountName));
+      if (cancelled) return;
+
+      if (lastSelected && occupiedClasses.includes(lastSelected as PlayerClass)) {
+        setSelectedCharacterClass(lastSelected as PlayerClass);
+      } else if (occupiedClasses.length === 1) {
+        setSelectedCharacterClass(occupiedClasses[0]);
+      } else {
+        setSelectedCharacterClass(null);
+      }
+
+      setSlotListLoading(false);
+    }
+
+    void loadCharacterSlots();
+    return () => {
+      cancelled = true;
+    };
+  }, [accountName]);
+
+  useEffect(() => {
+    if (!selectedCharacterClass) return;
+    void AsyncStorage.setItem(getLastCharacterSlotKey(accountName), selectedCharacterClass);
+  }, [accountName, selectedCharacterClass]);
+
+  useEffect(() => {
+    if (!selectedCharacterClass || !hydrated || !state.characterCreated) return;
+    setSlotSummaries(prev => prev.map(slot => slot.classId === selectedCharacterClass
+      ? {
+        ...slot,
+        occupied: true,
+        playerName: state.playerName,
+        level: state.level,
+        highestWaveReached: state.highestWaveReached,
+      }
+      : slot));
+  }, [hydrated, selectedCharacterClass, state.characterCreated, state.highestWaveReached, state.level, state.playerName]);
+
+  useEffect(() => {
+    if (!selectedCharacterClass) return;
+    setDraftClass(selectedCharacterClass);
+  }, [selectedCharacterClass]);
+
+  const selectedClassConfig = selectedCharacterClass
+    ? CLASSES.find(cls => cls.id === selectedCharacterClass) ?? CLASSES[0]
+    : null;
+  const occupiedCharacterCount = slotSummaries.filter(slot => slot.occupied).length;
 
   const classConfig = getClassConfig(state.playerClass ?? 'warrior');
   const classPassive = getClassPassive(state.playerClass ?? 'warrior');
@@ -704,14 +824,94 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const prestige25Done = (state.prestigeCount ?? 0) >= 25;
   const prestige50Done = (state.prestigeCount ?? 0) >= 50;
 
+  function openCharacterSlot(playerClass: PlayerClass) {
+    setDraftName('');
+    setSelectedCharacterClass(playerClass);
+  }
+
+  function returnToCharacterSelect() {
+    setSettingsOpen(false);
+    setDraftName('');
+    setSelectedCharacterClass(null);
+  }
+
+  if (slotListLoading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle="light-content" backgroundColor="#0A0A18" />
+        <View style={styles.characterLoadingWrap}>
+          <Text style={styles.createTitle}>Loading Characters...</Text>
+          <Text style={styles.createSubtitle}>Checking your class slots for this account.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!selectedCharacterClass) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle="light-content" backgroundColor="#0A0A18" />
+        <ScrollView contentContainerStyle={styles.createWrap}>
+          <Text style={styles.createTitle}>Choose Your Character</Text>
+          <Text style={styles.createSubtitle}>Each account can hold up to {CLASSES.length} characters, with one slot for each class. Filled: {occupiedCharacterCount}/{CLASSES.length}.</Text>
+
+          <View style={styles.characterSlotList}>
+            {slotSummaries.map(slot => {
+              const cls = CLASSES.find(entry => entry.id === slot.classId) ?? CLASSES[0];
+              return (
+                <Pressable
+                  key={slot.classId}
+                  style={[styles.characterSlotCard, slot.occupied && styles.characterSlotCardFilled]}
+                  onPress={() => openCharacterSlot(slot.classId)}
+                >
+                  <View style={styles.characterSlotHeader}>
+                    <Text style={styles.characterSlotTitle}>{cls.emoji} {cls.name}</Text>
+                    <Text style={[styles.characterSlotBadge, slot.occupied ? styles.characterSlotBadgeFilled : styles.characterSlotBadgeEmpty]}>
+                      {slot.occupied ? 'EXISTING' : 'EMPTY'}
+                    </Text>
+                  </View>
+                  <Text style={styles.characterSlotFantasy}>{cls.fantasy}</Text>
+                  <Text style={styles.characterSlotBody}>
+                    {slot.occupied
+                      ? `${slot.playerName} • Lv ${slot.level} • Peak Wave ${slot.highestWaveReached}`
+                      : `Create a ${cls.name.toLowerCase()} in this slot.`}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Pressable style={[styles.startBtn, styles.startBtnSecondary]} onPress={onLogout}>
+            <Text style={styles.startBtnTextLight}>Log Out</Text>
+          </Pressable>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  if (!hydrated) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle="light-content" backgroundColor="#0A0A18" />
+        <View style={styles.characterLoadingWrap}>
+          <Text style={styles.createTitle}>Loading {selectedClassConfig?.name ?? 'Character'}...</Text>
+          <Text style={styles.createSubtitle}>Preparing your save slot.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   // Character creation screen
   if (!state.characterCreated) {
     return (
       <SafeAreaView style={styles.safe}>
         <StatusBar barStyle="light-content" backgroundColor="#0A0A18" />
         <ScrollView contentContainerStyle={styles.createWrap}>
+          <Pressable style={styles.characterBackBtn} onPress={returnToCharacterSelect}>
+            <Text style={styles.characterBackBtnText}>← Back to Character Slots</Text>
+          </Pressable>
           <Text style={styles.createTitle}>Forge Your Hero</Text>
-          <Text style={styles.createSubtitle}>Choose your class. Summon allies. Rise as their leader.</Text>
+          <Text style={styles.createSubtitle}>This slot is locked to {selectedClassConfig?.name}. Summon allies. Rise as their leader.</Text>
 
           <Text style={styles.fieldLabel}>Hero Name</Text>
           <TextInput
@@ -722,24 +922,16 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             placeholderTextColor="#7575A8"
             maxLength={24}
           />
+          <Text style={styles.createHint}>Name must be 1-24 characters. You can have one character for each class slot.</Text>
 
           <Text style={styles.fieldLabel}>Class</Text>
-          <View style={styles.classList}>
-            {CLASSES.map(c => {
-              const selected = draftClass === c.id;
-              return (
-                <Pressable
-                  key={c.id}
-                  style={[styles.classCard, selected && styles.classCardSelected]}
-                  onPress={() => setDraftClass(c.id)}
-                >
-                  <Text style={styles.className}>{c.emoji} {c.name}</Text>
-                  <Text style={styles.classFantasy}>{c.fantasy}</Text>
-                  <Text style={styles.classStyle}>{c.style}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          {selectedClassConfig && (
+            <View style={[styles.classCard, styles.classCardSelected]}>
+              <Text style={styles.className}>{selectedClassConfig.emoji} {selectedClassConfig.name}</Text>
+              <Text style={styles.classFantasy}>{selectedClassConfig.fantasy}</Text>
+              <Text style={styles.classStyle}>{selectedClassConfig.style}</Text>
+            </View>
+          )}
 
           <Pressable
             style={[styles.startBtn, draftName.trim().length === 0 && styles.startBtnDisabled]}
@@ -1755,6 +1947,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                             </View>
                           )}
 
+                          {hero.level < 999 && (() => {
+                            const lvlCost = getHeroGoldLevelCost(hero.level);
+                            const canAfford = state.gold >= lvlCost;
+                            return (
+                              <Pressable
+                                style={[styles.heroLvlUpBtn, !canAfford && styles.heroLvlUpBtnDisabled]}
+                                disabled={!canAfford}
+                                onPress={() => levelUpHeroGold(hero.uid)}
+                              >
+                                <Text style={styles.heroLvlUpBtnText}>⬆ Level Up  {fmt(lvlCost)}g</Text>
+                              </Pressable>
+                            );
+                          })()}
                           <Pressable
                             style={styles.recycleBtn}
                             onPress={() => setRecycleConfirmUid(hero.uid)}
@@ -1864,6 +2069,20 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                           onPress={() => allocateStat(stat as any)}
                         >
                           <Text style={styles.statBtnText}>+1</Text>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.statBtn, state.unspentStatPoints === 0 && styles.statBtnDisabled, forceSpendStatStep && styles.statBtnDisabled]}
+                          disabled={state.unspentStatPoints === 0 || forceSpendStatStep}
+                          onPress={() => allocateStatN(stat as any, 5)}
+                        >
+                          <Text style={styles.statBtnText}>+5</Text>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.statBtn, state.unspentStatPoints === 0 && styles.statBtnDisabled, forceSpendStatStep && styles.statBtnDisabled]}
+                          disabled={state.unspentStatPoints === 0 || forceSpendStatStep}
+                          onPress={() => allocateStatN(stat as any, 10)}
+                        >
+                          <Text style={styles.statBtnText}>+10</Text>
                         </Pressable>
                         <Pressable
                           style={[
@@ -2060,8 +2279,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             {equipmentSubTab === 'craft' && (
               <View style={styles.craftRow}>
                 {(['weapon', 'armor', 'accessory'] as EquipmentSlot[]).map(slot => {
-                  const cost = slot === 'weapon' ? 130 : slot === 'armor' ? 120 : 100;
-                  const canCraft = state.equipmentScrap >= cost;
+                  const cost = getEquipmentCraftCost(slot);
+                  const canCraft = state.equipmentScrap >= cost.scrap && state.gold >= cost.gold;
                   return (
                     <Pressable
                       key={slot}
@@ -2070,7 +2289,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       onPress={() => craftEquipment(slot)}
                     >
                       <Text style={styles.craftBtnText}>{slot.toUpperCase()}</Text>
-                      <Text style={styles.craftCostText}>{cost}🔩</Text>
+                      <Text style={styles.craftCostText}>{cost.scrap}🔩 • {fmt(cost.gold)}g</Text>
                     </Pressable>
                   );
                 })}
@@ -2119,7 +2338,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                         >
                           <Text style={styles.upgradeGearBtnText}>
                             {upgradePlan.targetRarity
-                              ? `Upgrade → ${upgradePlan.targetRarity.toUpperCase()} (${upgradePlan.scrapCost}🔩 ${upgradePlan.essenceCost}🜂)`
+                              ? `Upgrade → ${upgradePlan.targetRarity.toUpperCase()} (${upgradePlan.scrapCost}🔩 ${upgradePlan.essenceCost}🜂 ${fmt(upgradePlan.goldCost)}g)`
                               : 'Upgrade Unavailable'}
                           </Text>
                         </Pressable>
@@ -2677,6 +2896,17 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             </View>
             <ScrollView style={styles.settingsScroll}>
               <View style={styles.settingsCard}>
+                <Text style={styles.settingsCardTitle}>Character Slots</Text>
+                <Text style={styles.settingsLabel}>Switch between your class-bound character slots or create a new one if an empty slot remains.</Text>
+                <Pressable
+                  style={styles.settingsCycleBtn}
+                  onPress={returnToCharacterSelect}
+                >
+                  <Text style={styles.settingsCycleBtnText}>Switch Character</Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.settingsCard}>
                 <Text style={styles.settingsCardTitle}>Beta Feedback</Text>
                 <Text style={styles.settingsLabel}>Send bugs, balance notes, and QoL requests to the beta board.</Text>
                 <Pressable
@@ -2920,6 +3150,83 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     lineHeight: 20,
   },
+  createHint: {
+    fontSize: 11,
+    color: '#8F95B2',
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  characterLoadingWrap: {
+    flex: 1,
+    paddingHorizontal: 24,
+    justifyContent: 'center',
+  },
+  characterSlotList: {
+    gap: 10,
+  },
+  characterSlotCard: {
+    borderWidth: 1,
+    borderColor: '#374358',
+    borderRadius: 12,
+    padding: 14,
+    backgroundColor: '#121927',
+    gap: 4,
+  },
+  characterSlotCardFilled: {
+    borderColor: '#6DDB7B',
+    backgroundColor: '#17231C',
+  },
+  characterSlotHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+  },
+  characterSlotTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  characterSlotBadge: {
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  characterSlotBadgeFilled: {
+    color: '#041108',
+    backgroundColor: '#6DDB7B',
+  },
+  characterSlotBadgeEmpty: {
+    color: '#D2D8E8',
+    backgroundColor: '#2B3447',
+  },
+  characterSlotFantasy: {
+    fontSize: 12,
+    color: '#8FA1C0',
+  },
+  characterSlotBody: {
+    fontSize: 13,
+    color: '#D4DCF2',
+    lineHeight: 18,
+  },
+  characterBackBtn: {
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#364560',
+    backgroundColor: '#111827',
+  },
+  characterBackBtnText: {
+    color: '#D9E4FF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   fieldLabel: {
     fontSize: 12,
     fontWeight: '600',
@@ -2980,8 +3287,16 @@ const styles = StyleSheet.create({
   startBtnDisabled: {
     opacity: 0.5,
   },
+  startBtnSecondary: {
+    backgroundColor: '#2A3344',
+  },
   startBtnText: {
     color: '#000',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  startBtnTextLight: {
+    color: '#F4F7FF',
     fontSize: 16,
     fontWeight: '700',
   },
@@ -5807,6 +6122,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#000',
+  },
+  heroLvlUpBtn: {
+    backgroundColor: '#2E5FA3',
+    borderRadius: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  heroLvlUpBtnDisabled: {
+    backgroundColor: '#2A2A3A',
+    opacity: 0.5,
+  },
+  heroLvlUpBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#CDE',
   },
   maxRankMsg: {
     fontSize: 11,

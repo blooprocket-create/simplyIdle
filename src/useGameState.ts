@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useReducer } from 'react';
+import { useEffect, useRef, useCallback, useReducer, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   PARTY,
@@ -84,6 +84,14 @@ const VALID_ACHIEVEMENT_IDS = new Set(ACHIEVEMENTS.map(achievement => achievemen
 const VALID_MISSION_IDS = new Set(MISSION_BOARD_GOALS.map(mission => mission.id));
 const VALID_WEEKLY_TRACK_MILESTONES = new Set(WEEKLY_TRACK_MILESTONES);
 const VALID_TUTORIAL_QUEST_IDS = new Set(TUTORIAL_QUESTS.map(quest => quest.id));
+
+export function getCharacterSaveSlot(accountName: string, playerClass: PlayerClass): string {
+  return `${accountName}_${playerClass}`;
+}
+
+export function getSaveStorageKey(saveSlot: string): string {
+  return `${SAVE_KEY}_${saveSlot}`;
+}
 
 interface RewardPopup {
   id: string;
@@ -870,29 +878,44 @@ function getRebirthSurvivalMultiplier(state: GameState): number {
 
 const EQUIP_RARITY_ORDER: Array<'common' | 'rare' | 'epic' | 'legendary' | 'mythic'> = ['common', 'rare', 'epic', 'legendary', 'mythic'];
 
+/** Gold cost to manually level a hero from `level` to `level+1` via gold. */
+export function getHeroGoldLevelCost(level: number): number {
+  return Math.floor(100 * Math.pow(1.08, level - 1));
+}
+
+export function getEquipmentCraftCost(slot: EquipmentSlot): { scrap: number; gold: number } {
+  const costBySlot: Record<EquipmentSlot, { scrap: number; gold: number }> = {
+    weapon: { scrap: 130, gold: 1800 },
+    armor: { scrap: 120, gold: 1500 },
+    accessory: { scrap: 100, gold: 1200 },
+  };
+  return costBySlot[slot];
+}
+
 function getEquipmentUpgradePlan(state: GameState, itemId: string): {
   canUpgrade: boolean;
   targetItemId: string | null;
   targetRarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythic' | null;
   scrapCost: number;
   essenceCost: number;
+  goldCost: number;
   reason?: string;
 } {
   const item = getEquipmentItem(itemId);
   if (!item) {
-    return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, reason: 'Missing item' };
+    return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, goldCost: 0, reason: 'Missing item' };
   }
 
   const idx = EQUIP_RARITY_ORDER.indexOf(item.rarity);
   if (idx < 0 || idx >= EQUIP_RARITY_ORDER.length - 1) {
-    return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, reason: 'At max rarity' };
+    return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, goldCost: 0, reason: 'At max rarity' };
   }
 
   let step = 0;
   for (let i = idx + 1; i < EQUIP_RARITY_ORDER.length; i++) {
     const rarity = EQUIP_RARITY_ORDER[i];
     if (rarity === 'mythic' && !hasUnlock(state, 'mythic_equipment')) {
-      return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, reason: 'Mythic tier locked' };
+      return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, goldCost: 0, reason: 'Mythic tier locked' };
     }
     const pool = EQUIPMENT_CATALOG.filter(candidate =>
       candidate.slot === item.slot
@@ -901,27 +924,29 @@ function getEquipmentUpgradePlan(state: GameState, itemId: string): {
     );
     step++;
     if (pool.length > 0) {
-      const baseCostByRarity: Record<string, { scrap: number; essence: number }> = {
-        common: { scrap: 80, essence: 0 },
-        rare: { scrap: 170, essence: 4 },
-        epic: { scrap: 300, essence: 8 },
-        legendary: { scrap: 500, essence: 14 },
+      const baseCostByRarity: Record<string, { scrap: number; essence: number; gold: number }> = {
+        common: { scrap: 80, essence: 0, gold: 1400 },
+        rare: { scrap: 170, essence: 4, gold: 4200 },
+        epic: { scrap: 300, essence: 8, gold: 12000 },
+        legendary: { scrap: 500, essence: 14, gold: 32000 },
       };
-      const base = baseCostByRarity[item.rarity] ?? { scrap: 0, essence: 0 };
+      const base = baseCostByRarity[item.rarity] ?? { scrap: 0, essence: 0, gold: 0 };
       const scrapCost = Math.ceil(base.scrap * (1 + (step - 1) * 0.55));
       const essenceCost = Math.ceil(base.essence * (1 + (step - 1) * 0.5));
+      const goldCost = Math.ceil(base.gold * (1 + (step - 1) * 0.75));
       const candidate = pool[Math.floor(Math.random() * pool.length)];
       return {
-        canUpgrade: state.equipmentScrap >= scrapCost && state.essence >= essenceCost,
+        canUpgrade: state.equipmentScrap >= scrapCost && state.essence >= essenceCost && state.gold >= goldCost,
         targetItemId: candidate.id,
         targetRarity: rarity,
         scrapCost,
         essenceCost,
+        goldCost,
       };
     }
   }
 
-  return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, reason: 'No higher tier candidate' };
+  return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, goldCost: 0, reason: 'No higher tier candidate' };
 }
 
 function getShardToEssenceCost(state: GameState): number {
@@ -1080,7 +1105,7 @@ function sanitizeLoadedHero(raw: unknown, index: number): HeroUnit | null {
   });
 }
 
-function sanitizeSaveData(payload: SaveData) {
+function sanitizeSaveData(payload: Partial<SaveData>) {
   const now = Date.now();
   const currentWeek = weekNumberForTimestamp(now);
   const currentDay = toDayNumber(now);
@@ -1200,6 +1225,13 @@ function sanitizeSaveData(payload: SaveData) {
   const weeklyEventId = getWeeklyEventByWeek(weeklyEventWeek).id;
   const seasonPoints = clampInt(payload.seasonPoints, 0, SAFE_INTEGER_CAP, 0);
   const bestSeasonPoints = Math.max(seasonPoints, clampInt(payload.bestSeasonPoints, 0, SAFE_INTEGER_CAP, 0));
+  const autoSummonMode: 'single' | 'x10' = payload.autoSummonMode === 'x10' ? 'x10' : 'single';
+  const heroActiveCdMs = Object.fromEntries(
+    Object.entries(isRecord(payload.heroActiveCdMs) ? payload.heroActiveCdMs : {})
+      .filter(([uid]) => heroUidSet.has(uid))
+      .map(([uid, ms]) => [uid, clampInt(ms, 0, 600_000, 0)] as const)
+      .filter((entry): entry is readonly [string, number] => entry[1] > 0),
+  );
 
   return {
     playerName,
@@ -1268,7 +1300,7 @@ function sanitizeSaveData(payload: SaveData) {
     autoUsePotionThresholdPct: clampFloat(payload.autoUsePotionThresholdPct, 0.05, 1, 0.35),
     autoRecycleEnabled: clampBoolean(payload.autoRecycleEnabled, false),
     autoSummonEnabled: clampBoolean(payload.autoSummonEnabled, false),
-    autoSummonMode: payload.autoSummonMode === 'x10' ? 'x10' : 'single',
+    autoSummonMode,
     autoSummonReserveGold: clampInt(payload.autoSummonReserveGold, 0, SAFE_INTEGER_CAP, 5000),
     lastActiveAt: clampInt(payload.lastActiveAt, 0, now, now),
     tutorialEnabled: clampBoolean(payload.tutorialEnabled, true),
@@ -1284,12 +1316,7 @@ function sanitizeSaveData(payload: SaveData) {
     damageBuffMs: clampInt(payload.damageBuffMs, 0, 600_000, 0),
     damageReductionBuffPct: clampFloat(payload.damageReductionBuffPct, 0, 1, 0),
     damageReductionBuffMs: clampInt(payload.damageReductionBuffMs, 0, 600_000, 0),
-    heroActiveCdMs: Object.fromEntries(
-      Object.entries(isRecord(payload.heroActiveCdMs) ? payload.heroActiveCdMs : {})
-        .filter(([uid]) => heroUidSet.has(uid))
-        .map(([uid, ms]) => [uid, clampInt(ms, 0, 600_000, 0)])
-        .filter(([, ms]) => ms > 0),
-    ),
+    heroActiveCdMs,
   };
 }
 
@@ -1647,6 +1674,8 @@ type Action =
   | { type: 'BUY_SKILL'; id: string }
   | { type: 'ALLOCATE_STAT'; stat: StatKey }
   | { type: 'ALLOCATE_STAT_MAX'; stat: StatKey }
+  | { type: 'ALLOCATE_STAT_N'; stat: StatKey; amount: number }
+  | { type: 'LEVEL_UP_HERO_GOLD'; uid: string }
   | { type: 'EQUIP_ITEM'; itemId: string }
   | { type: 'SUMMON_HERO' }
   | { type: 'SUMMON_HERO_X10' }
@@ -1832,6 +1861,21 @@ function reducer(state: GameState, action: Action): GameState {
         ...state,
         statsAlloc,
         unspentStatPoints: 0,
+        allocatedStatPoints: state.allocatedStatPoints + spend,
+      });
+    }
+
+    case 'ALLOCATE_STAT_N': {
+      if (state.unspentStatPoints <= 0) return state;
+      const spend = Math.min(action.amount, state.unspentStatPoints);
+      const statsAlloc = {
+        ...state.statsAlloc,
+        [action.stat]: state.statsAlloc[action.stat] + spend,
+      };
+      return progressTutorial({
+        ...state,
+        statsAlloc,
+        unspentStatPoints: state.unspentStatPoints - spend,
         allocatedStatPoints: state.allocatedStatPoints + spend,
       });
     }
@@ -2136,13 +2180,8 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'CRAFT_EQUIPMENT': {
       if (!state.playerClass) return state;
-      const craftCostBySlot: Record<EquipmentSlot, number> = {
-        weapon: 130,
-        armor: 120,
-        accessory: 100,
-      };
-      const cost = craftCostBySlot[action.slot];
-      if (state.equipmentScrap < cost) return state;
+      const cost = getEquipmentCraftCost(action.slot);
+      if (state.equipmentScrap < cost.scrap || state.gold < cost.gold) return state;
 
       const classSlotItems = EQUIPMENT_CATALOG.filter(item =>
         item.allowedClasses.includes(state.playerClass as PlayerClass) && item.slot === action.slot,
@@ -2159,24 +2198,26 @@ function reducer(state: GameState, action: Action): GameState {
         const refund = Math.ceil(equipmentScrapValue(item.rarity) * 0.75);
         return queueReward({
           ...state,
-          equipmentScrap: state.equipmentScrap - cost + refund,
+          equipmentScrap: state.equipmentScrap - cost.scrap + refund,
+          gold: state.gold - cost.gold,
         }, {
           id: `craft_dup_${item.id}_${Date.now()}`,
           kind: 'item',
           title: `Crafted Duplicate ${item.name}`,
-          detail: `Recovered +${refund} scrap`,
+          detail: `Spent ${cost.gold} gold, recovered +${refund} scrap`,
         });
       }
 
       return queueReward({
         ...state,
-        equipmentScrap: state.equipmentScrap - cost,
+        equipmentScrap: state.equipmentScrap - cost.scrap,
+        gold: state.gold - cost.gold,
         inventoryItemIds: [...state.inventoryItemIds, item.id],
       }, {
         id: `craft_${item.id}_${Date.now()}`,
         kind: 'item',
         title: `Crafted ${item.emoji} ${item.name}`,
-        detail: `${equipmentRarityConfig(item.rarity).label} ${item.slot}`,
+        detail: `${equipmentRarityConfig(item.rarity).label} ${item.slot} • -${cost.gold} gold`,
       });
     }
 
@@ -2186,7 +2227,7 @@ function reducer(state: GameState, action: Action): GameState {
       if (!item) return state;
       const plan = getEquipmentUpgradePlan(state, action.itemId);
       if (!plan.targetItemId || !plan.targetRarity) return state;
-      if (state.equipmentScrap < plan.scrapCost || state.essence < plan.essenceCost) return state;
+      if (state.equipmentScrap < plan.scrapCost || state.essence < plan.essenceCost || state.gold < plan.goldCost) return state;
       const target = getEquipmentItem(plan.targetItemId);
       if (!target) return state;
 
@@ -2200,6 +2241,7 @@ function reducer(state: GameState, action: Action): GameState {
         inventoryItemIds: nextInventory,
         equipmentScrap: state.equipmentScrap - plan.scrapCost + refund,
         essence: state.essence - plan.essenceCost,
+        gold: state.gold - plan.goldCost,
         equippedItems: Object.fromEntries(
           Object.entries(state.equippedItems).map(([slot, equippedId]) => [slot, equippedId === item.id ? target.id : equippedId]),
         ) as Record<EquipmentSlot, string | null>,
@@ -2207,7 +2249,7 @@ function reducer(state: GameState, action: Action): GameState {
         id: `upgrade_${item.id}_${Date.now()}`,
         kind: 'item',
         title: `Upgraded ${item.name}`,
-        detail: `Now ${target.emoji} ${target.name} (${plan.targetRarity.toUpperCase()})`,
+        detail: `Now ${target.emoji} ${target.name} (${plan.targetRarity.toUpperCase()}) • -${plan.goldCost} gold`,
       });
     }
 
@@ -2543,6 +2585,21 @@ function reducer(state: GameState, action: Action): GameState {
         ...state,
         heroRoster: newRoster,
         heroShards: state.heroShards - nextRankCost,
+      };
+    }
+
+    case 'LEVEL_UP_HERO_GOLD': {
+      const hero = state.heroRoster.find(h => h.uid === action.uid);
+      if (!hero || hero.level >= HERO_LEVEL_CAP) return state;
+      const cost = getHeroGoldLevelCost(hero.level);
+      if (state.gold < cost) return state;
+      const newRoster = state.heroRoster.map(h =>
+        h.uid === action.uid ? { ...h, level: h.level + 1 } : h
+      );
+      return {
+        ...state,
+        gold: state.gold - cost,
+        heroRoster: newRoster,
       };
     }
 
@@ -2899,8 +2956,9 @@ function serialize(state: GameState): SaveData {
 }
 
 export function useGameState(saveSlot: string = 'default') {
-  const saveKey = `${SAVE_KEY}_${saveSlot}`;
+  const saveKey = getSaveStorageKey(saveSlot);
   const [state, dispatch] = useReducer(reducer, DEFAULT_STATE);
+  const [hydrated, setHydrated] = useState(false);
   const lastTickRef = useRef(Date.now());
   const lastSaveRef = useRef(Date.now());
   const stateRef = useRef(state);
@@ -2913,19 +2971,32 @@ export function useGameState(saveSlot: string = 'default') {
   stateRef.current = state;
 
   useEffect(() => {
-    AsyncStorage.getItem(saveKey).then(raw => {
-      if (!raw) return;
-      try {
-        const data: SaveData = JSON.parse(raw);
-        dispatch({ type: 'LOAD', payload: data });
-        const elapsed = Date.now() - (data.lastActiveAt ?? Date.now());
-        dispatch({ type: 'APPLY_OFFLINE_PROGRESS', elapsedMs: elapsed });
-        dispatch({ type: 'APPLY_DAILY_LOGIN', nowMs: Date.now() });
-        dispatch({ type: 'APPLY_WEEKLY_ROLLOVER', nowMs: Date.now() });
-      } catch {
-        // Ignore corrupted save and continue fresh.
-      }
-    });
+    setHydrated(false);
+    dispatch({ type: 'LOAD', payload: {} });
+    sessionStartedRef.current = false;
+    sessionStartedAtRef.current = 0;
+    prevSummonsRef.current = 0;
+    prevHighestWaveRef.current = 1;
+    prevPrestigeRef.current = 0;
+    prevFtueCountRef.current = 0;
+    lastTickRef.current = Date.now();
+    lastSaveRef.current = Date.now();
+
+    AsyncStorage.getItem(saveKey)
+      .then(raw => {
+        if (!raw) return;
+        try {
+          const data: SaveData = JSON.parse(raw);
+          dispatch({ type: 'LOAD', payload: data });
+          const elapsed = Date.now() - (data.lastActiveAt ?? Date.now());
+          dispatch({ type: 'APPLY_OFFLINE_PROGRESS', elapsedMs: elapsed });
+          dispatch({ type: 'APPLY_DAILY_LOGIN', nowMs: Date.now() });
+          dispatch({ type: 'APPLY_WEEKLY_ROLLOVER', nowMs: Date.now() });
+        } catch {
+          // Ignore corrupted save and continue fresh.
+        }
+      })
+      .finally(() => setHydrated(true));
   }, [saveKey]);
 
   useEffect(() => {
@@ -2951,7 +3022,7 @@ export function useGameState(saveSlot: string = 'default') {
       lastTickRef.current = now;
       dispatch({ type: 'TICK', elapsed });
 
-      if (now - lastSaveRef.current >= SAVE_INTERVAL_MS) {
+      if (stateRef.current.characterCreated && now - lastSaveRef.current >= SAVE_INTERVAL_MS) {
         lastSaveRef.current = now;
         AsyncStorage.setItem(saveKey, JSON.stringify(serialize(stateRef.current)));
       }
@@ -3043,6 +3114,7 @@ export function useGameState(saveSlot: string = 'default') {
   const buySkill = useCallback((id: string) => dispatch({ type: 'BUY_SKILL', id }), []);
   const allocateStat = useCallback((stat: StatKey) => dispatch({ type: 'ALLOCATE_STAT', stat }), []);
   const allocateStatMax = useCallback((stat: StatKey) => dispatch({ type: 'ALLOCATE_STAT_MAX', stat }), []);
+  const allocateStatN = useCallback((stat: StatKey, amount: number) => dispatch({ type: 'ALLOCATE_STAT_N', stat, amount }), []);
   const equipItem = useCallback((itemId: string) => dispatch({ type: 'EQUIP_ITEM', itemId }), []);
   const summonHero = useCallback(() => dispatch({ type: 'SUMMON_HERO' }), []);
   const summonHeroX10 = useCallback(() => dispatch({ type: 'SUMMON_HERO_X10' }), []);
@@ -3063,6 +3135,7 @@ export function useGameState(saveSlot: string = 'default') {
     dispatch({ type: 'SET_AUTO_RECYCLE_ENABLED', enabled });
   }, []);
   const rankUpHero = useCallback((uid: string) => dispatch({ type: 'RANK_UP_HERO', uid }), []);
+  const levelUpHeroGold = useCallback((uid: string) => dispatch({ type: 'LEVEL_UP_HERO_GOLD', uid }), []);
   const convertShardsToEssence = useCallback(() => dispatch({ type: 'CONVERT_SHARDS_TO_ESSENCE' }), []);
   const convertShardsToScrap = useCallback(() => dispatch({ type: 'CONVERT_SHARDS_TO_SCRAP' }), []);
   const spendRebirthCore = useCallback((path: 'damage' | 'economy' | 'survival') => {
@@ -3140,6 +3213,7 @@ export function useGameState(saveSlot: string = 'default') {
   const stats = computeStats(state);
 
   return {
+    hydrated,
     state,
     stats,
     createCharacter,
@@ -3149,6 +3223,7 @@ export function useGameState(saveSlot: string = 'default') {
     buySkill,
     allocateStat,
     allocateStatMax,
+    allocateStatN,
     equipItem,
     summonHero,
     summonHeroX10,
@@ -3163,6 +3238,7 @@ export function useGameState(saveSlot: string = 'default') {
     setAutoRecycleMaxRarity,
     setAutoRecycleEnabled,
     rankUpHero,
+    levelUpHeroGold,
     convertShardsToEssence,
     convertShardsToScrap,
     spendRebirthCore,
