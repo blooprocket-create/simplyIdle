@@ -923,7 +923,24 @@ function getTeamDefense(state: GameState): number {
   return Math.max(0, defense * getMetaSurvivalMultiplier(state) * getRebirthSurvivalMultiplier(state) * formation.hpMult * synergy.hpMult);
 }
 
-function getDps(state: GameState): number {
+export function getDpsBreakdown(state: GameState): {
+  playerBaseDps: number;
+  heroBaseDps: number;
+  multipliers: {
+    rebirthLegacy: number;
+    achievementLegacy: number;
+    metaDamage: number;
+    rebirthDamagePath: number;
+    classPassive: number;
+    heroPassives: number;
+    formation: number;
+    synergy: number;
+    mastery: number;
+    temporaryBuff: number;
+  };
+  totalMultiplier: number;
+  finalDps: number;
+} {
   const cls = getClassConfig(state.playerClass ?? 'warrior');
   const stats = derivedStats(state);
   const rebirthMult = Math.pow(REBIRTH_BONUS, state.prestigeCount);
@@ -932,7 +949,7 @@ function getDps(state: GameState): number {
   const physical = stats.strength * 2 + stats.agility * 1.2 + state.level * 0.8;
   const magic = stats.intelligence * 2 + stats.spirit * 1.1 + state.level * 0.8;
 
-  let playerDps = ((physical * cls.physWeight * 0.4) + (magic * cls.magicWeight * 0.3)) / 2.5;
+  const playerDps = ((physical * cls.physWeight * 0.4) + (magic * cls.magicWeight * 0.3)) / 2.5;
 
   // Active team heroes damage
   let heroDps = 0;
@@ -961,18 +978,40 @@ function getDps(state: GameState): number {
   const synergy = getTeamSynergy(state);
   const masteryLevel = getClassMasteryLevel(state, state.playerClass);
   const masteryDpsMult = 1 + Math.min(0.4, masteryLevel * 0.01);
-  const totalDps = (playerDps + heroDps)
-    * rebirthMult
-    * getAchievementBonusMultiplier(state)
-    * getMetaDamageMultiplier(state)
-    * getRebirthDamageMultiplier(state)
-    * classPassiveMult
-    * heroPassive.dpsMult
-    * formation.dpsMult
-    * synergy.dpsMult
-    * masteryDpsMult
-    * activeBuffMult;
-  return Math.max(1, totalDps);
+  const multipliers = {
+    rebirthLegacy: rebirthMult,
+    achievementLegacy: getAchievementBonusMultiplier(state),
+    metaDamage: getMetaDamageMultiplier(state),
+    rebirthDamagePath: getRebirthDamageMultiplier(state),
+    classPassive: classPassiveMult,
+    heroPassives: heroPassive.dpsMult,
+    formation: formation.dpsMult,
+    synergy: synergy.dpsMult,
+    mastery: masteryDpsMult,
+    temporaryBuff: activeBuffMult,
+  };
+  const totalMultiplier = multipliers.rebirthLegacy
+    * multipliers.achievementLegacy
+    * multipliers.metaDamage
+    * multipliers.rebirthDamagePath
+    * multipliers.classPassive
+    * multipliers.heroPassives
+    * multipliers.formation
+    * multipliers.synergy
+    * multipliers.mastery
+    * multipliers.temporaryBuff;
+  const finalDps = Math.max(1, (playerDps + heroDps) * totalMultiplier);
+  return {
+    playerBaseDps: Math.max(0, playerDps),
+    heroBaseDps: Math.max(0, heroDps),
+    multipliers,
+    totalMultiplier,
+    finalDps,
+  };
+}
+
+function getDps(state: GameState): number {
+  return getDpsBreakdown(state).finalDps;
 }
 
 function getClickDamage(state: GameState): number {

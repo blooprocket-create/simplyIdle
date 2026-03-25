@@ -14,7 +14,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getCharacterSaveSlot, getEquipmentCraftCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState } from '../useGameState';
+import { getCharacterSaveSlot, getDpsBreakdown, getEquipmentCraftCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState } from '../useGameState';
 import { trackEvent } from '../telemetry';
 import {
   ACHIEVEMENTS,
@@ -93,6 +93,7 @@ const TAB_META: Record<Tab, { icon: string; label: string; mood: string }> = {
 const ACH_BONUS_PER_UNLOCK_PCT = 3;
 const ACH_BONUS_CAP_PCT = 75;
 const FEEDBACK_FORM_URL = 'https://forms.gle/replace-with-your-beta-form';
+const GEAR_RARITY_POINTS: Record<string, number> = { common: 40, rare: 90, epic: 170, legendary: 280, mythic: 430 };
 
 interface CharacterSlotSummary {
   classId: PlayerClass;
@@ -186,6 +187,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [idleChestOpen, setIdleChestOpen] = useState(false);
   const [idleChestReward, setIdleChestReward] = useState<{ title: string; detail: string } | null>(null);
   const [storyUnlockToast, setStoryUnlockToast] = useState<{ id: string; title: string; chapter: string } | null>(null);
+  const [hoveredTopChipId, setHoveredTopChipId] = useState<'dps' | 'power' | 'gear' | null>(null);
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const lastSummonIdRef = useRef<string | null>(null);
   const storyUnlockInitRef = useRef(false);
@@ -426,14 +428,32 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     [state.equippedItems],
   );
   const gearScore = useMemo(() => {
-    const rarityPoints: Record<string, number> = { common: 40, rare: 90, epic: 170, legendary: 280, mythic: 430 };
     return equippedItemsForScore.reduce((sum, item) => {
       if (!item) return sum;
       const statValue = Object.values(item.bonus).reduce((s, v) => s + (v ?? 0), 0);
-      return sum + (rarityPoints[item.rarity] ?? 0) + statValue * 12;
+      return sum + (GEAR_RARITY_POINTS[item.rarity] ?? 0) + statValue * 12;
     }, 0);
   }, [equippedItemsForScore]);
-  const teamPowerIndex = Math.floor(stats.dps * 0.45 + state.teamMaxHp * 0.25 + stats.teamDefense * 7 + gearScore * 15);
+  const gearScoreRows = useMemo(() => {
+    return equippedItemsForScore.map(item => {
+      if (!item) return null;
+      const rarityPoints = GEAR_RARITY_POINTS[item.rarity] ?? 0;
+      const statValue = Object.values(item.bonus).reduce((s, v) => s + (v ?? 0), 0);
+      const statPoints = statValue * 12;
+      return {
+        name: item.name ?? item.id,
+        rarityPoints,
+        statPoints,
+        total: rarityPoints + statPoints,
+      };
+    }).filter((row): row is { name: string; rarityPoints: number; statPoints: number; total: number } => !!row);
+  }, [equippedItemsForScore]);
+  const dpsBreakdown = useMemo(() => getDpsBreakdown(state), [state]);
+  const powerFromDps = stats.dps * 0.45;
+  const powerFromHp = state.teamMaxHp * 0.25;
+  const powerFromDefense = stats.teamDefense * 7;
+  const powerFromGear = gearScore * 15;
+  const teamPowerIndex = Math.floor(powerFromDps + powerFromHp + powerFromDefense + powerFromGear);
   const effectiveTeamDps = Math.max(1, stats.dps / affixTotals.hpMult);
   const ttkSeconds = state.monsterHp / effectiveTeamDps;
   const baseEnemyDps = getMonsterDamage(state.wave) * affixTotals.dmgMult;
@@ -538,11 +558,66 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     { id: 'dps', label: 'DPS', value: fmt(stats.dps) },
     { id: 'power', label: 'Power', value: fmt(teamPowerIndex) },
     { id: 'gear', label: 'Gear', value: fmt(gearScore) },
-    { id: 'bonus', label: 'Legacy Dmg/Gold/EXP', value: `+${(stats.achievementBonusPercent * 100).toFixed(0)}%` },
     { id: 'exp', label: 'EXP', value: `${expPct}%` },
     { id: 'streak', label: 'Streak', value: `${state.dailyLoginStreak}` },
     { id: 'peakwave', label: 'Peak Wave', value: `${state.highestWaveReached}` },
   ];
+  const topChipTooltip = useMemo(() => {
+    function multLine(label: string, mult: number): string {
+      const deltaPct = (mult - 1) * 100;
+      const sign = deltaPct >= 0 ? '+' : '';
+      return `${label}: x${mult.toFixed(2)} (${sign}${deltaPct.toFixed(1)}%)`;
+    }
+
+    if (hoveredTopChipId === 'dps') {
+      return {
+        title: 'DPS Breakdown',
+        lines: [
+          `Base player DPS: ${fmt(Math.floor(dpsBreakdown.playerBaseDps))}`,
+          `Base hero DPS: ${fmt(Math.floor(dpsBreakdown.heroBaseDps))}`,
+          `Total multiplier: x${dpsBreakdown.totalMultiplier.toFixed(2)}`,
+          multLine('Rebirth legacy', dpsBreakdown.multipliers.rebirthLegacy),
+          multLine('Achievement legacy', dpsBreakdown.multipliers.achievementLegacy),
+          multLine('Meta damage path', dpsBreakdown.multipliers.metaDamage),
+          multLine('Rebirth damage branch', dpsBreakdown.multipliers.rebirthDamagePath),
+          multLine('Class passive', dpsBreakdown.multipliers.classPassive),
+          multLine('Hero passives', dpsBreakdown.multipliers.heroPassives),
+          multLine('Formation + synergy', dpsBreakdown.multipliers.formation * dpsBreakdown.multipliers.synergy),
+          multLine('Mastery + temporary buff', dpsBreakdown.multipliers.mastery * dpsBreakdown.multipliers.temporaryBuff),
+        ],
+      };
+    }
+
+    if (hoveredTopChipId === 'power') {
+      return {
+        title: 'Power Formula',
+        lines: [
+          'Power = floor(DPS*0.45 + TeamHP*0.25 + Defense*7 + Gear*15)',
+          `DPS term: ${fmt(Math.floor(powerFromDps))} (${fmt(stats.dps)} * 0.45)`,
+          `Team HP term: ${fmt(Math.floor(powerFromHp))} (${fmt(state.teamMaxHp)} * 0.25)`,
+          `Defense term: ${fmt(Math.floor(powerFromDefense))} (${fmt(stats.teamDefense)} * 7)`,
+          `Gear term: ${fmt(Math.floor(powerFromGear))} (${fmt(gearScore)} * 15)`,
+          `Final power: ${fmt(teamPowerIndex)}`,
+        ],
+      };
+    }
+
+    if (hoveredTopChipId === 'gear') {
+      const rows = gearScoreRows.length === 0
+        ? ['No equipped gear in the 3 slots.']
+        : gearScoreRows.map(row => `${row.name}: rarity ${fmt(row.rarityPoints)} + stats ${fmt(Math.floor(row.statPoints))} = ${fmt(Math.floor(row.total))}`);
+      return {
+        title: 'Gear Score Sources',
+        lines: [
+          'Per item: rarity points + (sum of item stats * 12)',
+          ...rows,
+          `Total gear score: ${fmt(gearScore)}`,
+        ],
+      };
+    }
+
+    return null;
+  }, [hoveredTopChipId, dpsBreakdown, powerFromDps, powerFromHp, powerFromDefense, powerFromGear, stats.dps, state.teamMaxHp, stats.teamDefense, gearScore, teamPowerIndex, gearScoreRows]);
 
   useEffect(() => {
     const unlockedIds = storyEntries.filter(entry => entry.unlocked).map(entry => entry.id);
@@ -1024,10 +1099,25 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         </View>
         <ScrollView horizontal={true} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statChipRail}>
           {topStatChips.map(chip => (
-            <View key={chip.id} style={styles.statChip}>
+            <Pressable
+              key={chip.id}
+              style={[styles.statChip, hoveredTopChipId === chip.id && styles.statChipActive]}
+              onHoverIn={() => {
+                if (chip.id === 'dps' || chip.id === 'power' || chip.id === 'gear') setHoveredTopChipId(chip.id);
+              }}
+              onHoverOut={() => {
+                if (chip.id === 'dps' || chip.id === 'power' || chip.id === 'gear') setHoveredTopChipId(current => (current === chip.id ? null : current));
+              }}
+              onPressIn={() => {
+                if (chip.id === 'dps' || chip.id === 'power' || chip.id === 'gear') setHoveredTopChipId(chip.id);
+              }}
+              onPressOut={() => {
+                if (chip.id === 'dps' || chip.id === 'power' || chip.id === 'gear') setHoveredTopChipId(current => (current === chip.id ? null : current));
+              }}
+            >
               <Text style={styles.statChipLabel}>{chip.label}</Text>
               <Text style={styles.statChipValue}>{chip.value}</Text>
-            </View>
+            </Pressable>
           ))}
           {state.unspentStatPoints > 0 && (
             <View style={[styles.statChip, styles.statChipHighlight]}>
@@ -1036,6 +1126,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             </View>
           )}
         </ScrollView>
+        {topChipTooltip && (
+          <View style={styles.statChipTooltipCard}>
+            <Text style={styles.statChipTooltipTitle}>{topChipTooltip.title}</Text>
+            {topChipTooltip.lines.map(line => (
+              <Text key={line} style={styles.statChipTooltipLine}>{line}</Text>
+            ))}
+          </View>
+        )}
       </View>
 
       {currentQuest && (
@@ -1416,7 +1514,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               {warPanels.growth && (
                 <View style={styles.warPanelBody}>
                   <Text style={styles.warPanelStat}>Level {state.level} • Unspent: {state.unspentStatPoints}</Text>
-                  <Text style={styles.warPanelStat}>Achievement Bonus: +{(stats.achievementBonusPercent * 100).toFixed(0)}% to final DPS, tap damage, gold, and EXP</Text>
+                  <Text style={styles.warPanelStat}>Achievement Bonus: +{(stats.achievementBonusPercent * 100).toFixed(0)}% to final DPS, manual attack damage, gold, and EXP</Text>
                   <Text style={styles.warPanelStat}>Rebirth Cores: {state.rebirthCores}</Text>
                   <View style={styles.warPanelActionRow}>
                     <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('stats')}>
@@ -2451,7 +2549,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Text style={styles.achievementBonusValue}>+{(stats.achievementBonusPercent * 100).toFixed(0)}%</Text>
                 </View>
                 <Text style={styles.achievementBonusDesc}>
-                  Each unlocked achievement grants +{ACH_BONUS_PER_UNLOCK_PCT}% to final DPS, tap damage, gold gain, and EXP gain multipliers.
+                  Each unlocked achievement grants +{ACH_BONUS_PER_UNLOCK_PCT}% to final DPS, manual attack damage, gold gain, and EXP gain multipliers.
                 </Text>
                 <Text style={styles.achievementBonusDesc}>
                   Cap: +{ACH_BONUS_CAP_PCT}% • Unlocked: {state.achievements.size}/{ACHIEVEMENTS.length}
@@ -2460,7 +2558,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   Current multiplier: x{(1 + stats.achievementBonusPercent).toFixed(2)} applied after most build/class/rebirth modifiers.
                 </Text>
                 <Text style={styles.achievementBonusDesc}>
-                  Affects now: DPS x{(1 + stats.achievementBonusPercent).toFixed(2)} • Tap x{(1 + stats.achievementBonusPercent).toFixed(2)} • Gold x{(1 + stats.achievementBonusPercent).toFixed(2)} • EXP x{(1 + stats.achievementBonusPercent).toFixed(2)}
+                  Affects now: DPS x{(1 + stats.achievementBonusPercent).toFixed(2)} • Manual x{(1 + stats.achievementBonusPercent).toFixed(2)} • Gold x{(1 + stats.achievementBonusPercent).toFixed(2)} • EXP x{(1 + stats.achievementBonusPercent).toFixed(2)}
                 </Text>
                 <View style={styles.claimAllRow}>
                   <Text style={styles.claimAllInfo}>Claimable: {claimableWeeklyMilestones.length + claimableMissionIds.length}</Text>
@@ -2535,8 +2633,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     <Text style={styles.achDesc}>{ach.description}</Text>
                     <Text style={[styles.achBonusLine, unlocked && styles.achBonusLineUnlocked]}>
                       {unlocked
-                        ? `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/tap/gold/EXP applied`
-                        : `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/tap/gold/EXP on unlock`}
+                        ? `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/manual/gold/EXP applied`
+                        : `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/manual/gold/EXP on unlock`}
                     </Text>
                   </View>
                 </View>
@@ -3426,6 +3524,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 8,
   },
+  statChipActive: {
+    borderColor: '#78B4E6',
+    backgroundColor: '#17314A',
+  },
   statChipHighlight: {
     borderColor: '#83602A',
     backgroundColor: '#2C2412',
@@ -3443,6 +3545,26 @@ const styles = StyleSheet.create({
   },
   statChipValueWarn: {
     color: '#FBD484',
+  },
+  statChipTooltipCard: {
+    marginTop: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3A5A78',
+    backgroundColor: '#0F1C2A',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    gap: 3,
+  },
+  statChipTooltipTitle: {
+    color: '#D8ECFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  statChipTooltipLine: {
+    color: '#A9C7DD',
+    fontSize: 10,
+    lineHeight: 14,
   },
   header: {
     flexDirection: 'row',
