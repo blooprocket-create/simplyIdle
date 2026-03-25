@@ -3949,6 +3949,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                           setAutoUseCoolant(false);
                           return;
                         }
+                        setSettingsOpen(false);
                         setSmartCoolantConfirmOpen(true);
                       }}
                     >
