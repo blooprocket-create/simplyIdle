@@ -49,15 +49,17 @@ import {
   getRankUpShardCost,
   getUsableItem,
   Rarity,
+  HERO_LEVEL_CAP,
 } from '../gameConfig';
 import { fmt } from '../utils';
 import AchievementToast from '../components/AchievementToast';
 import RebirthModal from '../components/PrestigeModal';
 
-type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment';
+type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'guildhall';
 type HeroesSubTab = 'summon' | 'roster';
 type EquipmentSubTab = 'inventory' | 'craft' | 'forge';
 type AchievementsSubTab = 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex';
+type GuildhallSubTab = 'batch' | 'facilities' | 'expeditions';
 type ShopTab = 'diamond' | 'gold' | 'dollar';
 
 type MomentCue = 'none' | 'mythic' | 'boss' | 'rebirth' | 'ultimate';
@@ -89,6 +91,7 @@ const TAB_META: Record<Tab, { icon: string; label: string; mood: string }> = {
   stats: { icon: '📊', label: 'Growth', mood: 'Power Grid' },
   equipment: { icon: '🎒', label: 'Armory', mood: 'Forge Gear' },
   achievements: { icon: '🏆', label: 'Legends', mood: 'Milestones' },
+  guildhall: { icon: '🏰', label: 'Guild Hall', mood: 'Infrastructure' },
 };
 
 const ACH_BONUS_PER_UNLOCK_PCT = 3;
@@ -207,6 +210,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     getUpgradePlan,
     getWeeklyEvent,
     getMissionProgress,
+    batchLevelHeroes,
+    upgradeFacility,
+    startExpedition,
+    completeExpedition,
   } = useGameState(selectedCharacterClass ? getCharacterSaveSlot(accountName, selectedCharacterClass) : '__character_slot_preview__');
 
   const [tab, setTab] = useState<Tab>('warroom');
@@ -225,6 +232,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [heroesSubTab, setHeroesSubTab] = useState<HeroesSubTab>('summon');
   const [equipmentSubTab, setEquipmentSubTab] = useState<EquipmentSubTab>('inventory');
   const [achievementsSubTab, setAchievementsSubTab] = useState<AchievementsSubTab>('overview');
+  const [guildhallSubTab, setGuildhallSubTab] = useState<GuildhallSubTab>('batch');
   const [eventsOpen, setEventsOpen] = useState(false);
   const [chapterMapOpen, setChapterMapOpen] = useState(false);
   const [compareItemId, setCompareItemId] = useState<string | null>(null);
@@ -259,6 +267,18 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [riftDungeonModalOpen, setRiftDungeonModalOpen] = useState(false);
   const [riftDungeonResult, setRiftDungeonResult] = useState<{ waves: number; diamonds: number; shards: number; essence: number } | null>(null);
   const [riftIsSimulating, setRiftIsSimulating] = useState(false);
+
+  // Batch leveling state
+  const [batchLevelSelected, setBatchLevelSelected] = useState<Set<string>>(new Set());
+  const [batchLevelTarget, setBatchLevelTarget] = useState<number>(1);
+
+  // Rift bonus state
+  const [riftBonusRound, setRiftBonusRound] = useState(0);
+  const [riftSelectedBonuses, setRiftSelectedBonuses] = useState<string[]>([]);
+  const [riftCurrentBonuses, setRiftCurrentBonuses] = useState<Array<{ id: string; name: string; description: string; rarity: 'common' | 'rare' | 'epic' | 'legendary' }>>([]);
+
+  // Timer tick for expedition countdown display
+  const [timerTick, setTimerTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -1004,6 +1024,16 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       score: betaLeaderboardRows.playerBoardScore,
     });
   }, [eventsOpen, betaLeaderboardRows.myRank, betaLeaderboardRows.playerBoardScore]);
+
+  // Manage expedition queue timer display (ticks every second to update countdown display)
+  useEffect(() => {
+    if (state.expeditionQueue.length === 0) return;
+    const timer = setInterval(() => {
+      setTimerTick(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [state.expeditionQueue]);
+
 
   const isBossImminent = state.wave % 10 >= 8;
   const burstCost = 20;
@@ -2947,6 +2977,265 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     </View>
                   </View>
                 ))}
+              </View>
+            )}
+          </View>
+        )}
+
+        {tab === 'guildhall' && (
+          <View style={styles.guildhallTab}>
+            <Text style={styles.sectionTitle}>⚔️ Guild Headquarters</Text>
+            {renderSubTabBar((['batch', 'facilities', 'expeditions'] as const).map(st => ({
+              id: st,
+              label: st === 'batch' ? 'Batch Level' : st === 'facilities' ? 'Facilities' : 'Expeditions',
+              active: guildhallSubTab === st,
+              onPress: () => setGuildhallSubTab(st),
+            })))}
+
+            {/* BATCH LEVELING TAB */}
+            {guildhallSubTab === 'batch' && (
+              <View style={styles.batchLevelingSection}>
+                <Text style={styles.batchLevelTitle}>📚 Level Multiple Heroes at Once</Text>
+                <View style={styles.batchLevelControls}>
+                  <View style={styles.targetLevelControl}>
+                    <Text style={styles.targetLevelLabel}>Target Level: </Text>
+                    <View style={styles.targetLevelButtons}>
+                      {[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(level => (
+                        <Pressable
+                          key={level}
+                          style={[styles.levelBtn, batchLevelTarget === level && styles.levelBtnActive]}
+                          onPress={() => setBatchLevelTarget(level)}
+                        >
+                          <Text style={[styles.levelBtnText, batchLevelTarget === level && styles.levelBtnTextActive]}>{level}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+
+                <Text style={styles.selectHeroesLabel}>Select Heroes to Level</Text>
+                <ScrollView style={styles.batchHeroList} nestedScrollEnabled>
+                  {state.heroRoster.map(hero => {
+                    const isSelected = batchLevelSelected.has(hero.uid);
+                    const maxLevel = HERO_LEVEL_CAP;
+                    if (hero.level >= batchLevelTarget) return null;
+
+                    const costsForLevels: number[] = [];
+                    let totalCost = 0;
+                    for (let lvl = hero.level; lvl < Math.min(batchLevelTarget, maxLevel); lvl++) {
+                      const cost = getHeroGoldLevelCost(lvl);
+                      costsForLevels.push(cost);
+                      totalCost += cost;
+                    }
+
+                    return (
+                      <Pressable
+                        key={hero.uid}
+                        style={[styles.batchHeroCard, isSelected && styles.batchHeroCardSelected]}
+                        onPress={() => {
+                          const updated = new Set(batchLevelSelected);
+                          if (updated.has(hero.uid)) {
+                            updated.delete(hero.uid);
+                          } else {
+                            updated.add(hero.uid);
+                          }
+                          setBatchLevelSelected(updated);
+                        }}
+                      >
+                        <View style={styles.batchHeroCheckbox}>
+                          {isSelected && <View style={styles.batchHeroCheckboxInner} />}
+                        </View>
+                        <View style={styles.batchHeroInfo}>
+                          <Text style={styles.batchHeroName}>{hero.emoji} {hero.name}</Text>
+                          <Text style={styles.batchHeroLevel}>Level {hero.level} → {Math.min(batchLevelTarget, maxLevel)}</Text>
+                          <Text style={styles.batchHerosCost}>Cost: {fmt(totalCost)} 💰</Text>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+
+                {batchLevelSelected.size > 0 && (
+                  <Pressable
+                    style={styles.batchLevelConfirmBtn}
+                    onPress={() => {
+                      batchLevelHeroes(Array.from(batchLevelSelected), batchLevelTarget);
+                      setBatchLevelSelected(new Set());
+                    }}
+                  >
+                    <Text style={styles.batchLevelConfirmText}>Level {batchLevelSelected.size} Heroes</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
+
+            {/* FACILITIES TAB */}
+            {guildhallSubTab === 'facilities' && (
+              <View style={styles.facilitiesSection}>
+                <Text style={styles.facilitiesTitle}>🏰 Guild Facilities</Text>
+                <Text style={styles.facilitiesDesc}>Invest gold in permanent facilities to gain passive bonuses</Text>
+
+                {(['training', 'treasury', 'forge', 'tactics'] as const).map(facility => {
+                  const level = state.guildhallFacilities[facility].level;
+                  const costs: Record<string, number[]> = {
+                    training: [5000, 12000, 30000, 75000, 150000, 300000],
+                    treasury: [4000, 10000, 25000, 60000, 120000, 250000],
+                    forge: [6000, 15000, 40000, 90000, 180000, 350000],
+                    tactics: [5000, 12000, 30000, 75000, 150000, 300000],
+                  };
+
+                  const nextCost = costs[facility][level];
+                  const canUpgrade = level < 5 && state.gold >= nextCost;
+                  const bonuses: Record<string, string[]> = {
+                    training: ['+5% XP gain', '+10% XP gain', '+15% XP gain', '+20% XP gain', '+25% XP gain'],
+                    treasury: ['+2% gold gain', '+4% gold gain', '+6% gold gain', '+8% gold gain', '+10% gold gain'],
+                    forge: ['+3% gear rarity', '+6% gear rarity', '+9% gear rarity', '+12% gear rarity', '+15% gear rarity'],
+                    tactics: ['+1% team power', '+2% team power', '+3% team power', '+4% team power', '+5% team power'],
+                  };
+
+                  const icons = { training: '📚', treasury: '💰', forge: '⚒️', tactics: '🎯' };
+
+                  return (
+                    <View key={facility} style={styles.facilityCard}>
+                      <View style={styles.facilityHeader}>
+                        <Text style={styles.facilityName}>{icons[facility]} {facility === 'training' ? 'Training Hall' : facility === 'treasury' ? 'Treasury' : facility === 'forge' ? 'Equipment Forge' : 'Tactics Room'}</Text>
+                        <Text style={styles.facilityLevel}>Level {level}/5</Text>
+                      </View>
+
+                      <View style={styles.facilityBonusBar}>
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <View
+                            key={i}
+                            style={[
+                              styles.facilityBonusSegment,
+                              i < level && styles.facilityBonusSegmentActive,
+                            ]}
+                          />
+                        ))}
+                      </View>
+
+                      {level > 0 && (
+                        <Text style={styles.facilityBonusText}>Current: {bonuses[facility][level - 1]}</Text>
+                      )}
+                      {level < 5 && (
+                        <Text style={styles.facilityNextBonus}>Next: {bonuses[facility][level]}</Text>
+                      )}
+
+                      {level < 5 ? (
+                        <Pressable
+                          style={[styles.facilityUpgradeBtn, !canUpgrade && styles.facilityUpgradeBtnDisabled]}
+                          disabled={!canUpgrade}
+                          onPress={() => upgradeFacility(facility)}
+                        >
+                          <Text style={styles.facilityUpgradeBtnText}>Upgrade • {fmt(nextCost)} 💰</Text>
+                        </Pressable>
+                      ) : (
+                        <View style={[styles.facilityUpgradeBtn, styles.facilityUpgradeBtnMaxed]}>
+                          <Text style={styles.facilityUpgradeBtnText}>Maxed</Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* EXPEDITIONS TAB */}
+            {guildhallSubTab === 'expeditions' && (
+              <View style={styles.expeditionsSection}>
+                <Text style={styles.expeditionsTitle}>🗺️ Expeditions</Text>
+                <Text style={styles.expeditionsDesc}>Send parties on time-gated expeditions for rewards</Text>
+
+                {state.expeditionQueue.length > 0 && (
+                  <View style={styles.expeditionQueueSection}>
+                    <Text style={styles.expeditionQueueTitle}>Active Expeditions</Text>
+                    {state.expeditionQueue.map(exp => {
+                      const elapsed = Date.now() - exp.startTime;
+                      const remaining = Math.max(0, exp.durationMs - elapsed);
+                      const progress = (elapsed / exp.durationMs) * 100;
+                      const isComplete = remaining <= 0;
+
+                      return (
+                        <View key={exp.id} style={styles.expeditionQueueCard}>
+                          <Text style={styles.expeditionQueueName}>
+                            {exp.type === 'artifact' && '🗿'}
+                            {exp.type === 'merchant' && '🏪'}
+                            {exp.type === 'ruins' && '🏛️'}
+                            {exp.type === 'vault' && '🔐'}
+                            {exp.type === 'abyss' && '🌑'}
+                            {' '}{exp.type.charAt(0).toUpperCase() + exp.type.slice(1)} • {exp.rarity}
+                          </Text>
+
+                          <View style={styles.expeditionProgressBg}>
+                            <View style={[styles.expeditionProgressFill, { width: `${Math.min(100, progress)}%` }]} />
+                          </View>
+
+                          <Text style={styles.expeditionTimeRemaining}>
+                            {isComplete ? '✓ Ready to claim' : `${Math.ceil(remaining / 1000)}s remaining`}
+                          </Text>
+
+                          {isComplete && (
+                            <Pressable
+                              style={styles.expeditionClaimBtn}
+                              onPress={() => {
+                                completeExpedition(exp.id);
+                                queueReward({
+                                  id: `expedition_${exp.id}`,
+                                  kind: 'system',
+                                  title: 'Expedition Complete',
+                                  detail: `${exp.type} expedition returned: +${exp.reward.diamonds} 💎, +${exp.reward.shards} ✨${exp.reward.essence > 0 ? `, +${exp.reward.essence} ⚡` : ''}`,
+                                });
+                              }}
+                            >
+                              <Text style={styles.expeditionClaimBtnText}>Claim Rewards</Text>
+                            </Pressable>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+
+                <View style={styles.expeditionStartSection}>
+                  <Text style={styles.expeditionStartTitle}>Launch Expedition</Text>
+                  {(['artifact', 'merchant', 'ruins', 'vault', 'abyss'] as const).map(type => {
+                    const today = Math.floor(Date.now() / 86_400_000);
+                    const lastDay = state.lastExpeditionDay[type];
+                    const canStart = lastDay !== today;
+
+                    const configs = {
+                      artifact: { icon: '🗿', name: 'Artifact Hunt', rarity: 'rare', cost: '1,500', time: '30s', rewards: '+50💎 +200✨' },
+                      merchant: { icon: '🏪', name: 'Merchant Convoy', rarity: 'common', cost: '800', time: '15s', rewards: '+30💎 +100✨' },
+                      ruins: { icon: '🏛️', name: 'Ancient Ruins', rarity: 'epic', cost: '2,500', time: '45s', rewards: '+80💎 +350✨ +1⚡' },
+                      vault: { icon: '🔐', name: 'Vault Heist', rarity: 'legendary', cost: '4,000', time: '60s', rewards: '+120💎 +500✨ +2⚡' },
+                      abyss: { icon: '🌑', name: 'Abyss Dive', rarity: 'godly', cost: '6,500', time: '90s', rewards: '+180💎 +750✨ +3⚡' },
+                    };
+                    const cfg = configs[type];
+
+                    return (
+                      <Pressable
+                        key={type}
+                        style={[styles.expeditionStartCard, !canStart && styles.expeditionStartCardDisabled]}
+                        disabled={!canStart}
+                        onPress={() => startExpedition(type)}
+                      >
+                        <View style={styles.expeditionStartCardLeft}>
+                          <Text style={styles.expeditionStartCardName}>{cfg.icon} {cfg.name}</Text>
+                          <Text style={styles.expeditionStartCardMeta}>{cfg.rarity} • {cfg.time}</Text>
+                          <Text style={styles.expeditionStartCardRewards}>{cfg.rewards}</Text>
+                        </View>
+                        <View style={styles.expeditionStartCardRight}>
+                          <Text style={[styles.expeditionStartCardCost, !canStart && styles.expeditionStartCardCostDisabled]}>
+                            {cfg.cost} 💰
+                          </Text>
+                          <Text style={[styles.expeditionStartCardStatus,  !canStart && styles.expeditionStartCardStatusDisabled]}>
+                            {canStart ? 'Available' : 'Done'}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
             )}
           </View>
@@ -8040,5 +8329,343 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#000',
+  },
+
+  // Guild Hall Tab
+  guildhallTab: {
+    padding: 12,
+    gap: 16,
+  },
+  batchLevelingSection: {
+    gap: 12,
+  },
+  batchLevelTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#D9ECFF',
+    marginBottom: 8,
+  },
+  batchLevelControls: {
+    gap: 8,
+  },
+  targetLevelControl: {
+    gap: 8,
+  },
+  targetLevelLabel: {
+    fontSize: 12,
+    color: '#A9C0E8',
+    fontWeight: '700',
+  },
+  targetLevelButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  levelBtn: {
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#4A6FA5',
+    backgroundColor: '#1A2F47',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  levelBtnActive: {
+    backgroundColor: '#6DDB7B',
+    borderColor: '#6DDB7B',
+  },
+  levelBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#A9C0E8',
+  },
+  levelBtnTextActive: {
+    color: '#000',
+  },
+  selectHeroesLabel: {
+    fontSize: 12,
+    color: '#A9C0E8',
+    fontWeight: '700',
+  },
+  batchHeroList: {
+    maxHeight: 280,
+    gap: 8,
+  },
+  batchHeroCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#31506A',
+    backgroundColor: '#101C2A',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    gap: 10,
+  },
+  batchHeroCardSelected: {
+    borderColor: '#6DDB7B',
+    backgroundColor: 'rgba(109, 219, 123, 0.08)',
+  },
+  batchHeroCheckbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#4A6FA5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  batchHeroCheckboxInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 2,
+    backgroundColor: '#6DDB7B',
+  },
+  batchHeroInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  batchHeroName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#D9ECFF',
+  },
+  batchHeroLevel: {
+    fontSize: 11,
+    color: '#A9C0E8',
+  },
+  batchHerosCost: {
+    fontSize: 11,
+    color: '#FFD700',
+    fontWeight: '700',
+  },
+  batchLevelConfirmBtn: {
+    backgroundColor: '#6DDB7B',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  batchLevelConfirmText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#000',
+  },
+
+  // Facilities Tab
+  facilitiesSection: {
+    gap: 12,
+  },
+  facilitiesTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#D9ECFF',
+    marginBottom: 4,
+  },
+  facilitiesDesc: {
+    fontSize: 11,
+    color: '#9CDEC0',
+    marginBottom: 8,
+  },
+  facilityCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#31506A',
+    backgroundColor: '#101C2A',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    gap: 8,
+    marginBottom: 8,
+  },
+  facilityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  facilityName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#D9ECFF',
+    flex: 1,
+  },
+  facilityLevel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#A9C0E8',
+  },
+  facilityBonusBar: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  facilityBonusSegment: {
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#21364A',
+  },
+  facilityBonusSegmentActive: {
+    backgroundColor: '#6DDB7B',
+  },
+  facilityBonusText: {
+    fontSize: 11,
+    color: '#9CDEC0',
+    fontWeight: '600',
+  },
+  facilityNextBonus: {
+    fontSize: 10,
+    color: '#7FC39F',
+    fontStyle: 'italic',
+  },
+  facilityUpgradeBtn: {
+    backgroundColor: '#4A6FA5',
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+  },
+  facilityUpgradeBtnDisabled: {
+    backgroundColor: '#1A2F47',
+    opacity: 0.5,
+  },
+  facilityUpgradeBtnMaxed: {
+    backgroundColor: '#1A2F47',
+  },
+  facilityUpgradeBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#D9ECFF',
+  },
+
+  // Expeditions Tab
+  expeditionsSection: {
+    gap: 12,
+  },
+  expeditionsTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#D9ECFF',
+    marginBottom: 4,
+  },
+  expeditionsDesc: {
+    fontSize: 11,
+    color: '#9CDEC0',
+    marginBottom: 8,
+  },
+  expeditionQueueSection: {
+    gap: 8,
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#31506A',
+  },
+  expeditionQueueTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#A9C0E8',
+  },
+  expeditionQueueCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#5D88AD',
+    backgroundColor: '#0D1A27',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    gap: 8,
+  },
+  expeditionQueueName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#D9ECFF',
+  },
+  expeditionProgressBg: {
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#1A2F47',
+    overflow: 'hidden',
+  },
+  expeditionProgressFill: {
+    height: '100%',
+    borderRadius: 6,
+    backgroundColor: '#6DDB7B',
+  },
+  expeditionTimeRemaining: {
+    fontSize: 11,
+    color: '#A9C0E8',
+    fontWeight: '600',
+  },
+  expeditionClaimBtn: {
+    backgroundColor: '#6DDB7B',
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  expeditionClaimBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#000',
+  },
+  expeditionStartSection: {
+    gap: 8,
+  },
+  expeditionStartTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#A9C0E8',
+  },
+  expeditionStartCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#31506A',
+    backgroundColor: '#101C2A',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+  },
+  expeditionStartCardDisabled: {
+    opacity: 0.5,
+  },
+  expeditionStartCardLeft: {
+    flex: 1,
+    gap: 2,
+  },
+  expeditionStartCardName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#D9ECFF',
+  },
+  expeditionStartCardMeta: {
+    fontSize: 10,
+    color: '#A9C0E8',
+  },
+  expeditionStartCardRewards: {
+    fontSize: 10,
+    color: '#FFD700',
+    fontWeight: '600',
+  },
+  expeditionStartCardRight: {
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  expeditionStartCardCost: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFD700',
+  },
+  expeditionStartCardCostDisabled: {
+    color: '#7F6B47',
+  },
+  expeditionStartCardStatus: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#6DDB7B',
+  },
+  expeditionStartCardStatusDisabled: {
+    color: '#7F6B47',
   },
 });
