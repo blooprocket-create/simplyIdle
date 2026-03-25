@@ -144,6 +144,7 @@ export interface GameState {
   totalSummons: number;
   firstSummonGiven: boolean;  // track if free summon given on first kill
   freeSummonCharges: number;
+  bossTears: number;  // drops 1 per boss kill; used as the gacha summon currency
   heroShards: number;  // currency used to rank up heroes
   essence: number;
   rebirthCores: number;
@@ -243,6 +244,7 @@ const DEFAULT_STATE: GameState = {
   totalSummons: 0,
   firstSummonGiven: false,
   freeSummonCharges: 0,
+  bossTears: 0,
   heroShards: 0,
   essence: 0,
   rebirthCores: 0,
@@ -559,11 +561,9 @@ function maybeAutoRecycleBackground(state: GameState): GameState {
 function maybeAutoSummonTick(state: GameState): GameState {
   if (!state.autoSummonEnabled) return state;
   if (state.autoSummonCooldownMs > 0) return state;
-
-  const availableGold = Math.max(0, state.gold - state.autoSummonReserveGold);
   const trySingle = (): GameState | null => {
     const canUseFree = state.freeSummonCharges > 0;
-    if (!canUseFree && availableGold < GACHA_SUMMON_COST) return null;
+    if (!canUseFree && state.bossTears < 1) return null;
 
     const template = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
     const roll = rollRarityWithPity(state.gachaPityCounter);
@@ -588,7 +588,7 @@ function maybeAutoSummonTick(state: GameState): GameState {
     };
     let nextState = withAchievement(progressTutorial({
       ...state,
-      gold: canUseFree ? state.gold : state.gold - GACHA_SUMMON_COST,
+      bossTears: canUseFree ? state.bossTears : state.bossTears - 1,
       heroRoster: [hero, ...state.heroRoster],
       summonHistory: [historyEntry, ...state.summonHistory].slice(0, 60),
       totalSummons: state.totalSummons + 1,
@@ -604,8 +604,7 @@ function maybeAutoSummonTick(state: GameState): GameState {
     const totalPulls = 10;
     const freeUses = Math.min(state.freeSummonCharges, totalPulls);
     const paidUses = totalPulls - freeUses;
-    const totalCost = paidUses * GACHA_SUMMON_COST;
-    if (availableGold < totalCost) return null;
+    if (state.bossTears < paidUses) return null;
 
     const summoned: HeroUnit[] = [];
     const historyBatch: SummonHistoryEntry[] = [];
@@ -638,7 +637,7 @@ function maybeAutoSummonTick(state: GameState): GameState {
 
     let nextState = withAchievement(progressTutorial({
       ...state,
-      gold: state.gold - totalCost,
+      bossTears: state.bossTears - paidUses,
       heroRoster: [...summoned, ...state.heroRoster],
       summonHistory: [...historyBatch, ...state.summonHistory].slice(0, 60),
       totalSummons: state.totalSummons + totalPulls,
@@ -1260,6 +1259,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     totalSummons: clampInt(payload.totalSummons, 0, SAFE_INTEGER_CAP, 0),
     firstSummonGiven: clampBoolean(payload.firstSummonGiven, false),
     freeSummonCharges: clampInt(payload.freeSummonCharges, 0, SAFE_INTEGER_CAP, 0),
+    bossTears: clampInt(payload.bossTears, 0, SAFE_INTEGER_CAP, 0),
     heroShards: clampInt(payload.heroShards, 0, SAFE_INTEGER_CAP, 0),
     essence: clampInt(payload.essence, 0, SAFE_INTEGER_CAP, 0),
     rebirthCores: clampInt(payload.rebirthCores, 0, SAFE_INTEGER_CAP, 0),
@@ -1603,6 +1603,7 @@ function killMonster(state: GameState): GameState {
   }
 
   if (isBoss) {
+    newState = { ...newState, bossTears: newState.bossTears + 1 };
     newState = queueReward(newState, {
       id: `boss_stinger_${Date.now()}`,
       kind: 'system',
@@ -1629,6 +1630,7 @@ function killMonster(state: GameState): GameState {
       detail: `+${essenceReward} essence`,
     });
     newState = queueCombatLog(newState, `Boss reward: +${essenceReward} essence`);
+    newState = queueCombatLog(newState, `Boss drop: +1 Boss Tear 💧`);
   }
 
   return withAchievement(progressTutorial(newState));
@@ -1919,7 +1921,7 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'SUMMON_HERO': {
       const canUseFree = state.freeSummonCharges > 0;
-      if (!canUseFree && state.gold < GACHA_SUMMON_COST) return state;
+      if (!canUseFree && state.bossTears < 1) return state;
 
       const template = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
       const roll = rollRarityWithPity(state.gachaPityCounter);
@@ -1946,7 +1948,7 @@ function reducer(state: GameState, action: Action): GameState {
 
       let nextState = withAchievement(progressTutorial({
         ...state,
-        gold: canUseFree ? state.gold : state.gold - GACHA_SUMMON_COST,
+        bossTears: canUseFree ? state.bossTears : state.bossTears - 1,
         heroRoster: [hero, ...state.heroRoster],
         summonHistory: [historyEntry, ...state.summonHistory].slice(0, 60),
         totalSummons: state.totalSummons + 1,
@@ -1968,8 +1970,7 @@ function reducer(state: GameState, action: Action): GameState {
       const totalPulls = 10;
       const freeUses = Math.min(state.freeSummonCharges, totalPulls);
       const paidUses = totalPulls - freeUses;
-      const totalCost = paidUses * GACHA_SUMMON_COST;
-      if (state.gold < totalCost) return state;
+      if (state.bossTears < paidUses) return state;
 
       const summoned: HeroUnit[] = [];
       const historyBatch: SummonHistoryEntry[] = [];
@@ -2004,7 +2005,7 @@ function reducer(state: GameState, action: Action): GameState {
 
       let nextState = withAchievement(progressTutorial({
         ...state,
-        gold: state.gold - totalCost,
+        bossTears: state.bossTears - paidUses,
         heroRoster: [...summoned, ...state.heroRoster],
         summonHistory: [...historyBatch, ...state.summonHistory].slice(0, 60),
         totalSummons: state.totalSummons + totalPulls,
@@ -2838,6 +2839,7 @@ interface SaveData {
   firstSummonGiven: boolean;
   freeSummonCharges: number;
   heroShards: number;
+    bossTears: number;
   essence: number;
   rebirthCores: number;
   rebirthDamagePath: number;
@@ -2920,6 +2922,7 @@ function serialize(state: GameState): SaveData {
     totalSummons: state.totalSummons,
     firstSummonGiven: state.firstSummonGiven,
     freeSummonCharges: state.freeSummonCharges,
+    bossTears: state.bossTears,
     heroShards: state.heroShards,
     essence: state.essence,
     rebirthCores: state.rebirthCores,

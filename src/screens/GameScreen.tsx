@@ -324,9 +324,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     [state.usableItemCounts],
   );
 
-  const canGachaOnce = state.freeSummonCharges > 0 || state.gold >= GACHA_SUMMON_COST;
-  const gachaX10Cost = Math.max(0, 10 - state.freeSummonCharges) * GACHA_SUMMON_COST;
-  const canGachaX10 = state.freeSummonCharges >= 10 || state.gold >= gachaX10Cost;
+  // Boss Tears is the real summon currency; gold cost line kept for reference in tooltips
+  const paidSingles = state.freeSummonCharges > 0 ? 0 : 1;
+  const canGachaOnce = state.freeSummonCharges > 0 || state.bossTears >= 1;
+  const paidX10 = Math.max(0, 10 - state.freeSummonCharges);
+  const canGachaX10 = state.freeSummonCharges >= 10 || state.bossTears >= paidX10;
   const pityRemaining = Math.max(0, 30 - state.gachaPityCounter);
   const summonTimeline = state.summonHistory.slice(0, 12);
   const hasStatsNotification = state.unspentStatPoints > 0;
@@ -530,6 +532,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const expPct = Math.floor((state.exp / Math.max(1, stats.expNeeded)) * 100);
   const topStatChips = [
     { id: 'gold', label: 'Gold', value: fmt(state.gold) },
+    { id: 'tears', label: 'Tears 💧', value: `${state.bossTears}` },
     { id: 'shards', label: 'Shards', value: fmt(state.heroShards) },
     { id: 'essence', label: 'Essence', value: fmt(state.essence) },
     { id: 'dps', label: 'DPS', value: fmt(stats.dps) },
@@ -1363,6 +1366,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Text style={styles.warPanelStat}>Active Team: {state.activeTeamHeroIds.length}/{ACTIVE_TEAM_SIZE}</Text>
                   <Text style={styles.warPanelStat}>Total Heroes: {state.heroRoster.length}</Text>
                   <Text style={styles.warPanelStat}>Shards: {fmt(state.heroShards)}</Text>
+                                    <Text style={styles.warPanelStat}>Boss Tears: {state.bossTears} 💧 (summon currency)</Text>
                   <View style={styles.warPanelActionRow}>
                     <Pressable style={styles.warPanelActionBtn} onPress={autoEquipBestHeroes}>
                       <Text style={styles.warPanelActionText}>Auto Equip</Text>
@@ -1747,7 +1751,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 {state.freeSummonCharges > 0 ? (
                   <Text style={styles.gachaFree}>Free Summon Ready ({state.freeSummonCharges})</Text>
                 ) : (
-                  <Text style={styles.gachaCost}>Cost: 💰 {fmt(GACHA_SUMMON_COST)}</Text>
+                  <Text style={styles.gachaCost}>Cost: 💧 1 Boss Tear ({state.bossTears} owned)</Text>
                 )}
                 <View style={styles.gachaBtnRow}>
                   <Pressable
@@ -1774,7 +1778,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     onPress={summonHeroX10}
                   >
                     <Text style={[styles.gachaBtnText, styles.gachaBtnTextLight]}>Summon x10</Text>
-                    <Text style={styles.gachaX10Cost}>💰 {fmt(gachaX10Cost)}</Text>
+                    <Text style={styles.gachaX10Cost}>💧 {paidX10} Boss Tears</Text>
                   </Pressable>
                 </View>
                 <View style={styles.rarityInfo}>
