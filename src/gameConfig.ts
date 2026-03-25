@@ -222,7 +222,7 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
 // ── Equipment ──────────────────────────────────────────────────────────────
 
 export type EquipmentSlot = 'weapon' | 'armor' | 'accessory';
-export type EquipmentRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
+export type EquipmentRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic' | 'transcendent';
 
 export type PermanentUnlockId = 'class_passive' | 'advanced_consumables' | 'mythic_equipment';
 
@@ -391,6 +391,7 @@ export const EQUIPMENT_RARITIES: EquipmentRarityConfig[] = [
   { id: 'epic', label: 'Epic', color: '#B66BFF', dropWeight: 11 },
   { id: 'legendary', label: 'Legendary', color: '#FFB347', dropWeight: 3 },
   { id: 'mythic', label: 'Mythic', color: '#FF5B8A', dropWeight: 1 },
+  { id: 'transcendent', label: 'Transcendent', color: '#00D4FF', dropWeight: 0.4 },
 ];
 
 export const EQUIPMENT_CATALOG: EquipmentItem[] = [
@@ -1026,14 +1027,14 @@ export function getMonsterForWave(wave: number): MonsterConfig {
 
 export function getMonsterMaxHp(wave: number): number {
   const isBoss = wave % 10 === 0;
-  const base = Math.floor(30 * Math.pow(1.18, wave - 1));
-  return isBoss ? base * 6 : base;
+  const base = Math.floor(30 * Math.pow(1.14, wave - 1));
+  return isBoss ? base * 5 : base;
 }
 
 export function getMonsterGold(wave: number): number {
   const isBoss = wave % 10 === 0;
-  const base = Math.max(8, Math.floor(8 * Math.pow(1.12, wave - 1)));
-  return isBoss ? base * 6 : base;
+  const base = Math.max(8, Math.floor(8 * Math.pow(1.14, wave - 1)));
+  return isBoss ? base * 7 : base;
 }
 
 export function getMonsterExp(wave: number): number {
@@ -1045,8 +1046,8 @@ export function getMonsterExp(wave: number): number {
 export function getMonsterDamage(wave: number): number {
   // Enemy damage per second based on wave
   const isBoss = wave % 10 === 0;
-  const base = Math.max(0.5, Math.floor(0.8 * Math.pow(1.15, wave - 1)) / 10);
-  return isBoss ? base * 3 : base;
+  const base = Math.max(0.5, Math.floor(0.8 * Math.pow(1.12, wave - 1)) / 10);
+  return isBoss ? base * 2.5 : base;
 }
 
 export function expForLevel(level: number): number {

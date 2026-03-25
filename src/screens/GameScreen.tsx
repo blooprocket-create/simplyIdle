@@ -55,8 +55,8 @@ import AchievementToast from '../components/AchievementToast';
 import RebirthModal from '../components/PrestigeModal';
 
 type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment';
-type HeroesSubTab = 'summon' | 'roster' | 'forge';
-type EquipmentSubTab = 'inventory' | 'craft';
+type HeroesSubTab = 'summon' | 'roster';
+type EquipmentSubTab = 'inventory' | 'craft' | 'forge';
 type AchievementsSubTab = 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex';
 type ShopTab = 'diamond' | 'gold' | 'dollar';
 
@@ -95,7 +95,7 @@ const ACH_BONUS_PER_UNLOCK_PCT = 3;
 const ACH_BONUS_CAP_PCT = 75;
 const FEEDBACK_FORM_URL = 'https://forms.gle/replace-with-your-beta-form';
 const HAS_BETA_FEEDBACK_FORM = !FEEDBACK_FORM_URL.includes('replace-with-your-beta-form');
-const GEAR_RARITY_POINTS: Record<string, number> = { common: 40, rare: 90, epic: 170, legendary: 280, mythic: 430 };
+const GEAR_RARITY_POINTS: Record<string, number> = { common: 40, rare: 90, epic: 170, legendary: 280, mythic: 430, transcendent: 680 };
 const VIP_LEVEL_THRESHOLDS = [0, 50, 150, 350, 700, 1500, 3000, 6500, 15000, 35000, 100000] as const;
 const GOLD_SHOP_OFFERS = [
   { id: 'exp_cache', name: 'Training Cache', desc: '+6 Training Scrolls', cost: 2800 },
@@ -1275,23 +1275,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         </View>
       )}
 
-      <View style={styles.nextStepBanner}>
-        <View style={styles.nextStepHeader}>
-          <Text style={styles.nextStepTitle}>Command Recommendations</Text>
-          <Pressable style={styles.nextStepBtn} onPress={() => onTabChange(nextGuidance.tab)}>
-            <Text style={styles.nextStepBtnText}>Open</Text>
-          </Pressable>
-        </View>
-        <Pressable style={styles.nextStepItem} onPress={() => onTabChange(nextGuidance.tab)}>
-          <View style={styles.nextStepItemTop}>
-            <Text style={styles.nextStepItemIndex}>1</Text>
-            <Text style={styles.nextStepItemTitle}>{nextGuidance.title}</Text>
-          </View>
-          <Text style={styles.nextStepItemDetail}>{nextGuidance.detail}</Text>
+      <View style={styles.nextStepBannerCompact}>
+        <Pressable style={styles.nextStepChipCompact} onPress={() => onTabChange(nextGuidance.tab)}>
+          <Text style={styles.nextStepChipText}>💡 {nextGuidance.title}</Text>
+          <Text style={styles.nextStepChipArrow}>→</Text>
         </Pressable>
-        {extraGuidanceCount > 0 && (
-          <Text style={styles.nextStepMore}>+{extraGuidanceCount} more recommendations available after this action.</Text>
-        )}
+        {extraGuidanceCount > 0 && <Text style={styles.nextStepCompactMore}>+{extraGuidanceCount}</Text>}
       </View>
 
       <ScrollView
@@ -1998,9 +1987,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
         {tab === 'heroes' && (
           <View style={styles.heroesTab}>
-            {renderSubTabBar((['summon', 'roster', 'forge'] as const).map(st => ({
+            {renderSubTabBar((['summon', 'roster'] as const).map(st => ({
               id: st,
-              label: st === 'summon' ? 'Summon Bay' : st === 'roster' ? 'Roster' : 'Forge',
+              label: st === 'summon' ? 'Summon Bay' : 'Roster',
               active: heroesSubTab === st,
               onPress: () => setHeroesSubTab(st),
               disabled: (forceFreeSummonStep && st !== 'summon') || (forceBuildTeamStep && st !== 'roster'),
@@ -2264,62 +2253,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               </>
             )}
 
-            {heroesSubTab === 'forge' && (
-              <>
-                <View style={styles.shardForgeCard}>
-                  <Text style={styles.shardForgeTitle}>Shard Forge</Text>
-                  <Text style={styles.shardForgeDesc}>Spend overflow shards for persistent value and keep the roster economy under control.</Text>
-                  <View style={styles.shardForgeRow}>
-                    <Pressable
-                      style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.essenceCost && styles.shardForgeBtnDisabled]}
-                      disabled={state.heroShards < shardForgeCosts.essenceCost}
-                      onPress={convertShardsToEssence}
-                    >
-                      <Text style={styles.shardForgeBtnText}>Essence • {shardForgeCosts.essenceCost} ✨</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.scrapCost && styles.shardForgeBtnDisabled]}
-                      disabled={state.heroShards < shardForgeCosts.scrapCost}
-                      onPress={convertShardsToScrap}
-                    >
-                      <Text style={styles.shardForgeBtnText}>Scrap • {shardForgeCosts.scrapCost} ✨</Text>
-                    </Pressable>
-                  </View>
-                </View>
-
-                <View style={styles.autoSummonCard}>
-                  <Text style={styles.shardForgeTitle}>Automation</Text>
-                  <Text style={styles.shardForgeDesc}>Tune summon and recycle behavior for longer idle sessions on mobile.</Text>
-                  <View style={styles.autoSummonTopRow}>
-                    <Pressable
-                      style={[styles.autoSummonToggle, state.autoSummonEnabled && styles.autoSummonToggleActive]}
-                      onPress={() => setAutoSummonEnabled(!state.autoSummonEnabled)}
-                    >
-                      <Text style={styles.autoSummonToggleText}>Auto Summon {state.autoSummonEnabled ? 'ON' : 'OFF'}</Text>
-                    </Pressable>
-                    <Pressable style={styles.autoSummonModeBtn} onPress={() => setAutoSummonMode(state.autoSummonMode === 'single' ? 'x10' : 'single')}>
-                      <Text style={styles.autoSummonModeText}>Mode: {state.autoSummonMode === 'single' ? 'Single' : 'x10'}</Text>
-                    </Pressable>
-                  </View>
-                  <Text style={styles.autoSummonReserveText}>Auto summon uses Boss Tears now. No gold reserve required.</Text>
-                </View>
-
-                <View style={styles.recyclePickerWrap}>
-                  <View style={styles.recycleToggleRow}>
-                    <Text style={styles.recycleToggleLabel}>Auto Recycle</Text>
-                    <Pressable
-                      style={[styles.recycleToggleBtn, state.autoRecycleEnabled && styles.recycleToggleBtnActive]}
-                      onPress={() => setAutoRecycleEnabled(!state.autoRecycleEnabled)}
-                    >
-                      <Text style={styles.recycleToggleBtnText}>{state.autoRecycleEnabled ? 'ON' : 'OFF'}</Text>
-                    </Pressable>
-                  </View>
-                  <Text style={styles.recyclePickerLabel}>Current max rarity to recycle automatically</Text>
-                  <Pressable style={styles.recyclePickerBtn} onPress={cycleAutoRecycleRarity}>
-                    <Text style={styles.recyclePickerBtnText}>{state.autoRecycleMaxRarity.toUpperCase()}</Text>
-                  </Pressable>
-                </View>
-              </>
             )}
           </View>
         )}
@@ -2534,9 +2467,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             <View style={styles.equipHeaderRow}>
               <Text style={styles.sectionTitle}>🎒 Equipment Inventory</Text>
             </View>
-            {renderSubTabBar((['inventory', 'craft'] as const).map(st => ({
+            {renderSubTabBar((['inventory', 'craft', 'forge'] as const).map(st => ({
               id: st,
-              label: st === 'inventory' ? 'Inventory' : 'Crafting',
+              label: st === 'inventory' ? 'Inventory' : st === 'craft' ? 'Crafting' : 'Forge',
               active: equipmentSubTab === st,
               onPress: () => setEquipmentSubTab(st),
             })))}
@@ -2660,6 +2593,29 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   </View>
                 );
               })
+            ) : equipmentSubTab === 'forge' ? (
+              <>
+                <View style={styles.shardForgeCard}>
+                  <Text style={styles.shardForgeTitle}>Shard Forge</Text>
+                  <Text style={styles.shardForgeDesc}>Spend overflow shards for persistent value and keep the roster economy under control.</Text>
+                  <View style={styles.shardForgeRow}>
+                    <Pressable
+                      style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.essenceCost && styles.shardForgeBtnDisabled]}
+                      disabled={state.heroShards < shardForgeCosts.essenceCost}
+                      onPress={convertShardsToEssence}
+                    >
+                      <Text style={styles.shardForgeBtnText}>Essence • {shardForgeCosts.essenceCost} ✨</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.scrapCost && styles.shardForgeBtnDisabled]}
+                      disabled={state.heroShards < shardForgeCosts.scrapCost}
+                      onPress={convertShardsToScrap}
+                    >
+                      <Text style={styles.shardForgeBtnText}>Scrap • {shardForgeCosts.scrapCost} ✨</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </>
             ) : (
               <Text style={styles.sectionHelperText}>Select Inventory to manage equipped items and upgrades.</Text>
             )}
@@ -4184,83 +4140,45 @@ const styles = StyleSheet.create({
     color: '#EAF0FF',
     fontWeight: '700',
   },
-  nextStepBanner: {
+  nextStepBannerCompact: {
     marginHorizontal: 12,
-    marginBottom: 8,
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: '#1A2226',
-    borderLeftWidth: 3,
-    borderLeftColor: '#7BD9A8',
-  },
-  nextStepHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  nextStepTitle: {
-    fontSize: 11,
-    color: '#CFFFE4',
-    fontWeight: '700',
-  },
-  nextStepDesc: {
-    fontSize: 10,
-    color: '#A8D8BF',
-    lineHeight: 15,
-  },
-  nextStepItem: {
-    marginTop: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#335646',
-    backgroundColor: '#132A21',
-  },
-  nextStepItemTop: {
+    marginBottom: 6,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 2,
   },
-  nextStepItemIndex: {
-    width: 16,
-    height: 16,
-    textAlign: 'center',
-    lineHeight: 16,
-    borderRadius: 8,
-    overflow: 'hidden',
-    fontSize: 10,
-    color: '#E8FFF3',
-    backgroundColor: '#2D5744',
-    fontWeight: '700',
-  },
-  nextStepItemTitle: {
-    fontSize: 10,
-    color: '#D5FBE9',
-    fontWeight: '700',
-  },
-  nextStepItemDetail: {
-    fontSize: 10,
-    color: '#A6D9C2',
-    lineHeight: 14,
-  },
-  nextStepBtn: {
+  nextStepChipCompact: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: '#1A3B2E',
+    borderWidth: 1,
+    borderColor: '#4BA070',
+  },
+  nextStepChipText: {
+    fontSize: 10,
+    color: '#CFFFE4',
+    fontWeight: '700',
+    flex: 1,
+  },
+  nextStepChipArrow: {
+    fontSize: 11,
+    color: '#7BD9A8',
+    fontWeight: '700',
+    marginLeft: 4,
+  },
+  nextStepCompactMore: {
+    fontSize: 9,
+    color: '#8FA8A0',
+    fontWeight: '600',
+    paddingHorizontal: 6,
     paddingVertical: 4,
     borderRadius: 4,
-    backgroundColor: '#2E5843',
-  },
-  nextStepBtnText: {
-    fontSize: 10,
-    color: '#E3FFEF',
-    fontWeight: '700',
-  },
-  nextStepMore: {
-    marginTop: 5,
-    fontSize: 10,
-    color: '#8FC7AE',
+    backgroundColor: '#14201D',
   },
   metaStripScroll: {
     flexGrow: 0,
