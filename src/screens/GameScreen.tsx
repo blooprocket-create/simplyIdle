@@ -828,6 +828,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   const canCraftWeapon = state.equipmentScrap >= 130;
 
+  const hasWarRoomNotification = canRebirthNow || canPlayDiceToday || canRunRiftToday || (nextTeamSlotUnlock?.canUnlock ?? false);
+  const hasEquipmentNotification = canCraftWeapon || Object.values(state.equippedItems).filter(Boolean).length < 3;
+  const hasAchievementsNotification = hasClaimableRewards;
+
   const optimizeEquipment = () => {
     const slots: EquipmentSlot[] = ['weapon', 'armor', 'accessory'];
     const rarityOrder: Record<string, number> = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4 };
@@ -916,7 +920,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             <View style={styles.tabSignalPill}>
               <Text style={styles.tabSignalText}>{tabSignals[t]}</Text>
             </View>
-            {((t === 'stats' && hasStatsNotification) || (t === 'heroes' && hasGachaNotification)) && (
+            {((t === 'stats' && hasStatsNotification) || (t === 'heroes' && hasGachaNotification) || (t === 'warroom' && hasWarRoomNotification) || (t === 'equipment' && hasEquipmentNotification) || (t === 'achievements' && hasAchievementsNotification)) && (
               <View style={styles.redDot} />
             )}
           </View>
@@ -4638,10 +4642,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#0E1622',
     borderTopWidth: 1,
     borderTopColor: '#2A4055',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    marginTop: 6,
-    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    marginTop: 4,
+    gap: 4,
     zIndex: 1,
   },
   tabBarScroll: {
@@ -4651,9 +4655,9 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
   tabBarCompact: {
-    paddingHorizontal: 8,
-    paddingRight: 14,
-    gap: 8,
+    paddingHorizontal: 4,
+    paddingRight: 10,
+    gap: 6,
   },
   tab: {
     flex: 1,
@@ -4751,11 +4755,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2B4258',
     backgroundColor: '#0C131D',
-    minHeight: '100%',
   },
   tabContentCompact: {
-    marginHorizontal: 6,
-    padding: 10,
+    marginHorizontal: 4,
+    padding: 8,
+    marginBottom: 6,
   },
   tabContentShort: {
     marginBottom: 6,
