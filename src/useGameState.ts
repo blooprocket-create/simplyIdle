@@ -1238,6 +1238,28 @@ function sanitizeStringList(value: unknown, maxItems: number): string[] {
   return sanitized;
 }
 
+function sanitizeIntList(value: unknown, maxItems: number): number[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<number>();
+  const sanitized: number[] = [];
+
+  for (const item of value) {
+    const parsed = typeof item === 'number'
+      ? item
+      : typeof item === 'string'
+        ? Number(item)
+        : NaN;
+    if (!Number.isFinite(parsed)) continue;
+    const intVal = Math.floor(parsed);
+    if (seen.has(intVal)) continue;
+    seen.add(intVal);
+    sanitized.push(intVal);
+    if (sanitized.length >= maxItems) break;
+  }
+
+  return sanitized;
+}
+
 function sanitizeStatAllocation(raw: unknown, level: number): {
   statsAlloc: StatBlock;
   allocatedStatPoints: number;
@@ -1480,10 +1502,8 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     weeklyEventWeek,
     weeklyEventId,
     weeklyKills: clampInt(payload.weeklyKills, 0, SAFE_INTEGER_CAP, 0),
-    weeklyTrackClaimed: sanitizeStringList(payload.weeklyTrackClaimed, WEEKLY_TRACK_MILESTONES.length)
-      .map(value => Number(value))
-      .filter((value): value is number => Number.isFinite(value) && VALID_WEEKLY_TRACK_MILESTONES.has(value))
-      .map(value => Math.floor(value)),
+    weeklyTrackClaimed: sanitizeIntList(payload.weeklyTrackClaimed, WEEKLY_TRACK_MILESTONES.length)
+      .filter(value => VALID_WEEKLY_TRACK_MILESTONES.has(value)),
     claimedMissionIds: sanitizeStringList(payload.claimedMissionIds, VALID_MISSION_IDS.size)
       .filter(id => VALID_MISSION_IDS.has(id)),
     seenHintIds: sanitizeStringList(payload.seenHintIds, MAX_SAVE_LOG_ENTRIES),
