@@ -71,6 +71,13 @@ const MAX_SAVE_PLAYER_LEVEL = 1_000_000;
 const MAX_SAVE_COLLECTION = 500;
 const MAX_SAVE_LOG_ENTRIES = 100;
 const MAX_SAVE_SUMMON_HISTORY = 50;
+const HEAT_BASE_RATE_PER_SEC = 7;
+const HEAT_RECOVERY_RATE_PER_SEC = HEAT_BASE_RATE_PER_SEC * 0.66;
+const HEAT_MAX = 100;
+const PREMIUM_COOLANT_COSTS = {
+  coolant_mk1: 8,
+  coolant_mk2: 18,
+} as const;
 
 const VALID_PLAYER_CLASSES = new Set<PlayerClass>(['warrior', 'berserker', 'archer', 'mage', 'monk']);
 const VALID_RARITIES = new Set<Rarity>(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'godly']);
@@ -120,6 +127,7 @@ export interface GameState {
   characterCreated: boolean;
 
   gold: number;
+  diamonds: number;
   totalGold: number;
   exp: number;
   totalExp: number;
@@ -130,6 +138,7 @@ export interface GameState {
 
   totalKills: number;
   burstCharge: number;  // 0-25; increments on each kill, resets on BURST
+  combatHeat: number;
   wave: number;
   monsterHp: number;
   monsterMaxHp: number;
@@ -221,6 +230,7 @@ const DEFAULT_STATE: GameState = {
   characterCreated: false,
 
   gold: 0,
+  diamonds: 0,
   totalGold: 0,
   exp: 0,
   totalExp: 0,
@@ -231,6 +241,7 @@ const DEFAULT_STATE: GameState = {
 
   totalKills: 0,
   burstCharge: 0,
+  combatHeat: 0,
   wave: 1,
   monsterHp: getMonsterMaxHp(1),
   monsterMaxHp: getMonsterMaxHp(1),
@@ -389,6 +400,7 @@ function progressTutorial(state: GameState, event?: TutorialEvent): GameState {
 
     const quest = TUTORIAL_QUESTS[next.tutorialCurrentQuestIndex];
     const rewardGold = quest.rewardGold ?? 0;
+    const rewardDiamonds = quest.rewardDiamonds ?? 0;
     const nextIndex = next.tutorialCurrentQuestIndex + 1;
 
     next = {
@@ -396,16 +408,17 @@ function progressTutorial(state: GameState, event?: TutorialEvent): GameState {
       tutorialCurrentQuestIndex: nextIndex,
       tutorialCompletedQuestIds: [...next.tutorialCompletedQuestIds, quest.id],
       gold: next.gold + rewardGold,
+      diamonds: next.diamonds + rewardDiamonds,
       totalGold: next.totalGold + rewardGold,
       tutorialEnabled: nextIndex < TUTORIAL_QUESTS.length,
     };
 
-    if (rewardGold > 0) {
+    if (rewardGold > 0 || rewardDiamonds > 0) {
       next = queueReward(next, {
         id: `quest_${quest.id}_${Date.now()}`,
         kind: 'gold',
         title: `Quest Complete: ${quest.title}`,
-        detail: `+${rewardGold} gold`,
+        detail: `+${rewardGold} gold${rewardDiamonds > 0 ? `, +${rewardDiamonds} diamonds` : ''}`,
       });
     }
 
@@ -632,6 +645,35 @@ function decayBuffs(state: GameState, elapsedMs: number): GameState {
     damageReductionBuffPct: nextDrMs > 0 ? state.damageReductionBuffPct : 0,
     autoSummonCooldownMs: nextAutoSummonCd,
   };
+}
+
+function updateCombatHeat(state: GameState, elapsedMs: number): GameState {
+  const seconds = elapsedMs / 1000;
+  if (seconds <= 0) return state;
+
+  let nextHeat = state.combatHeat;
+  if (state.combatTempo === 1) {
+    nextHeat = Math.max(0, state.combatHeat - HEAT_RECOVERY_RATE_PER_SEC * seconds);
+    return { ...state, combatHeat: nextHeat };
+  }
+
+  const buildRate = state.combatTempo === 2 ? HEAT_BASE_RATE_PER_SEC : HEAT_BASE_RATE_PER_SEC * 3;
+  nextHeat = Math.min(HEAT_MAX, state.combatHeat + buildRate * seconds);
+  if (nextHeat >= HEAT_MAX) {
+    const overheated: GameState = {
+      ...state,
+      combatHeat: HEAT_MAX,
+      combatTempo: 1,
+    };
+    return queueReward(queueCombatLog(overheated, 'OVERHEAT! Combat Tempo forced to 1x'), {
+      id: `overheat_${Date.now()}`,
+      kind: 'system',
+      title: 'Overheat Triggered',
+      detail: 'Tempo dropped to 1x. Use coolant or wait for recovery.',
+    });
+  }
+
+  return { ...state, combatHeat: nextHeat };
 }
 
 function maybeAutoRecycleBackground(state: GameState): GameState {
@@ -1348,6 +1390,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     playerClass,
     characterCreated,
     gold: clampInt(payload.gold, 0, SAFE_INTEGER_CAP, 0),
+    diamonds: clampInt(payload.diamonds, 0, SAFE_INTEGER_CAP, 0),
     totalGold: Math.max(clampInt(payload.gold, 0, SAFE_INTEGER_CAP, 0), clampInt(payload.totalGold, 0, SAFE_INTEGER_CAP, 0)),
     exp: clampInt(payload.exp, 0, Math.max(0, expForLevel(level) - 1), 0),
     totalExp: clampInt(payload.totalExp, 0, SAFE_INTEGER_CAP, 0),
@@ -1356,6 +1399,8 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     unspentStatPoints,
     statsAlloc,
     totalKills: clampInt(payload.totalKills, 0, SAFE_INTEGER_CAP, 0),
+    burstCharge: clampInt(payload.burstCharge, 0, 25, 0),
+    combatHeat: clampFloat(payload.combatHeat, 0, HEAT_MAX, 0),
     wave,
     monsterHp,
     monsterMaxHp: maxMonsterHp,
@@ -1536,16 +1581,23 @@ function equipmentScrapValue(rarity: ReturnType<typeof equipmentRarityConfig>['i
 function maybeAutoUsePotion(state: GameState): GameState {
   if (!state.autoUsePotionEnabled) return state;
   if (state.teamMaxHp <= 0) return state;
-  if (state.teamHp / state.teamMaxHp > state.autoUsePotionThresholdPct) return state;
-  const qty = state.usableItemCounts['small_potion'] ?? 0;
-  if (qty <= 0) return state;
+  const hpRatio = state.teamHp / state.teamMaxHp;
+  if (hpRatio > state.autoUsePotionThresholdPct) return state;
 
-  const item = getUsableItem('small_potion');
+  const grandQty = state.usableItemCounts['grand_potion'] ?? 0;
+  const smallQty = state.usableItemCounts['small_potion'] ?? 0;
+  const preferGrand = hpRatio <= state.autoUsePotionThresholdPct * 0.6;
+  const itemId = preferGrand
+    ? (grandQty > 0 ? 'grand_potion' : smallQty > 0 ? 'small_potion' : null)
+    : (smallQty > 0 ? 'small_potion' : grandQty > 0 ? 'grand_potion' : null);
+  if (!itemId) return state;
+
+  const item = getUsableItem(itemId);
   if (!item || item.effect !== 'heal_team_percent') return state;
   const healed = Math.ceil(state.teamMaxHp * item.value);
   return queueReward({
     ...state,
-    usableItemCounts: addUsableItemCount(state.usableItemCounts, 'small_potion', -1),
+    usableItemCounts: addUsableItemCount(state.usableItemCounts, item.id, -1),
     teamHp: Math.min(state.teamMaxHp, state.teamHp + healed),
   }, {
     id: `auto_potion_${Date.now()}`,
@@ -1825,6 +1877,7 @@ type Action =
   | { type: 'SET_AUTO_SUMMON_MODE'; mode: 'single' | 'x10' }
   | { type: 'SET_COMBAT_TEMPO'; tempo: CombatTempo }
   | { type: 'SET_AUTO_SUMMON_RESERVE_GOLD'; reserveGold: number }
+  | { type: 'BUY_PREMIUM_COOLANT'; itemId: 'coolant_mk1' | 'coolant_mk2' }
   | { type: 'USE_USABLE_ITEM'; itemId: string }
   | { type: 'DISMANTLE_EQUIPMENT'; itemId: string }
   | { type: 'CRAFT_EQUIPMENT'; slot: EquipmentSlot }
@@ -1881,6 +1934,7 @@ function reducer(state: GameState, action: Action): GameState {
       const scaledElapsed = action.elapsed * state.combatTempo;
       let working = decayBuffs(state, scaledElapsed);
       working = tickHeroActives(working, scaledElapsed);
+      working = updateCombatHeat(working, action.elapsed);
       const weekly = getCurrentWeeklyEvent(working);
 
       const dps = getDps(working);
@@ -2305,6 +2359,19 @@ function reducer(state: GameState, action: Action): GameState {
         });
       }
 
+      if (item.effect === 'reduce_heat_flat') {
+        const reduced = Math.max(0, nextState.combatHeat - item.value);
+        nextState = queueReward({
+          ...nextState,
+          combatHeat: reduced,
+        }, {
+          id: `use_${item.id}_${Date.now()}`,
+          kind: 'system',
+          title: `Used ${item.emoji} ${item.name}`,
+          detail: `Heat ${Math.ceil(nextState.combatHeat)} -> ${Math.ceil(reduced)}`,
+        });
+      }
+
       return withAchievement(progressTutorial(nextState));
     }
 
@@ -2509,18 +2576,20 @@ function reducer(state: GameState, action: Action): GameState {
       const rewardGold = mission.rewardGold ?? 0;
       const rewardShards = mission.rewardShards ?? 0;
       const rewardEssence = mission.rewardEssence ?? 0;
+      const rewardDiamonds = mission.rewardDiamonds ?? 0;
       return queueReward({
         ...state,
         claimedMissionIds: [...state.claimedMissionIds, mission.id],
         gold: state.gold + rewardGold,
         totalGold: state.totalGold + rewardGold,
+        diamonds: state.diamonds + rewardDiamonds,
         heroShards: state.heroShards + rewardShards,
         essence: state.essence + rewardEssence,
       }, {
         id: `mission_${mission.id}_${Date.now()}`,
         kind: 'system',
         title: `Mission Complete: ${mission.title}`,
-        detail: `+${rewardGold} gold, +${rewardShards} shards, +${rewardEssence} essence`,
+        detail: `+${rewardGold} gold, +${rewardShards} shards, +${rewardEssence} essence${rewardDiamonds > 0 ? `, +${rewardDiamonds} diamonds` : ''}`,
       });
     }
 
@@ -2877,6 +2946,23 @@ function reducer(state: GameState, action: Action): GameState {
       };
     }
 
+    case 'BUY_PREMIUM_COOLANT': {
+      const cost = PREMIUM_COOLANT_COSTS[action.itemId];
+      if (state.diamonds < cost) return state;
+      const item = getUsableItem(action.itemId);
+      if (!item) return state;
+      return queueReward({
+        ...state,
+        diamonds: state.diamonds - cost,
+        usableItemCounts: addUsableItemCount(state.usableItemCounts, action.itemId, 1),
+      }, {
+        id: `buy_${action.itemId}_${Date.now()}`,
+        kind: 'system',
+        title: `Purchased ${item.emoji} ${item.name}`,
+        detail: `-${cost} diamonds`,
+      });
+    }
+
     case 'LOAD': {
       const p = sanitizeSaveData(action.payload);
       return {
@@ -2895,6 +2981,8 @@ function reducer(state: GameState, action: Action): GameState {
         statsAlloc: p.statsAlloc,
 
         totalKills: p.totalKills,
+        burstCharge: p.burstCharge,
+        combatHeat: p.combatHeat,
         wave: p.wave,
         monsterHp: p.monsterHp,
         monsterMaxHp: p.monsterMaxHp,
@@ -2909,6 +2997,8 @@ function reducer(state: GameState, action: Action): GameState {
         totalSummons: p.totalSummons,
         firstSummonGiven: p.firstSummonGiven,
         freeSummonCharges: p.freeSummonCharges,
+        diamonds: p.diamonds,
+        bossTears: p.bossTears,
         heroShards: p.heroShards,
         essence: p.essence,
         rebirthCores: p.rebirthCores,
@@ -2946,6 +3036,7 @@ function reducer(state: GameState, action: Action): GameState {
         autoRecycleEnabled: p.autoRecycleEnabled,
         autoSummonEnabled: p.autoSummonEnabled,
         autoSummonMode: p.autoSummonMode,
+        combatTempo: p.combatTempo === 2 || p.combatTempo === 4 ? p.combatTempo : 1,
         autoSummonReserveGold: p.autoSummonReserveGold,
         autoSummonCooldownMs: 0,
         lastActiveAt: p.lastActiveAt,
@@ -2979,6 +3070,7 @@ interface SaveData {
   characterCreated: boolean;
 
   gold: number;
+  diamonds?: number;
   totalGold: number;
   exp: number;
   totalExp: number;
@@ -2989,6 +3081,8 @@ interface SaveData {
   statsAlloc: StatBlock;
 
   totalKills: number;
+  burstCharge?: number;
+  combatHeat?: number;
   wave: number;
   monsterHp: number;
   teamHp: number;
@@ -3065,6 +3159,7 @@ function serialize(state: GameState): SaveData {
     characterCreated: state.characterCreated,
 
     gold: state.gold,
+    diamonds: state.diamonds,
     totalGold: state.totalGold,
     exp: state.exp,
     totalExp: state.totalExp,
@@ -3074,6 +3169,8 @@ function serialize(state: GameState): SaveData {
     statsAlloc: state.statsAlloc,
 
     totalKills: state.totalKills,
+    burstCharge: state.burstCharge,
+    combatHeat: state.combatHeat,
     wave: state.wave,
     monsterHp: state.monsterHp,
     teamHp: state.teamHp,
@@ -3343,6 +3440,9 @@ export function useGameState(saveSlot: string = 'default') {
   const setAutoSummonReserveGold = useCallback((reserveGold: number) => {
     dispatch({ type: 'SET_AUTO_SUMMON_RESERVE_GOLD', reserveGold });
   }, []);
+  const buyPremiumCoolant = useCallback((itemId: 'coolant_mk1' | 'coolant_mk2') => {
+    dispatch({ type: 'BUY_PREMIUM_COOLANT', itemId });
+  }, []);
   const spendEssenceUpgrade = useCallback((path: 'damage' | 'economy' | 'survival') => {
     dispatch({ type: 'SPEND_ESSENCE_UPGRADE', path });
   }, []);
@@ -3444,6 +3544,7 @@ export function useGameState(saveSlot: string = 'default') {
     setAutoSummonMode,
     setCombatTempo,
     setAutoSummonReserveGold,
+    buyPremiumCoolant,
     spendEssenceUpgrade,
     claimWeeklyTrack,
     claimMission,

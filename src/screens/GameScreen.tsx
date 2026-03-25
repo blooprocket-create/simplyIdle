@@ -148,6 +148,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setAutoSummonEnabled,
     setAutoSummonMode,
     setCombatTempo,
+    buyPremiumCoolant,
     spendEssenceUpgrade,
     claimWeeklyTrack,
     claimMission,
@@ -530,6 +531,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const expPct = Math.floor((state.exp / Math.max(1, stats.expNeeded)) * 100);
   const topStatChips = [
     { id: 'gold', label: 'Gold', value: fmt(state.gold) },
+    { id: 'diamonds', label: 'Diamonds 💎', value: `${state.diamonds}` },
     { id: 'tears', label: 'Tears 💧', value: `${state.bossTears}` },
     { id: 'shards', label: 'Shards', value: fmt(state.heroShards) },
     { id: 'essence', label: 'Essence', value: fmt(state.essence) },
@@ -1137,7 +1139,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             {isBossImminent && !isBoss && <Text style={styles.bossImminentText}>⚠️ Boss Approaching</Text>}
             <Text style={styles.monsterEmoji}>{monster.emoji}</Text>
             <Text style={styles.monsterName}>{monster.name}</Text>
-            <View style={styles.hpBarBg}>
+            <View style={styles.monsterHpBarBg}>
               <View
                 style={[
                   styles.hpBarFill,
@@ -1510,6 +1512,18 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 </View>
               </View>
               <Text style={styles.battleTempoHint}>Higher tempo speeds up passive combat and burst payout.</Text>
+              <Text style={styles.battleTempoHint}>Heat: {Math.ceil(state.combatHeat)}/{100} {state.combatTempo > 1 ? '(building)' : '(recovering)'}</Text>
+              <View style={styles.hpBarBg}>
+                <View
+                  style={[
+                    styles.hpBarFill,
+                    {
+                      width: `${Math.min(100, Math.max(0, state.combatHeat))}%`,
+                      backgroundColor: state.combatHeat >= 85 ? '#FF5B5B' : state.combatHeat >= 55 ? '#FFB347' : '#64D39D',
+                    },
+                  ]}
+                />
+              </View>
               <View style={styles.burstRow}>
                 <View style={styles.burstInfo}>
                   <Text style={styles.burstTitle}>Burst Gauge</Text>
@@ -1533,6 +1547,38 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <View style={[styles.hpBarFill, { width: `${burstChargePct}%`, backgroundColor: '#FFB347' }]} />
               </View>
               <Text style={styles.burstHint}>{canBurst ? 'Burst ready: cash in now for a wave skip push.' : `${25 - state.burstCharge} kills to next burst`}</Text>
+              <View style={styles.heatStoreRow}>
+                <Pressable
+                  style={[styles.heatStoreBtn, state.diamonds < 8 && styles.heatStoreBtnDisabled]}
+                  disabled={state.diamonds < 8}
+                  onPress={() => buyPremiumCoolant('coolant_mk1')}
+                >
+                  <Text style={styles.heatStoreBtnText}>Buy 🧊 x1 (8💎)</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.heatStoreBtn, state.diamonds < 18 && styles.heatStoreBtnDisabled]}
+                  disabled={state.diamonds < 18}
+                  onPress={() => buyPremiumCoolant('coolant_mk2')}
+                >
+                  <Text style={styles.heatStoreBtnText}>Buy ❄️ x1 (18💎)</Text>
+                </Pressable>
+              </View>
+              <View style={styles.heatStoreRow}>
+                <Pressable
+                  style={[styles.heatUseBtn, (state.usableItemCounts['coolant_mk1'] ?? 0) <= 0 && styles.heatStoreBtnDisabled]}
+                  disabled={(state.usableItemCounts['coolant_mk1'] ?? 0) <= 0}
+                  onPress={() => useUsableItem('coolant_mk1')}
+                >
+                  <Text style={styles.heatStoreBtnText}>Use 🧊 ({state.usableItemCounts['coolant_mk1'] ?? 0})</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.heatUseBtn, (state.usableItemCounts['coolant_mk2'] ?? 0) <= 0 && styles.heatStoreBtnDisabled]}
+                  disabled={(state.usableItemCounts['coolant_mk2'] ?? 0) <= 0}
+                  onPress={() => useUsableItem('coolant_mk2')}
+                >
+                  <Text style={styles.heatStoreBtnText}>Use ❄️ ({state.usableItemCounts['coolant_mk2'] ?? 0})</Text>
+                </Pressable>
+              </View>
             </View>
 
             <View style={styles.battleSection}>
@@ -3834,6 +3880,15 @@ const styles = StyleSheet.create({
     borderBottomColor: '#2A2A4A',
     marginBottom: 8,
   },
+  monsterHpBarBg: {
+    width: '88%',
+    maxWidth: 460,
+    height: 18,
+    backgroundColor: '#2A2A4A',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginTop: 6,
+  },
   waveLabel: {
     fontSize: 12,
     fontWeight: '600',
@@ -4443,6 +4498,36 @@ const styles = StyleSheet.create({
   burstHint: {
     fontSize: 10,
     color: '#E4CFA8',
+  },
+  heatStoreRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  heatStoreBtn: {
+    flex: 1,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#6FA6E0',
+    backgroundColor: '#1E3956',
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  heatUseBtn: {
+    flex: 1,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#7BBE9B',
+    backgroundColor: '#1E4D3B',
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  heatStoreBtnDisabled: {
+    opacity: 0.45,
+  },
+  heatStoreBtnText: {
+    fontSize: 10,
+    color: '#EAF3FF',
+    fontWeight: '700',
   },
   burstBtn: {
     borderRadius: 5,

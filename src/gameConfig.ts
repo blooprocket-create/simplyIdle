@@ -145,6 +145,7 @@ export interface TutorialQuest {
   description: string;
   targetTab: GameTab;
   rewardGold?: number;
+  rewardDiamonds?: number;
   requiredEvent?: TutorialEvent;
   requiredState?: {
     minKills?: number;
@@ -163,6 +164,7 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
     targetTab: 'battle',
     requiredState: { minKills: 1 },
     rewardGold: 500,
+    rewardDiamonds: 2,
   },
   {
     id: 'q_open_heroes',
@@ -213,6 +215,7 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
     targetTab: 'battle',
     requiredState: { minWave: 5 },
     rewardGold: 300,
+    rewardDiamonds: 3,
   },
 ];
 
@@ -519,7 +522,7 @@ export function getStarterEquipmentForClass(playerClass: PlayerClass): string[] 
     .filter((id): id is string => !!id);
 }
 
-export type UsableItemEffect = 'heal_team_percent' | 'gain_gold_flat' | 'gain_exp_flat' | 'gain_shards_flat';
+export type UsableItemEffect = 'heal_team_percent' | 'gain_gold_flat' | 'gain_exp_flat' | 'gain_shards_flat' | 'reduce_heat_flat';
 export type UsableItemType = 'basic' | 'advanced';
 
 export interface UsableItem {
@@ -593,6 +596,26 @@ export const USABLE_ITEMS: UsableItem[] = [
     effect: 'gain_gold_flat',
     value: 1200,
     dropWeight: 14,
+  },
+  {
+    id: 'coolant_mk1',
+    name: 'Coolant Capsule I',
+    emoji: '🧊',
+    description: 'Premium: reduce combat heat by 35.',
+    itemType: 'advanced',
+    effect: 'reduce_heat_flat',
+    value: 35,
+    dropWeight: 0,
+  },
+  {
+    id: 'coolant_mk2',
+    name: 'Coolant Capsule II',
+    emoji: '❄️',
+    description: 'Premium: reduce combat heat by 75.',
+    itemType: 'advanced',
+    effect: 'reduce_heat_flat',
+    value: 75,
+    dropWeight: 0,
   },
 ];
 
@@ -1236,6 +1259,7 @@ export interface MissionBoardGoal {
   rewardGold?: number;
   rewardShards?: number;
   rewardEssence?: number;
+  rewardDiamonds?: number;
 }
 
 export const MISSION_BOARD_GOALS: MissionBoardGoal[] = [
@@ -1248,6 +1272,7 @@ export const MISSION_BOARD_GOALS: MissionBoardGoal[] = [
     target: 20,
     rewardGold: 1200,
     rewardShards: 80,
+    rewardDiamonds: 2,
   },
   {
     id: 'm_short_team_4',
@@ -1277,6 +1302,7 @@ export const MISSION_BOARD_GOALS: MissionBoardGoal[] = [
     target: 40,
     rewardShards: 220,
     rewardEssence: 6,
+    rewardDiamonds: 4,
   },
   {
     id: 'm_long_essence_60',
@@ -1287,6 +1313,7 @@ export const MISSION_BOARD_GOALS: MissionBoardGoal[] = [
     target: 60,
     rewardGold: 6000,
     rewardEssence: 10,
+    rewardDiamonds: 8,
   },
   {
     id: 'm_long_shards_2000',
