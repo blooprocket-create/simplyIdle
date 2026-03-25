@@ -129,6 +129,7 @@ export interface GameState {
   statsAlloc: StatBlock;
 
   totalKills: number;
+  burstCharge: number;  // 0-25; increments on each kill, resets on BURST
   wave: number;
   monsterHp: number;
   monsterMaxHp: number;
@@ -227,6 +228,7 @@ const DEFAULT_STATE: GameState = {
   statsAlloc: blankStats,
 
   totalKills: 0,
+  burstCharge: 0,
   wave: 1,
   monsterHp: getMonsterMaxHp(1),
   monsterMaxHp: getMonsterMaxHp(1),
@@ -1489,6 +1491,7 @@ function killMonster(state: GameState): GameState {
     highestWaveReached: Math.max(state.highestWaveReached, newWave),
     unspentStatPoints: state.unspentStatPoints + lvl.gainedLevels * STAT_POINTS_PER_LEVEL,
     totalKills: state.totalKills + 1,
+    burstCharge: Math.min(25, state.burstCharge + 1),
     weeklyKills: state.weeklyKills + 1,
     seasonPoints: state.seasonPoints + 12 + (isBoss ? 80 : 0),
     bestSeasonPoints: Math.max(state.bestSeasonPoints, state.seasonPoints + 12 + (isBoss ? 80 : 0)),
@@ -1675,6 +1678,7 @@ type Action =
   | { type: 'ALLOCATE_STAT'; stat: StatKey }
   | { type: 'ALLOCATE_STAT_MAX'; stat: StatKey }
   | { type: 'ALLOCATE_STAT_N'; stat: StatKey; amount: number }
+  | { type: 'BURST'; hits: number }
   | { type: 'LEVEL_UP_HERO_GOLD'; uid: string }
   | { type: 'EQUIP_ITEM'; itemId: string }
   | { type: 'SUMMON_HERO' }
@@ -1814,6 +1818,23 @@ function reducer(state: GameState, action: Action): GameState {
       const logged = queueCombatLog(state, `${crit ? 'CRIT' : 'Hit'} for ${Math.ceil(dmg)} dmg`);
       if (hp <= 0) return withAchievement(killMonster(logged));
       return { ...logged, monsterHp: hp };
+    }
+
+    case 'BURST': {
+      if (state.burstCharge < 25) return state;
+      let working: GameState = { ...state, burstCharge: 0 };
+      for (let i = 0; i < action.hits; i++) {
+        const affix = getMonsterAffixModifiers(working.wave);
+        const crit = Math.random() < 0.2;
+        const dmg = (getClickDamage(working) * (crit ? 1.8 : 1)) / affix.hpMult;
+        const hp = working.monsterHp - dmg;
+        if (hp <= 0) {
+          working = withAchievement(killMonster(working));
+        } else {
+          working = { ...working, monsterHp: hp };
+        }
+      }
+      return working;
     }
 
     case 'BUY_PARTY': {
@@ -3115,6 +3136,7 @@ export function useGameState(saveSlot: string = 'default') {
   const allocateStat = useCallback((stat: StatKey) => dispatch({ type: 'ALLOCATE_STAT', stat }), []);
   const allocateStatMax = useCallback((stat: StatKey) => dispatch({ type: 'ALLOCATE_STAT_MAX', stat }), []);
   const allocateStatN = useCallback((stat: StatKey, amount: number) => dispatch({ type: 'ALLOCATE_STAT_N', stat, amount }), []);
+  const burst = useCallback((hits: number) => dispatch({ type: 'BURST', hits }), []);
   const equipItem = useCallback((itemId: string) => dispatch({ type: 'EQUIP_ITEM', itemId }), []);
   const summonHero = useCallback(() => dispatch({ type: 'SUMMON_HERO' }), []);
   const summonHeroX10 = useCallback(() => dispatch({ type: 'SUMMON_HERO_X10' }), []);
@@ -3224,6 +3246,7 @@ export function useGameState(saveSlot: string = 'default') {
     allocateStat,
     allocateStatMax,
     allocateStatN,
+    burst,
     equipItem,
     summonHero,
     summonHeroX10,

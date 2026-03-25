@@ -132,6 +132,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     allocateStat,
     allocateStatMax,
     allocateStatN,
+    burst,
     equipItem,
     recycleHero,
     rankUpHero,
@@ -816,8 +817,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   }, [eventsOpen, betaLeaderboardRows.myRank, betaLeaderboardRows.playerBoardScore]);
 
   const isBossImminent = state.wave % 10 >= 8;
-  const burstChargePct = Math.min(100, (((state.totalKills % 25) + 1) / 25) * 100);
-  const canBurst = burstChargePct >= 96;
+  const burstChargePct = Math.min(100, (state.burstCharge / 25) * 100);
+  const canBurst = state.burstCharge >= 25;
   const prestige1Done = (state.prestigeCount ?? 0) >= 1;
   const prestige5Done = (state.prestigeCount ?? 0) >= 5;
   const prestige10Done = (state.prestigeCount ?? 0) >= 10;
@@ -1510,7 +1511,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   disabled={!canBurst}
                   onPress={() => {
                     const hits = 4 * battleSpeed;
-                    for (let i = 0; i < hits; i += 1) attack();
+                    burst(hits);
                     setUltimateTagline('LIMIT BREAK');
                     setMomentCue('ultimate');
                     setTimeout(() => setMomentCue('none'), 700);
