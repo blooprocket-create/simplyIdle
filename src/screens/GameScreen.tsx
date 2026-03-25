@@ -23,7 +23,6 @@ import {
   StatKey,
   EquipmentSlot,
   RARITIES,
-  GACHA_SUMMON_COST,
   ACTIVE_TEAM_SIZE,
   REBIRTH_WAVE_THRESHOLD,
   TUTORIAL_QUESTS,
@@ -1214,37 +1213,42 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 {state.activeTeamHeroIds.length === 0 ? (
                   <Text style={styles.noTeamMsg}>No heroes selected. Tap Edit to choose your team.</Text>
                 ) : (
-                  state.activeTeamHeroIds.map((heroId, idx) => {
-                    const hero = state.heroRoster.find(h => h.uid === heroId);
-                    if (!hero) return null;
-                    const cls = getClassConfig(hero.heroClass);
-                    return (
-                      <View key={heroId} style={styles.activeTeamCard}>
-                        <Text style={styles.slotIdx}>#{idx + 1}</Text>
-                        <View style={styles.activeTeamCardContent}>
-                          <Text style={styles.activeTeamHeroName}>{hero.emoji} {hero.name}</Text>
-                          <Text style={styles.activeTeamHeroClass}>
-                            <Text style={{ color: rarityConfig(hero.rarity).color }}>{hero.rarity}</Text>
-                            {' • '}
-                            {cls.name} Lv{hero.level}
-                          </Text>
+                  <>
+                    {state.activeTeamHeroIds.map((heroId, idx) => {
+                      const hero = state.heroRoster.find(h => h.uid === heroId);
+                      if (!hero) return null;
+                      const cls = getClassConfig(hero.heroClass);
+                      return (
+                        <View key={heroId} style={styles.activeTeamCard}>
+                          <Text style={styles.slotIdx}>#{idx + 1}</Text>
+                          <View style={styles.activeTeamCardContent}>
+                            <Text style={styles.activeTeamHeroName}>{hero.emoji} {hero.name}</Text>
+                            <Text style={styles.activeTeamHeroClass}>
+                              <Text style={{ color: rarityConfig(hero.rarity).color }}>{hero.rarity}</Text>
+                              {' • '}
+                              {cls.name} Lv{hero.level}
+                            </Text>
+                          </View>
+                          <Pressable
+                            style={styles.formationBadge}
+                            onPress={() => {
+                              const roles: Array<'front' | 'mid' | 'back'> = ['front', 'mid', 'back'];
+                              const cur = state.heroFormationByUid[heroId] ?? (hero.heroClass === 'warrior' || hero.heroClass === 'berserker' ? 'front' : hero.heroClass === 'archer' || hero.heroClass === 'mage' ? 'back' : 'mid');
+                              const next = roles[(roles.indexOf(cur) + 1) % roles.length];
+                              setHeroFormation(heroId, next);
+                            }}
+                          >
+                            <Text style={styles.formationBadgeText}>
+                              {(state.heroFormationByUid[heroId] ?? (hero.heroClass === 'warrior' || hero.heroClass === 'berserker' ? 'front' : hero.heroClass === 'archer' || hero.heroClass === 'mage' ? 'back' : 'mid')) === 'front' ? '🛡️ Front' : (state.heroFormationByUid[heroId] ?? 'mid') === 'mid' ? '⚔️ Mid' : '🏹 Back'}
+                            </Text>
+                          </Pressable>
                         </View>
-                        <Pressable
-                          style={styles.formationBadge}
-                          onPress={() => {
-                            const roles: Array<'front' | 'mid' | 'back'> = ['front', 'mid', 'back'];
-                            const cur = state.heroFormationByUid[heroId] ?? (hero.heroClass === 'warrior' || hero.heroClass === 'berserker' ? 'front' : hero.heroClass === 'archer' || hero.heroClass === 'mage' ? 'back' : 'mid');
-                            const next = roles[(roles.indexOf(cur) + 1) % roles.length];
-                            setHeroFormation(heroId, next);
-                          }}
-                        >
-                          <Text style={styles.formationBadgeText}>
-                            {(state.heroFormationByUid[heroId] ?? (hero.heroClass === 'warrior' || hero.heroClass === 'berserker' ? 'front' : hero.heroClass === 'archer' || hero.heroClass === 'mage' ? 'back' : 'mid')) === 'front' ? '🛡️ Front' : (state.heroFormationByUid[heroId] ?? 'mid') === 'mid' ? '⚔️ Mid' : '🏹 Back'}
-                          </Text>
-                        </Pressable>
-                      </View>
-                    );
-                  })
+                      );
+                    })}
+                    <Text style={styles.teamSynergyInline}>
+                      Synergies Active: {stats.synergies.length} • Formation: F{stats.formation.front}/M{stats.formation.mid}/B{stats.formation.back}
+                    </Text>
+                  </>
                 )}
               </View>
             )}
@@ -2825,15 +2829,35 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Text style={styles.eventsCardTitle}>⚔️ Formation Bonuses</Text>
                 <Text style={styles.eventsSubtitle}>Assign hero roles in your active team (tap badge to cycle)</Text>
                 {[
-                  { role: '🛡️ Front', perk: '+20% HP for this hero' },
-                  { role: '⚔️ Mid', perk: '+10% DPS, balanced' },
-                  { role: '🏹 Back', perk: '+15% DPS, takes less damage' },
+                  { role: '🛡️ Front', perk: 'Tank stance: higher survivability, slower casts' },
+                  { role: '⚔️ Mid', perk: 'Balanced stance: mixed offense/defense' },
+                  { role: '🏹 Back', perk: 'Artillery stance: more DPS and faster active procs, squishier' },
                 ].map(row => (
                   <View key={row.role} style={styles.formationInfoRow}>
                     <Text style={styles.formationInfoRole}>{row.role}</Text>
                     <Text style={styles.formationInfoPerk}>{row.perk}</Text>
                   </View>
                 ))}
+                <Text style={styles.eventsHint}>
+                  Live Team Effect: {stats.formation.dpsBonusPct >= 0 ? '+' : ''}{stats.formation.dpsBonusPct.toFixed(1)}% DPS •
+                  {' '} {stats.formation.hpBonusPct >= 0 ? '+' : ''}{stats.formation.hpBonusPct.toFixed(1)}% HP •
+                  {' '} {stats.formation.incomingDeltaPct >= 0 ? '-' : '+'}{Math.abs(stats.formation.incomingDeltaPct).toFixed(1)}% incoming damage
+                </Text>
+              </View>
+
+              <View style={styles.eventsCard}>
+                <Text style={styles.eventsCardTitle}>🧬 Team Synergy Sets</Text>
+                <Text style={styles.eventsSubtitle}>Class and faction combos unlock passive bonuses.</Text>
+                {stats.synergies.length === 0 ? (
+                  <Text style={styles.eventsHint}>No active set bonuses yet. Mix classes and factions in your active team.</Text>
+                ) : (
+                  stats.synergies.map(syn => (
+                    <View key={syn.id} style={styles.formationInfoRow}>
+                      <Text style={styles.formationInfoRole}>{syn.name}</Text>
+                      <Text style={styles.formationInfoPerk}>{syn.effect}</Text>
+                    </View>
+                  ))
+                )}
               </View>
 
             </ScrollView>
@@ -3980,6 +4004,12 @@ const styles = StyleSheet.create({
   activeTeamHeroClass: {
     fontSize: 10,
     color: '#AAA',
+  },
+  teamSynergyInline: {
+    marginTop: 6,
+    fontSize: 11,
+    color: '#9BC2FF',
+    fontWeight: '600',
   },
 
   // Tab Bar

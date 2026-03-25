@@ -19,7 +19,6 @@ import {
   PermanentUnlockId,
   HeroPassiveTraitId,
   HeroActiveSkillArchetypeId,
-  GACHA_SUMMON_COST,
   HERO_POOL,
   ACTIVE_TEAM_SIZE,
   HERO_LEVEL_EXP_FORMULA,
@@ -441,25 +440,126 @@ function getFormationMultipliers(state: GameState): {
   dpsMult: number;
   hpMult: number;
   incomingMult: number;
+  front: number;
+  mid: number;
+  back: number;
 } {
   const active = new Set(state.activeTeamHeroIds);
   let front = 0;
   let mid = 0;
   let back = 0;
+  let dpsMult = 1;
+  let hpMult = 1;
+  let incomingMult = 1;
 
   for (const hero of state.heroRoster) {
     if (!active.has(hero.uid)) continue;
     const role = getFormationRoleForHero(state, hero);
-    if (role === 'front') front += 1;
-    else if (role === 'mid') mid += 1;
-    else back += 1;
+    if (role === 'front') {
+      front += 1;
+      hpMult *= 1.06;
+      incomingMult *= 0.95;
+      if (hero.heroClass === 'warrior' || hero.heroClass === 'berserker' || hero.heroClass === 'monk') {
+        incomingMult *= 0.96;
+      } else {
+        dpsMult *= 0.98;
+      }
+    } else if (role === 'mid') {
+      mid += 1;
+      dpsMult *= 1.03;
+      hpMult *= 1.02;
+      incomingMult *= 0.99;
+    } else {
+      back += 1;
+      dpsMult *= 1.05;
+      incomingMult *= 1.03;
+      if (hero.heroClass === 'archer' || hero.heroClass === 'mage') {
+        dpsMult *= 1.04;
+      } else {
+        incomingMult *= 1.02;
+      }
+    }
   }
 
-  const dpsMult = 1 + (mid * 0.02) + (back * 0.035);
-  const hpMult = 1 + (front * 0.05) + (mid * 0.015);
-  const incomingMult = Math.max(0.74, 1 - (front * 0.05) - (mid * 0.01));
+  dpsMult = Math.min(1.95, dpsMult);
+  hpMult = Math.min(1.85, hpMult);
+  incomingMult = Math.max(0.68, Math.min(1.35, incomingMult));
 
-  return { dpsMult, hpMult, incomingMult };
+  return { dpsMult, hpMult, incomingMult, front, mid, back };
+}
+
+function factionForClass(playerClass: PlayerClass): 'vanguard' | 'ranger' | 'arcanum' | 'aegis' {
+  if (playerClass === 'warrior' || playerClass === 'berserker') return 'vanguard';
+  if (playerClass === 'archer') return 'ranger';
+  if (playerClass === 'mage') return 'arcanum';
+  return 'aegis';
+}
+
+function getTeamSynergy(state: GameState): {
+  dpsMult: number;
+  hpMult: number;
+  incomingMult: number;
+  goldMult: number;
+  expMult: number;
+  active: Array<{ id: string; name: string; effect: string }>;
+} {
+  const activeIds = new Set(state.activeTeamHeroIds);
+  const activeHeroes = state.heroRoster.filter(hero => activeIds.has(hero.uid));
+  const classCounts: Record<PlayerClass, number> = {
+    warrior: 0,
+    berserker: 0,
+    archer: 0,
+    mage: 0,
+    monk: 0,
+  };
+  const factionCounts = {
+    vanguard: 0,
+    ranger: 0,
+    arcanum: 0,
+    aegis: 0,
+  };
+
+  for (const hero of activeHeroes) {
+    classCounts[hero.heroClass] += 1;
+    factionCounts[factionForClass(hero.heroClass)] += 1;
+  }
+
+  let dpsMult = 1;
+  let hpMult = 1;
+  let incomingMult = 1;
+  let goldMult = 1;
+  let expMult = 1;
+  const active: Array<{ id: string; name: string; effect: string }> = [];
+
+  if (factionCounts.vanguard >= 2) {
+    hpMult *= 1.12;
+    active.push({ id: 'vanguard_wall', name: 'Vanguard Wall', effect: '+12% team HP' });
+  }
+
+  if (factionCounts.ranger >= 1 && factionCounts.arcanum >= 1) {
+    dpsMult *= 1.10;
+    active.push({ id: 'spellshot', name: 'Spellshot Link', effect: '+10% team DPS' });
+  }
+
+  if ((classCounts.warrior + classCounts.berserker) >= 1 && classCounts.monk >= 1) {
+    incomingMult *= 0.93;
+    active.push({ id: 'iron_mandala', name: 'Iron Mandala', effect: '-7% incoming damage' });
+  }
+
+  const uniqueClassCount = (Object.values(classCounts) as number[]).filter(n => n > 0).length;
+  if (uniqueClassCount >= 4) {
+    dpsMult *= 1.08;
+    expMult *= 1.08;
+    active.push({ id: 'grand_coalition', name: 'Grand Coalition', effect: '+8% DPS, +8% EXP' });
+  }
+
+  const monoClass = (Object.values(classCounts) as number[]).some(n => n === activeHeroes.length && activeHeroes.length >= 3);
+  if (monoClass) {
+    goldMult *= 1.18;
+    active.push({ id: 'warband_focus', name: 'Warband Focus', effect: '+18% gold gains' });
+  }
+
+  return { dpsMult, hpMult, incomingMult, goldMult, expMult, active };
 }
 
 function rarityRank(rarity: Rarity): number {
@@ -673,7 +773,9 @@ function tickHeroActives(state: GameState, elapsedMs: number): GameState {
     cooldowns[hero.uid] = Math.max(0, (cooldowns[hero.uid] ?? 0) - elapsedMs);
     if (cooldowns[hero.uid] > 0) continue;
 
-    const triggerChance = Math.min(0.16, 0.015 + hero.level * 0.00012) * (elapsedMs / 1000);
+    const role = getFormationRoleForHero(nextState, hero);
+    const roleTriggerMult = role === 'back' ? 1.22 : role === 'mid' ? 1.05 : 0.92;
+    const triggerChance = Math.min(0.16, 0.015 + hero.level * 0.00012) * roleTriggerMult * (elapsedMs / 1000);
     if (Math.random() > triggerChance) continue;
 
     const archetype: HeroActiveSkillArchetypeId = hero.activeSkillArchetype;
@@ -742,9 +844,10 @@ function getTeamMaxHp(state: GameState): number {
 
   const survivalMult = getMetaSurvivalMultiplier(state);
   const formation = getFormationMultipliers(state);
+  const synergy = getTeamSynergy(state);
   const masteryLevel = getClassMasteryLevel(state, state.playerClass);
   const masteryHpMult = 1 + Math.min(0.25, Math.floor(masteryLevel / 4) * 0.02);
-  return Math.ceil(maxHp * survivalMult * getRebirthSurvivalMultiplier(state) * formation.hpMult * masteryHpMult);
+  return Math.ceil(maxHp * survivalMult * getRebirthSurvivalMultiplier(state) * formation.hpMult * synergy.hpMult * masteryHpMult);
 }
 
 function getTeamDefense(state: GameState): number {
@@ -764,7 +867,8 @@ function getTeamDefense(state: GameState): number {
   }
 
   const formation = getFormationMultipliers(state);
-  return Math.max(0, defense * getMetaSurvivalMultiplier(state) * getRebirthSurvivalMultiplier(state) * formation.hpMult);
+  const synergy = getTeamSynergy(state);
+  return Math.max(0, defense * getMetaSurvivalMultiplier(state) * getRebirthSurvivalMultiplier(state) * formation.hpMult * synergy.hpMult);
 }
 
 function getDps(state: GameState): number {
@@ -802,6 +906,7 @@ function getDps(state: GameState): number {
   const heroPassive = getHeroPassiveMultipliers(state);
   const activeBuffMult = 1 + state.damageBuffPct;
   const formation = getFormationMultipliers(state);
+  const synergy = getTeamSynergy(state);
   const masteryLevel = getClassMasteryLevel(state, state.playerClass);
   const masteryDpsMult = 1 + Math.min(0.4, masteryLevel * 0.01);
   const totalDps = (playerDps + heroDps)
@@ -812,6 +917,7 @@ function getDps(state: GameState): number {
     * classPassiveMult
     * heroPassive.dpsMult
     * formation.dpsMult
+    * synergy.dpsMult
     * masteryDpsMult
     * activeBuffMult;
   return Math.max(1, totalDps);
@@ -1327,6 +1433,8 @@ export function computeStats(state: GameState) {
   const combined = derivedStats(state);
   const teamBoost = getTeamHeroBoost(state);
   const equipmentBonus = getEquipmentBonusStats(state);
+  const formation = getFormationMultipliers(state);
+  const synergy = getTeamSynergy(state);
 
   // Per-hero derived stats for display in the heroes tab
   const heroDetails: Record<string, {
@@ -1367,6 +1475,15 @@ export function computeStats(state: GameState) {
     combined,
     equipmentBonus,
     heroDetails,
+    formation: {
+      front: formation.front,
+      mid: formation.mid,
+      back: formation.back,
+      dpsBonusPct: (formation.dpsMult - 1) * 100,
+      hpBonusPct: (formation.hpMult - 1) * 100,
+      incomingDeltaPct: (1 - formation.incomingMult) * 100,
+    },
+    synergies: synergy.active,
   };
 }
 
@@ -1457,10 +1574,11 @@ function killMonster(state: GameState): GameState {
   const achievementMult = getAchievementBonusMultiplier(state);
   const economyMult = getMetaEconomyMultiplier(state);
   const heroPassive = getHeroPassiveMultipliers(state);
+  const synergy = getTeamSynergy(state);
   const masteryLevel = getClassMasteryLevel(state, state.playerClass);
   const masteryEconomyMult = 1 + Math.min(0.25, Math.floor(masteryLevel / 5) * 0.01);
-  const goldReward = Math.ceil(getMonsterGold(state.wave) * Math.pow(REBIRTH_BONUS, state.prestigeCount) * achievementMult * affix.goldMult * economyMult * getRebirthEconomyMultiplier(state) * heroPassive.goldMult * masteryEconomyMult * weekly.goldMultiplier);
-  const expReward = Math.ceil(getMonsterExp(state.wave) * achievementMult * affix.expMult * heroPassive.expMult * weekly.expMultiplier);
+  const goldReward = Math.ceil(getMonsterGold(state.wave) * Math.pow(REBIRTH_BONUS, state.prestigeCount) * achievementMult * affix.goldMult * economyMult * getRebirthEconomyMultiplier(state) * heroPassive.goldMult * synergy.goldMult * masteryEconomyMult * weekly.goldMultiplier);
+  const expReward = Math.ceil(getMonsterExp(state.wave) * achievementMult * affix.expMult * heroPassive.expMult * synergy.expMult * weekly.expMultiplier);
   const lvl = processLevelUp(state.exp + expReward, state.level);
   const isBoss = state.wave % 10 === 0;
   const act = getActForWave(state.wave);
@@ -1777,12 +1895,14 @@ function reducer(state: GameState, action: Action): GameState {
         : 1;
       const heroPassive = getHeroPassiveMultipliers(working);
       const formation = getFormationMultipliers(working);
+      const synergy = getTeamSynergy(working);
       const activeReductionMult = 1 - Math.max(0, Math.min(0.7, working.damageReductionBuffPct));
       const actualEnemyDamage = enemyDmg
         * (1 - damageReduction)
         * passiveIncomingMult
         * heroPassive.incomingDmgMult
         * formation.incomingMult
+        * synergy.incomingMult
         * activeReductionMult
         * (action.elapsed / 1000);
       const teamHp = working.teamHp - actualEnemyDamage;
