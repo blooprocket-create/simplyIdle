@@ -926,7 +926,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       return;
     }
 
-    const baseDps = Number.isFinite(dpsBreakdown.totalDps) && dpsBreakdown.totalDps > 0 ? dpsBreakdown.totalDps : Math.max(1, stats.dps);
+    const baseDps = Number.isFinite(dpsBreakdown.finalDps) && dpsBreakdown.finalDps > 0 ? dpsBreakdown.finalDps : Math.max(1, stats.dps);
     const baseHp = Number.isFinite(state.teamMaxHp) && state.teamMaxHp > 0 ? state.teamMaxHp : 100;
     const baseDefense = Number.isFinite(stats.teamDefense) && stats.teamDefense > 0 ? stats.teamDefense : 1;
     const monsterDps = Math.max(1, getMonsterDamage(state.wave));
@@ -3305,15 +3305,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                           {isComplete && (
                             <Pressable
                               style={styles.expeditionClaimBtn}
-                              onPress={() => {
-                                completeExpedition(exp.id);
-                                queueReward({
-                                  id: `expedition_${exp.id}`,
-                                  kind: 'system',
-                                  title: 'Expedition Complete',
-                                  detail: `${exp.type} expedition returned: +${exp.reward.diamonds} 💎, +${exp.reward.shards} ✨${exp.reward.essence > 0 ? `, +${exp.reward.essence} ⚡` : ''}`,
-                                });
-                              }}
+                              onPress={() => completeExpedition(exp.id)}
                             >
                               <Text style={styles.expeditionClaimBtnText}>Claim Rewards</Text>
                             </Pressable>

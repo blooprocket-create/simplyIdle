@@ -496,7 +496,8 @@ export function getNextEquipmentRarity(rarity: EquipmentRarity): EquipmentRarity
     rare: 'epic',
     epic: 'legendary',
     legendary: 'mythic',
-    mythic: null,
+    mythic: 'transcendent',
+    transcendent: null,
   };
   return chain[rarity];
 }
@@ -508,6 +509,7 @@ export function getStarterEquipmentForClass(playerClass: PlayerClass): string[] 
     epic: 2,
     legendary: 3,
     mythic: 4,
+    transcendent: 5,
   };
 
   const classItems = EQUIPMENT_CATALOG.filter(item => item.allowedClasses.includes(playerClass));

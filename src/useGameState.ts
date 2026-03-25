@@ -1256,7 +1256,7 @@ function getRebirthSurvivalMultiplier(state: GameState): number {
   return 1 + state.rebirthSurvivalPath * 0.07;
 }
 
-const EQUIP_RARITY_ORDER: Array<'common' | 'rare' | 'epic' | 'legendary' | 'mythic'> = ['common', 'rare', 'epic', 'legendary', 'mythic'];
+const EQUIP_RARITY_ORDER: Array<ReturnType<typeof equipmentRarityConfig>['id']> = ['common', 'rare', 'epic', 'legendary', 'mythic', 'transcendent'];
 
 /** Gold cost to manually level a hero from `level` to `level+1` via gold. */
 export function getHeroGoldLevelCost(level: number): number {
@@ -1275,7 +1275,7 @@ export function getEquipmentCraftCost(slot: EquipmentSlot): { scrap: number; gol
 function getEquipmentUpgradePlan(state: GameState, itemId: string): {
   canUpgrade: boolean;
   targetItemId: string | null;
-  targetRarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythic' | null;
+  targetRarity: ReturnType<typeof equipmentRarityConfig>['id'] | null;
   scrapCost: number;
   essenceCost: number;
   goldCost: number;
@@ -1309,6 +1309,7 @@ function getEquipmentUpgradePlan(state: GameState, itemId: string): {
         rare: { scrap: 170, essence: 4, gold: 4200 },
         epic: { scrap: 300, essence: 8, gold: 12000 },
         legendary: { scrap: 500, essence: 14, gold: 32000 },
+        mythic: { scrap: 900, essence: 26, gold: 90000 },
       };
       const base = baseCostByRarity[item.rarity] ?? { scrap: 0, essence: 0, gold: 0 };
       const scrapCost = Math.ceil(base.scrap * (1 + (step - 1) * 0.55));
@@ -1650,6 +1651,53 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
       .filter((entry): entry is readonly [string, number] => entry[1] > 0),
   );
 
+  const guildhallFacilities = {
+    training: { level: clampInt(payload.guildhallFacilities?.training?.level, 0, 5, 0) },
+    treasury: { level: clampInt(payload.guildhallFacilities?.treasury?.level, 0, 5, 0) },
+    forge: { level: clampInt(payload.guildhallFacilities?.forge?.level, 0, 5, 0) },
+    tactics: { level: clampInt(payload.guildhallFacilities?.tactics?.level, 0, 5, 0) },
+  };
+
+  const validExpeditionTypes = new Set(['artifact', 'merchant', 'ruins', 'vault', 'abyss']);
+  const validExpeditionRarities = new Set(['common', 'rare', 'epic', 'legendary', 'godly']);
+  const expeditionQueue: GameState['expeditionQueue'] = Array.isArray(payload.expeditionQueue)
+    ? payload.expeditionQueue
+      .filter((entry): entry is Record<string, unknown> => isRecord(entry))
+      .slice(0, 20)
+      .map((entry, index) => {
+        const type: GameState['expeditionQueue'][number]['type'] =
+          typeof entry.type === 'string' && validExpeditionTypes.has(entry.type)
+            ? entry.type as GameState['expeditionQueue'][number]['type']
+            : 'artifact';
+        const rarity: GameState['expeditionQueue'][number]['rarity'] =
+          typeof entry.rarity === 'string' && validExpeditionRarities.has(entry.rarity)
+            ? entry.rarity as GameState['expeditionQueue'][number]['rarity']
+            : 'common';
+        const reward = isRecord(entry.reward) ? entry.reward : {};
+        return {
+          id: clampString(entry.id, `exp_${index}`, 64),
+          type,
+          rarity,
+          startTime: clampInt(entry.startTime, 0, now, now),
+          durationMs: clampInt(entry.durationMs, 1_000, 7 * 24 * 60 * 60 * 1000, 30_000),
+          reward: {
+            diamonds: clampInt(reward.diamonds, 0, SAFE_INTEGER_CAP, 0),
+            shards: clampInt(reward.shards, 0, SAFE_INTEGER_CAP, 0),
+            essence: clampInt(reward.essence, 0, SAFE_INTEGER_CAP, 0),
+            artifacts: clampInt(reward.artifacts, 0, SAFE_INTEGER_CAP, 0),
+          },
+        };
+      })
+    : [];
+
+  const lastExpeditionDay = {
+    artifact: payload.lastExpeditionDay?.artifact == null ? null : clampInt(payload.lastExpeditionDay.artifact, 0, currentDay, currentDay),
+    merchant: payload.lastExpeditionDay?.merchant == null ? null : clampInt(payload.lastExpeditionDay.merchant, 0, currentDay, currentDay),
+    ruins: payload.lastExpeditionDay?.ruins == null ? null : clampInt(payload.lastExpeditionDay.ruins, 0, currentDay, currentDay),
+    vault: payload.lastExpeditionDay?.vault == null ? null : clampInt(payload.lastExpeditionDay.vault, 0, currentDay, currentDay),
+    abyss: payload.lastExpeditionDay?.abyss == null ? null : clampInt(payload.lastExpeditionDay.abyss, 0, currentDay, currentDay),
+  };
+
   return {
     playerName,
     playerClass,
@@ -1698,6 +1746,9 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     lastRiftRunDay: payload.lastRiftRunDay == null ? null : clampInt(payload.lastRiftRunDay, 0, currentDay, currentDay),
     lastDiceRollValue: payload.lastDiceRollValue == null ? null : clampInt(payload.lastDiceRollValue, 1, 20, 1),
     lastRiftWavesCleared: clampInt(payload.lastRiftWavesCleared, 0, 5, 0),
+    guildhallFacilities,
+    expeditionQueue,
+    lastExpeditionDay,
     classMasteryXp,
     seasonPoints,
     bestSeasonPoints,
@@ -1857,6 +1908,7 @@ function equipmentScrapValue(rarity: ReturnType<typeof equipmentRarityConfig>['i
     epic: 60,
     legendary: 160,
     mythic: 360,
+    transcendent: 760,
   }[rarity] ?? 10;
 }
 
@@ -3443,13 +3495,18 @@ function reducer(state: GameState, action: Action): GameState {
       const expedition = state.expeditionQueue[expIndex];
       const newQueue = state.expeditionQueue.filter((_, i) => i !== expIndex);
 
-      return {
+      return queueReward({
         ...state,
         diamonds: state.diamonds + expedition.reward.diamonds,
         heroShards: state.heroShards + expedition.reward.shards,
         essence: state.essence + expedition.reward.essence,
         expeditionQueue: newQueue,
-      };
+      }, {
+        id: `expedition_${expedition.id}`,
+        kind: 'system',
+        title: 'Expedition Complete',
+        detail: `${expedition.type} returned +${expedition.reward.diamonds} diamonds, +${expedition.reward.shards} shards${expedition.reward.essence > 0 ? `, +${expedition.reward.essence} essence` : ''}`,
+      });
     }
 
     case 'SET_AUTO_RECYCLE_ENABLED': {

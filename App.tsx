@@ -23,7 +23,7 @@ export default function App() {
     body.style.overflowX = 'hidden';
     body.style.overflowY = 'auto';
     body.style.touchAction = 'pan-y pinch-zoom';
-    body.style.webkitOverflowScrolling = 'touch';
+    body.style.setProperty('-webkit-overflow-scrolling', 'touch');
     body.style.overscrollBehaviorY = 'contain';
 
     if (root) {
