@@ -517,7 +517,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const isNativeApp = Platform.OS !== 'web';
   const isCompactPhone = viewportWidth < 430;
   const isShortPhone = viewportHeight < 780;
-  const compactCommandTabWidth = viewportWidth < 390 ? 96 : 112;
+  const compactCommandTabWidth = viewportWidth < 390 ? 106 : viewportWidth < 520 ? 118 : 126;
+  const useCompactCommandTabs = isCompactPhone || viewportWidth <= 560;
   const compactSubTabMinWidth = viewportWidth < 390 ? 92 : 108;
   const claimableWeeklyMilestones = WEEKLY_TRACK_MILESTONES.filter(ms => state.weeklyKills >= ms && !state.weeklyTrackClaimed.includes(ms));
   const claimableMissionIds = missionCards.filter(m => !m.claimed && m.progress.done).map(m => m.mission.id);
@@ -886,16 +887,18 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             tab === t && styles.tabActive,
             lockedOut && styles.tabLocked,
             tutorialTarget && styles.tutorialPulse,
-            isCompactPhone && styles.tabCompact,
-            isCompactPhone && { width: compactCommandTabWidth },
+            useCompactCommandTabs && styles.tabCompact,
+            useCompactCommandTabs && { width: compactCommandTabWidth },
           ]}
           onPress={() => onTabChange(t)}
           disabled={lockedOut}
         >
           <View style={styles.tabIconWrap}>
             <Text style={[styles.tabIcon, tab === t && styles.tabIconActive]}>{TAB_META[t].icon}</Text>
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{TAB_META[t].label}</Text>
-            <Text style={[styles.tabSubText, tab === t && styles.tabSubTextActive]}>{TAB_META[t].mood}</Text>
+            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.tabText, tab === t && styles.tabTextActive]}>{TAB_META[t].label}</Text>
+            {!useCompactCommandTabs && (
+              <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.tabSubText, tab === t && styles.tabSubTextActive]}>{TAB_META[t].mood}</Text>
+            )}
             <View style={styles.tabSignalPill}>
               <Text style={styles.tabSignalText}>{tabSignals[t]}</Text>
             </View>
@@ -907,7 +910,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       );
     });
 
-    if (isCompactPhone) {
+    if (useCompactCommandTabs) {
       return (
         <ScrollView
           horizontal={true}
@@ -3471,6 +3474,9 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: '#060B12',
+    width: '100%',
+    maxWidth: '100%',
+    overflow: 'hidden',
   },
   sceneDecor: {
     ...StyleSheet.absoluteFillObject,
@@ -4524,9 +4530,12 @@ const styles = StyleSheet.create({
   tabBarScroll: {
     flexGrow: 0,
     marginTop: 6,
+    width: '100%',
+    maxWidth: '100%',
   },
   tabBarCompact: {
     paddingHorizontal: 8,
+    paddingRight: 14,
     gap: 8,
   },
   tab: {

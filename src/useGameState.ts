@@ -1002,10 +1002,10 @@ export function getDpsBreakdown(state: GameState): {
   const rebirthMult = Math.pow(REBIRTH_BONUS, state.prestigeCount);
 
   // Player damage contribution
-  const physical = stats.strength * 2 + stats.agility * 1.2 + state.level * 0.8;
-  const magic = stats.intelligence * 2 + stats.spirit * 1.1 + state.level * 0.8;
+  const physical = stats.strength * 2.4 + stats.agility * (1.1 + cls.physWeight * 0.65) + state.level * 1.1;
+  const magic = stats.intelligence * (1.5 + cls.magicWeight * 0.9) + stats.spirit * (0.9 + cls.magicWeight * 0.55) + state.level * 0.9;
 
-  const playerDps = ((physical * cls.physWeight * 0.4) + (magic * cls.magicWeight * 0.3)) / 2.5;
+  const playerDps = ((physical * cls.physWeight * 0.58) + (magic * cls.magicWeight * 0.42)) / 2.1;
 
   // Active team heroes damage
   let heroDps = 0;
