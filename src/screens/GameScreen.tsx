@@ -208,6 +208,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [draftName, setDraftName] = useState('');
   const [draftClass, setDraftClass] = useState<PlayerClass>('warrior');
   const [teamSelectionMode, setTeamSelectionMode] = useState(false);
+  const [activeTeamCollapsed, setActiveTeamCollapsed] = useState(false);
   const [tempTeam, setTempTeam] = useState<string[]>(state.activeTeamHeroIds);
   const [expandedHeroes, setExpandedHeroes] = useState<Set<string>>(new Set());
   const [recycleConfirmUid, setRecycleConfirmUid] = useState<string | null>(null);
@@ -1367,18 +1368,37 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           <View style={styles.teamInfo}>
             <View style={styles.teamHeader}>
               <Text style={styles.teamTitle}>⚔️ Active Team (+ You)</Text>
-              <Pressable
-                onPress={() => {
-                  setTempTeam([...state.activeTeamHeroIds]);
-                  setTeamSelectionMode(!teamSelectionMode);
-                }}
-                style={[styles.editBtn, forceBuildTeamStep && !teamSelectionMode && styles.tutorialPulse]}
-              >
-                <Text style={styles.editBtnText}>{teamSelectionMode ? 'Cancel' : 'Edit'}</Text>
-              </Pressable>
+              <View style={styles.teamHeaderActions}>
+                <Pressable
+                  onPress={() => {
+                    setTempTeam([...state.activeTeamHeroIds]);
+                    setTeamSelectionMode(!teamSelectionMode);
+                    if (activeTeamCollapsed) setActiveTeamCollapsed(false);
+                  }}
+                  style={[styles.editBtn, forceBuildTeamStep && !teamSelectionMode && styles.tutorialPulse]}
+                >
+                  <Text style={styles.editBtnText}>{teamSelectionMode ? 'Cancel' : 'Edit'}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setActiveTeamCollapsed(prev => {
+                      const next = !prev;
+                      if (next) setTeamSelectionMode(false);
+                      return next;
+                    });
+                  }}
+                  style={styles.teamCollapseBtn}
+                >
+                  <Text style={styles.teamCollapseBtnText}>{activeTeamCollapsed ? 'Expand' : 'Collapse'}</Text>
+                </Pressable>
+              </View>
             </View>
 
-            {teamSelectionMode ? (
+            {activeTeamCollapsed ? (
+              <Text style={styles.teamCollapsedHint}>
+                Active heroes: {state.activeTeamHeroIds.length}/{ACTIVE_TEAM_SIZE} • Synergies: {stats.synergies.length}
+              </Text>
+            ) : teamSelectionMode ? (
               <View>
                 <Text style={styles.selectMsg}>Select up to {ACTIVE_TEAM_SIZE} heroes ({tempTeam.length}/{ACTIVE_TEAM_SIZE})</Text>
                 <ScrollView style={styles.heroSelector}>
@@ -4394,6 +4414,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  teamHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   teamTitle: {
     fontSize: 13,
     fontWeight: '600',
@@ -4409,6 +4434,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#FFF',
+  },
+  teamCollapseBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#2D3F54',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#3E5772',
+  },
+  teamCollapseBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#D8EBFF',
+  },
+  teamCollapsedHint: {
+    fontSize: 11,
+    color: '#98B9D7',
+    paddingVertical: 6,
   },
   selectMsg: {
     fontSize: 11,
