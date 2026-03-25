@@ -99,6 +99,7 @@ const DOLLAR_SHOP_PACKS: Record<DollarShopOfferId, { usdCents: number; diamonds:
   usd_4999: { usdCents: 4999, diamonds: 6000 },
   usd_9999: { usdCents: 9999, diamonds: 13000 },
 };
+export const ENABLE_SIMULATED_DOLLAR_PURCHASES = false;
 const VIP_MILESTONE_REWARDS: Record<number, { diamonds: number; gold: number; shards: number; essence: number }> = {
   1: { diamonds: 50, gold: 1200, shards: 50, essence: 0 },
   2: { diamonds: 100, gold: 2800, shards: 90, essence: 1 },
@@ -752,10 +753,18 @@ function maybeAutoRecycleBackground(state: GameState): GameState {
   const shardReward = Math.ceil(toRecycle.reduce((sum, hero) => sum + calculateShardReward(hero.rarity, hero.level), 0) * weekly.shardMultiplier);
   const newRoster = state.heroRoster.filter(h => !recycledIds.has(h.uid));
   const newMaxHp = getTeamMaxHp({ ...state, heroRoster: newRoster });
+  const heroFormationByUid = Object.fromEntries(
+    Object.entries(state.heroFormationByUid).filter(([uid]) => !recycledIds.has(uid)),
+  ) as Record<string, HeroFormationRole>;
+  const heroActiveCdMs = Object.fromEntries(
+    Object.entries(state.heroActiveCdMs).filter(([uid]) => !recycledIds.has(uid)),
+  ) as Record<string, number>;
 
   return queueReward({
     ...state,
     heroRoster: newRoster,
+    heroFormationByUid,
+    heroActiveCdMs,
     heroShards: state.heroShards + shardReward,
     teamMaxHp: newMaxHp,
     teamHp: Math.min(state.teamHp, newMaxHp),
@@ -799,7 +808,7 @@ function maybeAutoSummonTick(state: GameState): GameState {
       ...state,
       bossTears: canUseFree ? state.bossTears : state.bossTears - 1,
       heroRoster: [hero, ...state.heroRoster],
-      summonHistory: [historyEntry, ...state.summonHistory].slice(0, 60),
+      summonHistory: [historyEntry, ...state.summonHistory].slice(0, MAX_SAVE_SUMMON_HISTORY),
       totalSummons: state.totalSummons + 1,
       freeSummonCharges: canUseFree ? state.freeSummonCharges - 1 : state.freeSummonCharges,
       gachaPityCounter: roll.nextCounter,
@@ -848,7 +857,7 @@ function maybeAutoSummonTick(state: GameState): GameState {
       ...state,
       bossTears: state.bossTears - paidUses,
       heroRoster: [...summoned, ...state.heroRoster],
-      summonHistory: [...historyBatch, ...state.summonHistory].slice(0, 60),
+      summonHistory: [...historyBatch, ...state.summonHistory].slice(0, MAX_SAVE_SUMMON_HISTORY),
       totalSummons: state.totalSummons + totalPulls,
       freeSummonCharges: state.freeSummonCharges - freeUses,
       gachaPityCounter: pityCounter,
@@ -1477,7 +1486,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     const itemId = payload.equippedItems?.[slot];
     if (typeof itemId !== 'string') continue;
     const item = getEquipmentItem(itemId);
-    if (!item || item.slot !== slot) continue;
+    if (!item || item.slot !== slot || !inventoryItemIds.includes(itemId)) continue;
     equippedItems[slot] = itemId;
   }
 
@@ -1494,7 +1503,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
 
   const summonHistory = Array.isArray(payload.summonHistory)
     ? payload.summonHistory
-      .slice(-MAX_SAVE_SUMMON_HISTORY)
+      .slice(0, MAX_SAVE_SUMMON_HISTORY)
       .filter((entry): entry is SummonHistoryEntry => isRecord(entry))
       .map((entry, index) => ({
         id: clampString(entry.id, `summon_${index}`, 64) || `summon_${index}`,
@@ -1593,7 +1602,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     usableItemCounts,
     autoUsePotionEnabled: clampBoolean(payload.autoUsePotionEnabled, false),
     autoUseCoolantEnabled: clampBoolean(payload.autoUseCoolantEnabled, false),
-    autoUsePotionThresholdPct: clampFloat(payload.autoUsePotionThresholdPct, 0.05, 1, 0.35),
+    autoUsePotionThresholdPct: clampFloat(payload.autoUsePotionThresholdPct, 0.1, 1, 0.35),
     autoRecycleEnabled: clampBoolean(payload.autoRecycleEnabled, false),
     autoSummonEnabled: clampBoolean(payload.autoSummonEnabled, false),
     autoSummonMode,
@@ -2335,7 +2344,7 @@ function reducer(state: GameState, action: Action): GameState {
         ...state,
         bossTears: canUseFree ? state.bossTears : state.bossTears - 1,
         heroRoster: [hero, ...state.heroRoster],
-        summonHistory: [historyEntry, ...state.summonHistory].slice(0, 60),
+        summonHistory: [historyEntry, ...state.summonHistory].slice(0, MAX_SAVE_SUMMON_HISTORY),
         totalSummons: state.totalSummons + 1,
         freeSummonCharges: canUseFree ? state.freeSummonCharges - 1 : state.freeSummonCharges,
         gachaPityCounter: roll.nextCounter,
@@ -2392,7 +2401,7 @@ function reducer(state: GameState, action: Action): GameState {
         ...state,
         bossTears: state.bossTears - paidUses,
         heroRoster: [...summoned, ...state.heroRoster],
-        summonHistory: [...historyBatch, ...state.summonHistory].slice(0, 60),
+        summonHistory: [...historyBatch, ...state.summonHistory].slice(0, MAX_SAVE_SUMMON_HISTORY),
         totalSummons: state.totalSummons + totalPulls,
         freeSummonCharges: state.freeSummonCharges - freeUses,
         gachaPityCounter: pityCounter,
@@ -2712,7 +2721,7 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'SET_AUTO_USE_POTION_THRESHOLD': {
-      const clamped = Math.max(0.1, Math.min(0.9, action.thresholdPct));
+      const clamped = Math.max(0.1, Math.min(1, action.thresholdPct));
       return {
         ...state,
         autoUsePotionThresholdPct: clamped,
@@ -2987,11 +2996,19 @@ function reducer(state: GameState, action: Action): GameState {
       const newRoster = state.heroRoster.filter(h => h.uid !== action.uid);
       const newActiveTeam = state.activeTeamHeroIds.filter(id => id !== action.uid);
       const newMaxHp = getTeamMaxHp({ ...state, heroRoster: newRoster, activeTeamHeroIds: newActiveTeam });
+      const heroFormationByUid = Object.fromEntries(
+        Object.entries(state.heroFormationByUid).filter(([uid]) => uid !== action.uid),
+      ) as Record<string, HeroFormationRole>;
+      const heroActiveCdMs = Object.fromEntries(
+        Object.entries(state.heroActiveCdMs).filter(([uid]) => uid !== action.uid),
+      ) as Record<string, number>;
       
       return {
         ...state,
         heroRoster: newRoster,
         activeTeamHeroIds: newActiveTeam,
+        heroFormationByUid,
+        heroActiveCdMs,
         heroShards: state.heroShards + shardReward,
         teamMaxHp: newMaxHp,
         teamHp: Math.min(state.teamHp, newMaxHp),
@@ -3011,10 +3028,18 @@ function reducer(state: GameState, action: Action): GameState {
       const shardReward = Math.ceil(toRecycle.reduce((sum, hero) => sum + calculateShardReward(hero.rarity, hero.level), 0) * weekly.shardMultiplier);
       const newRoster = state.heroRoster.filter(h => !recycledIds.has(h.uid));
       const newMaxHp = getTeamMaxHp({ ...state, heroRoster: newRoster });
+      const heroFormationByUid = Object.fromEntries(
+        Object.entries(state.heroFormationByUid).filter(([uid]) => !recycledIds.has(uid)),
+      ) as Record<string, HeroFormationRole>;
+      const heroActiveCdMs = Object.fromEntries(
+        Object.entries(state.heroActiveCdMs).filter(([uid]) => !recycledIds.has(uid)),
+      ) as Record<string, number>;
 
       const nextState: GameState = {
         ...state,
         heroRoster: newRoster,
+        heroFormationByUid,
+        heroActiveCdMs,
         heroShards: state.heroShards + shardReward,
         teamMaxHp: newMaxHp,
         teamHp: Math.min(state.teamHp, newMaxHp),
@@ -3306,6 +3331,7 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'SIMULATE_DOLLAR_PURCHASE': {
+      if (!ENABLE_SIMULATED_DOLLAR_PURCHASES) return state;
       const pack = DOLLAR_SHOP_PACKS[action.offerId];
       if (!pack) return state;
       const firstPurchaseActive = !state.dollarFirstPurchaseClaimedOfferIds.includes(action.offerId);
@@ -3464,6 +3490,7 @@ function reducer(state: GameState, action: Action): GameState {
         equippedItems: p.equippedItems,
         usableItemCounts: p.usableItemCounts,
         autoUsePotionEnabled: p.autoUsePotionEnabled,
+        autoUseCoolantEnabled: p.autoUseCoolantEnabled,
         autoUsePotionThresholdPct: p.autoUsePotionThresholdPct,
         autoRecycleEnabled: p.autoRecycleEnabled,
         autoSummonEnabled: p.autoSummonEnabled,

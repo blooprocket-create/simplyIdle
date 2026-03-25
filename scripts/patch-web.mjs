@@ -24,17 +24,21 @@ html = html.replace(
 // ── 2. Mobile interaction CSS (injected inside the expo-reset <style> block) ──
 const mobileCss = `
       /* ── Mobile web fixes ───────────────────────────────────────────── */
-      /* Eliminate 300 ms tap delay and accidental double-tap zoom */
-      * { touch-action: manipulation; box-sizing: border-box; }
+  /* Keep sizing predictable without disabling native scroll gestures */
+  * { box-sizing: border-box; }
       /* Kill the grey/blue tap-highlight flash on iOS/Android Chrome */
       * { -webkit-tap-highlight-color: transparent; }
-      /* Prevent accidental text selection during gameplay */
-      body { -webkit-user-select: none; user-select: none; }
+  /* Allow vertical page scrolling on mobile browsers */
+  html, body { min-height: 100%; height: 100%; overflow-x: hidden; overflow-y: auto; }
+  body {
+    touch-action: pan-y pinch-zoom;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
       /* iOS Safari 100dvh fix — address bar eats space */
       html { height: -webkit-fill-available; }
-      #root { min-height: -webkit-fill-available; }
-      /* Smooth momentum scrolling inside ScrollViews on iOS */
-      * { -webkit-overflow-scrolling: touch; }`;
+  body, #root { min-height: -webkit-fill-available; }
+  #root { overflow: visible; }`;
 
 // Insert just before the closing </style> of the expo-reset block
 html = html.replace('</style>', mobileCss + '\n    </style>');

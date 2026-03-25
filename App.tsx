@@ -1,6 +1,6 @@
 import 'react-native-reanimated';
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import GameScreen from './src/screens/GameScreen.tsx';
 import AuthScreen, { AUTH_STORAGE_KEYS, getValidStoredSession } from './src/screens/AuthScreen.tsx';
@@ -8,6 +8,30 @@ import AuthScreen, { AUTH_STORAGE_KEYS, getValidStoredSession } from './src/scre
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [accountName, setAccountName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+
+    const html = document.documentElement;
+    const body = document.body;
+    const root = document.getElementById('root');
+
+    html.style.height = '100%';
+    html.style.overflow = 'auto';
+    body.style.height = '100%';
+    body.style.minHeight = '100%';
+    body.style.overflowX = 'hidden';
+    body.style.overflowY = 'auto';
+    body.style.touchAction = 'pan-y pinch-zoom';
+    body.style.webkitOverflowScrolling = 'touch';
+    body.style.overscrollBehaviorY = 'contain';
+
+    if (root) {
+      root.style.minHeight = '100%';
+      root.style.overflow = 'visible';
+      root.style.touchAction = 'pan-y pinch-zoom';
+    }
+  }, []);
 
   useEffect(() => {
     getValidStoredSession()

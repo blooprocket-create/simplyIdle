@@ -14,7 +14,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getCharacterSaveSlot, getDpsBreakdown, getEquipmentCraftCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState } from '../useGameState';
+import { ENABLE_SIMULATED_DOLLAR_PURCHASES, getCharacterSaveSlot, getDpsBreakdown, getEquipmentCraftCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState } from '../useGameState';
 import { trackEvent } from '../telemetry';
 import {
   ACHIEVEMENTS,
@@ -94,6 +94,7 @@ const TAB_META: Record<Tab, { icon: string; label: string; mood: string }> = {
 const ACH_BONUS_PER_UNLOCK_PCT = 3;
 const ACH_BONUS_CAP_PCT = 75;
 const FEEDBACK_FORM_URL = 'https://forms.gle/replace-with-your-beta-form';
+const HAS_BETA_FEEDBACK_FORM = !FEEDBACK_FORM_URL.includes('replace-with-your-beta-form');
 const GEAR_RARITY_POINTS: Record<string, number> = { common: 40, rare: 90, epic: 170, legendary: 280, mythic: 430 };
 const VIP_LEVEL_THRESHOLDS = [0, 50, 150, 350, 700, 1500, 3000, 6500, 15000, 35000, 100000] as const;
 const GOLD_SHOP_OFFERS = [
@@ -3120,8 +3121,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
               {shopTab === 'dollar' && (
                 <View style={styles.eventsCard}>
-                  <Text style={styles.eventsCardTitle}>💵 Dollar Shop (Simulation)</Text>
-                  <Text style={styles.eventsHint}>Standard IAP flow simulation: every pack has a one-time first-purchase bonus (x2 diamonds).</Text>
+                  <Text style={styles.eventsCardTitle}>💵 Dollar Shop</Text>
+                  <Text style={styles.eventsHint}>
+                    {ENABLE_SIMULATED_DOLLAR_PURCHASES
+                      ? 'Standard IAP flow simulation: every pack has a one-time first-purchase bonus (x2 diamonds).'
+                      : 'Disabled in live balance builds to avoid free premium-currency exploits.'}
+                  </Text>
                   {DOLLAR_SHOP_OFFERS.map(offer => {
                     const firstBonusAvailable = !dollarFirstPurchaseClaimed.has(offer.id);
                     const totalDiamonds = offer.diamonds + (firstBonusAvailable ? offer.firstBonusDiamonds : 0);
@@ -3133,10 +3138,15 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                           <Text style={styles.shopOfferPrice}>{firstBonusAvailable ? `First Purchase Bonus: +${fmt(offer.firstBonusDiamonds)} diamonds` : 'First purchase bonus already claimed'}</Text>
                         </View>
                         <Pressable
-                          style={styles.eventsActionBtn}
+                          style={[styles.eventsActionBtn, !ENABLE_SIMULATED_DOLLAR_PURCHASES && styles.shopBuyBtnDisabled]}
+                          disabled={!ENABLE_SIMULATED_DOLLAR_PURCHASES}
                           onPress={() => simulateDollarPurchase(offer.id)}
                         >
-                          <Text style={styles.eventsActionBtnText}>{firstBonusAvailable ? 'Sim Buy x2' : 'Sim Buy'}</Text>
+                          <Text style={styles.eventsActionBtnText}>
+                            {ENABLE_SIMULATED_DOLLAR_PURCHASES
+                              ? firstBonusAvailable ? 'Sim Buy x2' : 'Sim Buy'
+                              : 'Unavailable'}
+                          </Text>
                         </Pressable>
                       </View>
                     );
@@ -3398,15 +3408,20 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
               <View style={styles.settingsCard}>
                 <Text style={styles.settingsCardTitle}>Beta Feedback</Text>
-                <Text style={styles.settingsLabel}>Send bugs, balance notes, and QoL requests to the beta board.</Text>
+                <Text style={styles.settingsLabel}>
+                  {HAS_BETA_FEEDBACK_FORM
+                    ? 'Send bugs, balance notes, and QoL requests to the beta board.'
+                    : 'Feedback form is not configured yet. Add a live form URL before enabling this action.'}
+                </Text>
                 <Pressable
-                  style={styles.settingsCycleBtn}
+                  style={[styles.settingsCycleBtn, !HAS_BETA_FEEDBACK_FORM && styles.shopBuyBtnDisabled]}
+                  disabled={!HAS_BETA_FEEDBACK_FORM}
                   onPress={() => {
                     void trackEvent('feedback_link_opened', { source: 'settings' });
                     void Linking.openURL(FEEDBACK_FORM_URL);
                   }}
                 >
-                  <Text style={styles.settingsCycleBtnText}>Open Feedback Form</Text>
+                  <Text style={styles.settingsCycleBtnText}>{HAS_BETA_FEEDBACK_FORM ? 'Open Feedback Form' : 'Feedback Form Soon'}</Text>
                 </Pressable>
               </View>
 
