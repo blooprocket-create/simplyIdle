@@ -99,6 +99,18 @@ const DOLLAR_SHOP_PACKS: Record<DollarShopOfferId, { usdCents: number; diamonds:
   usd_4999: { usdCents: 4999, diamonds: 6000 },
   usd_9999: { usdCents: 9999, diamonds: 13000 },
 };
+const VIP_MILESTONE_REWARDS: Record<number, { diamonds: number; gold: number; shards: number; essence: number }> = {
+  1: { diamonds: 50, gold: 1200, shards: 50, essence: 0 },
+  2: { diamonds: 100, gold: 2800, shards: 90, essence: 1 },
+  3: { diamonds: 180, gold: 5200, shards: 140, essence: 1 },
+  4: { diamonds: 300, gold: 9200, shards: 220, essence: 2 },
+  5: { diamonds: 500, gold: 16000, shards: 340, essence: 3 },
+  6: { diamonds: 800, gold: 30000, shards: 500, essence: 4 },
+  7: { diamonds: 1250, gold: 52000, shards: 760, essence: 6 },
+  8: { diamonds: 2000, gold: 90000, shards: 1100, essence: 9 },
+  9: { diamonds: 3200, gold: 145000, shards: 1550, essence: 13 },
+  10: { diamonds: 5000, gold: 220000, shards: 2200, essence: 20 },
+};
 const VIP_LEVEL_THRESHOLDS = [0, 50, 150, 350, 700, 1500, 3000, 6500, 15000, 35000, 100000] as const;
 const VIP_DAMAGE_PER_LEVEL = 0.03;
 const VIP_GOLD_PER_LEVEL = 0.025;
@@ -120,6 +132,7 @@ const VALID_ACHIEVEMENT_IDS = new Set(ACHIEVEMENTS.map(achievement => achievemen
 const VALID_MISSION_IDS = new Set(MISSION_BOARD_GOALS.map(mission => mission.id));
 const VALID_WEEKLY_TRACK_MILESTONES = new Set(WEEKLY_TRACK_MILESTONES);
 const VALID_TUTORIAL_QUEST_IDS = new Set(TUTORIAL_QUESTS.map(quest => quest.id));
+const VALID_DOLLAR_SHOP_OFFER_IDS = new Set<DollarShopOfferId>(['usd_499', 'usd_1999', 'usd_4999', 'usd_9999']);
 
 export function getCharacterSaveSlot(accountName: string, playerClass: PlayerClass): string {
   return `${accountName}_${playerClass}`;
@@ -218,6 +231,8 @@ export interface GameState {
   metaSurvivalLevel: number;
   vipPoints: number;
   vipLevel: number;
+  vipRewardClaimedLevels: number[];
+  dollarFirstPurchaseClaimedOfferIds: DollarShopOfferId[];
 
   inventoryItemIds: string[];
   equippedItems: Record<EquipmentSlot, string | null>;
@@ -332,6 +347,8 @@ const DEFAULT_STATE: GameState = {
   metaSurvivalLevel: 0,
   vipPoints: 0,
   vipLevel: 0,
+  vipRewardClaimedLevels: [],
+  dollarFirstPurchaseClaimedOfferIds: [],
 
   inventoryItemIds: [],
   equippedItems: {
@@ -1565,6 +1582,10 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     metaSurvivalLevel: clampInt(payload.metaSurvivalLevel, 0, SAFE_INTEGER_CAP, 0),
     vipPoints: clampInt(payload.vipPoints, 0, SAFE_INTEGER_CAP, 0),
     vipLevel: getVipLevelFromPoints(clampInt(payload.vipPoints, 0, SAFE_INTEGER_CAP, 0)),
+    vipRewardClaimedLevels: sanitizeIntList(payload.vipRewardClaimedLevels, 10)
+      .filter(level => level >= 1 && level <= 10),
+    dollarFirstPurchaseClaimedOfferIds: sanitizeStringList(payload.dollarFirstPurchaseClaimedOfferIds, VALID_DOLLAR_SHOP_OFFER_IDS.size)
+      .filter((id): id is DollarShopOfferId => VALID_DOLLAR_SHOP_OFFER_IDS.has(id as DollarShopOfferId)),
     inventoryItemIds,
     equippedItems,
     usableItemCounts,
@@ -2026,6 +2047,7 @@ type Action =
   | { type: 'BUY_GOLD_SHOP_ITEM'; offerId: GoldShopOfferId }
   | { type: 'BUY_DIAMOND_SHOP_ITEM'; offerId: DiamondShopOfferId }
   | { type: 'SIMULATE_DOLLAR_PURCHASE'; offerId: DollarShopOfferId }
+  | { type: 'CLAIM_VIP_REWARD'; level: number }
   | { type: 'BUY_PREMIUM_COOLANT'; itemId: 'coolant_mk1' | 'coolant_mk2' }
   | { type: 'USE_USABLE_ITEM'; itemId: string }
   | { type: 'AUTO_DISMANTLE_EQUIPMENT' }
@@ -3240,31 +3262,69 @@ function reducer(state: GameState, action: Action): GameState {
     case 'SIMULATE_DOLLAR_PURCHASE': {
       const pack = DOLLAR_SHOP_PACKS[action.offerId];
       if (!pack) return state;
+      const firstPurchaseActive = !state.dollarFirstPurchaseClaimedOfferIds.includes(action.offerId);
 
       const pointsGain = Math.max(1, Math.round(pack.usdCents / 10));
       const nextPoints = state.vipPoints + pointsGain;
       const nextLevel = getVipLevelFromPoints(nextPoints);
       const leveledUp = nextLevel > state.vipLevel;
       const priceLabel = `$${(pack.usdCents / 100).toFixed(2)}`;
+      const bonusDiamonds = firstPurchaseActive ? pack.diamonds : 0;
 
       const purchasedState = queueReward({
         ...state,
-        diamonds: state.diamonds + pack.diamonds,
+        diamonds: state.diamonds + pack.diamonds + bonusDiamonds,
         vipPoints: nextPoints,
         vipLevel: nextLevel,
+        dollarFirstPurchaseClaimedOfferIds: firstPurchaseActive
+          ? [...state.dollarFirstPurchaseClaimedOfferIds, action.offerId]
+          : state.dollarFirstPurchaseClaimedOfferIds,
       }, {
         id: `shop_cash_${action.offerId}_${Date.now()}`,
         kind: 'system',
         title: 'Dollar Shop Purchase (Simulated)',
-        detail: `${priceLabel} pack: +${pack.diamonds} diamonds, +${pointsGain} VIP points`,
+        detail: `${priceLabel} pack: +${pack.diamonds + bonusDiamonds} diamonds${firstPurchaseActive ? ' (first purchase x2 bonus)' : ''}, +${pointsGain} VIP points`,
       });
 
-      if (!leveledUp) return purchasedState;
-      return queueReward(purchasedState, {
+      const withFirstBonus = firstPurchaseActive
+        ? queueReward(purchasedState, {
+          id: `shop_cash_first_bonus_${action.offerId}_${Date.now()}`,
+          kind: 'system',
+          title: 'First Purchase Bonus',
+          detail: `+${bonusDiamonds} bonus diamonds (one-time for this pack)`,
+        })
+        : purchasedState;
+
+      if (!leveledUp) return withFirstBonus;
+      return queueReward(withFirstBonus, {
         id: `vip_level_${nextLevel}_${Date.now()}`,
         kind: 'system',
         title: `VIP Level Up: ${nextLevel}`,
         detail: `Bonuses now: +${Math.round((getVipDamageMultiplier({ ...state, vipLevel: nextLevel }) - 1) * 100)}% DPS, +${Math.round((getVipGoldMultiplier({ ...state, vipLevel: nextLevel }) - 1) * 100)}% gold, +${Math.round((getVipExpMultiplier({ ...state, vipLevel: nextLevel }) - 1) * 100)}% EXP`,
+      });
+    }
+
+    case 'CLAIM_VIP_REWARD': {
+      if (action.level < 1 || action.level > 10) return state;
+      if (state.vipLevel < action.level) return state;
+      if (state.vipRewardClaimedLevels.includes(action.level)) return state;
+
+      const reward = VIP_MILESTONE_REWARDS[action.level];
+      if (!reward) return state;
+
+      return queueReward({
+        ...state,
+        vipRewardClaimedLevels: [...state.vipRewardClaimedLevels, action.level],
+        diamonds: state.diamonds + reward.diamonds,
+        gold: state.gold + reward.gold,
+        totalGold: state.totalGold + reward.gold,
+        heroShards: state.heroShards + reward.shards,
+        essence: state.essence + reward.essence,
+      }, {
+        id: `vip_reward_${action.level}_${Date.now()}`,
+        kind: 'system',
+        title: `VIP ${action.level} Reward Claimed`,
+        detail: `+${reward.diamonds} diamonds, +${reward.gold} gold, +${reward.shards} shards, +${reward.essence} essence`,
       });
     }
 
@@ -3351,6 +3411,8 @@ function reducer(state: GameState, action: Action): GameState {
         metaSurvivalLevel: p.metaSurvivalLevel,
         vipPoints: p.vipPoints,
         vipLevel: p.vipLevel,
+        vipRewardClaimedLevels: p.vipRewardClaimedLevels,
+        dollarFirstPurchaseClaimedOfferIds: p.dollarFirstPurchaseClaimedOfferIds,
 
         inventoryItemIds: p.inventoryItemIds,
         equippedItems: p.equippedItems,
@@ -3453,6 +3515,8 @@ interface SaveData {
   metaSurvivalLevel: number;
   vipPoints?: number;
   vipLevel?: number;
+  vipRewardClaimedLevels?: number[];
+  dollarFirstPurchaseClaimedOfferIds?: string[];
 
   inventoryItemIds: string[];
   equippedItems: Record<EquipmentSlot, string | null>;
@@ -3546,6 +3610,8 @@ function serialize(state: GameState): SaveData {
     metaSurvivalLevel: state.metaSurvivalLevel,
     vipPoints: state.vipPoints,
     vipLevel: state.vipLevel,
+    vipRewardClaimedLevels: state.vipRewardClaimedLevels,
+    dollarFirstPurchaseClaimedOfferIds: state.dollarFirstPurchaseClaimedOfferIds,
 
     inventoryItemIds: state.inventoryItemIds,
     equippedItems: state.equippedItems,
@@ -3642,12 +3708,20 @@ export function useGameState(saveSlot: string = 'default') {
 
   useEffect(() => {
     if (!hydrated || !state.characterCreated) return;
-    const fingerprint = `${state.weeklyTrackClaimed.join(',')}|${state.claimedMissionIds.join(',')}`;
+    const fingerprint = `${state.weeklyTrackClaimed.join(',')}|${state.claimedMissionIds.join(',')}|${state.vipRewardClaimedLevels.join(',')}|${state.dollarFirstPurchaseClaimedOfferIds.join(',')}`;
     if (fingerprint === claimFingerprintRef.current) return;
     claimFingerprintRef.current = fingerprint;
     lastSaveRef.current = Date.now();
     void AsyncStorage.setItem(saveKey, JSON.stringify(serialize(stateRef.current)));
-  }, [hydrated, state.characterCreated, state.weeklyTrackClaimed, state.claimedMissionIds, saveKey]);
+  }, [
+    hydrated,
+    state.characterCreated,
+    state.weeklyTrackClaimed,
+    state.claimedMissionIds,
+    state.vipRewardClaimedLevels,
+    state.dollarFirstPurchaseClaimedOfferIds,
+    saveKey,
+  ]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -3794,6 +3868,7 @@ export function useGameState(saveSlot: string = 'default') {
   const buyGoldShopItem = useCallback((offerId: GoldShopOfferId) => dispatch({ type: 'BUY_GOLD_SHOP_ITEM', offerId }), []);
   const buyDiamondShopItem = useCallback((offerId: DiamondShopOfferId) => dispatch({ type: 'BUY_DIAMOND_SHOP_ITEM', offerId }), []);
   const simulateDollarPurchase = useCallback((offerId: DollarShopOfferId) => dispatch({ type: 'SIMULATE_DOLLAR_PURCHASE', offerId }), []);
+  const claimVipReward = useCallback((level: number) => dispatch({ type: 'CLAIM_VIP_REWARD', level }), []);
   const buyPremiumCoolant = useCallback((itemId: 'coolant_mk1' | 'coolant_mk2') => {
     dispatch({ type: 'BUY_PREMIUM_COOLANT', itemId });
   }, []);
@@ -3905,6 +3980,7 @@ export function useGameState(saveSlot: string = 'default') {
     buyGoldShopItem,
     buyDiamondShopItem,
     simulateDollarPurchase,
+    claimVipReward,
     buyPremiumCoolant,
     autoDismantleEquipment,
     spendEssenceUpgrade,

@@ -107,10 +107,22 @@ const DIAMOND_SHOP_OFFERS = [
   { id: 'elite_supply', name: 'Elite Supply Crate', desc: '+5 Coolant I, +3 Coolant II, +2 Grand Potions', cost: 120 },
 ] as const;
 const DOLLAR_SHOP_OFFERS = [
-  { id: 'usd_499', label: '$4.99', diamonds: 500, vipPoints: 50 },
-  { id: 'usd_1999', label: '$19.99', diamonds: 2200, vipPoints: 200 },
-  { id: 'usd_4999', label: '$49.99', diamonds: 6000, vipPoints: 500 },
-  { id: 'usd_9999', label: '$99.99', diamonds: 13000, vipPoints: 1000 },
+  { id: 'usd_499', label: '$4.99', diamonds: 500, vipPoints: 50, firstBonusDiamonds: 500 },
+  { id: 'usd_1999', label: '$19.99', diamonds: 2200, vipPoints: 200, firstBonusDiamonds: 2200 },
+  { id: 'usd_4999', label: '$49.99', diamonds: 6000, vipPoints: 500, firstBonusDiamonds: 6000 },
+  { id: 'usd_9999', label: '$99.99', diamonds: 13000, vipPoints: 1000, firstBonusDiamonds: 13000 },
+] as const;
+const VIP_REWARD_MILESTONES = [
+  { level: 1, diamonds: 50, gold: 1200, shards: 50, essence: 0 },
+  { level: 2, diamonds: 100, gold: 2800, shards: 90, essence: 1 },
+  { level: 3, diamonds: 180, gold: 5200, shards: 140, essence: 1 },
+  { level: 4, diamonds: 300, gold: 9200, shards: 220, essence: 2 },
+  { level: 5, diamonds: 500, gold: 16000, shards: 340, essence: 3 },
+  { level: 6, diamonds: 800, gold: 30000, shards: 500, essence: 4 },
+  { level: 7, diamonds: 1250, gold: 52000, shards: 760, essence: 6 },
+  { level: 8, diamonds: 2000, gold: 90000, shards: 1100, essence: 9 },
+  { level: 9, diamonds: 3200, gold: 145000, shards: 1550, essence: 13 },
+  { level: 10, diamonds: 5000, gold: 220000, shards: 2200, essence: 20 },
 ] as const;
 
 interface CharacterSlotSummary {
@@ -173,6 +185,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     buyGoldShopItem,
     buyDiamondShopItem,
     simulateDollarPurchase,
+    claimVipReward,
     buyPremiumCoolant,
     autoDismantleEquipment,
     spendEssenceUpgrade,
@@ -516,6 +529,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const vipProgressPct = vipLevel >= 10
     ? 100
     : Math.max(0, Math.min(100, ((vipPoints - vipCurrentThreshold) / Math.max(1, vipNextThreshold - vipCurrentThreshold)) * 100));
+  const vipClaimedLevels = state.vipRewardClaimedLevels ?? [];
+  const dollarFirstPurchaseClaimed = new Set(state.dollarFirstPurchaseClaimedOfferIds ?? []);
   const storyEntries = useMemo(
     () => STORY_BEATS.map(beat => {
       const waveReady = state.highestWaveReached >= beat.unlockWave;
@@ -2997,6 +3012,32 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 </Text>
               </View>
 
+              <View style={styles.eventsCard}>
+                <Text style={styles.eventsCardTitle}>🎁 VIP Milestone Rewards</Text>
+                <Text style={styles.eventsHint}>Each VIP level reward is one-time claimable after reaching that level.</Text>
+                {VIP_REWARD_MILESTONES.map(row => {
+                  const claimed = vipClaimedLevels.includes(row.level);
+                  const canClaim = !claimed && vipLevel >= row.level;
+                  return (
+                    <View key={row.level} style={styles.shopOfferRow}>
+                      <View style={styles.shopOfferInfo}>
+                        <Text style={styles.shopOfferTitle}>VIP {row.level} Milestone</Text>
+                        <Text style={styles.shopOfferDesc}>
+                          +{fmt(row.diamonds)} diamonds • +{fmt(row.gold)} gold • +{fmt(row.shards)} shards{row.essence > 0 ? ` • +${fmt(row.essence)} essence` : ''}
+                        </Text>
+                      </View>
+                      <Pressable
+                        style={[styles.eventsActionBtn, !canClaim && styles.shopBuyBtnDisabled]}
+                        disabled={!canClaim}
+                        onPress={() => claimVipReward(row.level)}
+                      >
+                        <Text style={styles.eventsActionBtnText}>{claimed ? 'Claimed' : canClaim ? 'Claim' : `VIP ${row.level}`}</Text>
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+
               {shopTab === 'diamond' && (
                 <View style={styles.eventsCard}>
                   <Text style={styles.eventsCardTitle}>💎 Diamond Shop</Text>
@@ -3052,22 +3093,26 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               {shopTab === 'dollar' && (
                 <View style={styles.eventsCard}>
                   <Text style={styles.eventsCardTitle}>💵 Dollar Shop (Simulation)</Text>
-                  <Text style={styles.eventsHint}>No real payments yet. Purchases are simulated and still grant VIP points.</Text>
-                  {DOLLAR_SHOP_OFFERS.map(offer => (
-                    <View key={offer.id} style={styles.shopOfferRow}>
-                      <View style={styles.shopOfferInfo}>
-                        <Text style={styles.shopOfferTitle}>{offer.label} Pack</Text>
-                        <Text style={styles.shopOfferDesc}>+{fmt(offer.diamonds)} diamonds • +{offer.vipPoints} VIP points</Text>
-                        <Text style={styles.shopOfferPrice}>Rate: $1 = 10 VIP points</Text>
+                  <Text style={styles.eventsHint}>Standard IAP flow simulation: every pack has a one-time first-purchase bonus (x2 diamonds).</Text>
+                  {DOLLAR_SHOP_OFFERS.map(offer => {
+                    const firstBonusAvailable = !dollarFirstPurchaseClaimed.has(offer.id);
+                    const totalDiamonds = offer.diamonds + (firstBonusAvailable ? offer.firstBonusDiamonds : 0);
+                    return (
+                      <View key={offer.id} style={styles.shopOfferRow}>
+                        <View style={styles.shopOfferInfo}>
+                          <Text style={styles.shopOfferTitle}>{offer.label} Pack</Text>
+                          <Text style={styles.shopOfferDesc}>+{fmt(totalDiamonds)} diamonds • +{offer.vipPoints} VIP points</Text>
+                          <Text style={styles.shopOfferPrice}>{firstBonusAvailable ? `First Purchase Bonus: +${fmt(offer.firstBonusDiamonds)} diamonds` : 'First purchase bonus already claimed'}</Text>
+                        </View>
+                        <Pressable
+                          style={styles.eventsActionBtn}
+                          onPress={() => simulateDollarPurchase(offer.id)}
+                        >
+                          <Text style={styles.eventsActionBtnText}>{firstBonusAvailable ? 'Sim Buy x2' : 'Sim Buy'}</Text>
+                        </Pressable>
                       </View>
-                      <Pressable
-                        style={styles.eventsActionBtn}
-                        onPress={() => simulateDollarPurchase(offer.id)}
-                      >
-                        <Text style={styles.eventsActionBtnText}>Sim Buy</Text>
-                      </Pressable>
-                    </View>
-                  ))}
+                    );
+                  })}
                 </View>
               )}
             </ScrollView>
