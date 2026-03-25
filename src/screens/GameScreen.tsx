@@ -928,10 +928,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   }, [eventsOpen, betaLeaderboardRows.myRank, betaLeaderboardRows.playerBoardScore]);
 
   const isBossImminent = state.wave % 10 >= 8;
-  const burstChargePct = Math.min(100, (state.burstCharge / 25) * 100);
+  const burstCost = 20;
+  const burstChargePct = Math.min(100, (state.burstCharge / burstCost) * 100);
   const maxHeat = getMaxHeatForLevel(state.level);
   const heatPct = Math.min(100, Math.max(0, (state.combatHeat / maxHeat) * 100));
-  const canBurst = state.burstCharge >= 25;
+  const canBurst = state.burstCharge >= burstCost;
   const battleSpeed = state.combatTempo;
   const prestige1Done = (state.prestigeCount ?? 0) >= 1;
   const prestige5Done = (state.prestigeCount ?? 0) >= 5;
@@ -1565,7 +1566,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               {warPanels.growth && (
                 <View style={styles.warPanelBody}>
                   <Text style={styles.warPanelStat}>Level {state.level} • Unspent: {state.unspentStatPoints}</Text>
-                  <Text style={styles.warPanelStat}>Achievement Bonus: +{(stats.achievementBonusPercent * 100).toFixed(0)}% to final DPS, manual attack damage, gold, and EXP</Text>
+                  <Text style={styles.warPanelStat}>Achievement Bonus: +{(stats.achievementBonusPercent * 100).toFixed(0)}% to final DPS, gold, and EXP</Text>
                   <Text style={styles.warPanelStat}>Rebirth Cores: {state.rebirthCores}</Text>
                   <View style={styles.warPanelActionRow}>
                     <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('stats')}>
@@ -1678,7 +1679,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <View style={styles.burstRow}>
                 <View style={styles.burstInfo}>
                   <Text style={styles.burstTitle}>Burst Gauge</Text>
-                  <Text style={styles.burstSub}>Charge from kills ({state.burstCharge}/25) • spend for amplified strikes</Text>
+                  <Text style={styles.burstSub}>Charge from kills ({state.burstCharge}/{burstCost}) • bosses grant +3 • spend for amplified strikes</Text>
                 </View>
                 <Pressable
                   style={[styles.burstBtn, !canBurst && styles.burstBtnDisabled]}
@@ -1697,7 +1698,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <View style={styles.hpBarBg}>
                 <View style={[styles.hpBarFill, { width: `${burstChargePct}%`, backgroundColor: '#FFB347' }]} />
               </View>
-              <Text style={styles.burstHint}>{canBurst ? 'Burst ready: cash in now for a wave skip push.' : `${25 - state.burstCharge} kills to next burst`}</Text>
+              <Text style={styles.burstHint}>{canBurst ? 'Burst ready: cash in now for a wave skip push.' : `${burstCost - state.burstCharge} kills to next burst`}</Text>
               <View style={styles.heatStoreRow}>
                 <Pressable
                   style={[styles.heatStoreBtn, state.diamonds < 8 && styles.heatStoreBtnDisabled]}
@@ -2600,7 +2601,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Text style={styles.achievementBonusValue}>+{(stats.achievementBonusPercent * 100).toFixed(0)}%</Text>
                 </View>
                 <Text style={styles.achievementBonusDesc}>
-                  Each unlocked achievement grants +{ACH_BONUS_PER_UNLOCK_PCT}% to final DPS, manual attack damage, gold gain, and EXP gain multipliers.
+                  Each unlocked achievement grants +{ACH_BONUS_PER_UNLOCK_PCT}% to final DPS, gold gain, and EXP gain multipliers.
                 </Text>
                 <Text style={styles.achievementBonusDesc}>
                   Cap: +{ACH_BONUS_CAP_PCT}% • Unlocked: {state.achievements.size}/{ACHIEVEMENTS.length}
@@ -2609,7 +2610,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   Current multiplier: x{(1 + stats.achievementBonusPercent).toFixed(2)} applied after most build/class/rebirth modifiers.
                 </Text>
                 <Text style={styles.achievementBonusDesc}>
-                  Affects now: DPS x{(1 + stats.achievementBonusPercent).toFixed(2)} • Manual x{(1 + stats.achievementBonusPercent).toFixed(2)} • Gold x{(1 + stats.achievementBonusPercent).toFixed(2)} • EXP x{(1 + stats.achievementBonusPercent).toFixed(2)}
+                  Affects now: DPS x{(1 + stats.achievementBonusPercent).toFixed(2)} • Gold x{(1 + stats.achievementBonusPercent).toFixed(2)} • EXP x{(1 + stats.achievementBonusPercent).toFixed(2)}
                 </Text>
                 <View style={styles.claimAllRow}>
                   <Text style={styles.claimAllInfo}>Claimable: {claimableWeeklyMilestones.length + claimableMissionIds.length}</Text>
@@ -2684,8 +2685,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     <Text style={styles.achDesc}>{ach.description}</Text>
                     <Text style={[styles.achBonusLine, unlocked && styles.achBonusLineUnlocked]}>
                       {unlocked
-                        ? `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/manual/gold/EXP applied`
-                        : `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/manual/gold/EXP on unlock`}
+                        ? `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/gold/EXP applied`
+                        : `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/gold/EXP on unlock`}
                     </Text>
                   </View>
                 </View>

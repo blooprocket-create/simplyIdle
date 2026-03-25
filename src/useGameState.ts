@@ -75,6 +75,10 @@ const HEAT_BASE_RATE_PER_SEC = 7;
 const HEAT_RECOVERY_RATE_PER_SEC = HEAT_BASE_RATE_PER_SEC * 0.66;
 const HEAT_MAX_BASE = 100;
 const HEAT_MAX_PER_LEVEL = 2;
+const BURST_COST = 20;
+const BURST_BOSS_CHARGE_GAIN = 3;
+const ACTIVE_STRIKE_DPS_MULT = 0.9;
+const BURST_STRIKE_DPS_MULT = 1.35;
 const PREMIUM_COOLANT_COSTS = {
   coolant_mk1: 8,
   coolant_mk2: 18,
@@ -143,7 +147,7 @@ export interface GameState {
   statsAlloc: StatBlock;
 
   totalKills: number;
-  burstCharge: number;  // 0-25; increments on each kill, resets on BURST
+  burstCharge: number;  // 0-BURST_COST; increments on each kill, resets on BURST
   combatHeat: number;
   wave: number;
   monsterHp: number;
@@ -1014,23 +1018,8 @@ function getDps(state: GameState): number {
   return getDpsBreakdown(state).finalDps;
 }
 
-function getClickDamage(state: GameState): number {
-  const cls = getClassConfig(state.playerClass ?? 'warrior');
-  const stats = derivedStats(state);
-  const rebirthMult = Math.pow(REBIRTH_BONUS, state.prestigeCount);
-
-  const physical = stats.strength * 2 + stats.agility * 1.2 + state.level * 0.8;
-  const magic = stats.intelligence * 2 + stats.spirit * 1.1 + state.level * 0.8;
-
-  let manual = ((physical * cls.physWeight * 0.35) + (magic * cls.magicWeight * 0.2)) / 8;
-  for (const sk of SKILLS) {
-    if (sk.targetId === 'click' && state.skills.has(sk.id)) {
-      manual *= sk.multiplier;
-    }
-  }
-
-  // Manual input is intentionally secondary to team DPS.
-  return Math.max(1, manual * rebirthMult * 0.75 * getAchievementBonusMultiplier(state));
+function getActiveStrikeDamage(state: GameState): number {
+  return Math.max(1, getDps(state) * ACTIVE_STRIKE_DPS_MULT);
 }
 
 function getAchievementBonusMultiplier(state: GameState): number {
@@ -1446,7 +1435,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     unspentStatPoints,
     statsAlloc,
     totalKills: clampInt(payload.totalKills, 0, SAFE_INTEGER_CAP, 0),
-    burstCharge: clampInt(payload.burstCharge, 0, 25, 0),
+    burstCharge: clampInt(payload.burstCharge, 0, BURST_COST, 0),
     combatHeat: clampFloat(payload.combatHeat, 0, maxHeat, 0),
     wave,
     monsterHp,
@@ -1562,7 +1551,6 @@ export function computeStats(state: GameState) {
     teamDefense: getTeamDefense(state),
     damageBuffPct: state.damageBuffMs > 0 ? state.damageBuffPct : 0,
     damageReductionBuffPct: state.damageReductionBuffMs > 0 ? state.damageReductionBuffPct : 0,
-    clickDmg: getClickDamage(state),
     achievementBonusPercent: getAchievementBonusMultiplier(state) - 1,
     expNeeded: expForLevel(state.level),
     expProgress: Math.min(1, state.exp / expForLevel(state.level)),
@@ -1712,7 +1700,7 @@ function killMonster(state: GameState): GameState {
     highestWaveReached: Math.max(state.highestWaveReached, newWave),
     unspentStatPoints: state.unspentStatPoints + lvl.gainedLevels * STAT_POINTS_PER_LEVEL,
     totalKills: state.totalKills + 1,
-    burstCharge: Math.min(25, state.burstCharge + 1),
+    burstCharge: Math.min(BURST_COST, state.burstCharge + (isBoss ? BURST_BOSS_CHARGE_GAIN : 1)),
     weeklyKills: state.weeklyKills + 1,
     seasonPoints: state.seasonPoints + 12 + (isBoss ? 80 : 0),
     bestSeasonPoints: Math.max(state.bestSeasonPoints, state.seasonPoints + 12 + (isBoss ? 80 : 0)),
@@ -2043,7 +2031,7 @@ function reducer(state: GameState, action: Action): GameState {
       if (!state.characterCreated) return state;
       const affix = getMonsterAffixModifiers(state.wave);
       const crit = Math.random() < 0.2;
-      const dmg = (getClickDamage(state) * (crit ? 1.8 : 1)) / affix.hpMult;
+      const dmg = (getActiveStrikeDamage(state) * (crit ? 1.8 : 1)) / affix.hpMult;
       const hp = state.monsterHp - dmg;
       const logged = queueCombatLog(state, `${crit ? 'CRIT' : 'Hit'} for ${Math.ceil(dmg)} dmg`);
       if (hp <= 0) return withAchievement(killMonster(logged));
@@ -2051,12 +2039,12 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'BURST': {
-      if (state.burstCharge < 25) return state;
+      if (state.burstCharge < BURST_COST) return state;
       let working: GameState = { ...state, burstCharge: 0 };
       for (let i = 0; i < action.hits; i++) {
         const affix = getMonsterAffixModifiers(working.wave);
         const crit = Math.random() < 0.2;
-        const dmg = (getClickDamage(working) * 8 * (crit ? 1.8 : 1)) / affix.hpMult;
+        const dmg = (getDps(working) * BURST_STRIKE_DPS_MULT * (crit ? 1.8 : 1)) / affix.hpMult;
         const hp = working.monsterHp - dmg;
         if (hp <= 0) {
           working = withAchievement(killMonster(working));
