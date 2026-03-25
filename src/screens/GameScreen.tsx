@@ -616,11 +616,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   ]);
   const expPct = Math.floor((state.exp / Math.max(1, stats.expNeeded)) * 100);
   const topStatChips = [
-    { id: 'gold', label: 'Gold', value: fmt(state.gold) },
+    { id: 'gold', label: 'Gold 💰', value: fmt(state.gold) },
     { id: 'diamonds', label: 'Diamonds 💎', value: `${state.diamonds}` },
     { id: 'tears', label: 'Tears 💧', value: `${state.bossTears}` },
-    { id: 'shards', label: 'Shards', value: fmt(state.heroShards) },
-    { id: 'essence', label: 'Essence', value: fmt(state.essence) },
+    { id: 'shards', label: 'Shards ✨', value: fmt(state.heroShards) },
+    { id: 'essence', label: 'Essence ⚡', value: fmt(state.essence) },
     { id: 'dps', label: 'DPS', value: fmt(stats.dps) },
     { id: 'power', label: 'Power', value: fmt(teamPowerIndex) },
     { id: 'gear', label: 'Gear', value: fmt(gearScore) },
@@ -2337,8 +2337,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   })
                 )}
               </>
-            )}
-
             )}
           </View>
         )}
