@@ -189,8 +189,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [idleChestReward, setIdleChestReward] = useState<{ title: string; detail: string } | null>(null);
   const [storyUnlockToast, setStoryUnlockToast] = useState<{ id: string; title: string; chapter: string } | null>(null);
   const [hoveredTopChipId, setHoveredTopChipId] = useState<'dps' | 'power' | 'gear' | null>(null);
+  const [topChipTooltipAnchor, setTopChipTooltipAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const lastSummonIdRef = useRef<string | null>(null);
+  const topChipRefs = useRef<Record<'dps' | 'power' | 'gear', View | null>>({ dps: null, power: null, gear: null });
   const storyUnlockInitRef = useRef(false);
   const seenStoryUnlockIdsRef = useRef<Set<string>>(new Set());
   const [warPanels, setWarPanels] = useState({
@@ -619,17 +621,36 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
     return null;
   }, [hoveredTopChipId, dpsBreakdown, powerFromDps, powerFromHp, powerFromDefense, powerFromGear, stats.dps, state.teamMaxHp, stats.teamDefense, gearScore, teamPowerIndex, gearScoreRows]);
-  const topChipTooltipAnchor = useMemo(() => {
-    const bubbleWidth = 280;
-    const railWidth = Math.max(320, viewportWidth - 24);
-    const maxLeft = Math.max(8, railWidth - bubbleWidth - 8);
-    const clampLeft = (value: number) => Math.max(8, Math.min(maxLeft, value));
-
-    if (hoveredTopChipId === 'dps') return { left: clampLeft(railWidth * 0.40) };
-    if (hoveredTopChipId === 'power') return { left: clampLeft(railWidth * 0.52) };
-    if (hoveredTopChipId === 'gear') return { left: clampLeft(railWidth * 0.64) };
-    return { left: clampLeft(railWidth * 0.50) };
-  }, [hoveredTopChipId, viewportWidth]);
+  const isTopChipWithTooltip = (id: string): id is 'dps' | 'power' | 'gear' => id === 'dps' || id === 'power' || id === 'gear';
+  const updateTopChipAnchor = (id: 'dps' | 'power' | 'gear') => {
+    const ref = topChipRefs.current[id];
+    if (!ref || typeof ref.measureInWindow !== 'function') return;
+    ref.measureInWindow((x, y, width, height) => {
+      if (width > 0 && height > 0) {
+        setTopChipTooltipAnchor({ x, y, width, height });
+      }
+    });
+  };
+  const showTopChipTooltip = (id: 'dps' | 'power' | 'gear') => {
+    setHoveredTopChipId(id);
+    requestAnimationFrame(() => updateTopChipAnchor(id));
+  };
+  const hideTopChipTooltip = (id: 'dps' | 'power' | 'gear') => {
+    setHoveredTopChipId(current => (current === id ? null : current));
+  };
+  useEffect(() => {
+    if (!hoveredTopChipId) return;
+    requestAnimationFrame(() => updateTopChipAnchor(hoveredTopChipId));
+  }, [hoveredTopChipId, viewportWidth, viewportHeight]);
+  const topChipTooltipLayout = useMemo(() => {
+    if (!topChipTooltipAnchor) return null;
+    const bubbleWidth = Math.max(260, Math.min(340, viewportWidth - 20));
+    const centerX = topChipTooltipAnchor.x + topChipTooltipAnchor.width / 2;
+    const left = Math.max(8, Math.min(viewportWidth - bubbleWidth - 8, centerX - bubbleWidth / 2));
+    const top = Math.max(8, topChipTooltipAnchor.y + topChipTooltipAnchor.height + 8);
+    const arrowLeft = Math.max(12, Math.min(bubbleWidth - 18, centerX - left - 6));
+    return { left, top, width: bubbleWidth, arrowLeft };
+  }, [topChipTooltipAnchor, viewportWidth]);
 
   useEffect(() => {
     const unlockedIds = storyEntries.filter(entry => entry.unlocked).map(entry => entry.id);
@@ -1114,17 +1135,20 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             <Pressable
               key={chip.id}
               style={[styles.statChip, hoveredTopChipId === chip.id && styles.statChipActive]}
+              ref={ref => {
+                if (isTopChipWithTooltip(chip.id)) topChipRefs.current[chip.id] = ref;
+              }}
               onHoverIn={() => {
-                if (chip.id === 'dps' || chip.id === 'power' || chip.id === 'gear') setHoveredTopChipId(chip.id);
+                if (isTopChipWithTooltip(chip.id)) showTopChipTooltip(chip.id);
               }}
               onHoverOut={() => {
-                if (chip.id === 'dps' || chip.id === 'power' || chip.id === 'gear') setHoveredTopChipId(current => (current === chip.id ? null : current));
+                if (isTopChipWithTooltip(chip.id)) hideTopChipTooltip(chip.id);
               }}
               onPressIn={() => {
-                if (chip.id === 'dps' || chip.id === 'power' || chip.id === 'gear') setHoveredTopChipId(chip.id);
+                if (isTopChipWithTooltip(chip.id)) showTopChipTooltip(chip.id);
               }}
               onPressOut={() => {
-                if (chip.id === 'dps' || chip.id === 'power' || chip.id === 'gear') setHoveredTopChipId(current => (current === chip.id ? null : current));
+                if (isTopChipWithTooltip(chip.id)) hideTopChipTooltip(chip.id);
               }}
             >
               <Text style={styles.statChipLabel}>{chip.label}</Text>
@@ -1138,16 +1162,30 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             </View>
           )}
         </ScrollView>
-        {topChipTooltip && (
-          <View pointerEvents="none" style={[styles.statChipTooltipBubble, topChipTooltipAnchor]}>
-            <View style={styles.statChipTooltipArrow} />
-            <Text style={styles.statChipTooltipTitle}>{topChipTooltip.title}</Text>
-            {topChipTooltip.lines.map(line => (
-              <Text key={line} style={styles.statChipTooltipLine}>{line}</Text>
-            ))}
-          </View>
-        )}
       </View>
+
+      {topChipTooltip && topChipTooltipLayout && (
+        <Modal transparent visible animationType="none" onRequestClose={() => setHoveredTopChipId(null)}>
+          <View pointerEvents="none" style={styles.statChipTooltipModalRoot}>
+            <View
+              style={[
+                styles.statChipTooltipBubbleModal,
+                {
+                  left: topChipTooltipLayout.left,
+                  top: topChipTooltipLayout.top,
+                  width: topChipTooltipLayout.width,
+                },
+              ]}
+            >
+              <View style={[styles.statChipTooltipArrowModal, { left: topChipTooltipLayout.arrowLeft }]} />
+              <Text style={styles.statChipTooltipTitle}>{topChipTooltip.title}</Text>
+              {topChipTooltip.lines.map(line => (
+                <Text key={line} style={styles.statChipTooltipLine}>{line}</Text>
+              ))}
+            </View>
+          </View>
+        </Modal>
+      )}
 
       {currentQuest && (
         <View style={styles.questBanner}>
@@ -3561,11 +3599,15 @@ const styles = StyleSheet.create({
   statChipValueWarn: {
     color: '#FBD484',
   },
-  statChipTooltipBubble: {
+  statChipTooltipModalRoot: {
+    flex: 1,
+    position: 'relative',
+    zIndex: 9999,
+    elevation: 999,
+  },
+  statChipTooltipBubbleModal: {
     position: 'absolute',
-    top: 60,
-    width: 280,
-    zIndex: 50,
+    zIndex: 10000,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#3A5A78',
@@ -3577,12 +3619,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.22,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    elevation: 12,
   },
-  statChipTooltipArrow: {
+  statChipTooltipArrowModal: {
     position: 'absolute',
     top: -6,
-    left: 136,
     width: 10,
     height: 10,
     backgroundColor: '#0F1C2A',
