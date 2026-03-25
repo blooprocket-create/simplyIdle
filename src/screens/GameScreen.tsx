@@ -2177,7 +2177,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
                           {nextRankCost && (
                             <View style={styles.rankUpSection}>
-                              <Text style={styles.rankUpLabel}>Rank Up Cost: {nextRankCost} 💎</Text>
+                              <Text style={styles.rankUpLabel}>Rank Up Cost: {nextRankCost} ✨</Text>
                               <Pressable
                                 style={[styles.rankUpBtn, !canRankUp && styles.rankUpBtnDisabled]}
                                 disabled={!canRankUp}
@@ -2275,14 +2275,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       disabled={state.heroShards < shardForgeCosts.essenceCost}
                       onPress={convertShardsToEssence}
                     >
-                      <Text style={styles.shardForgeBtnText}>Essence • {shardForgeCosts.essenceCost} 💎</Text>
+                      <Text style={styles.shardForgeBtnText}>Essence • {shardForgeCosts.essenceCost} ✨</Text>
                     </Pressable>
                     <Pressable
                       style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.scrapCost && styles.shardForgeBtnDisabled]}
                       disabled={state.heroShards < shardForgeCosts.scrapCost}
                       onPress={convertShardsToScrap}
                     >
-                      <Text style={styles.shardForgeBtnText}>Scrap • {shardForgeCosts.scrapCost} 💎</Text>
+                      <Text style={styles.shardForgeBtnText}>Scrap • {shardForgeCosts.scrapCost} ✨</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -4751,6 +4751,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2B4258',
     backgroundColor: '#0C131D',
+    minHeight: '100%',
   },
   tabContentCompact: {
     marginHorizontal: 6,
@@ -4760,7 +4761,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   tabContentInner: {
-    paddingBottom: 12,
+    paddingBottom: 80,
+    flexGrow: 1,
   },
   tabContentInnerNative: {
     paddingBottom: 32,
