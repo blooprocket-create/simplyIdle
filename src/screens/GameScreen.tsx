@@ -252,6 +252,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     prestige: false,
   });
 
+  const [diceRollModalOpen, setDiceRollModalOpen] = useState(false);
+  const [diceRollResult, setDiceRollResult] = useState<{ roll: number; diamonds: number; shards: number } | null>(null);
+  const [diceIsRolling, setDiceIsRolling] = useState(false);
+
+  const [riftDungeonModalOpen, setRiftDungeonModalOpen] = useState(false);
+  const [riftDungeonResult, setRiftDungeonResult] = useState<{ waves: number; diamonds: number; shards: number; essence: number } | null>(null);
+  const [riftIsSimulating, setRiftIsSimulating] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -828,8 +836,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   const canCraftWeapon = state.equipmentScrap >= 130;
 
-  const hasWarRoomNotification = canRebirthNow || canPlayDiceToday || canRunRiftToday || (nextTeamSlotUnlock?.canUnlock ?? false);
-  const hasEquipmentNotification = canCraftWeapon || Object.values(state.equippedItems).filter(Boolean).length < 3;
+  const hasWarRoomNotification = canRebirthNow || (nextTeamSlotUnlock?.canUnlock ?? false);
+  const hasEquipmentNotification = Object.values(state.equippedItems).filter(Boolean).length < 3;
   const hasAchievementsNotification = hasClaimableRewards;
 
   const optimizeEquipment = () => {
@@ -1660,16 +1668,39 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     <Pressable
                       style={[styles.warPanelActionBtn, !canPlayDiceToday && styles.warPanelActionBtnDisabled]}
                       disabled={!canPlayDiceToday}
-                      onPress={playDiceRoll}
+                      onPress={() => {
+                        const roll = 1 + Math.floor(Math.random() * 20);
+                        const diamonds = roll === 20 ? 30 : roll >= 17 ? 18 : roll >= 13 ? 12 : roll >= 9 ? 8 : 5;
+                        const shardBonus = roll >= 15 ? Math.ceil(roll * 12) : 0;
+                        setDiceRollResult({ roll, diamonds, shards: shardBonus });
+                        setDiceRollModalOpen(true);
+                      }}
                     >
-                      <Text style={styles.warPanelActionText}>Roll Dice (+Diamonds)</Text>
+                      <View style={{ position: 'relative', alignItems: 'center' }}>
+                        <Text style={styles.warPanelActionText}>Roll Dice (+Diamonds)</Text>
+                        {canPlayDiceToday && <View style={[styles.redDot, { position: 'absolute', top: -2, right: 0 }]} />}
+                      </View>
                     </Pressable>
                     <Pressable
                       style={[styles.warPanelActionBtn, !canRunRiftToday && styles.warPanelActionBtnDisabled]}
                       disabled={!canRunRiftToday}
-                      onPress={runRiftDungeon}
+                      onPress={() => {
+                        const dpsVal = dpsBreakdown.totalDps;
+                        const monsterMaxHpVal = state.wave < 10 ? 10 * Math.pow(1.15, state.wave) : 10 * Math.pow(1.15, 10) * Math.pow(1.25, state.wave - 10);
+                        const expected = Math.min(5, Math.max(1, Math.floor((dpsVal / Math.max(1, monsterMaxHpVal * 0.12)) * 2)));
+                        const variance = Math.floor(Math.random() * 3) - 1;
+                        const waves = Math.max(1, Math.min(5, expected + variance));
+                        const diamonds = 8 + waves * 4 + (waves === 5 ? 8 : 0);
+                        const shardReward = Math.ceil(waves * 90 * (1 + state.highestWaveReached / 250));
+                        const essenceReward = waves >= 4 ? 1 : 0;
+                        setRiftDungeonResult({ waves, diamonds, shards: shardReward, essence: essenceReward });
+                        setRiftDungeonModalOpen(true);
+                      }}
                     >
-                      <Text style={styles.warPanelActionText}>Run Rift (+Diamonds)</Text>
+                      <View style={{ position: 'relative', alignItems: 'center' }}>
+                        <Text style={styles.warPanelActionText}>Run Rift (+Diamonds)</Text>
+                        {canRunRiftToday && <View style={[styles.redDot, { position: 'absolute', top: -2, right: 0 }]} />}
+                      </View>
                     </Pressable>
                   </View>
                   <View style={styles.warPanelActionRow}>
@@ -3584,6 +3615,161 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Text style={styles.settingsHintText}>At heat 0, auto tempo re-engages from 1x to your selected target.</Text>
               </View>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Dice Roll Modal */}
+      <Modal
+        visible={diceRollModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!diceIsRolling) {
+            setDiceRollModalOpen(false);
+            if (diceRollResult) {
+              playDiceRoll();
+              setDiceRollResult(null);
+            }
+          }
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.diceRollModalContent}>
+            <Text style={styles.diceRollTitle}>🎲 Dice Protocol</Text>
+            {!diceIsRolling && diceRollResult ? (
+              <>
+                <View style={styles.diceResultContainer}>
+                  <Text style={styles.diceResultNumber}>{diceRollResult.roll}</Text>
+                  <Text style={styles.diceResultLabel}>/ 20</Text>
+                </View>
+                <View style={styles.rewardsList}>
+                  <View style={styles.rewardItem}>
+                    <Text style={styles.rewardLabel}>Diamonds</Text>
+                    <Text style={styles.rewardValue}>💎 +{diceRollResult.diamonds}</Text>
+                  </View>
+                  {diceRollResult.shards > 0 && (
+                    <View style={styles.rewardItem}>
+                      <Text style={styles.rewardLabel}>Shards</Text>
+                      <Text style={styles.rewardValue}>✨ +{diceRollResult.shards}</Text>
+                    </View>
+                  )}
+                </View>
+                <Pressable
+                  style={styles.modalCloseBtn}
+                  onPress={() => {
+                    setDiceRollModalOpen(false);
+                    playDiceRoll();
+                    setDiceRollResult(null);
+                  }}
+                >
+                  <Text style={styles.modalCloseBtnText}>Claim Rewards</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={styles.diceRollHint}>Tap the die to roll!</Text>
+                <Pressable
+                  style={styles.diceButton}
+                  onPress={() => {
+                    setDiceIsRolling(true);
+                    setTimeout(() => setDiceIsRolling(false), 600);
+                  }}
+                  disabled={diceIsRolling}
+                >
+                  <Text style={styles.diceEmoji}>🎲</Text>
+                </Pressable>
+                {diceIsRolling && <Text style={styles.diceRollingText}>Rolling...</Text>}
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Rift Dungeon Modal */}
+      <Modal
+        visible={riftDungeonModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!riftIsSimulating) {
+            setRiftDungeonModalOpen(false);
+            if (riftDungeonResult) {
+              runRiftDungeon();
+              setRiftDungeonResult(null);
+            }
+          }
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.riftModalContent}>
+            <Text style={styles.riftTitle}>⚔️ Rift Breach Challenge</Text>
+            {!riftIsSimulating && riftDungeonResult ? (
+              <>
+                <View style={styles.wavesClearedContainer}>
+                  <Text style={styles.wavesClearedNumber}>{riftDungeonResult.waves}</Text>
+                  <Text style={styles.wavesClearedLabel}>/ 5 Waves Cleared</Text>
+                </View>
+                <View style={styles.rewardsList}>
+                  <View style={styles.rewardItem}>
+                    <Text style={styles.rewardLabel}>Diamonds</Text>
+                    <Text style={styles.rewardValue}>💎 +{riftDungeonResult.diamonds}</Text>
+                  </View>
+                  <View style={styles.rewardItem}>
+                    <Text style={styles.rewardLabel}>Shards</Text>
+                    <Text style={styles.rewardValue}>✨ +{riftDungeonResult.shards}</Text>
+                  </View>
+                  {riftDungeonResult.essence > 0 && (
+                    <View style={styles.rewardItem}>
+                      <Text style={styles.rewardLabel}>Essence</Text>
+                      <Text style={styles.rewardValue}>⚡ +{riftDungeonResult.essence}</Text>
+                    </View>
+                  )}
+                </View>
+                <Pressable
+                  style={styles.modalCloseBtn}
+                  onPress={() => {
+                    setRiftDungeonModalOpen(false);
+                    runRiftDungeon();
+                    setRiftDungeonResult(null);
+                  }}
+                >
+                  <Text style={styles.modalCloseBtnText}>Claim Rewards</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={styles.riftSimulationHint}>Simulating breach...</Text>
+                <View style={styles.waveBarsContainer}>
+                  {[1, 2, 3, 4, 5].map(wave => {
+                    const isCleared = riftDungeonResult && wave <= riftDungeonResult.waves;
+                    const isActive = riftIsSimulating && Math.random() > 0.3;
+                    return (
+                      <View
+                        key={wave}
+                        style={[
+                          styles.waveBar,
+                          isCleared && styles.waveBarCleared,
+                          isActive && styles.waveBarActive,
+                        ]}
+                      >
+                        <Text style={styles.waveBarLabel}>W{wave}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+                <Pressable
+                  style={styles.startSimulationBtn}
+                  onPress={() => {
+                    setRiftIsSimulating(true);
+                    setTimeout(() => setRiftIsSimulating(false), 1200);
+                  }}
+                  disabled={riftIsSimulating}
+                >
+                  <Text style={styles.startSimulationBtnText}>Start Simulation</Text>
+                </Pressable>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -7677,5 +7863,182 @@ const styles = StyleSheet.create({
   prestigeMilestoneBonus: {
     fontSize: 10,
     color: '#8AAFCC',
+  },
+
+  // Dice Roll Modal
+  diceRollModalContent: {
+    backgroundColor: '#15151F',
+    borderRadius: 16,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    borderWidth: 1,
+    borderColor: '#2A2A4A',
+    minWidth: '80%',
+    maxWidth: '85%',
+    alignItems: 'center',
+  },
+  diceRollTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 20,
+  },
+  diceRollHint: {
+    fontSize: 14,
+    color: '#AAA',
+    marginBottom: 16,
+  },
+  diceButton: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    backgroundColor: '#2A3956',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  diceEmoji: {
+    fontSize: 60,
+  },
+  diceRollingText: {
+    fontSize: 14,
+    color: '#6DDB7B',
+    fontWeight: '700',
+    marginTop: 8,
+  },
+  diceResultContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  diceResultNumber: {
+    fontSize: 72,
+    fontWeight: '700',
+    color: '#FFD700',
+  },
+  diceResultLabel: {
+    fontSize: 18,
+    color: '#AAA',
+    marginTop: -8,
+  },
+
+  // Rift Dungeon Modal
+  riftModalContent: {
+    backgroundColor: '#15151F',
+    borderRadius: 16,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    borderWidth: 1,
+    borderColor: '#2A2A4A',
+    minWidth: '80%',
+    maxWidth: '85%',
+    alignItems: 'center',
+  },
+  riftTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 20,
+  },
+  riftSimulationHint: {
+    fontSize: 14,
+    color: '#AAA',
+    marginBottom: 20,
+  },
+  waveBarsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    gap: 8,
+    marginBottom: 20,
+    height: 80,
+  },
+  waveBar: {
+    width: 40,
+    height: 20,
+    backgroundColor: '#2A3956',
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#4A5C7A',
+  },
+  waveBarCleared: {
+    backgroundColor: '#2F7547',
+    borderColor: '#5BB58F',
+  },
+  waveBarActive: {
+    backgroundColor: '#6DDB7B',
+    borderColor: '#A8FF6B',
+  },
+  waveBarLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  wavesClearedContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  wavesClearedNumber: {
+    fontSize: 72,
+    fontWeight: '700',
+    color: '#FF6B6B',
+  },
+  wavesClearedLabel: {
+    fontSize: 18,
+    color: '#AAA',
+    marginTop: -8,
+  },
+
+  // Shared modal styles
+  rewardsList: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  rewardItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#0D1523',
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#2A4258',
+  },
+  rewardLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#A9C4DB',
+  },
+  rewardValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFD700',
+  },
+  modalCloseBtn: {
+    backgroundColor: '#6DDB7B',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+  },
+  modalCloseBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#000',
+  },
+  startSimulationBtn: {
+    backgroundColor: '#6DDB7B',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+  },
+  startSimulationBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#000',
   },
 });
