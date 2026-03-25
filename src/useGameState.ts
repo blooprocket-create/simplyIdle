@@ -127,6 +127,7 @@ interface SummonHistoryEntry {
 
 type HeroFormationRole = 'front' | 'mid' | 'back';
 type CombatTempo = 1 | 2 | 4;
+type AutoTempoTarget = 2 | 4;
 
 const ACHIEVEMENT_BONUS_PER_UNLOCK = 0.03;
 const ACHIEVEMENT_BONUS_CAP = 0.75;
@@ -202,6 +203,8 @@ export interface GameState {
   autoSummonEnabled: boolean;
   autoSummonMode: 'single' | 'x10';
   combatTempo: CombatTempo;
+  autoTempoEnabled: boolean;
+  autoTempoTarget: AutoTempoTarget;
   autoSummonReserveGold: number;
   autoSummonCooldownMs: number;
   lastActiveAt: number;
@@ -315,6 +318,8 @@ const DEFAULT_STATE: GameState = {
   autoSummonEnabled: false,
   autoSummonMode: 'single',
   combatTempo: 1,
+  autoTempoEnabled: false,
+  autoTempoTarget: 2,
   autoSummonReserveGold: 5000,
   autoSummonCooldownMs: 0,
   lastActiveAt: Date.now(),
@@ -1494,6 +1499,8 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     autoSummonEnabled: clampBoolean(payload.autoSummonEnabled, false),
     autoSummonMode,
     combatTempo: payload.combatTempo === 2 || payload.combatTempo === 4 ? payload.combatTempo : 1,
+    autoTempoEnabled: clampBoolean(payload.autoTempoEnabled, false),
+    autoTempoTarget: payload.autoTempoTarget === 4 ? 4 : 2,
     autoSummonReserveGold: clampInt(payload.autoSummonReserveGold, 0, SAFE_INTEGER_CAP, 5000),
     lastActiveAt: clampInt(payload.lastActiveAt, 0, now, now),
     tutorialEnabled: clampBoolean(payload.tutorialEnabled, true),
@@ -1911,6 +1918,8 @@ type Action =
   | { type: 'SET_AUTO_SUMMON_ENABLED'; enabled: boolean }
   | { type: 'SET_AUTO_SUMMON_MODE'; mode: 'single' | 'x10' }
   | { type: 'SET_COMBAT_TEMPO'; tempo: CombatTempo }
+  | { type: 'SET_AUTO_TEMPO_ENABLED'; enabled: boolean }
+  | { type: 'SET_AUTO_TEMPO_TARGET'; target: AutoTempoTarget }
   | { type: 'SET_AUTO_SUMMON_RESERVE_GOLD'; reserveGold: number }
   | { type: 'BUY_PREMIUM_COOLANT'; itemId: 'coolant_mk1' | 'coolant_mk2' }
   | { type: 'USE_USABLE_ITEM'; itemId: string }
@@ -1967,8 +1976,11 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'TICK': {
       if (!state.characterCreated) return state;
-      const scaledElapsed = action.elapsed * state.combatTempo;
-      let working = decayBuffs(state, scaledElapsed);
+      const withAutoTempo = state.autoTempoEnabled && state.combatHeat <= 0 && state.combatTempo === 1
+        ? { ...state, combatTempo: state.autoTempoTarget }
+        : state;
+      const scaledElapsed = action.elapsed * withAutoTempo.combatTempo;
+      let working = decayBuffs(withAutoTempo, scaledElapsed);
       working = tickHeroActives(working, scaledElapsed);
       working = updateCombatHeat(working, action.elapsed);
       const weekly = getCurrentWeeklyEvent(working);
@@ -2999,6 +3011,20 @@ function reducer(state: GameState, action: Action): GameState {
       };
     }
 
+    case 'SET_AUTO_TEMPO_ENABLED': {
+      return {
+        ...state,
+        autoTempoEnabled: action.enabled,
+      };
+    }
+
+    case 'SET_AUTO_TEMPO_TARGET': {
+      return {
+        ...state,
+        autoTempoTarget: action.target,
+      };
+    }
+
     case 'SET_AUTO_SUMMON_RESERVE_GOLD': {
       return {
         ...state,
@@ -3097,6 +3123,8 @@ function reducer(state: GameState, action: Action): GameState {
         autoSummonEnabled: p.autoSummonEnabled,
         autoSummonMode: p.autoSummonMode,
         combatTempo: p.combatTempo === 2 || p.combatTempo === 4 ? p.combatTempo : 1,
+        autoTempoEnabled: p.autoTempoEnabled,
+        autoTempoTarget: p.autoTempoTarget === 4 ? 4 : 2,
         autoSummonReserveGold: p.autoSummonReserveGold,
         autoSummonCooldownMs: 0,
         lastActiveAt: p.lastActiveAt,
@@ -3194,6 +3222,8 @@ interface SaveData {
   autoSummonEnabled: boolean;
   autoSummonMode: 'single' | 'x10';
   combatTempo?: CombatTempo;
+  autoTempoEnabled?: boolean;
+  autoTempoTarget?: AutoTempoTarget;
   autoSummonReserveGold: number;
   lastActiveAt: number;
 
@@ -3282,6 +3312,8 @@ function serialize(state: GameState): SaveData {
     autoSummonEnabled: state.autoSummonEnabled,
     autoSummonMode: state.autoSummonMode,
     combatTempo: state.combatTempo,
+    autoTempoEnabled: state.autoTempoEnabled,
+    autoTempoTarget: state.autoTempoTarget,
     autoSummonReserveGold: state.autoSummonReserveGold,
     lastActiveAt: Date.now(),
 
@@ -3497,6 +3529,8 @@ export function useGameState(saveSlot: string = 'default') {
   const setAutoSummonEnabled = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_SUMMON_ENABLED', enabled }), []);
   const setAutoSummonMode = useCallback((mode: 'single' | 'x10') => dispatch({ type: 'SET_AUTO_SUMMON_MODE', mode }), []);
   const setCombatTempo = useCallback((tempo: CombatTempo) => dispatch({ type: 'SET_COMBAT_TEMPO', tempo }), []);
+  const setAutoTempoEnabled = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_TEMPO_ENABLED', enabled }), []);
+  const setAutoTempoTarget = useCallback((target: AutoTempoTarget) => dispatch({ type: 'SET_AUTO_TEMPO_TARGET', target }), []);
   const setAutoSummonReserveGold = useCallback((reserveGold: number) => {
     dispatch({ type: 'SET_AUTO_SUMMON_RESERVE_GOLD', reserveGold });
   }, []);
@@ -3604,6 +3638,8 @@ export function useGameState(saveSlot: string = 'default') {
     setAutoSummonEnabled,
     setAutoSummonMode,
     setCombatTempo,
+    setAutoTempoEnabled,
+    setAutoTempoTarget,
     setAutoSummonReserveGold,
     buyPremiumCoolant,
     autoDismantleEquipment,

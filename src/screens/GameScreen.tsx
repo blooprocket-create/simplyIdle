@@ -149,6 +149,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setAutoSummonEnabled,
     setAutoSummonMode,
     setCombatTempo,
+    setAutoTempoEnabled,
+    setAutoTempoTarget,
     buyPremiumCoolant,
     autoDismantleEquipment,
     spendEssenceUpgrade,
@@ -3211,6 +3213,26 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   </Pressable>
                 </View>
                 <Text style={styles.settingsHintText}>Summons consume Boss Tears, so reserve gold controls were removed.</Text>
+              </View>
+
+              <View style={styles.settingsCard}>
+                <Text style={styles.settingsCardTitle}>Auto Tempo</Text>
+                <View style={styles.settingsRowBetween}>
+                  <Text style={styles.settingsLabel}>Enabled</Text>
+                  <Pressable
+                    style={[styles.settingsToggleBtn, state.autoTempoEnabled && styles.settingsToggleBtnActive]}
+                    onPress={() => setAutoTempoEnabled(!state.autoTempoEnabled)}
+                  >
+                    <Text style={styles.settingsToggleText}>{state.autoTempoEnabled ? 'ON' : 'OFF'}</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.settingsRowBetween}>
+                  <Text style={styles.settingsLabel}>Tempo At Heat 0</Text>
+                  <Pressable style={styles.settingsCycleBtn} onPress={() => setAutoTempoTarget(state.autoTempoTarget === 2 ? 4 : 2)}>
+                    <Text style={styles.settingsCycleBtnText}>{state.autoTempoTarget}x</Text>
+                  </Pressable>
+                </View>
+                <Text style={styles.settingsHintText}>At heat 0, auto tempo re-engages from 1x to your selected target.</Text>
               </View>
             </ScrollView>
           </View>
