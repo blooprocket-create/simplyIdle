@@ -175,6 +175,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     craftEquipment,
     upgradeEquipmentRarity,
     setAutoUsePotion,
+    setAutoUseCoolant,
     setAutoUsePotionThreshold,
     setAutoSummonEnabled,
     setAutoSummonMode,
@@ -212,6 +213,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [tempTeam, setTempTeam] = useState<string[]>(state.activeTeamHeroIds);
   const [expandedHeroes, setExpandedHeroes] = useState<Set<string>>(new Set());
   const [recycleConfirmUid, setRecycleConfirmUid] = useState<string | null>(null);
+  const [smartCoolantConfirmOpen, setSmartCoolantConfirmOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shopOpen, setShopOpen] = useState(false);
   const [shopTab, setShopTab] = useState<ShopTab>('diamond');
@@ -3333,6 +3335,42 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       })()}
 
       <Modal
+        visible={smartCoolantConfirmOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSmartCoolantConfirmOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Enable Smart Coolant?</Text>
+            <Text style={styles.modalContent}>
+              Smart Use will automatically spend coolant when combat heat gets close to overheat.
+            </Text>
+            <Text style={styles.modalWarning}>
+              Coolant is a premium consumable and costs diamonds to replace. Only enable this if you want automation spending those items.
+            </Text>
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalBtn, styles.modalBtnCancel]}
+                onPress={() => setSmartCoolantConfirmOpen(false)}
+              >
+                <Text style={styles.modalBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalBtn, styles.modalBtnConfirm]}
+                onPress={() => {
+                  setAutoUseCoolant(true);
+                  setSmartCoolantConfirmOpen(false);
+                }}
+              >
+                <Text style={styles.modalBtnTextConfirm}>Enable</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
         visible={settingsOpen}
         transparent={true}
         animationType="fade"
@@ -3394,6 +3432,27 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       <Text style={styles.autoPotionAdjustText}>+</Text>
                     </Pressable>
                   </View>
+                </View>
+                <View style={styles.settingsSubCard}>
+                  <View style={styles.settingsRowBetween}>
+                    <View style={styles.settingsSubLabelWrap}>
+                      <Text style={styles.settingsLabel}>Smart Use Coolant</Text>
+                      <Text style={styles.settingsHintText}>Adds premium coolant to auto-consumables. Auto Potion remains the master toggle for this section.</Text>
+                    </View>
+                    <Pressable
+                      style={[styles.settingsToggleBtn, state.autoUseCoolantEnabled && styles.settingsToggleBtnActive]}
+                      onPress={() => {
+                        if (state.autoUseCoolantEnabled) {
+                          setAutoUseCoolant(false);
+                          return;
+                        }
+                        setSmartCoolantConfirmOpen(true);
+                      }}
+                    >
+                      <Text style={styles.settingsToggleText}>{state.autoUseCoolantEnabled ? 'ON' : 'OFF'}</Text>
+                    </Pressable>
+                  </View>
+                  <Text style={styles.settingsSubtleText}>Smart Use prefers 🧊 first and escalates to ❄️ only when heat is close to cap.</Text>
                 </View>
               </View>
 
@@ -6945,6 +7004,24 @@ const styles = StyleSheet.create({
   settingsHintText: {
     fontSize: 10,
     color: '#9DB7CF',
+  },
+  settingsSubCard: {
+    marginTop: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#29415F',
+    backgroundColor: '#122033',
+    padding: 8,
+    gap: 6,
+  },
+  settingsSubLabelWrap: {
+    flex: 1,
+    paddingRight: 8,
+    gap: 4,
+  },
+  settingsSubtleText: {
+    fontSize: 10,
+    color: '#82A3C4',
   },
   chapterMapModalBox: {
     backgroundColor: '#0F1A2A',

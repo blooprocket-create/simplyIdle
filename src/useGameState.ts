@@ -238,6 +238,7 @@ export interface GameState {
   equippedItems: Record<EquipmentSlot, string | null>;
   usableItemCounts: Record<string, number>;
   autoUsePotionEnabled: boolean;
+  autoUseCoolantEnabled: boolean;
   autoUsePotionThresholdPct: number;
   autoRecycleEnabled: boolean;
   autoSummonEnabled: boolean;
@@ -358,6 +359,7 @@ const DEFAULT_STATE: GameState = {
   },
   usableItemCounts: {},
   autoUsePotionEnabled: false,
+  autoUseCoolantEnabled: false,
   autoUsePotionThresholdPct: 0.35,
   autoRecycleEnabled: false,
   autoSummonEnabled: false,
@@ -1590,6 +1592,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     equippedItems,
     usableItemCounts,
     autoUsePotionEnabled: clampBoolean(payload.autoUsePotionEnabled, false),
+    autoUseCoolantEnabled: clampBoolean(payload.autoUseCoolantEnabled, false),
     autoUsePotionThresholdPct: clampFloat(payload.autoUsePotionThresholdPct, 0.05, 1, 0.35),
     autoRecycleEnabled: clampBoolean(payload.autoRecycleEnabled, false),
     autoSummonEnabled: clampBoolean(payload.autoSummonEnabled, false),
@@ -1748,6 +1751,40 @@ function maybeAutoUsePotion(state: GameState): GameState {
     kind: 'item',
     title: `Auto Used ${item.emoji} ${item.name}`,
     detail: `Restored ${healed} team HP`,
+  });
+}
+
+function maybeAutoUseCoolant(state: GameState): GameState {
+  if (!state.autoUsePotionEnabled || !state.autoUseCoolantEnabled) return state;
+
+  const maxHeat = getMaxHeatForLevel(state.level);
+  if (maxHeat <= 0) return state;
+
+  const heatRatio = state.combatHeat / maxHeat;
+  if (heatRatio < 0.72) return state;
+
+  const mk1Qty = state.usableItemCounts['coolant_mk1'] ?? 0;
+  const mk2Qty = state.usableItemCounts['coolant_mk2'] ?? 0;
+  const severeHeat = heatRatio >= 0.9;
+  const mk1WouldStabilize = state.combatHeat - 35 <= maxHeat * 0.55;
+  const itemId = severeHeat
+    ? (mk2Qty > 0 && !mk1WouldStabilize ? 'coolant_mk2' : mk1Qty > 0 ? 'coolant_mk1' : mk2Qty > 0 ? 'coolant_mk2' : null)
+    : (mk1Qty > 0 ? 'coolant_mk1' : mk2Qty > 0 ? 'coolant_mk2' : null);
+  if (!itemId) return state;
+
+  const item = getUsableItem(itemId);
+  if (!item || item.effect !== 'reduce_heat_flat') return state;
+
+  const reduced = Math.max(0, state.combatHeat - item.value);
+  return queueReward({
+    ...state,
+    usableItemCounts: addUsableItemCount(state.usableItemCounts, item.id, -1),
+    combatHeat: reduced,
+  }, {
+    id: `auto_coolant_${Date.now()}`,
+    kind: 'system',
+    title: `Smart Used ${item.emoji} ${item.name}`,
+    detail: `Heat ${Math.ceil(state.combatHeat)} -> ${Math.ceil(reduced)}`,
   });
 }
 
@@ -2055,6 +2092,7 @@ type Action =
   | { type: 'CRAFT_EQUIPMENT'; slot: EquipmentSlot }
   | { type: 'UPGRADE_EQUIPMENT_RARITY'; itemId: string }
   | { type: 'SET_AUTO_USE_POTION'; enabled: boolean }
+  | { type: 'SET_AUTO_USE_COOLANT'; enabled: boolean }
   | { type: 'SET_AUTO_USE_POTION_THRESHOLD'; thresholdPct: number }
   | { type: 'SPEND_ESSENCE_UPGRADE'; path: 'damage' | 'economy' | 'survival' }
   | { type: 'APPLY_WEEKLY_ROLLOVER'; nowMs: number }
@@ -2162,7 +2200,8 @@ function reducer(state: GameState, action: Action): GameState {
       }
 
       const withPotions = maybeAutoUsePotion({ ...working, monsterHp: hp, teamHp, lastActiveAt: Date.now() });
-      const withRecycle = maybeAutoRecycleBackground(withPotions);
+      const withCoolant = maybeAutoUseCoolant(withPotions);
+      const withRecycle = maybeAutoRecycleBackground(withCoolant);
       const withSummon = maybeAutoSummonTick(withRecycle);
       if (withSummon.autoBurstEnabled && withSummon.burstCharge >= BURST_COST) {
         return applyBurst(withSummon, 4 * withSummon.combatTempo);
@@ -2662,6 +2701,13 @@ function reducer(state: GameState, action: Action): GameState {
       return {
         ...state,
         autoUsePotionEnabled: action.enabled,
+      };
+    }
+
+    case 'SET_AUTO_USE_COOLANT': {
+      return {
+        ...state,
+        autoUseCoolantEnabled: action.enabled,
       };
     }
 
@@ -3522,6 +3568,7 @@ interface SaveData {
   equippedItems: Record<EquipmentSlot, string | null>;
   usableItemCounts: Record<string, number>;
   autoUsePotionEnabled: boolean;
+  autoUseCoolantEnabled?: boolean;
   autoUsePotionThresholdPct: number;
   autoRecycleEnabled: boolean;
   autoSummonEnabled: boolean;
@@ -3617,6 +3664,7 @@ function serialize(state: GameState): SaveData {
     equippedItems: state.equippedItems,
     usableItemCounts: state.usableItemCounts,
     autoUsePotionEnabled: state.autoUsePotionEnabled,
+    autoUseCoolantEnabled: state.autoUseCoolantEnabled,
     autoUsePotionThresholdPct: state.autoUsePotionThresholdPct,
     autoRecycleEnabled: state.autoRecycleEnabled,
     autoSummonEnabled: state.autoSummonEnabled,
@@ -3855,6 +3903,7 @@ export function useGameState(saveSlot: string = 'default') {
   const craftEquipment = useCallback((slot: EquipmentSlot) => dispatch({ type: 'CRAFT_EQUIPMENT', slot }), []);
   const upgradeEquipmentRarity = useCallback((itemId: string) => dispatch({ type: 'UPGRADE_EQUIPMENT_RARITY', itemId }), []);
   const setAutoUsePotion = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_USE_POTION', enabled }), []);
+  const setAutoUseCoolant = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_USE_COOLANT', enabled }), []);
   const setAutoUsePotionThreshold = useCallback((thresholdPct: number) => dispatch({ type: 'SET_AUTO_USE_POTION_THRESHOLD', thresholdPct }), []);
   const setAutoSummonEnabled = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_SUMMON_ENABLED', enabled }), []);
   const setAutoSummonMode = useCallback((mode: 'single' | 'x10') => dispatch({ type: 'SET_AUTO_SUMMON_MODE', mode }), []);
@@ -3969,6 +4018,7 @@ export function useGameState(saveSlot: string = 'default') {
     craftEquipment,
     upgradeEquipmentRarity,
     setAutoUsePotion,
+    setAutoUseCoolant,
     setAutoUsePotionThreshold,
     setAutoSummonEnabled,
     setAutoSummonMode,
