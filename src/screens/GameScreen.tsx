@@ -148,6 +148,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setAutoUsePotionThreshold,
     setAutoSummonEnabled,
     setAutoSummonMode,
+    setAutoBurstEnabled,
     setCombatTempo,
     setAutoTempoEnabled,
     setAutoTempoTarget,
@@ -3213,6 +3214,20 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   </Pressable>
                 </View>
                 <Text style={styles.settingsHintText}>Summons consume Boss Tears, so reserve gold controls were removed.</Text>
+              </View>
+
+              <View style={styles.settingsCard}>
+                <Text style={styles.settingsCardTitle}>Auto Burst</Text>
+                <View style={styles.settingsRowBetween}>
+                  <Text style={styles.settingsLabel}>Enabled</Text>
+                  <Pressable
+                    style={[styles.settingsToggleBtn, state.autoBurstEnabled && styles.settingsToggleBtnActive]}
+                    onPress={() => setAutoBurstEnabled(!state.autoBurstEnabled)}
+                  >
+                    <Text style={styles.settingsToggleText}>{state.autoBurstEnabled ? 'ON' : 'OFF'}</Text>
+                  </Pressable>
+                </View>
+                <Text style={styles.settingsHintText}>When burst charge reaches 20, it auto-fires with tempo-scaled hits.</Text>
               </View>
 
               <View style={styles.settingsCard}>

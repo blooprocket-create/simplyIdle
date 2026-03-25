@@ -202,6 +202,7 @@ export interface GameState {
   autoRecycleEnabled: boolean;
   autoSummonEnabled: boolean;
   autoSummonMode: 'single' | 'x10';
+  autoBurstEnabled: boolean;
   combatTempo: CombatTempo;
   autoTempoEnabled: boolean;
   autoTempoTarget: AutoTempoTarget;
@@ -317,6 +318,7 @@ const DEFAULT_STATE: GameState = {
   autoRecycleEnabled: false,
   autoSummonEnabled: false,
   autoSummonMode: 'single',
+  autoBurstEnabled: false,
   combatTempo: 1,
   autoTempoEnabled: false,
   autoTempoTarget: 2,
@@ -1498,6 +1500,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     autoRecycleEnabled: clampBoolean(payload.autoRecycleEnabled, false),
     autoSummonEnabled: clampBoolean(payload.autoSummonEnabled, false),
     autoSummonMode,
+    autoBurstEnabled: clampBoolean(payload.autoBurstEnabled, false),
     combatTempo: payload.combatTempo === 2 || payload.combatTempo === 4 ? payload.combatTempo : 1,
     autoTempoEnabled: clampBoolean(payload.autoTempoEnabled, false),
     autoTempoTarget: payload.autoTempoTarget === 4 ? 4 : 2,
@@ -1886,6 +1889,26 @@ function withAchievement(state: GameState): GameState {
   return { ...state, achievements, newAchievement: achId };
 }
 
+function applyBurst(state: GameState, hits: number): GameState {
+  if (state.burstCharge < BURST_COST) return state;
+
+  let working: GameState = { ...state, burstCharge: 0 };
+  const burstHits = Math.max(1, Math.floor(hits));
+  for (let i = 0; i < burstHits; i++) {
+    const affix = getMonsterAffixModifiers(working.wave);
+    const crit = Math.random() < 0.2;
+    const dmg = (getDps(working) * BURST_STRIKE_DPS_MULT * (crit ? 1.8 : 1)) / affix.hpMult;
+    const hp = working.monsterHp - dmg;
+    if (hp <= 0) {
+      working = withAchievement(killMonster(working));
+    } else {
+      working = { ...working, monsterHp: hp };
+    }
+  }
+
+  return queueCombatLog(working, `Burst unleashed for ${burstHits} amplified strikes`);
+}
+
 type Action =
   | { type: 'CREATE_CHARACTER'; name: string; playerClass: PlayerClass }
   | { type: 'QUEST_EVENT'; event: TutorialEvent }
@@ -1917,6 +1940,7 @@ type Action =
   | { type: 'SPEND_REBIRTH_CORE'; path: 'damage' | 'economy' | 'survival' }
   | { type: 'SET_AUTO_SUMMON_ENABLED'; enabled: boolean }
   | { type: 'SET_AUTO_SUMMON_MODE'; mode: 'single' | 'x10' }
+  | { type: 'SET_AUTO_BURST_ENABLED'; enabled: boolean }
   | { type: 'SET_COMBAT_TEMPO'; tempo: CombatTempo }
   | { type: 'SET_AUTO_TEMPO_ENABLED'; enabled: boolean }
   | { type: 'SET_AUTO_TEMPO_TARGET'; target: AutoTempoTarget }
@@ -2036,7 +2060,11 @@ function reducer(state: GameState, action: Action): GameState {
 
       const withPotions = maybeAutoUsePotion({ ...working, monsterHp: hp, teamHp, lastActiveAt: Date.now() });
       const withRecycle = maybeAutoRecycleBackground(withPotions);
-      return maybeAutoSummonTick(withRecycle);
+      const withSummon = maybeAutoSummonTick(withRecycle);
+      if (withSummon.autoBurstEnabled && withSummon.burstCharge >= BURST_COST) {
+        return applyBurst(withSummon, 4 * withSummon.combatTempo);
+      }
+      return withSummon;
     }
 
     case 'ATTACK': {
@@ -2051,20 +2079,7 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'BURST': {
-      if (state.burstCharge < BURST_COST) return state;
-      let working: GameState = { ...state, burstCharge: 0 };
-      for (let i = 0; i < action.hits; i++) {
-        const affix = getMonsterAffixModifiers(working.wave);
-        const crit = Math.random() < 0.2;
-        const dmg = (getDps(working) * BURST_STRIKE_DPS_MULT * (crit ? 1.8 : 1)) / affix.hpMult;
-        const hp = working.monsterHp - dmg;
-        if (hp <= 0) {
-          working = withAchievement(killMonster(working));
-        } else {
-          working = { ...working, monsterHp: hp };
-        }
-      }
-      return queueCombatLog(working, `Burst unleashed for ${action.hits} amplified strikes`);
+      return applyBurst(state, action.hits);
     }
 
     case 'BUY_PARTY': {
@@ -3004,6 +3019,13 @@ function reducer(state: GameState, action: Action): GameState {
       };
     }
 
+    case 'SET_AUTO_BURST_ENABLED': {
+      return {
+        ...state,
+        autoBurstEnabled: action.enabled,
+      };
+    }
+
     case 'SET_COMBAT_TEMPO': {
       return {
         ...state,
@@ -3122,6 +3144,7 @@ function reducer(state: GameState, action: Action): GameState {
         autoRecycleEnabled: p.autoRecycleEnabled,
         autoSummonEnabled: p.autoSummonEnabled,
         autoSummonMode: p.autoSummonMode,
+        autoBurstEnabled: p.autoBurstEnabled,
         combatTempo: p.combatTempo === 2 || p.combatTempo === 4 ? p.combatTempo : 1,
         autoTempoEnabled: p.autoTempoEnabled,
         autoTempoTarget: p.autoTempoTarget === 4 ? 4 : 2,
@@ -3221,6 +3244,7 @@ interface SaveData {
   autoRecycleEnabled: boolean;
   autoSummonEnabled: boolean;
   autoSummonMode: 'single' | 'x10';
+  autoBurstEnabled?: boolean;
   combatTempo?: CombatTempo;
   autoTempoEnabled?: boolean;
   autoTempoTarget?: AutoTempoTarget;
@@ -3311,6 +3335,7 @@ function serialize(state: GameState): SaveData {
     autoRecycleEnabled: state.autoRecycleEnabled,
     autoSummonEnabled: state.autoSummonEnabled,
     autoSummonMode: state.autoSummonMode,
+    autoBurstEnabled: state.autoBurstEnabled,
     combatTempo: state.combatTempo,
     autoTempoEnabled: state.autoTempoEnabled,
     autoTempoTarget: state.autoTempoTarget,
@@ -3539,6 +3564,7 @@ export function useGameState(saveSlot: string = 'default') {
   const setAutoUsePotionThreshold = useCallback((thresholdPct: number) => dispatch({ type: 'SET_AUTO_USE_POTION_THRESHOLD', thresholdPct }), []);
   const setAutoSummonEnabled = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_SUMMON_ENABLED', enabled }), []);
   const setAutoSummonMode = useCallback((mode: 'single' | 'x10') => dispatch({ type: 'SET_AUTO_SUMMON_MODE', mode }), []);
+  const setAutoBurstEnabled = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_BURST_ENABLED', enabled }), []);
   const setCombatTempo = useCallback((tempo: CombatTempo) => dispatch({ type: 'SET_COMBAT_TEMPO', tempo }), []);
   const setAutoTempoEnabled = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_TEMPO_ENABLED', enabled }), []);
   const setAutoTempoTarget = useCallback((target: AutoTempoTarget) => dispatch({ type: 'SET_AUTO_TEMPO_TARGET', target }), []);
@@ -3648,6 +3674,7 @@ export function useGameState(saveSlot: string = 'default') {
     setAutoUsePotionThreshold,
     setAutoSummonEnabled,
     setAutoSummonMode,
+    setAutoBurstEnabled,
     setCombatTempo,
     setAutoTempoEnabled,
     setAutoTempoTarget,
