@@ -11,6 +11,8 @@ import {
   TextInput,
   Modal,
   Linking,
+  Animated,
+  Easing,
   useWindowDimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -69,6 +71,16 @@ type SummonReveal = {
   heroName: string;
   emoji: string;
   rarity: Rarity;
+};
+
+type RiftBuffChoice = {
+  id: string;
+  name: string;
+  description: string;
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  dpsMult: number;
+  hpMult: number;
+  defenseMult: number;
 };
 
 interface GameScreenProps {
@@ -263,6 +275,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [diceRollModalOpen, setDiceRollModalOpen] = useState(false);
   const [diceRollResult, setDiceRollResult] = useState<{ roll: number; diamonds: number; shards: number } | null>(null);
   const [diceIsRolling, setDiceIsRolling] = useState(false);
+  const diceTranslateY = useRef(new Animated.Value(0)).current;
+  const diceRotate = useRef(new Animated.Value(0)).current;
+  const [diceFace, setDiceFace] = useState<number>(1);
 
   const [riftDungeonModalOpen, setRiftDungeonModalOpen] = useState(false);
   const [riftDungeonResult, setRiftDungeonResult] = useState<{ waves: number; diamonds: number; shards: number; essence: number } | null>(null);
@@ -274,8 +289,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   // Rift bonus state
   const [riftBonusRound, setRiftBonusRound] = useState(0);
-  const [riftSelectedBonuses, setRiftSelectedBonuses] = useState<string[]>([]);
-  const [riftCurrentBonuses, setRiftCurrentBonuses] = useState<Array<{ id: string; name: string; description: string; rarity: 'common' | 'rare' | 'epic' | 'legendary' }>>([]);
+  const [riftSelectedBonuses, setRiftSelectedBonuses] = useState<RiftBuffChoice[]>([]);
+  const [riftCurrentBonuses, setRiftCurrentBonuses] = useState<RiftBuffChoice[]>([]);
 
   // Timer tick for expedition countdown display
   const [timerTick, setTimerTick] = useState(0);
@@ -840,6 +855,133 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     };
     const event = eventMap[nextTab];
     if (event) notifyQuestEvent(event);
+  };
+
+  const getDiceOutcome = (roll: number) => {
+    const diamonds = roll === 20 ? 30 : roll >= 17 ? 18 : roll >= 13 ? 12 : roll >= 9 ? 8 : 5;
+    const shards = roll >= 15 ? Math.ceil(roll * 12) : 0;
+    return { roll, diamonds, shards };
+  };
+
+  const buildRiftChoices = (wave: number): RiftBuffChoice[] => {
+    const rarityRoll = () => {
+      const r = Math.random();
+      if (r < 0.55) return 'common' as const;
+      if (r < 0.82) return 'rare' as const;
+      if (r < 0.96) return 'epic' as const;
+      return 'legendary' as const;
+    };
+    const rarityMult: Record<RiftBuffChoice['rarity'], number> = {
+      common: 1,
+      rare: 1.45,
+      epic: 1.95,
+      legendary: 2.6,
+    };
+    const templates = [
+      { key: 'ferocity', name: 'Ferocity Sigil', description: '+DMG', dps: 0.08, hp: 0, def: 0 },
+      { key: 'bulwark', name: 'Bulwark Seal', description: '+HP', dps: 0, hp: 0.10, def: 0 },
+      { key: 'aegis', name: 'Aegis Script', description: '+DEF', dps: 0, hp: 0, def: 0.10 },
+      { key: 'onslaught', name: 'Onslaught Rune', description: '+DMG +DEF', dps: 0.06, hp: 0, def: 0.06 },
+      { key: 'vigor', name: 'Vigor Matrix', description: '+HP +DMG', dps: 0.05, hp: 0.08, def: 0 },
+    ];
+
+    const shuffled = [...templates].sort(() => Math.random() - 0.5).slice(0, 3);
+    return shuffled.map((tpl, idx) => {
+      const rarity = rarityRoll();
+      const mult = rarityMult[rarity] * (1 + (wave - 1) * 0.05);
+      const dpsMult = 1 + tpl.dps * mult;
+      const hpMult = 1 + tpl.hp * mult;
+      const defenseMult = 1 + tpl.def * mult;
+      return {
+        id: `${tpl.key}_${wave}_${idx}_${Date.now()}`,
+        name: tpl.name,
+        description: `${tpl.description} (${rarity})`,
+        rarity,
+        dpsMult,
+        hpMult,
+        defenseMult,
+      };
+    });
+  };
+
+  const openRiftChallenge = () => {
+    setRiftDungeonResult(null);
+    setRiftIsSimulating(false);
+    setRiftSelectedBonuses([]);
+    setRiftBonusRound(1);
+    setRiftCurrentBonuses(buildRiftChoices(1));
+    setRiftDungeonModalOpen(true);
+  };
+
+  const chooseRiftBuff = (choice: RiftBuffChoice) => {
+    if (riftDungeonResult || riftIsSimulating) return;
+
+    const nextBonuses = [...riftSelectedBonuses, choice];
+    setRiftSelectedBonuses(nextBonuses);
+
+    if (riftBonusRound < 5) {
+      const nextRound = riftBonusRound + 1;
+      setRiftBonusRound(nextRound);
+      setRiftCurrentBonuses(buildRiftChoices(nextRound));
+      return;
+    }
+
+    const baseDps = Number.isFinite(dpsBreakdown.totalDps) && dpsBreakdown.totalDps > 0 ? dpsBreakdown.totalDps : Math.max(1, stats.dps);
+    const baseHp = Number.isFinite(state.teamMaxHp) && state.teamMaxHp > 0 ? state.teamMaxHp : 100;
+    const baseDefense = Number.isFinite(stats.teamDefense) && stats.teamDefense > 0 ? stats.teamDefense : 1;
+    const monsterDps = Math.max(1, getMonsterDamage(state.wave));
+    const monsterHp = Math.max(1, state.monsterMaxHp);
+
+    const finalDps = nextBonuses.reduce((acc, b) => acc * b.dpsMult, baseDps);
+    const finalHp = nextBonuses.reduce((acc, b) => acc * b.hpMult, baseHp);
+    const finalDefense = nextBonuses.reduce((acc, b) => acc * b.defenseMult, baseDefense);
+
+    const offenseScore = finalDps / (monsterHp * 0.08);
+    const survivalScore = (finalHp / (monsterDps * 6)) + (finalDefense / 200);
+    const combined = offenseScore * 0.7 + survivalScore * 0.3;
+    const variance = (Math.random() - 0.5) * 0.6;
+    const waves = Math.max(1, Math.min(5, Math.floor(combined + variance)));
+
+    const diamonds = Math.max(8, Math.floor(8 + waves * 4 + (waves === 5 ? 8 : 0)));
+    const shards = Math.max(40, Math.floor(waves * 90 * (1 + state.highestWaveReached / 250)));
+    const essence = waves >= 4 ? 1 : 0;
+    setRiftDungeonResult({ waves, diamonds, shards, essence });
+  };
+
+  const startDiceRoll = () => {
+    if (diceIsRolling || !!diceRollResult) return;
+
+    setDiceIsRolling(true);
+    const rolled = 1 + Math.floor(Math.random() * 20);
+
+    Animated.parallel([
+      Animated.timing(diceRotate, {
+        toValue: 1,
+        duration: 750,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.sequence([
+        Animated.timing(diceTranslateY, {
+          toValue: -90,
+          duration: 180,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.spring(diceTranslateY, {
+          toValue: 0,
+          friction: 5,
+          tension: 120,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start(() => {
+      setDiceFace(rolled);
+      setDiceRollResult(getDiceOutcome(rolled));
+      setDiceIsRolling(false);
+      diceRotate.setValue(0);
+      diceTranslateY.setValue(0);
+    });
   };
 
   const toggleWarPanel = (key: keyof typeof warPanels) => {
@@ -1697,10 +1839,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       style={[styles.warPanelActionBtn, !canPlayDiceToday && styles.warPanelActionBtnDisabled]}
                       disabled={!canPlayDiceToday}
                       onPress={() => {
-                        const roll = 1 + Math.floor(Math.random() * 20);
-                        const diamonds = roll === 20 ? 30 : roll >= 17 ? 18 : roll >= 13 ? 12 : roll >= 9 ? 8 : 5;
-                        const shardBonus = roll >= 15 ? Math.ceil(roll * 12) : 0;
-                        setDiceRollResult({ roll, diamonds, shards: shardBonus });
+                        setDiceRollResult(null);
+                        setDiceFace(1);
+                        setDiceIsRolling(false);
                         setDiceRollModalOpen(true);
                       }}
                     >
@@ -1712,18 +1853,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     <Pressable
                       style={[styles.warPanelActionBtn, !canRunRiftToday && styles.warPanelActionBtnDisabled]}
                       disabled={!canRunRiftToday}
-                      onPress={() => {
-                        const dpsVal = dpsBreakdown.totalDps;
-                        const monsterMaxHpVal = state.wave < 10 ? 10 * Math.pow(1.15, state.wave) : 10 * Math.pow(1.15, 10) * Math.pow(1.25, state.wave - 10);
-                        const expected = Math.min(5, Math.max(1, Math.floor((dpsVal / Math.max(1, monsterMaxHpVal * 0.12)) * 2)));
-                        const variance = Math.floor(Math.random() * 3) - 1;
-                        const waves = Math.max(1, Math.min(5, expected + variance));
-                        const diamonds = 8 + waves * 4 + (waves === 5 ? 8 : 0);
-                        const shardReward = Math.ceil(waves * 90 * (1 + state.highestWaveReached / 250));
-                        const essenceReward = waves >= 4 ? 1 : 0;
-                        setRiftDungeonResult({ waves, diamonds, shards: shardReward, essence: essenceReward });
-                        setRiftDungeonModalOpen(true);
-                      }}
+                      onPress={openRiftChallenge}
                     >
                       <View style={{ position: 'relative', alignItems: 'center' }}>
                         <Text style={styles.warPanelActionText}>Run Rift (+Diamonds)</Text>
@@ -3914,10 +4044,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         onRequestClose={() => {
           if (!diceIsRolling) {
             setDiceRollModalOpen(false);
-            if (diceRollResult) {
-              playDiceRoll();
-              setDiceRollResult(null);
-            }
+            setDiceRollResult(null);
           }
         }}
       >
@@ -3945,8 +4072,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Pressable
                   style={styles.modalCloseBtn}
                   onPress={() => {
+                    playDiceRoll(diceRollResult.roll);
                     setDiceRollModalOpen(false);
-                    playDiceRoll();
                     setDiceRollResult(null);
                   }}
                 >
@@ -3955,16 +4082,26 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               </>
             ) : (
               <>
-                <Text style={styles.diceRollHint}>Tap the die to roll!</Text>
-                <Pressable
-                  style={styles.diceButton}
-                  onPress={() => {
-                    setDiceIsRolling(true);
-                    setTimeout(() => setDiceIsRolling(false), 600);
-                  }}
-                  disabled={diceIsRolling}
-                >
-                  <Text style={styles.diceEmoji}>🎲</Text>
+                <Text style={styles.diceRollHint}>Tap the die to roll. It tumbles and bounces before landing.</Text>
+                <Pressable style={styles.diceButton} onPress={startDiceRoll} disabled={diceIsRolling}>
+                  <Animated.View
+                    style={[
+                      styles.diceFace,
+                      {
+                        transform: [
+                          { translateY: diceTranslateY },
+                          {
+                            rotate: diceRotate.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: ['0deg', '1080deg'],
+                            }),
+                          },
+                        ],
+                      },
+                    ]}
+                  >
+                    <Text style={styles.diceFaceText}>{diceFace}</Text>
+                  </Animated.View>
                 </Pressable>
                 {diceIsRolling && <Text style={styles.diceRollingText}>Rolling...</Text>}
               </>
@@ -3981,10 +4118,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         onRequestClose={() => {
           if (!riftIsSimulating) {
             setRiftDungeonModalOpen(false);
-            if (riftDungeonResult) {
-              runRiftDungeon();
-              setRiftDungeonResult(null);
-            }
+            setRiftDungeonResult(null);
+            setRiftSelectedBonuses([]);
+            setRiftCurrentBonuses([]);
+            setRiftBonusRound(0);
           }
         }}
       >
@@ -4016,9 +4153,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Pressable
                   style={styles.modalCloseBtn}
                   onPress={() => {
+                    runRiftDungeon(riftDungeonResult);
                     setRiftDungeonModalOpen(false);
-                    runRiftDungeon();
                     setRiftDungeonResult(null);
+                    setRiftSelectedBonuses([]);
+                    setRiftCurrentBonuses([]);
+                    setRiftBonusRound(0);
                   }}
                 >
                   <Text style={styles.modalCloseBtnText}>Claim Rewards</Text>
@@ -4026,11 +4166,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               </>
             ) : (
               <>
-                <Text style={styles.riftSimulationHint}>Simulating breach...</Text>
+                <Text style={styles.riftSimulationHint}>Wave {Math.max(1, riftBonusRound)}/5: choose 1 of 3 buffs.</Text>
                 <View style={styles.waveBarsContainer}>
                   {[1, 2, 3, 4, 5].map(wave => {
-                    const isCleared = riftDungeonResult && wave <= riftDungeonResult.waves;
-                    const isActive = riftIsSimulating && Math.random() > 0.3;
+                    const isCleared = wave < Math.max(1, riftBonusRound);
+                    const isActive = wave === Math.max(1, riftBonusRound);
                     return (
                       <View
                         key={wave}
@@ -4045,16 +4185,33 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     );
                   })}
                 </View>
-                <Pressable
-                  style={styles.startSimulationBtn}
-                  onPress={() => {
-                    setRiftIsSimulating(true);
-                    setTimeout(() => setRiftIsSimulating(false), 1200);
-                  }}
-                  disabled={riftIsSimulating}
-                >
-                  <Text style={styles.startSimulationBtnText}>Start Simulation</Text>
-                </Pressable>
+
+                <View style={styles.riftBuffList}>
+                  {riftCurrentBonuses.map(choice => (
+                    <Pressable
+                      key={choice.id}
+                      style={[
+                        styles.riftBuffCard,
+                        choice.rarity === 'rare' && styles.riftBuffCardRare,
+                        choice.rarity === 'epic' && styles.riftBuffCardEpic,
+                        choice.rarity === 'legendary' && styles.riftBuffCardLegendary,
+                      ]}
+                      onPress={() => chooseRiftBuff(choice)}
+                    >
+                      <Text style={styles.riftBuffTitle}>{choice.name}</Text>
+                      <Text style={styles.riftBuffDesc}>{choice.description}</Text>
+                      <Text style={styles.riftBuffStat}>
+                        {choice.dpsMult > 1 ? `DMG +${Math.round((choice.dpsMult - 1) * 100)}% ` : ''}
+                        {choice.hpMult > 1 ? `HP +${Math.round((choice.hpMult - 1) * 100)}% ` : ''}
+                        {choice.defenseMult > 1 ? `DEF +${Math.round((choice.defenseMult - 1) * 100)}%` : ''}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {riftSelectedBonuses.length > 0 && (
+                  <Text style={styles.riftPickedCount}>Chosen buffs: {riftSelectedBonuses.length}/5</Text>
+                )}
               </>
             )}
           </View>
@@ -8187,6 +8344,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  diceFace: {
+    width: 70,
+    height: 70,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#8FAED1',
+    backgroundColor: '#112136',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#7BB8FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  diceFaceText: {
+    fontSize: 34,
+    fontWeight: '800',
+    color: '#F4FBFF',
+  },
   diceEmoji: {
     fontSize: 60,
   },
@@ -8241,6 +8418,51 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 20,
     height: 80,
+  },
+  riftBuffList: {
+    width: '100%',
+    gap: 8,
+    marginBottom: 12,
+  },
+  riftBuffCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3A5674',
+    backgroundColor: '#0E1827',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    gap: 3,
+  },
+  riftBuffCardRare: {
+    borderColor: '#4E89D8',
+    backgroundColor: '#10223D',
+  },
+  riftBuffCardEpic: {
+    borderColor: '#A264E8',
+    backgroundColor: '#201637',
+  },
+  riftBuffCardLegendary: {
+    borderColor: '#E2B148',
+    backgroundColor: '#35270F',
+  },
+  riftBuffTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#E5F3FF',
+  },
+  riftBuffDesc: {
+    fontSize: 11,
+    color: '#A8C8E5',
+  },
+  riftBuffStat: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#79EAA3',
+  },
+  riftPickedCount: {
+    fontSize: 11,
+    color: '#A4C6DE',
+    fontWeight: '700',
   },
   waveBar: {
     width: 40,

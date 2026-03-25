@@ -2202,8 +2202,8 @@ type Action =
   | { type: 'TOGGLE_EQUIP_HERO'; uid: string }
   | { type: 'SET_ACTIVE_TEAM'; heroIds: string[] }
   | { type: 'SET_HERO_FORMATION'; uid: string; role: HeroFormationRole }
-  | { type: 'PLAY_DICE_ROLL' }
-  | { type: 'RUN_RIFT_DUNGEON' }
+  | { type: 'PLAY_DICE_ROLL'; forcedRoll?: number }
+  | { type: 'RUN_RIFT_DUNGEON'; forcedWaves?: number; forcedDiamonds?: number; forcedShards?: number; forcedEssence?: number }
   | { type: 'RECYCLE_HERO'; uid: string }
   | { type: 'AUTO_RECYCLE_HEROES' }
   | { type: 'SET_AUTO_RECYCLE_MAX_RARITY'; rarity: Rarity }
@@ -3261,7 +3261,10 @@ function reducer(state: GameState, action: Action): GameState {
       const today = toDayNumber(Date.now());
       if (state.lastDiceRollDay === today) return state;
 
-      const roll = 1 + Math.floor(Math.random() * 20);
+      const forcedRoll = typeof action.forcedRoll === 'number' && Number.isFinite(action.forcedRoll)
+        ? Math.floor(action.forcedRoll)
+        : null;
+      const roll = forcedRoll == null ? 1 + Math.floor(Math.random() * 20) : Math.max(1, Math.min(20, forcedRoll));
       const diamonds = roll === 20 ? 30 : roll >= 17 ? 18 : roll >= 13 ? 12 : roll >= 9 ? 8 : 5;
       const shardBonus = roll >= 15 ? Math.ceil(roll * 12) : 0;
 
@@ -3283,13 +3286,29 @@ function reducer(state: GameState, action: Action): GameState {
       const today = toDayNumber(Date.now());
       if (state.lastRiftRunDay === today) return state;
 
+      const hasForcedOutcome =
+        typeof action.forcedWaves === 'number' && Number.isFinite(action.forcedWaves) &&
+        typeof action.forcedDiamonds === 'number' && Number.isFinite(action.forcedDiamonds) &&
+        typeof action.forcedShards === 'number' && Number.isFinite(action.forcedShards) &&
+        typeof action.forcedEssence === 'number' && Number.isFinite(action.forcedEssence);
+
       const teamPower = Math.max(1, getDps(state));
       const expected = Math.min(5, Math.max(1, Math.floor((teamPower / Math.max(1, getMonsterMaxHp(state.wave) * 0.12)) * 2)));
       const variance = Math.floor(Math.random() * 3) - 1;
-      const clearedWaves = Math.max(1, Math.min(5, expected + variance));
-      const diamonds = 8 + clearedWaves * 4 + (clearedWaves === 5 ? 8 : 0);
-      const shardReward = Math.ceil(clearedWaves * 90 * (1 + state.highestWaveReached / 250));
-      const essenceReward = clearedWaves >= 4 ? 1 : 0;
+      const fallbackWaves = Math.max(1, Math.min(5, expected + variance));
+
+      const clearedWaves = hasForcedOutcome
+        ? Math.max(1, Math.min(5, Math.floor(action.forcedWaves!)))
+        : fallbackWaves;
+      const diamonds = hasForcedOutcome
+        ? Math.max(0, Math.floor(action.forcedDiamonds!))
+        : 8 + clearedWaves * 4 + (clearedWaves === 5 ? 8 : 0);
+      const shardReward = hasForcedOutcome
+        ? Math.max(0, Math.floor(action.forcedShards!))
+        : Math.ceil(clearedWaves * 90 * (1 + state.highestWaveReached / 250));
+      const essenceReward = hasForcedOutcome
+        ? Math.max(0, Math.floor(action.forcedEssence!))
+        : (clearedWaves >= 4 ? 1 : 0);
 
       return queueReward({
         ...state,
@@ -4299,8 +4318,20 @@ export function useGameState(saveSlot: string = 'default') {
   const setHeroFormation = useCallback((uid: string, role: HeroFormationRole) => {
     dispatch({ type: 'SET_HERO_FORMATION', uid, role });
   }, []);
-  const playDiceRoll = useCallback(() => dispatch({ type: 'PLAY_DICE_ROLL' }), []);
-  const runRiftDungeon = useCallback(() => dispatch({ type: 'RUN_RIFT_DUNGEON' }), []);
+  const playDiceRoll = useCallback((forcedRoll?: number) => dispatch({ type: 'PLAY_DICE_ROLL', forcedRoll }), []);
+  const runRiftDungeon = useCallback((payload?: { waves: number; diamonds: number; shards: number; essence: number }) => {
+    if (!payload) {
+      dispatch({ type: 'RUN_RIFT_DUNGEON' });
+      return;
+    }
+    dispatch({
+      type: 'RUN_RIFT_DUNGEON',
+      forcedWaves: payload.waves,
+      forcedDiamonds: payload.diamonds,
+      forcedShards: payload.shards,
+      forcedEssence: payload.essence,
+    });
+  }, []);
   const recycleHero = useCallback((uid: string) => dispatch({ type: 'RECYCLE_HERO', uid }), []);
   const autoRecycleHeroes = useCallback(() => dispatch({ type: 'AUTO_RECYCLE_HEROES' }), []);
   const setAutoRecycleMaxRarity = useCallback((rarity: Rarity) => {
