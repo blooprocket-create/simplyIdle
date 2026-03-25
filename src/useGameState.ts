@@ -627,7 +627,10 @@ function getFormationMultipliers(state: GameState): {
   for (const hero of state.heroRoster) {
     if (!active.has(hero.uid)) continue;
     const role = getFormationRoleForHero(state, hero);
+    
+    // Cap each role at MAX_FORMATION_ROLE_HEROES
     if (role === 'front') {
+      if (front >= MAX_FORMATION_ROLE_HEROES) continue;
       front += 1;
       hpMult *= 1.06;
       incomingMult *= 0.95;
@@ -637,11 +640,13 @@ function getFormationMultipliers(state: GameState): {
         dpsMult *= 0.98;
       }
     } else if (role === 'mid') {
+      if (mid >= MAX_FORMATION_ROLE_HEROES) continue;
       mid += 1;
       dpsMult *= 1.03;
       hpMult *= 1.02;
       incomingMult *= 0.99;
     } else {
+      if (back >= MAX_FORMATION_ROLE_HEROES) continue;
       back += 1;
       dpsMult *= 1.05;
       incomingMult *= 1.03;

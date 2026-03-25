@@ -1529,7 +1529,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                             }}
                           >
                             <Text style={styles.formationBadgeText}>
-                              {(state.heroFormationByUid[heroId] ?? (hero.heroClass === 'warrior' || hero.heroClass === 'berserker' ? 'front' : hero.heroClass === 'archer' || hero.heroClass === 'mage' ? 'back' : 'mid')) === 'front' ? '🛡️ Front' : (state.heroFormationByUid[heroId] ?? 'mid') === 'mid' ? '⚔️ Mid' : '🏹 Back'}
+                              {(() => {
+                                const role = state.heroFormationByUid[heroId] ?? (hero.heroClass === 'warrior' || hero.heroClass === 'berserker' ? 'front' : hero.heroClass === 'archer' || hero.heroClass === 'mage' ? 'back' : 'mid');
+                                return role === 'front' ? '🛡️ Front' : role === 'mid' ? '⚔️ Mid' : '🏹 Back';
+                              })()}
                             </Text>
                           </Pressable>
                         </View>
