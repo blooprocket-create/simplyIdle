@@ -552,14 +552,28 @@ function getClassMasteryLevel(state: GameState, playerClass: PlayerClass | null)
   return Math.floor(xp / 100);
 }
 
+// Allowed formation roles per class:
+//   warrior / berserker  → front only
+//   monk                 → front | mid
+//   mage  / archer       → mid  | back
+export const VALID_FORMATION_ROLES_FOR_CLASS: Record<PlayerClass, HeroFormationRole[]> = {
+  warrior:   ['front'],
+  berserker: ['front'],
+  monk:      ['front', 'mid'],
+  mage:      ['mid', 'back'],
+  archer:    ['mid', 'back'],
+};
+
 function defaultFormationForClass(playerClass: PlayerClass): HeroFormationRole {
-  if (playerClass === 'warrior' || playerClass === 'berserker') return 'front';
-  if (playerClass === 'mage' || playerClass === 'archer') return 'back';
-  return 'mid';
+  return VALID_FORMATION_ROLES_FOR_CLASS[playerClass][0];
 }
 
 function getFormationRoleForHero(state: GameState, hero: HeroUnit): HeroFormationRole {
-  return state.heroFormationByUid[hero.uid] ?? defaultFormationForClass(hero.heroClass);
+  const stored = state.heroFormationByUid[hero.uid];
+  const valid = VALID_FORMATION_ROLES_FOR_CLASS[hero.heroClass];
+  // If the stored role isn't valid for this class, fall back to the class default
+  if (stored && valid.includes(stored)) return stored;
+  return valid[0];
 }
 
 function getTeamSlotUnlockRequirement(targetSlots: number): { requiredWave: number; goldCost: number; shardCost: number } | null {
@@ -1557,7 +1571,12 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     for (const uid of Object.keys(payload.heroFormationByUid)) {
       if (!heroUidSet.has(uid)) continue;
       const role = payload.heroFormationByUid[uid];
-      if (typeof role === 'string' && VALID_HERO_FORMATION_ROLES.has(role as HeroFormationRole)) {
+      if (typeof role !== 'string' || !VALID_HERO_FORMATION_ROLES.has(role as HeroFormationRole)) continue;
+      // Strip roles that are invalid for the hero's class
+      const hero = heroRoster.find(h => h.uid === uid);
+      if (!hero) continue;
+      const validRoles = VALID_FORMATION_ROLES_FOR_CLASS[hero.heroClass];
+      if (validRoles.includes(role as HeroFormationRole)) {
         heroFormationByUid[uid] = role as HeroFormationRole;
       }
     }
@@ -3216,7 +3235,11 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'SET_HERO_FORMATION': {
-      if (!state.heroRoster.some(h => h.uid === action.uid)) return state;
+      const hero = state.heroRoster.find(h => h.uid === action.uid);
+      if (!hero) return state;
+      // Reject roles that aren't valid for this hero's class
+      const validRoles = VALID_FORMATION_ROLES_FOR_CLASS[hero.heroClass];
+      if (!validRoles.includes(action.role)) return state;
       const activeTeamSet = new Set(state.activeTeamHeroIds);
       if (activeTeamSet.has(action.uid)) {
         const nextRoleCounts = getTeamRoleCounts(state, state.activeTeamHeroIds.filter(id => id !== action.uid));

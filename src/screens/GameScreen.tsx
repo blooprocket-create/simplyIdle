@@ -14,7 +14,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ENABLE_SIMULATED_DOLLAR_PURCHASES, getCharacterSaveSlot, getDpsBreakdown, getEquipmentCraftCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState } from '../useGameState';
+import { ENABLE_SIMULATED_DOLLAR_PURCHASES, getCharacterSaveSlot, getDpsBreakdown, getEquipmentCraftCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState, VALID_FORMATION_ROLES_FOR_CLASS } from '../useGameState';
 import { trackEvent } from '../telemetry';
 import {
   ACHIEVEMENTS,
@@ -1519,22 +1519,15 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                               {cls.name} Lv{hero.level}
                             </Text>
                           </View>
-                          <Pressable
-                            style={styles.formationBadge}
-                            onPress={() => {
-                              const roles: Array<'front' | 'mid' | 'back'> = ['front', 'mid', 'back'];
-                              const cur = state.heroFormationByUid[heroId] ?? (hero.heroClass === 'warrior' || hero.heroClass === 'berserker' ? 'front' : hero.heroClass === 'archer' || hero.heroClass === 'mage' ? 'back' : 'mid');
-                              const next = roles[(roles.indexOf(cur) + 1) % roles.length];
-                              setHeroFormation(heroId, next);
-                            }}
-                          >
-                            <Text style={styles.formationBadgeText}>
-                              {(() => {
-                                const role = state.heroFormationByUid[heroId] ?? (hero.heroClass === 'warrior' || hero.heroClass === 'berserker' ? 'front' : hero.heroClass === 'archer' || hero.heroClass === 'mage' ? 'back' : 'mid');
-                                return role === 'front' ? '🛡️ Front' : role === 'mid' ? '⚔️ Mid' : '🏹 Back';
-                              })()}
-                            </Text>
-                          </Pressable>
+                          {(() => {
+                            const role = VALID_FORMATION_ROLES_FOR_CLASS[hero.heroClass][0];
+                            const roleName = role === 'front' ? '🛡️ Front' : role === 'mid' ? '⚔️ Mid' : '🏹 Back';
+                            return (
+                              <View style={styles.formationBadge}>
+                                <Text style={styles.formationBadgeText}>{roleName}</Text>
+                              </View>
+                            );
+                          })()}
                         </View>
                       );
                     })}
@@ -7835,6 +7828,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 8,
     alignSelf: 'center',
+  },
+  formationBadgeLocked: {
+    opacity: 0.6,
   },
   formationBadgeText: {
     fontSize: 10,
