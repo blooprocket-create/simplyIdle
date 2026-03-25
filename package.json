@@ -15,6 +15,7 @@
   "dependencies": {
     "@expo/metro-config": "~55.0.9",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@vercel/analytics": "^2.0.1",
     "expo": "~55.0.8",
     "expo-crypto": "~55.0.10",
     "expo-haptics": "^55.0.9",
