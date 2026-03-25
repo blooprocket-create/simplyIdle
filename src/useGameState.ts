@@ -109,6 +109,7 @@ interface SummonHistoryEntry {
 }
 
 type HeroFormationRole = 'front' | 'mid' | 'back';
+type CombatTempo = 1 | 2 | 4;
 
 const ACHIEVEMENT_BONUS_PER_UNLOCK = 0.03;
 const ACHIEVEMENT_BONUS_CAP = 0.75;
@@ -181,6 +182,7 @@ export interface GameState {
   autoRecycleEnabled: boolean;
   autoSummonEnabled: boolean;
   autoSummonMode: 'single' | 'x10';
+  combatTempo: CombatTempo;
   autoSummonReserveGold: number;
   autoSummonCooldownMs: number;
   lastActiveAt: number;
@@ -291,6 +293,7 @@ const DEFAULT_STATE: GameState = {
   autoRecycleEnabled: false,
   autoSummonEnabled: false,
   autoSummonMode: 'single',
+  combatTempo: 1,
   autoSummonReserveGold: 5000,
   autoSummonCooldownMs: 0,
   lastActiveAt: Date.now(),
@@ -1409,6 +1412,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     autoRecycleEnabled: clampBoolean(payload.autoRecycleEnabled, false),
     autoSummonEnabled: clampBoolean(payload.autoSummonEnabled, false),
     autoSummonMode,
+    combatTempo: payload.combatTempo === 2 || payload.combatTempo === 4 ? payload.combatTempo : 1,
     autoSummonReserveGold: clampInt(payload.autoSummonReserveGold, 0, SAFE_INTEGER_CAP, 5000),
     lastActiveAt: clampInt(payload.lastActiveAt, 0, now, now),
     tutorialEnabled: clampBoolean(payload.tutorialEnabled, true),
@@ -1819,6 +1823,7 @@ type Action =
   | { type: 'SPEND_REBIRTH_CORE'; path: 'damage' | 'economy' | 'survival' }
   | { type: 'SET_AUTO_SUMMON_ENABLED'; enabled: boolean }
   | { type: 'SET_AUTO_SUMMON_MODE'; mode: 'single' | 'x10' }
+  | { type: 'SET_COMBAT_TEMPO'; tempo: CombatTempo }
   | { type: 'SET_AUTO_SUMMON_RESERVE_GOLD'; reserveGold: number }
   | { type: 'USE_USABLE_ITEM'; itemId: string }
   | { type: 'DISMANTLE_EQUIPMENT'; itemId: string }
@@ -1873,8 +1878,9 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'TICK': {
       if (!state.characterCreated) return state;
-      let working = decayBuffs(state, action.elapsed);
-      working = tickHeroActives(working, action.elapsed);
+      const scaledElapsed = action.elapsed * state.combatTempo;
+      let working = decayBuffs(state, scaledElapsed);
+      working = tickHeroActives(working, scaledElapsed);
       const weekly = getCurrentWeeklyEvent(working);
 
       const dps = getDps(working);
@@ -1882,7 +1888,7 @@ function reducer(state: GameState, action: Action): GameState {
       const affix = getMonsterAffixModifiers(working.wave);
 
       // Team deals damage to enemy
-      const damage = (dps * (action.elapsed / 1000)) / (affix.hpMult * weekly.enemyHpMultiplier);
+      const damage = (dps * (scaledElapsed / 1000)) / (affix.hpMult * weekly.enemyHpMultiplier);
       const hp = working.monsterHp - damage;
 
       // Enemy deals damage to team (reduced by defense)
@@ -1904,7 +1910,7 @@ function reducer(state: GameState, action: Action): GameState {
         * formation.incomingMult
         * synergy.incomingMult
         * activeReductionMult
-        * (action.elapsed / 1000);
+        * (scaledElapsed / 1000);
       const teamHp = working.teamHp - actualEnemyDamage;
 
       // Check if monster is defeated
@@ -1948,7 +1954,7 @@ function reducer(state: GameState, action: Action): GameState {
       for (let i = 0; i < action.hits; i++) {
         const affix = getMonsterAffixModifiers(working.wave);
         const crit = Math.random() < 0.2;
-        const dmg = (getClickDamage(working) * (crit ? 1.8 : 1)) / affix.hpMult;
+        const dmg = (getClickDamage(working) * 8 * (crit ? 1.8 : 1)) / affix.hpMult;
         const hp = working.monsterHp - dmg;
         if (hp <= 0) {
           working = withAchievement(killMonster(working));
@@ -1956,7 +1962,7 @@ function reducer(state: GameState, action: Action): GameState {
           working = { ...working, monsterHp: hp };
         }
       }
-      return working;
+      return queueCombatLog(working, `Burst unleashed for ${action.hits} amplified strikes`);
     }
 
     case 'BUY_PARTY': {
@@ -2531,28 +2537,58 @@ function reducer(state: GameState, action: Action): GameState {
       const elapsed = Math.max(0, Math.min(action.elapsedMs, OFFLINE_PROGRESS_CAP_MS));
       if (elapsed < 5000) return { ...state, lastActiveAt: Date.now() };
 
-      const seconds = Math.floor(elapsed / 1000);
-      const achievementMult = getAchievementBonusMultiplier(state);
-      const masteryLevel = getClassMasteryLevel(state, state.playerClass);
-      const masteryEconomyMult = 1 + Math.min(0.25, Math.floor(masteryLevel / 5) * 0.01);
-      const goldGain = Math.floor(getMonsterGold(state.wave) * 0.35 * seconds * achievementMult * getMetaEconomyMultiplier(state) * getRebirthEconomyMultiplier(state) * masteryEconomyMult);
-      const expGain = Math.floor(getMonsterExp(state.wave) * 0.22 * seconds * achievementMult);
-      const lvl = processLevelUp(state.exp + expGain, state.level);
+      const MAX_OFFLINE_KILLS = 4000;
+      const MIN_KILL_MS = 35;
+      let remainingMs = elapsed;
+      let working = state;
+      const startWave = state.wave;
+      const startKills = state.totalKills;
+      const startGold = state.gold;
+      const startExp = state.totalExp;
+      const baseRewardQueue = state.rewardQueue;
+      const baseCombatLog = state.combatLog;
+
+      while (remainingMs > 0 && working.characterCreated && (working.totalKills - startKills) < MAX_OFFLINE_KILLS) {
+        const weekly = getCurrentWeeklyEvent(working);
+        const affix = getMonsterAffixModifiers(working.wave);
+        const dps = Math.max(1, getDps(working));
+        const killMs = Math.max(
+          MIN_KILL_MS,
+          Math.ceil((working.monsterHp * affix.hpMult * weekly.enemyHpMultiplier / dps) * 1000),
+        );
+
+        if (killMs > remainingMs) {
+          const dealt = (dps * (remainingMs / 1000)) / (affix.hpMult * weekly.enemyHpMultiplier);
+          working = {
+            ...working,
+            monsterHp: Math.max(1, working.monsterHp - dealt),
+          };
+          remainingMs = 0;
+          break;
+        }
+
+        working = killMonster(working);
+        remainingMs -= killMs;
+      }
+
+      const killsGained = working.totalKills - startKills;
+      const wavesGained = Math.max(0, working.wave - startWave);
+      const goldGain = Math.max(0, working.gold - startGold);
+      const expGain = Math.max(0, working.totalExp - startExp);
+      working = {
+        ...working,
+        rewardQueue: baseRewardQueue,
+        combatLog: baseCombatLog,
+      };
 
       const next = queueReward({
-        ...state,
-        gold: state.gold + goldGain,
-        totalGold: state.totalGold + goldGain,
-        exp: lvl.exp,
-        totalExp: state.totalExp + expGain,
-        level: lvl.level,
-        unspentStatPoints: state.unspentStatPoints + lvl.gainedLevels * STAT_POINTS_PER_LEVEL,
+        ...working,
         lastActiveAt: Date.now(),
       }, {
         id: `offline_${Date.now()}`,
         kind: 'system',
         title: 'Offline Progress',
-        detail: `+${goldGain} gold and +${expGain} EXP`,
+        detail: `+${killsGained} kills • +${wavesGained} waves • +${goldGain} gold • +${expGain} EXP`,
       });
       return withAchievement(progressTutorial(next));
     }
@@ -2827,6 +2863,13 @@ function reducer(state: GameState, action: Action): GameState {
       };
     }
 
+    case 'SET_COMBAT_TEMPO': {
+      return {
+        ...state,
+        combatTempo: action.tempo,
+      };
+    }
+
     case 'SET_AUTO_SUMMON_RESERVE_GOLD': {
       return {
         ...state,
@@ -2959,7 +3002,7 @@ interface SaveData {
   firstSummonGiven: boolean;
   freeSummonCharges: number;
   heroShards: number;
-    bossTears: number;
+  bossTears: number;
   essence: number;
   rebirthCores: number;
   rebirthDamagePath: number;
@@ -2996,6 +3039,7 @@ interface SaveData {
   autoRecycleEnabled: boolean;
   autoSummonEnabled: boolean;
   autoSummonMode: 'single' | 'x10';
+  combatTempo?: CombatTempo;
   autoSummonReserveGold: number;
   lastActiveAt: number;
 
@@ -3080,6 +3124,7 @@ function serialize(state: GameState): SaveData {
     autoRecycleEnabled: state.autoRecycleEnabled,
     autoSummonEnabled: state.autoSummonEnabled,
     autoSummonMode: state.autoSummonMode,
+    combatTempo: state.combatTempo,
     autoSummonReserveGold: state.autoSummonReserveGold,
     lastActiveAt: Date.now(),
 
@@ -3294,6 +3339,7 @@ export function useGameState(saveSlot: string = 'default') {
   const setAutoUsePotionThreshold = useCallback((thresholdPct: number) => dispatch({ type: 'SET_AUTO_USE_POTION_THRESHOLD', thresholdPct }), []);
   const setAutoSummonEnabled = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_SUMMON_ENABLED', enabled }), []);
   const setAutoSummonMode = useCallback((mode: 'single' | 'x10') => dispatch({ type: 'SET_AUTO_SUMMON_MODE', mode }), []);
+  const setCombatTempo = useCallback((tempo: CombatTempo) => dispatch({ type: 'SET_COMBAT_TEMPO', tempo }), []);
   const setAutoSummonReserveGold = useCallback((reserveGold: number) => {
     dispatch({ type: 'SET_AUTO_SUMMON_RESERVE_GOLD', reserveGold });
   }, []);
@@ -3396,6 +3442,7 @@ export function useGameState(saveSlot: string = 'default') {
     setAutoUsePotionThreshold,
     setAutoSummonEnabled,
     setAutoSummonMode,
+    setCombatTempo,
     setAutoSummonReserveGold,
     spendEssenceUpgrade,
     claimWeeklyTrack,

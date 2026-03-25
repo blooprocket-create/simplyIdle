@@ -147,7 +147,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setAutoUsePotionThreshold,
     setAutoSummonEnabled,
     setAutoSummonMode,
-    setAutoSummonReserveGold,
+    setCombatTempo,
     spendEssenceUpgrade,
     claimWeeklyTrack,
     claimMission,
@@ -184,7 +184,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [idleChestReady, setIdleChestReady] = useState(false);
   const [idleChestOpen, setIdleChestOpen] = useState(false);
   const [idleChestReward, setIdleChestReward] = useState<{ title: string; detail: string } | null>(null);
-  const [battleSpeed, setBattleSpeed] = useState<1 | 2 | 4>(1);
   const [storyUnlockToast, setStoryUnlockToast] = useState<{ id: string; title: string; chapter: string } | null>(null);
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const lastSummonIdRef = useRef<string | null>(null);
@@ -821,6 +820,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const isBossImminent = state.wave % 10 >= 8;
   const burstChargePct = Math.min(100, (state.burstCharge / 25) * 100);
   const canBurst = state.burstCharge >= 25;
+  const battleSpeed = state.combatTempo;
   const prestige1Done = (state.prestigeCount ?? 0) >= 1;
   const prestige5Done = (state.prestigeCount ?? 0) >= 5;
   const prestige10Done = (state.prestigeCount ?? 0) >= 10;
@@ -1502,17 +1502,18 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     <Pressable
                       key={mult}
                       style={[styles.battleTempoBtn, battleSpeed === mult && styles.battleTempoBtnActive]}
-                      onPress={() => setBattleSpeed(mult)}
+                      onPress={() => setCombatTempo(mult)}
                     >
                       <Text style={[styles.battleTempoBtnText, battleSpeed === mult && styles.battleTempoBtnTextActive]}>{mult}x</Text>
                     </Pressable>
                   ))}
                 </View>
               </View>
+              <Text style={styles.battleTempoHint}>Higher tempo speeds up passive combat and burst payout.</Text>
               <View style={styles.burstRow}>
                 <View style={styles.burstInfo}>
                   <Text style={styles.burstTitle}>Burst Gauge</Text>
-                  <Text style={styles.burstSub}>Charge from kills • consume for rapid strikes</Text>
+                  <Text style={styles.burstSub}>Charge from kills ({state.burstCharge}/25) • spend for amplified strikes</Text>
                 </View>
                 <Pressable
                   style={[styles.burstBtn, !canBurst && styles.burstBtnDisabled]}
@@ -1531,6 +1532,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <View style={styles.hpBarBg}>
                 <View style={[styles.hpBarFill, { width: `${burstChargePct}%`, backgroundColor: '#FFB347' }]} />
               </View>
+              <Text style={styles.burstHint}>{canBurst ? 'Burst ready: cash in now for a wave skip push.' : `${25 - state.burstCharge} kills to next burst`}</Text>
             </View>
 
             <View style={styles.battleSection}>
@@ -2020,17 +2022,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       <Text style={styles.autoSummonModeText}>Mode: {state.autoSummonMode === 'single' ? 'Single' : 'x10'}</Text>
                     </Pressable>
                   </View>
-                  <View style={styles.autoSummonReserveRow}>
-                    <Text style={styles.autoSummonReserveText}>Reserve Gold: {fmt(state.autoSummonReserveGold)}</Text>
-                    <View style={styles.autoPotionThresholdWrap}>
-                      <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoSummonReserveGold(Math.max(0, state.autoSummonReserveGold - 1000))}>
-                        <Text style={styles.autoPotionAdjustText}>-</Text>
-                      </Pressable>
-                      <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoSummonReserveGold(state.autoSummonReserveGold + 1000)}>
-                        <Text style={styles.autoPotionAdjustText}>+</Text>
-                      </Pressable>
-                    </View>
-                  </View>
+                  <Text style={styles.autoSummonReserveText}>Auto summon uses Boss Tears now. No gold reserve required.</Text>
                 </View>
 
                 <View style={styles.recyclePickerWrap}>
@@ -3010,18 +3002,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     <Text style={styles.settingsCycleBtnText}>{state.autoSummonMode.toUpperCase()}</Text>
                   </Pressable>
                 </View>
-                <View style={styles.settingsRowBetween}>
-                  <Text style={styles.settingsLabel}>Reserve Gold</Text>
-                  <View style={styles.settingsAdjustWrap}>
-                    <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoSummonReserveGold(state.autoSummonReserveGold - 1000)}>
-                      <Text style={styles.autoPotionAdjustText}>-</Text>
-                    </Pressable>
-                    <Text style={styles.settingsValueText}>{fmt(state.autoSummonReserveGold)}</Text>
-                    <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoSummonReserveGold(state.autoSummonReserveGold + 1000)}>
-                      <Text style={styles.autoPotionAdjustText}>+</Text>
-                    </Pressable>
-                  </View>
-                </View>
+                <Text style={styles.settingsHintText}>Summons consume Boss Tears, so reserve gold controls were removed.</Text>
               </View>
             </ScrollView>
           </View>
@@ -4413,6 +4394,10 @@ const styles = StyleSheet.create({
     color: '#D9ECFF',
     fontWeight: '700',
   },
+  battleTempoHint: {
+    fontSize: 10,
+    color: '#95B4CF',
+  },
   battleTempoRow: {
     flexDirection: 'row',
     gap: 6,
@@ -4454,6 +4439,10 @@ const styles = StyleSheet.create({
   burstSub: {
     fontSize: 10,
     color: '#A7BDD4',
+  },
+  burstHint: {
+    fontSize: 10,
+    color: '#E4CFA8',
   },
   burstBtn: {
     borderRadius: 5,
@@ -6356,6 +6345,10 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#CFE6FF',
     fontWeight: '700',
+  },
+  settingsHintText: {
+    fontSize: 10,
+    color: '#9DB7CF',
   },
   chapterMapModalBox: {
     backgroundColor: '#0F1A2A',
