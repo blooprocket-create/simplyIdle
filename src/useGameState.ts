@@ -1926,6 +1926,7 @@ type Action =
   | { type: 'SET_AUTO_SUMMON_RESERVE_GOLD'; reserveGold: number }
   | { type: 'BUY_PREMIUM_COOLANT'; itemId: 'coolant_mk1' | 'coolant_mk2' }
   | { type: 'USE_USABLE_ITEM'; itemId: string }
+  | { type: 'AUTO_DISMANTLE_EQUIPMENT' }
   | { type: 'DISMANTLE_EQUIPMENT'; itemId: string }
   | { type: 'CRAFT_EQUIPMENT'; slot: EquipmentSlot }
   | { type: 'UPGRADE_EQUIPMENT_RARITY'; itemId: string }
@@ -2437,6 +2438,30 @@ function reducer(state: GameState, action: Action): GameState {
         kind: 'item',
         title: `Dismantled ${item.emoji} ${item.name}`,
         detail: `+${gain} scrap`,
+      });
+    }
+
+    case 'AUTO_DISMANTLE_EQUIPMENT': {
+      const equippedIds = new Set(
+        Object.values(state.equippedItems).filter((id): id is string => !!id),
+      );
+      const candidates = state.inventoryItemIds
+        .filter(itemId => !equippedIds.has(itemId))
+        .map(itemId => ({ itemId, item: getEquipmentItem(itemId) }))
+        .filter((entry): entry is { itemId: string; item: NonNullable<ReturnType<typeof getEquipmentItem>> } => !!entry.item);
+      if (candidates.length === 0) return state;
+
+      const dismantleIds = new Set(candidates.map(entry => entry.itemId));
+      const gain = candidates.reduce((sum, entry) => sum + equipmentScrapValue(entry.item.rarity), 0);
+      return queueReward({
+        ...state,
+        inventoryItemIds: state.inventoryItemIds.filter(id => !dismantleIds.has(id)),
+        equipmentScrap: state.equipmentScrap + gain,
+      }, {
+        id: `auto_dismantle_${Date.now()}`,
+        kind: 'item',
+        title: 'Auto Dismantle Complete',
+        detail: `+${gain} scrap from ${candidates.length} unequipped items`,
       });
     }
 
@@ -3490,6 +3515,7 @@ export function useGameState(saveSlot: string = 'default') {
   const buyPremiumCoolant = useCallback((itemId: 'coolant_mk1' | 'coolant_mk2') => {
     dispatch({ type: 'BUY_PREMIUM_COOLANT', itemId });
   }, []);
+  const autoDismantleEquipment = useCallback(() => dispatch({ type: 'AUTO_DISMANTLE_EQUIPMENT' }), []);
   const spendEssenceUpgrade = useCallback((path: 'damage' | 'economy' | 'survival') => {
     dispatch({ type: 'SPEND_ESSENCE_UPGRADE', path });
   }, []);
@@ -3592,6 +3618,7 @@ export function useGameState(saveSlot: string = 'default') {
     setCombatTempo,
     setAutoSummonReserveGold,
     buyPremiumCoolant,
+    autoDismantleEquipment,
     spendEssenceUpgrade,
     claimWeeklyTrack,
     claimMission,

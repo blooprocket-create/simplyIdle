@@ -150,6 +150,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setAutoSummonMode,
     setCombatTempo,
     buyPremiumCoolant,
+    autoDismantleEquipment,
     spendEssenceUpgrade,
     claimWeeklyTrack,
     claimMission,
@@ -2412,9 +2413,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           <View style={styles.equipmentTab}>
             <View style={styles.equipHeaderRow}>
               <Text style={styles.sectionTitle}>🎒 Equipment Inventory</Text>
-              <Pressable style={styles.equipOptimizeBtnHeader} onPress={optimizeEquipment}>
-                <Text style={styles.equipOptimizeBtnHeaderText}>⚡ Optimize</Text>
-              </Pressable>
             </View>
             {renderSubTabBar((['inventory', 'craft'] as const).map(st => ({
               id: st,
@@ -2434,7 +2432,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Pressable style={styles.equipOptimizeBtn} onPress={optimizeEquipment}>
                   <Text style={styles.equipOptimizeBtnText}>⚡ Optimize Gear</Text>
                 </Pressable>
-                <Text style={styles.equipOptimizeHint}>Auto-equips best item per slot</Text>
+                <Pressable style={styles.equipDismantleBtn} onPress={autoDismantleEquipment}>
+                  <Text style={styles.equipDismantleBtnText}>🧰 Auto Dismantle</Text>
+                </Pressable>
+                <Text style={styles.equipOptimizeHint}>Optimize equips best item per slot. Auto dismantle scraps all unequipped items.</Text>
               </View>
             )}
             {equipmentSubTab === 'craft' && (
@@ -6903,22 +6904,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 4,
   },
-  equipOptimizeBtnHeader: {
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#5FA870',
-    backgroundColor: '#1E3D2C',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-  },
-  equipOptimizeBtnHeaderText: {
-    fontSize: 10,
-    color: '#AFFFCA',
-    fontWeight: '700',
-  },
   equipOptimizeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 10,
     marginBottom: 8,
   },
@@ -6933,6 +6922,19 @@ const styles = StyleSheet.create({
   equipOptimizeBtnText: {
     fontSize: 10,
     color: '#AFFFCA',
+    fontWeight: '700',
+  },
+  equipDismantleBtn: {
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A86C5F',
+    backgroundColor: '#3A251E',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  equipDismantleBtnText: {
+    fontSize: 10,
+    color: '#FFD1C5',
     fontWeight: '700',
   },
   equipOptimizeHint: {
