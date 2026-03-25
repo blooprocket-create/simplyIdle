@@ -58,6 +58,7 @@ type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipme
 type HeroesSubTab = 'summon' | 'roster' | 'forge';
 type EquipmentSubTab = 'inventory' | 'craft';
 type AchievementsSubTab = 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex';
+type ShopTab = 'diamond' | 'gold' | 'dollar';
 
 type MomentCue = 'none' | 'mythic' | 'boss' | 'rebirth' | 'ultimate';
 
@@ -94,6 +95,23 @@ const ACH_BONUS_PER_UNLOCK_PCT = 3;
 const ACH_BONUS_CAP_PCT = 75;
 const FEEDBACK_FORM_URL = 'https://forms.gle/replace-with-your-beta-form';
 const GEAR_RARITY_POINTS: Record<string, number> = { common: 40, rare: 90, epic: 170, legendary: 280, mythic: 430 };
+const VIP_LEVEL_THRESHOLDS = [0, 50, 150, 350, 700, 1500, 3000, 6500, 15000, 35000, 100000] as const;
+const GOLD_SHOP_OFFERS = [
+  { id: 'exp_cache', name: 'Training Cache', desc: '+6 Training Scrolls', cost: 2800 },
+  { id: 'potion_bundle', name: 'Field Bundle', desc: '+3 Small Potion, +1 Grand Potion, +2 Gold Cache', cost: 4200 },
+  { id: 'armory_crate', name: 'Armory Crate', desc: 'Random class-compatible gear', cost: 12000 },
+] as const;
+const DIAMOND_SHOP_OFFERS = [
+  { id: 'coolant_i_pack', name: 'Coolant Pack I', desc: '+4 Coolant Capsule I', cost: 24 },
+  { id: 'coolant_ii_pack', name: 'Coolant Pack II', desc: '+3 Coolant Capsule II', cost: 58 },
+  { id: 'elite_supply', name: 'Elite Supply Crate', desc: '+5 Coolant I, +3 Coolant II, +2 Grand Potions', cost: 120 },
+] as const;
+const DOLLAR_SHOP_OFFERS = [
+  { id: 'usd_499', label: '$4.99', diamonds: 500, vipPoints: 50 },
+  { id: 'usd_1999', label: '$19.99', diamonds: 2200, vipPoints: 200 },
+  { id: 'usd_4999', label: '$49.99', diamonds: 6000, vipPoints: 500 },
+  { id: 'usd_9999', label: '$99.99', diamonds: 13000, vipPoints: 1000 },
+] as const;
 
 interface CharacterSlotSummary {
   classId: PlayerClass;
@@ -152,6 +170,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setCombatTempo,
     setAutoTempoEnabled,
     setAutoTempoTarget,
+    buyGoldShopItem,
+    buyDiamondShopItem,
+    simulateDollarPurchase,
     buyPremiumCoolant,
     autoDismantleEquipment,
     spendEssenceUpgrade,
@@ -178,6 +199,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [expandedHeroes, setExpandedHeroes] = useState<Set<string>>(new Set());
   const [recycleConfirmUid, setRecycleConfirmUid] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [shopOpen, setShopOpen] = useState(false);
+  const [shopTab, setShopTab] = useState<ShopTab>('diamond');
   const [heroesSubTab, setHeroesSubTab] = useState<HeroesSubTab>('summon');
   const [equipmentSubTab, setEquipmentSubTab] = useState<EquipmentSubTab>('inventory');
   const [achievementsSubTab, setAchievementsSubTab] = useState<AchievementsSubTab>('overview');
@@ -486,6 +509,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const claimableWeeklyMilestones = WEEKLY_TRACK_MILESTONES.filter(ms => state.weeklyKills >= ms && !state.weeklyTrackClaimed.includes(ms));
   const claimableMissionIds = missionCards.filter(m => !m.claimed && m.progress.done).map(m => m.mission.id);
   const hasClaimableRewards = claimableWeeklyMilestones.length > 0 || claimableMissionIds.length > 0;
+  const vipLevel = Math.max(0, Math.min(10, state.vipLevel ?? 0));
+  const vipPoints = Math.max(0, state.vipPoints ?? 0);
+  const vipCurrentThreshold = VIP_LEVEL_THRESHOLDS[vipLevel] ?? 0;
+  const vipNextThreshold = vipLevel >= 10 ? vipCurrentThreshold : (VIP_LEVEL_THRESHOLDS[vipLevel + 1] ?? vipCurrentThreshold + 1);
+  const vipProgressPct = vipLevel >= 10
+    ? 100
+    : Math.max(0, Math.min(100, ((vipPoints - vipCurrentThreshold) / Math.max(1, vipNextThreshold - vipCurrentThreshold)) * 100));
   const storyEntries = useMemo(
     () => STORY_BEATS.map(beat => {
       const waveReady = state.highestWaveReached >= beat.unlockWave;
@@ -589,6 +619,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           multLine('Class passive', dpsBreakdown.multipliers.classPassive),
           multLine('Hero passives', dpsBreakdown.multipliers.heroPassives),
           multLine('Formation + synergy', dpsBreakdown.multipliers.formation * dpsBreakdown.multipliers.synergy),
+          multLine('VIP protocol', dpsBreakdown.multipliers.vipDamage),
           multLine('Mastery + temporary buff', dpsBreakdown.multipliers.mastery * dpsBreakdown.multipliers.temporaryBuff),
         ],
       };
@@ -1125,6 +1156,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           <View style={styles.headerActionRow}>
             <Pressable style={styles.headerActionBtn} onPress={() => setEventsOpen(true)}>
               <Text style={styles.headerActionBtnText}>🗓️</Text>
+            </Pressable>
+            <Pressable style={styles.headerActionBtn} onPress={() => setShopOpen(true)}>
+              <Text style={styles.headerActionBtnText}>🛒</Text>
             </Pressable>
             <Pressable style={styles.headerActionBtn} onPress={() => setSettingsOpen(true)}>
               <Text style={styles.headerActionBtnText}>⚙️</Text>
@@ -2922,6 +2956,121 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             >
               <Text style={styles.idleChestClaimText}>Claim Rewards</Text>
             </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Shop Modal */}
+      <Modal
+        visible={shopOpen}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShopOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.eventsModalBox}>
+            <View style={styles.eventsHeaderRow}>
+              <Text style={styles.eventsModalTitle}>🛒 Shop</Text>
+              <Pressable style={styles.settingsCloseBtn} onPress={() => setShopOpen(false)}>
+                <Text style={styles.settingsCloseBtnText}>Close</Text>
+              </Pressable>
+            </View>
+
+            {renderSubTabBar([
+              { id: 'diamond', label: 'Diamond Shop', active: shopTab === 'diamond', onPress: () => setShopTab('diamond') },
+              { id: 'gold', label: 'Gold Shop', active: shopTab === 'gold', onPress: () => setShopTab('gold') },
+              { id: 'dollar', label: 'Dollar Shop', active: shopTab === 'dollar', onPress: () => setShopTab('dollar') },
+            ])}
+
+            <ScrollView style={styles.eventsScroll} contentContainerStyle={styles.eventsScrollContent}>
+              <View style={styles.eventsCard}>
+                <Text style={styles.eventsCardTitle}>👑 VIP Status</Text>
+                <Text style={styles.eventsStatLine}>Level: {vipLevel}/10 • Points: {fmt(vipPoints)}</Text>
+                <Text style={styles.eventsStatLine}>Bonuses: +{stats.vipDamageBonusPct.toFixed(1)}% DPS • +{stats.vipGoldBonusPct.toFixed(1)}% Gold • +{stats.vipExpBonusPct.toFixed(1)}% EXP</Text>
+                <View style={styles.hpBarBg}>
+                  <View style={[styles.hpBarFill, { width: `${vipProgressPct}%`, backgroundColor: '#FFE07A' }]} />
+                </View>
+                <Text style={styles.eventsHint}>
+                  {vipLevel >= 10
+                    ? 'MAX VIP reached.'
+                    : `Next VIP at ${fmt(vipNextThreshold)} points (${fmt(Math.max(0, vipNextThreshold - vipPoints))} to go).`}
+                </Text>
+              </View>
+
+              {shopTab === 'diamond' && (
+                <View style={styles.eventsCard}>
+                  <Text style={styles.eventsCardTitle}>💎 Diamond Shop</Text>
+                  <Text style={styles.eventsHint}>Spend diamonds on premium consumables like heat coolants.</Text>
+                  {DIAMOND_SHOP_OFFERS.map(offer => {
+                    const canBuy = state.diamonds >= offer.cost;
+                    return (
+                      <View key={offer.id} style={styles.shopOfferRow}>
+                        <View style={styles.shopOfferInfo}>
+                          <Text style={styles.shopOfferTitle}>{offer.name}</Text>
+                          <Text style={styles.shopOfferDesc}>{offer.desc}</Text>
+                          <Text style={styles.shopOfferPrice}>Cost: {offer.cost} 💎</Text>
+                        </View>
+                        <Pressable
+                          style={[styles.eventsActionBtn, !canBuy && styles.shopBuyBtnDisabled]}
+                          disabled={!canBuy}
+                          onPress={() => buyDiamondShopItem(offer.id)}
+                        >
+                          <Text style={styles.eventsActionBtnText}>{canBuy ? 'Buy' : 'Need 💎'}</Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              {shopTab === 'gold' && (
+                <View style={styles.eventsCard}>
+                  <Text style={styles.eventsCardTitle}>🪙 Gold Shop</Text>
+                  <Text style={styles.eventsHint}>Spend gold on progression items, potions, and gear crates.</Text>
+                  {GOLD_SHOP_OFFERS.map(offer => {
+                    const canBuy = state.gold >= offer.cost;
+                    return (
+                      <View key={offer.id} style={styles.shopOfferRow}>
+                        <View style={styles.shopOfferInfo}>
+                          <Text style={styles.shopOfferTitle}>{offer.name}</Text>
+                          <Text style={styles.shopOfferDesc}>{offer.desc}</Text>
+                          <Text style={styles.shopOfferPrice}>Cost: {fmt(offer.cost)} gold</Text>
+                        </View>
+                        <Pressable
+                          style={[styles.eventsActionBtn, !canBuy && styles.shopBuyBtnDisabled]}
+                          disabled={!canBuy}
+                          onPress={() => buyGoldShopItem(offer.id)}
+                        >
+                          <Text style={styles.eventsActionBtnText}>{canBuy ? 'Buy' : 'Need Gold'}</Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              {shopTab === 'dollar' && (
+                <View style={styles.eventsCard}>
+                  <Text style={styles.eventsCardTitle}>💵 Dollar Shop (Simulation)</Text>
+                  <Text style={styles.eventsHint}>No real payments yet. Purchases are simulated and still grant VIP points.</Text>
+                  {DOLLAR_SHOP_OFFERS.map(offer => (
+                    <View key={offer.id} style={styles.shopOfferRow}>
+                      <View style={styles.shopOfferInfo}>
+                        <Text style={styles.shopOfferTitle}>{offer.label} Pack</Text>
+                        <Text style={styles.shopOfferDesc}>+{fmt(offer.diamonds)} diamonds • +{offer.vipPoints} VIP points</Text>
+                        <Text style={styles.shopOfferPrice}>Rate: $1 = 10 VIP points</Text>
+                      </View>
+                      <Pressable
+                        style={styles.eventsActionBtn}
+                        onPress={() => simulateDollarPurchase(offer.id)}
+                      >
+                        <Text style={styles.eventsActionBtnText}>Sim Buy</Text>
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -6828,6 +6977,35 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#D4EAFF',
     fontWeight: '700',
+  },
+  shopBuyBtnDisabled: {
+    opacity: 0.45,
+  },
+  shopOfferRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#1E3348',
+    paddingTop: 8,
+    marginTop: 8,
+  },
+  shopOfferInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  shopOfferTitle: {
+    fontSize: 11,
+    color: '#E1F2FF',
+    fontWeight: '700',
+  },
+  shopOfferDesc: {
+    fontSize: 10,
+    color: '#A9C4DB',
+  },
+  shopOfferPrice: {
+    fontSize: 10,
+    color: '#FFE39A',
   },
 
   // Daily quest rows

@@ -83,6 +83,26 @@ const PREMIUM_COOLANT_COSTS = {
   coolant_mk1: 8,
   coolant_mk2: 18,
 } as const;
+const GOLD_SHOP_COSTS: Record<GoldShopOfferId, number> = {
+  exp_cache: 2800,
+  potion_bundle: 4200,
+  armory_crate: 12000,
+};
+const DIAMOND_SHOP_COSTS: Record<DiamondShopOfferId, number> = {
+  coolant_i_pack: 24,
+  coolant_ii_pack: 58,
+  elite_supply: 120,
+};
+const DOLLAR_SHOP_PACKS: Record<DollarShopOfferId, { usdCents: number; diamonds: number }> = {
+  usd_499: { usdCents: 499, diamonds: 500 },
+  usd_1999: { usdCents: 1999, diamonds: 2200 },
+  usd_4999: { usdCents: 4999, diamonds: 6000 },
+  usd_9999: { usdCents: 9999, diamonds: 13000 },
+};
+const VIP_LEVEL_THRESHOLDS = [0, 50, 150, 350, 700, 1500, 3000, 6500, 15000, 35000, 100000] as const;
+const VIP_DAMAGE_PER_LEVEL = 0.03;
+const VIP_GOLD_PER_LEVEL = 0.025;
+const VIP_EXP_PER_LEVEL = 0.025;
 
 export function getMaxHeatForLevel(level: number): number {
   const safeLevel = Math.max(1, Math.floor(level));
@@ -128,6 +148,9 @@ interface SummonHistoryEntry {
 type HeroFormationRole = 'front' | 'mid' | 'back';
 type CombatTempo = 1 | 2 | 4;
 type AutoTempoTarget = 2 | 4;
+type GoldShopOfferId = 'exp_cache' | 'potion_bundle' | 'armory_crate';
+type DiamondShopOfferId = 'coolant_i_pack' | 'coolant_ii_pack' | 'elite_supply';
+type DollarShopOfferId = 'usd_499' | 'usd_1999' | 'usd_4999' | 'usd_9999';
 
 const ACHIEVEMENT_BONUS_PER_UNLOCK = 0.03;
 const ACHIEVEMENT_BONUS_CAP = 0.75;
@@ -193,6 +216,8 @@ export interface GameState {
   metaDamageLevel: number;
   metaEconomyLevel: number;
   metaSurvivalLevel: number;
+  vipPoints: number;
+  vipLevel: number;
 
   inventoryItemIds: string[];
   equippedItems: Record<EquipmentSlot, string | null>;
@@ -305,6 +330,8 @@ const DEFAULT_STATE: GameState = {
   metaDamageLevel: 0,
   metaEconomyLevel: 0,
   metaSurvivalLevel: 0,
+  vipPoints: 0,
+  vipLevel: 0,
 
   inventoryItemIds: [],
   equippedItems: {
@@ -947,6 +974,7 @@ export function getDpsBreakdown(state: GameState): {
     formation: number;
     synergy: number;
     mastery: number;
+    vipDamage: number;
     temporaryBuff: number;
   };
   totalMultiplier: number;
@@ -989,6 +1017,7 @@ export function getDpsBreakdown(state: GameState): {
   const synergy = getTeamSynergy(state);
   const masteryLevel = getClassMasteryLevel(state, state.playerClass);
   const masteryDpsMult = 1 + Math.min(0.4, masteryLevel * 0.01);
+  const vipDamageMult = getVipDamageMultiplier(state);
   const multipliers = {
     rebirthLegacy: rebirthMult,
     achievementLegacy: getAchievementBonusMultiplier(state),
@@ -999,6 +1028,7 @@ export function getDpsBreakdown(state: GameState): {
     formation: formation.dpsMult,
     synergy: synergy.dpsMult,
     mastery: masteryDpsMult,
+    vipDamage: vipDamageMult,
     temporaryBuff: activeBuffMult,
   };
   const totalMultiplier = multipliers.rebirthLegacy
@@ -1010,6 +1040,7 @@ export function getDpsBreakdown(state: GameState): {
     * multipliers.formation
     * multipliers.synergy
     * multipliers.mastery
+    * multipliers.vipDamage
     * multipliers.temporaryBuff;
   const finalDps = Math.max(1, (playerDps + heroDps) * totalMultiplier);
   return {
@@ -1032,6 +1063,26 @@ function getActiveStrikeDamage(state: GameState): number {
 function getAchievementBonusMultiplier(state: GameState): number {
   const pct = Math.min(ACHIEVEMENT_BONUS_CAP, state.achievements.size * ACHIEVEMENT_BONUS_PER_UNLOCK);
   return 1 + pct;
+}
+
+function getVipLevelFromPoints(points: number): number {
+  const safePoints = Math.max(0, Math.floor(points));
+  for (let level = 10; level >= 1; level--) {
+    if (safePoints >= VIP_LEVEL_THRESHOLDS[level]) return level;
+  }
+  return 0;
+}
+
+function getVipDamageMultiplier(state: GameState): number {
+  return 1 + state.vipLevel * VIP_DAMAGE_PER_LEVEL;
+}
+
+function getVipGoldMultiplier(state: GameState): number {
+  return 1 + state.vipLevel * VIP_GOLD_PER_LEVEL;
+}
+
+function getVipExpMultiplier(state: GameState): number {
+  return 1 + state.vipLevel * VIP_EXP_PER_LEVEL;
 }
 
 function hasUnlock(state: GameState, unlock: PermanentUnlockId): boolean {
@@ -1512,6 +1563,8 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     metaDamageLevel: clampInt(payload.metaDamageLevel, 0, SAFE_INTEGER_CAP, 0),
     metaEconomyLevel: clampInt(payload.metaEconomyLevel, 0, SAFE_INTEGER_CAP, 0),
     metaSurvivalLevel: clampInt(payload.metaSurvivalLevel, 0, SAFE_INTEGER_CAP, 0),
+    vipPoints: clampInt(payload.vipPoints, 0, SAFE_INTEGER_CAP, 0),
+    vipLevel: getVipLevelFromPoints(clampInt(payload.vipPoints, 0, SAFE_INTEGER_CAP, 0)),
     inventoryItemIds,
     equippedItems,
     usableItemCounts,
@@ -1586,6 +1639,11 @@ export function computeStats(state: GameState) {
     expProgress: Math.min(1, state.exp / expForLevel(state.level)),
     // Return decimal (e.g. 0.06 = 6%) so UI can multiply by 100 once
     teamBoostPercent: teamBoost,
+    vipLevel: state.vipLevel,
+    vipPoints: state.vipPoints,
+    vipDamageBonusPct: (getVipDamageMultiplier(state) - 1) * 100,
+    vipGoldBonusPct: (getVipGoldMultiplier(state) - 1) * 100,
+    vipExpBonusPct: (getVipExpMultiplier(state) - 1) * 100,
     combined,
     equipmentBonus,
     heroDetails,
@@ -1698,8 +1756,8 @@ function killMonster(state: GameState): GameState {
   const synergy = getTeamSynergy(state);
   const masteryLevel = getClassMasteryLevel(state, state.playerClass);
   const masteryEconomyMult = 1 + Math.min(0.25, Math.floor(masteryLevel / 5) * 0.01);
-  const goldReward = Math.ceil(getMonsterGold(state.wave) * Math.pow(REBIRTH_BONUS, state.prestigeCount) * achievementMult * affix.goldMult * economyMult * getRebirthEconomyMultiplier(state) * heroPassive.goldMult * synergy.goldMult * masteryEconomyMult * weekly.goldMultiplier);
-  const expReward = Math.ceil(getMonsterExp(state.wave) * achievementMult * affix.expMult * heroPassive.expMult * synergy.expMult * weekly.expMultiplier);
+  const goldReward = Math.ceil(getMonsterGold(state.wave) * Math.pow(REBIRTH_BONUS, state.prestigeCount) * achievementMult * affix.goldMult * economyMult * getRebirthEconomyMultiplier(state) * heroPassive.goldMult * synergy.goldMult * masteryEconomyMult * weekly.goldMultiplier * getVipGoldMultiplier(state));
+  const expReward = Math.ceil(getMonsterExp(state.wave) * achievementMult * affix.expMult * heroPassive.expMult * synergy.expMult * weekly.expMultiplier * getVipExpMultiplier(state));
   const lvl = processLevelUp(state.exp + expReward, state.level);
   const isBoss = state.wave % 10 === 0;
   const act = getActForWave(state.wave);
@@ -1965,6 +2023,9 @@ type Action =
   | { type: 'SET_AUTO_TEMPO_ENABLED'; enabled: boolean }
   | { type: 'SET_AUTO_TEMPO_TARGET'; target: AutoTempoTarget }
   | { type: 'SET_AUTO_SUMMON_RESERVE_GOLD'; reserveGold: number }
+  | { type: 'BUY_GOLD_SHOP_ITEM'; offerId: GoldShopOfferId }
+  | { type: 'BUY_DIAMOND_SHOP_ITEM'; offerId: DiamondShopOfferId }
+  | { type: 'SIMULATE_DOLLAR_PURCHASE'; offerId: DollarShopOfferId }
   | { type: 'BUY_PREMIUM_COOLANT'; itemId: 'coolant_mk1' | 'coolant_mk2' }
   | { type: 'USE_USABLE_ITEM'; itemId: string }
   | { type: 'AUTO_DISMANTLE_EQUIPMENT' }
@@ -2398,7 +2459,7 @@ function reducer(state: GameState, action: Action): GameState {
       }
 
       if (item.effect === 'gain_gold_flat') {
-        const gain = Math.ceil(item.value * Math.pow(REBIRTH_BONUS, nextState.prestigeCount));
+        const gain = Math.ceil(item.value * Math.pow(REBIRTH_BONUS, nextState.prestigeCount) * getVipGoldMultiplier(nextState));
         nextState = queueReward({
           ...nextState,
           gold: nextState.gold + gain,
@@ -2412,7 +2473,7 @@ function reducer(state: GameState, action: Action): GameState {
       }
 
       if (item.effect === 'gain_exp_flat') {
-        const gain = Math.ceil(item.value * getAchievementBonusMultiplier(nextState));
+        const gain = Math.ceil(item.value * getAchievementBonusMultiplier(nextState) * getVipExpMultiplier(nextState));
         const lvl = processLevelUp(nextState.exp + gain, nextState.level);
         nextState = queueReward({
           ...nextState,
@@ -3074,6 +3135,139 @@ function reducer(state: GameState, action: Action): GameState {
       };
     }
 
+    case 'BUY_GOLD_SHOP_ITEM': {
+      const cost = GOLD_SHOP_COSTS[action.offerId];
+      if (state.gold < cost) return state;
+
+      if (action.offerId === 'exp_cache') {
+        const nextState = {
+          ...state,
+          gold: state.gold - cost,
+          usableItemCounts: addUsableItemCount(state.usableItemCounts, 'exp_scroll', 6),
+        };
+        return queueReward(nextState, {
+          id: `shop_gold_exp_${Date.now()}`,
+          kind: 'item',
+          title: 'Gold Shop Purchase: Training Cache',
+          detail: '-2800 gold, +6 Training Scrolls',
+        });
+      }
+
+      if (action.offerId === 'potion_bundle') {
+        let counts = addUsableItemCount(state.usableItemCounts, 'small_potion', 3);
+        counts = addUsableItemCount(counts, 'grand_potion', 1);
+        counts = addUsableItemCount(counts, 'gold_cache', 2);
+        const nextState = {
+          ...state,
+          gold: state.gold - cost,
+          usableItemCounts: counts,
+        };
+        return queueReward(nextState, {
+          id: `shop_gold_potion_${Date.now()}`,
+          kind: 'item',
+          title: 'Gold Shop Purchase: Field Bundle',
+          detail: '-4200 gold, +3 Small Potions, +1 Grand Potion, +2 Gold Cache',
+        });
+      }
+
+      if (!state.playerClass) return state;
+      const classItems = EQUIPMENT_CATALOG.filter(item => item.allowedClasses.includes(state.playerClass as PlayerClass));
+      if (classItems.length === 0) return state;
+      const rolledRarity = rollEquipmentRarityByTier(Math.random(), hasUnlock(state, 'mythic_equipment'));
+      const rarityPool = classItems.filter(item => item.rarity === rolledRarity);
+      const source = rarityPool.length > 0 ? rarityPool : classItems;
+      const item = source[Math.floor(Math.random() * source.length)];
+      if (!item) return state;
+
+      const alreadyOwned = state.inventoryItemIds.includes(item.id);
+      if (alreadyOwned) {
+        const scrapGain = equipmentScrapValue(item.rarity) + 40;
+        return queueReward({
+          ...state,
+          gold: state.gold - cost,
+          equipmentScrap: state.equipmentScrap + scrapGain,
+        }, {
+          id: `shop_gold_gear_dup_${Date.now()}`,
+          kind: 'item',
+          title: 'Gold Shop Purchase: Armory Crate',
+          detail: `Duplicate ${item.name} converted to +${scrapGain} scrap`,
+        });
+      }
+
+      return queueReward({
+        ...state,
+        gold: state.gold - cost,
+        inventoryItemIds: [...state.inventoryItemIds, item.id],
+      }, {
+        id: `shop_gold_gear_${Date.now()}`,
+        kind: 'item',
+        title: `Gold Shop Purchase: ${item.emoji} ${item.name}`,
+        detail: `${equipmentRarityConfig(item.rarity).label} gear • -12000 gold`,
+      });
+    }
+
+    case 'BUY_DIAMOND_SHOP_ITEM': {
+      const cost = DIAMOND_SHOP_COSTS[action.offerId];
+      if (state.diamonds < cost) return state;
+
+      let counts = state.usableItemCounts;
+      let detail = '';
+      if (action.offerId === 'coolant_i_pack') {
+        counts = addUsableItemCount(counts, 'coolant_mk1', 4);
+        detail = '-24 diamonds, +4 Coolant Capsule I';
+      } else if (action.offerId === 'coolant_ii_pack') {
+        counts = addUsableItemCount(counts, 'coolant_mk2', 3);
+        detail = '-58 diamonds, +3 Coolant Capsule II';
+      } else {
+        counts = addUsableItemCount(counts, 'coolant_mk1', 5);
+        counts = addUsableItemCount(counts, 'coolant_mk2', 3);
+        counts = addUsableItemCount(counts, 'grand_potion', 2);
+        detail = '-120 diamonds, +5 Coolant I, +3 Coolant II, +2 Grand Potions';
+      }
+
+      return queueReward({
+        ...state,
+        diamonds: state.diamonds - cost,
+        usableItemCounts: counts,
+      }, {
+        id: `shop_diamond_${action.offerId}_${Date.now()}`,
+        kind: 'system',
+        title: 'Diamond Shop Purchase Complete',
+        detail,
+      });
+    }
+
+    case 'SIMULATE_DOLLAR_PURCHASE': {
+      const pack = DOLLAR_SHOP_PACKS[action.offerId];
+      if (!pack) return state;
+
+      const pointsGain = Math.max(1, Math.round(pack.usdCents / 10));
+      const nextPoints = state.vipPoints + pointsGain;
+      const nextLevel = getVipLevelFromPoints(nextPoints);
+      const leveledUp = nextLevel > state.vipLevel;
+      const priceLabel = `$${(pack.usdCents / 100).toFixed(2)}`;
+
+      const purchasedState = queueReward({
+        ...state,
+        diamonds: state.diamonds + pack.diamonds,
+        vipPoints: nextPoints,
+        vipLevel: nextLevel,
+      }, {
+        id: `shop_cash_${action.offerId}_${Date.now()}`,
+        kind: 'system',
+        title: 'Dollar Shop Purchase (Simulated)',
+        detail: `${priceLabel} pack: +${pack.diamonds} diamonds, +${pointsGain} VIP points`,
+      });
+
+      if (!leveledUp) return purchasedState;
+      return queueReward(purchasedState, {
+        id: `vip_level_${nextLevel}_${Date.now()}`,
+        kind: 'system',
+        title: `VIP Level Up: ${nextLevel}`,
+        detail: `Bonuses now: +${Math.round((getVipDamageMultiplier({ ...state, vipLevel: nextLevel }) - 1) * 100)}% DPS, +${Math.round((getVipGoldMultiplier({ ...state, vipLevel: nextLevel }) - 1) * 100)}% gold, +${Math.round((getVipExpMultiplier({ ...state, vipLevel: nextLevel }) - 1) * 100)}% EXP`,
+      });
+    }
+
     case 'BUY_PREMIUM_COOLANT': {
       const cost = PREMIUM_COOLANT_COSTS[action.itemId];
       if (state.diamonds < cost) return state;
@@ -3155,6 +3349,8 @@ function reducer(state: GameState, action: Action): GameState {
         metaDamageLevel: p.metaDamageLevel,
         metaEconomyLevel: p.metaEconomyLevel,
         metaSurvivalLevel: p.metaSurvivalLevel,
+        vipPoints: p.vipPoints,
+        vipLevel: p.vipLevel,
 
         inventoryItemIds: p.inventoryItemIds,
         equippedItems: p.equippedItems,
@@ -3255,6 +3451,8 @@ interface SaveData {
   metaDamageLevel: number;
   metaEconomyLevel: number;
   metaSurvivalLevel: number;
+  vipPoints?: number;
+  vipLevel?: number;
 
   inventoryItemIds: string[];
   equippedItems: Record<EquipmentSlot, string | null>;
@@ -3346,6 +3544,8 @@ function serialize(state: GameState): SaveData {
     metaDamageLevel: state.metaDamageLevel,
     metaEconomyLevel: state.metaEconomyLevel,
     metaSurvivalLevel: state.metaSurvivalLevel,
+    vipPoints: state.vipPoints,
+    vipLevel: state.vipLevel,
 
     inventoryItemIds: state.inventoryItemIds,
     equippedItems: state.equippedItems,
@@ -3591,6 +3791,9 @@ export function useGameState(saveSlot: string = 'default') {
   const setAutoSummonReserveGold = useCallback((reserveGold: number) => {
     dispatch({ type: 'SET_AUTO_SUMMON_RESERVE_GOLD', reserveGold });
   }, []);
+  const buyGoldShopItem = useCallback((offerId: GoldShopOfferId) => dispatch({ type: 'BUY_GOLD_SHOP_ITEM', offerId }), []);
+  const buyDiamondShopItem = useCallback((offerId: DiamondShopOfferId) => dispatch({ type: 'BUY_DIAMOND_SHOP_ITEM', offerId }), []);
+  const simulateDollarPurchase = useCallback((offerId: DollarShopOfferId) => dispatch({ type: 'SIMULATE_DOLLAR_PURCHASE', offerId }), []);
   const buyPremiumCoolant = useCallback((itemId: 'coolant_mk1' | 'coolant_mk2') => {
     dispatch({ type: 'BUY_PREMIUM_COOLANT', itemId });
   }, []);
@@ -3699,6 +3902,9 @@ export function useGameState(saveSlot: string = 'default') {
     setAutoTempoEnabled,
     setAutoTempoTarget,
     setAutoSummonReserveGold,
+    buyGoldShopItem,
+    buyDiamondShopItem,
+    simulateDollarPurchase,
     buyPremiumCoolant,
     autoDismantleEquipment,
     spendEssenceUpgrade,
