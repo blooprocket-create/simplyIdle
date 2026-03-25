@@ -14,7 +14,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getCharacterSaveSlot, getEquipmentCraftCost, getHeroGoldLevelCost, getSaveStorageKey, useGameState } from '../useGameState';
+import { getCharacterSaveSlot, getEquipmentCraftCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState } from '../useGameState';
 import { trackEvent } from '../telemetry';
 import {
   ACHIEVEMENTS,
@@ -821,6 +821,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   const isBossImminent = state.wave % 10 >= 8;
   const burstChargePct = Math.min(100, (state.burstCharge / 25) * 100);
+  const maxHeat = getMaxHeatForLevel(state.level);
+  const heatPct = Math.min(100, Math.max(0, (state.combatHeat / maxHeat) * 100));
   const canBurst = state.burstCharge >= 25;
   const battleSpeed = state.combatTempo;
   const prestige1Done = (state.prestigeCount ?? 0) >= 1;
@@ -1512,14 +1514,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 </View>
               </View>
               <Text style={styles.battleTempoHint}>Higher tempo speeds up passive combat and burst payout.</Text>
-              <Text style={styles.battleTempoHint}>Heat: {Math.ceil(state.combatHeat)}/{100} {state.combatTempo > 1 ? '(building)' : '(recovering)'}</Text>
+              <Text style={styles.battleTempoHint}>Heat: {Math.ceil(state.combatHeat)}/{Math.ceil(maxHeat)} {state.combatTempo > 1 ? '(building)' : '(recovering)'}</Text>
               <View style={styles.hpBarBg}>
                 <View
                   style={[
                     styles.hpBarFill,
                     {
-                      width: `${Math.min(100, Math.max(0, state.combatHeat))}%`,
-                      backgroundColor: state.combatHeat >= 85 ? '#FF5B5B' : state.combatHeat >= 55 ? '#FFB347' : '#64D39D',
+                      width: `${heatPct}%`,
+                      backgroundColor: heatPct >= 85 ? '#FF5B5B' : heatPct >= 55 ? '#FFB347' : '#64D39D',
                     },
                   ]}
                 />

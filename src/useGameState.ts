@@ -73,11 +73,17 @@ const MAX_SAVE_LOG_ENTRIES = 100;
 const MAX_SAVE_SUMMON_HISTORY = 50;
 const HEAT_BASE_RATE_PER_SEC = 7;
 const HEAT_RECOVERY_RATE_PER_SEC = HEAT_BASE_RATE_PER_SEC * 0.66;
-const HEAT_MAX = 100;
+const HEAT_MAX_BASE = 100;
+const HEAT_MAX_PER_LEVEL = 2;
 const PREMIUM_COOLANT_COSTS = {
   coolant_mk1: 8,
   coolant_mk2: 18,
 } as const;
+
+export function getMaxHeatForLevel(level: number): number {
+  const safeLevel = Math.max(1, Math.floor(level));
+  return HEAT_MAX_BASE + (safeLevel - 1) * HEAT_MAX_PER_LEVEL;
+}
 
 const VALID_PLAYER_CLASSES = new Set<PlayerClass>(['warrior', 'berserker', 'archer', 'mage', 'monk']);
 const VALID_RARITIES = new Set<Rarity>(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'godly']);
@@ -650,6 +656,7 @@ function decayBuffs(state: GameState, elapsedMs: number): GameState {
 function updateCombatHeat(state: GameState, elapsedMs: number): GameState {
   const seconds = elapsedMs / 1000;
   if (seconds <= 0) return state;
+  const maxHeat = getMaxHeatForLevel(state.level);
 
   let nextHeat = state.combatHeat;
   if (state.combatTempo === 1) {
@@ -658,11 +665,11 @@ function updateCombatHeat(state: GameState, elapsedMs: number): GameState {
   }
 
   const buildRate = state.combatTempo === 2 ? HEAT_BASE_RATE_PER_SEC : HEAT_BASE_RATE_PER_SEC * 3;
-  nextHeat = Math.min(HEAT_MAX, state.combatHeat + buildRate * seconds);
-  if (nextHeat >= HEAT_MAX) {
+  nextHeat = Math.min(maxHeat, state.combatHeat + buildRate * seconds);
+  if (nextHeat >= maxHeat) {
     const overheated: GameState = {
       ...state,
-      combatHeat: HEAT_MAX,
+      combatHeat: maxHeat,
       combatTempo: 1,
     };
     return queueReward(queueCombatLog(overheated, 'OVERHEAT! Combat Tempo forced to 1x'), {
@@ -1267,6 +1274,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     : null;
   const characterCreated = clampBoolean(payload.characterCreated, false) && !!playerName && playerClass !== null;
   const level = clampInt(payload.level, 1, MAX_SAVE_PLAYER_LEVEL, 1);
+  const maxHeat = getMaxHeatForLevel(level);
   const wave = clampInt(payload.wave, 1, MAX_SAVE_WAVE, 1);
   const highestWaveReached = Math.max(
     wave,
@@ -1400,7 +1408,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     statsAlloc,
     totalKills: clampInt(payload.totalKills, 0, SAFE_INTEGER_CAP, 0),
     burstCharge: clampInt(payload.burstCharge, 0, 25, 0),
-    combatHeat: clampFloat(payload.combatHeat, 0, HEAT_MAX, 0),
+    combatHeat: clampFloat(payload.combatHeat, 0, maxHeat, 0),
     wave,
     monsterHp,
     monsterMaxHp: maxMonsterHp,
