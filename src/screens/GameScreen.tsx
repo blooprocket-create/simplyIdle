@@ -155,11 +155,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     autoEquipBestHeroes,
     saveTeamLoadout,
     loadTeamLoadout,
+    unlockTeamSlot,
     autoRecycleHeroes,
     setAutoRecycleMaxRarity,
     setAutoRecycleEnabled,
     toggleEquipHero,
     setHeroFormation,
+    playDiceRoll,
+    runRiftDungeon,
     allocateStat,
     allocateStatMax,
     allocateStatN,
@@ -200,6 +203,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     getEssenceCost,
     getRebirthCoreCost,
     getShardForgeCosts,
+    getNextTeamSlotUnlock,
     getUpgradePlan,
     getWeeklyEvent,
     getMissionProgress,
@@ -241,6 +245,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [warPanels, setWarPanels] = useState({
     frontline: true,
     roster: true,
+    operations: true,
     armory: false,
     growth: false,
     objectives: true,
@@ -447,6 +452,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     return byClass[state.playerClass ?? 'warrior'];
   }, [state.playerClass]);
   const canRebirthNow = state.wave >= REBIRTH_WAVE_THRESHOLD;
+  const teamSlotCap = Math.max(4, Math.min(ACTIVE_TEAM_SIZE, state.teamSlotsUnlocked ?? 4));
+  const nextTeamSlotUnlock = getNextTeamSlotUnlock();
+  const currentDay = Math.floor(Date.now() / 86_400_000);
+  const canPlayDiceToday = state.lastDiceRollDay !== currentDay;
+  const canRunRiftToday = state.lastRiftRunDay !== currentDay;
   const rebirthProgressPct = Math.max(0, Math.min(1, state.wave / REBIRTH_WAVE_THRESHOLD)) * 100;
   const rebirthWavesLeft = Math.max(0, REBIRTH_WAVE_THRESHOLD - state.wave);
   const guidanceList = useMemo(() => {
@@ -454,8 +464,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     if (canRebirthNow) {
       recs.push({ title: 'Rebirth Ready', detail: 'Reset now for permanent cores and stronger scaling.', tab: 'battle' });
     }
-    if (state.activeTeamHeroIds.length < ACTIVE_TEAM_SIZE) {
-      recs.push({ title: 'Build Full Team', detail: 'Equip 4 heroes to stabilize damage and survival.', tab: 'heroes' });
+    if (state.activeTeamHeroIds.length < teamSlotCap) {
+      recs.push({ title: 'Build Full Team', detail: `Equip ${teamSlotCap} heroes to stabilize damage and survival.`, tab: 'heroes' });
     }
     if (state.unspentStatPoints > 0) {
       recs.push({ title: 'Spend Stat Points', detail: 'Use unspent points to increase immediate power.', tab: 'stats' });
@@ -466,7 +476,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     }
     recs.push({ title: 'Push Act Boss', detail: `Advance to Wave ${currentAct.bossWave} for permanent unlock progress.`, tab: 'battle' });
     return recs.slice(0, 3);
-  }, [canRebirthNow, state.activeTeamHeroIds.length, state.unspentStatPoints, missionCards, currentAct.bossWave]);
+  }, [canRebirthNow, state.activeTeamHeroIds.length, state.unspentStatPoints, missionCards, currentAct.bossWave, teamSlotCap]);
   const nextGuidance = guidanceList[0];
   const extraGuidanceCount = Math.max(0, guidanceList.length - 1);
   const equippedItemsForScore = useMemo(
@@ -1388,11 +1398,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
             {activeTeamCollapsed ? (
               <Text style={styles.teamCollapsedHint}>
-                Active heroes: {state.activeTeamHeroIds.length}/{ACTIVE_TEAM_SIZE} • Synergies: {stats.synergies.length}
+                Active heroes: {state.activeTeamHeroIds.length}/{teamSlotCap} • Synergies: {stats.synergies.length}
               </Text>
             ) : teamSelectionMode ? (
               <View>
-                <Text style={styles.selectMsg}>Select up to {ACTIVE_TEAM_SIZE} heroes ({tempTeam.length}/{ACTIVE_TEAM_SIZE})</Text>
+                <Text style={styles.selectMsg}>Select up to {teamSlotCap} heroes ({tempTeam.length}/{teamSlotCap})</Text>
+                <Text style={styles.sectionHelperText}>Formation cap: max 2 Front, 2 Mid, 2 Back.</Text>
                 <ScrollView style={styles.heroSelector}>
                   {state.heroRoster.map(hero => {
                     const isSelected = tempTeam.includes(hero.uid);
@@ -1404,10 +1415,23 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                           setTempTeam(prev => {
                             if (prev.includes(hero.uid)) {
                               return prev.filter(id => id !== hero.uid);
-                            } else if (prev.length < ACTIVE_TEAM_SIZE) {
-                              return [...prev, hero.uid];
                             }
-                            return prev;
+                            if (prev.length >= teamSlotCap) return prev;
+
+                            const roleForUid = (uid: string) => {
+                              const rosterHero = state.heroRoster.find(h => h.uid === uid);
+                              if (!rosterHero) return 'mid';
+                              return state.heroFormationByUid[uid]
+                                ?? (rosterHero.heroClass === 'warrior' || rosterHero.heroClass === 'berserker'
+                                  ? 'front'
+                                  : rosterHero.heroClass === 'archer' || rosterHero.heroClass === 'mage'
+                                    ? 'back'
+                                    : 'mid');
+                            };
+                            const role = roleForUid(hero.uid);
+                            const roleCount = prev.reduce((count, uid) => count + (roleForUid(uid) === role ? 1 : 0), 0);
+                            if (roleCount >= 2) return prev;
+                            return [...prev, hero.uid];
                           });
                         }}
                       >
@@ -1591,7 +1615,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               </Pressable>
               {warPanels.roster && (
                 <View style={styles.warPanelBody}>
-                  <Text style={styles.warPanelStat}>Active Team: {state.activeTeamHeroIds.length}/{ACTIVE_TEAM_SIZE}</Text>
+                  <Text style={styles.warPanelStat}>Active Team: {state.activeTeamHeroIds.length}/{teamSlotCap}</Text>
                   <Text style={styles.warPanelStat}>Total Heroes: {state.heroRoster.length}</Text>
                   <Text style={styles.warPanelStat}>Shards: {fmt(state.heroShards)}</Text>
                                     <Text style={styles.warPanelStat}>Boss Tears: {state.bossTears} 💧 (summon currency)</Text>
@@ -1601,6 +1625,64 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     </Pressable>
                     <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('heroes')}>
                       <Text style={styles.warPanelActionText}>Manage Roster</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.warPanel}>
+              <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('operations')}>
+                <Text style={styles.warPanelTitle}>🎲 Operations</Text>
+                <Text style={styles.warPanelChevron}>{warPanels.operations ? '−' : '+'}</Text>
+              </Pressable>
+              {warPanels.operations && (
+                <View style={styles.warPanelBody}>
+                  <Text style={styles.warPanelStat}>Daily Dice: {canPlayDiceToday ? 'Ready' : 'Claimed today'}</Text>
+                  <Text style={styles.warPanelStat}>Rift Challenge: {canRunRiftToday ? 'Ready' : 'Cleared today'}{state.lastRiftWavesCleared > 0 ? ` • Last clear ${state.lastRiftWavesCleared}/5` : ''}</Text>
+                  {state.lastDiceRollValue != null && (
+                    <Text style={styles.warPanelStat}>Last Dice Roll: {state.lastDiceRollValue}/20</Text>
+                  )}
+                  <Text style={styles.warPanelStat}>Formation Rule: Max 2 Front, 2 Mid, 2 Back</Text>
+                  <Text style={styles.warPanelStat}>Team Slots: {state.activeTeamHeroIds.length}/{teamSlotCap}</Text>
+                  {nextTeamSlotUnlock ? (
+                    <Text style={styles.warPanelStat}>
+                      Next Slot {nextTeamSlotUnlock.targetSlots}: Wave {nextTeamSlotUnlock.requiredWave}, {fmt(nextTeamSlotUnlock.goldCost)} gold, {fmt(nextTeamSlotUnlock.shardCost)} shards
+                    </Text>
+                  ) : (
+                    <Text style={styles.warPanelStat}>All team slots unlocked.</Text>
+                  )}
+                  <View style={styles.warPanelActionRow}>
+                    <Pressable
+                      style={[styles.warPanelActionBtn, !canPlayDiceToday && styles.warPanelActionBtnDisabled]}
+                      disabled={!canPlayDiceToday}
+                      onPress={playDiceRoll}
+                    >
+                      <Text style={styles.warPanelActionText}>Roll Dice (+Diamonds)</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.warPanelActionBtn, !canRunRiftToday && styles.warPanelActionBtnDisabled]}
+                      disabled={!canRunRiftToday}
+                      onPress={runRiftDungeon}
+                    >
+                      <Text style={styles.warPanelActionText}>Run Rift (+Diamonds)</Text>
+                    </Pressable>
+                  </View>
+                  <View style={styles.warPanelActionRow}>
+                    <Pressable
+                      style={[
+                        styles.warPanelActionBtn,
+                        (!nextTeamSlotUnlock || !nextTeamSlotUnlock.canUnlock) && styles.warPanelActionBtnDisabled,
+                      ]}
+                      disabled={!nextTeamSlotUnlock || !nextTeamSlotUnlock.canUnlock}
+                      onPress={unlockTeamSlot}
+                    >
+                      <Text style={styles.warPanelActionText}>
+                        {nextTeamSlotUnlock ? `Unlock Slot ${nextTeamSlotUnlock.targetSlots}` : 'Slots Maxed'}
+                      </Text>
+                    </Pressable>
+                    <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('heroes')}>
+                      <Text style={styles.warPanelActionText}>Edit Team</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -1856,7 +1938,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
             {/* Team Composition */}
             <View style={styles.battleSection}>
-              <Text style={styles.battleSectionTitle}>Your Team ({state.activeTeamHeroIds.length}/{ACTIVE_TEAM_SIZE})</Text>
+              <Text style={styles.battleSectionTitle}>Your Team ({state.activeTeamHeroIds.length}/{teamSlotCap})</Text>
               {state.activeTeamHeroIds.length === 0 ? (
                 <Text style={styles.emptyMsg}>No team selected! Tap "Edit Team" above to assemble your squad.</Text>
               ) : (
@@ -2094,7 +2176,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   </View>
                 </View>
                 <Text style={styles.rosterCount}>
-                  {state.heroRoster.length} heroes • {state.activeTeamHeroIds.length}/{ACTIVE_TEAM_SIZE} in active team
+                  {state.heroRoster.length} heroes • {state.activeTeamHeroIds.length}/{teamSlotCap} in active team
                 </Text>
                 <View style={styles.loadoutRow}>
                   {[0, 1, 2].map(slot => (

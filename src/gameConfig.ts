@@ -876,7 +876,7 @@ export const HERO_POOL: HeroTemplate[] = [
 ];
 
 export const MAX_EQUIPPED_HEROES = 5;
-export const ACTIVE_TEAM_SIZE = 4;  // heroes in battle (+ player = 5 total)
+export const ACTIVE_TEAM_SIZE = 6;  // max heroes in battle (+ player)
 export const GACHA_SUMMON_COST = 500;
 export const HERO_LEVEL_EXP_FORMULA = (level: number) => Math.floor(50 * Math.pow(1.18, level - 1));
 export const HERO_LEVEL_CAP = 999;

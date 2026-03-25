@@ -116,6 +116,11 @@ const VIP_LEVEL_THRESHOLDS = [0, 50, 150, 350, 700, 1500, 3000, 6500, 15000, 350
 const VIP_DAMAGE_PER_LEVEL = 0.03;
 const VIP_GOLD_PER_LEVEL = 0.025;
 const VIP_EXP_PER_LEVEL = 0.025;
+const MAX_FORMATION_ROLE_HEROES = 2;
+const TEAM_SLOT_UNLOCK_RULES: Record<number, { requiredWave: number; goldCost: number; shardCost: number }> = {
+  5: { requiredWave: 50, goldCost: 125000, shardCost: 450 },
+  6: { requiredWave: 100, goldCost: 550000, shardCost: 1600 },
+};
 
 export function getMaxHeatForLevel(level: number): number {
   const safeLevel = Math.max(1, Math.floor(level));
@@ -197,7 +202,7 @@ export interface GameState {
   skills: Set<string>;
 
   heroRoster: HeroUnit[];
-  activeTeamHeroIds: string[];  // 4 heroes in battle (+ player = 5 total)
+  activeTeamHeroIds: string[];  // unlockable up to 6 heroes in battle (+ player)
   totalSummons: number;
   firstSummonGiven: boolean;  // track if free summon given on first kill
   freeSummonCharges: number;
@@ -213,7 +218,12 @@ export interface GameState {
   gachaPityCounter: number;
   summonHistory: SummonHistoryEntry[];
   teamLoadouts: string[][];
+  teamSlotsUnlocked: number;
   heroFormationByUid: Record<string, HeroFormationRole>;
+  lastDiceRollDay: number | null;
+  lastRiftRunDay: number | null;
+  lastDiceRollValue: number | null;
+  lastRiftWavesCleared: number;
   classMasteryXp: Record<PlayerClass, number>;
   seasonPoints: number;
   bestSeasonPoints: number;
@@ -324,7 +334,12 @@ const DEFAULT_STATE: GameState = {
   gachaPityCounter: 0,
   summonHistory: [],
   teamLoadouts: [[], [], []],
+  teamSlotsUnlocked: 4,
   heroFormationByUid: {},
+  lastDiceRollDay: null,
+  lastRiftRunDay: null,
+  lastDiceRollValue: null,
+  lastRiftWavesCleared: 0,
   classMasteryXp: {
     warrior: 0,
     berserker: 0,
@@ -514,6 +529,52 @@ function defaultFormationForClass(playerClass: PlayerClass): HeroFormationRole {
 
 function getFormationRoleForHero(state: GameState, hero: HeroUnit): HeroFormationRole {
   return state.heroFormationByUid[hero.uid] ?? defaultFormationForClass(hero.heroClass);
+}
+
+function getTeamSlotUnlockRequirement(targetSlots: number): { requiredWave: number; goldCost: number; shardCost: number } | null {
+  return TEAM_SLOT_UNLOCK_RULES[targetSlots] ?? null;
+}
+
+function getUnlockedTeamSlotCap(state: Pick<GameState, 'teamSlotsUnlocked'>): number {
+  const safeSlots = Number.isFinite(state.teamSlotsUnlocked) ? Math.floor(state.teamSlotsUnlocked) : 4;
+  return Math.max(4, Math.min(ACTIVE_TEAM_SIZE, safeSlots));
+}
+
+function normalizeTeamSelectionByRules(
+  state: Pick<GameState, 'heroRoster' | 'heroFormationByUid' | 'teamSlotsUnlocked'>,
+  heroIds: string[],
+): string[] {
+  const cap = getUnlockedTeamSlotCap(state);
+  const accepted: string[] = [];
+  const seen = new Set<string>();
+  const roleCounts: Record<HeroFormationRole, number> = { front: 0, mid: 0, back: 0 };
+
+  for (const uid of heroIds) {
+    if (accepted.length >= cap) break;
+    if (seen.has(uid)) continue;
+    const hero = state.heroRoster.find(h => h.uid === uid);
+    if (!hero) continue;
+
+    const role = state.heroFormationByUid[uid] ?? defaultFormationForClass(hero.heroClass);
+    if (roleCounts[role] >= MAX_FORMATION_ROLE_HEROES) continue;
+
+    accepted.push(uid);
+    seen.add(uid);
+    roleCounts[role] += 1;
+  }
+
+  return accepted;
+}
+
+function getTeamRoleCounts(state: Pick<GameState, 'heroRoster' | 'heroFormationByUid'>, heroIds: string[]) {
+  const roleCounts: Record<HeroFormationRole, number> = { front: 0, mid: 0, back: 0 };
+  for (const uid of heroIds) {
+    const hero = state.heroRoster.find(h => h.uid === uid);
+    if (!hero) continue;
+    const role = state.heroFormationByUid[uid] ?? defaultFormationForClass(hero.heroClass);
+    roleCounts[role] += 1;
+  }
+  return roleCounts;
 }
 
 function getFormationMultipliers(state: GameState): {
@@ -1444,16 +1505,16 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     }
   }
 
-  const activeTeamHeroIds = sanitizeStringList(payload.activeTeamHeroIds, ACTIVE_TEAM_SIZE)
+  const rawActiveTeamHeroIds = sanitizeStringList(payload.activeTeamHeroIds, ACTIVE_TEAM_SIZE)
     .filter(uid => heroUidSet.has(uid))
     .slice(0, ACTIVE_TEAM_SIZE);
 
-  const teamLoadouts = Array.isArray(payload.teamLoadouts)
+  const rawTeamLoadouts = Array.isArray(payload.teamLoadouts)
     ? payload.teamLoadouts.slice(0, 3).map(loadout => sanitizeStringList(loadout, ACTIVE_TEAM_SIZE)
       .filter(uid => heroUidSet.has(uid))
       .slice(0, ACTIVE_TEAM_SIZE))
     : [];
-  while (teamLoadouts.length < 3) teamLoadouts.push([]);
+  while (rawTeamLoadouts.length < 3) rawTeamLoadouts.push([]);
 
   const heroFormationByUid: Record<string, HeroFormationRole> = {};
   if (isRecord(payload.heroFormationByUid)) {
@@ -1465,6 +1526,15 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
       }
     }
   }
+
+  const teamSlotsUnlocked = clampInt(payload.teamSlotsUnlocked, 4, ACTIVE_TEAM_SIZE, 4);
+  const teamRuleView = {
+    heroRoster,
+    heroFormationByUid,
+    teamSlotsUnlocked,
+  };
+  const activeTeamHeroIds = normalizeTeamSelectionByRules(teamRuleView, rawActiveTeamHeroIds);
+  const teamLoadouts = rawTeamLoadouts.map(loadout => normalizeTeamSelectionByRules(teamRuleView, loadout));
 
   const classMasteryXp = {
     warrior: clampInt(payload.classMasteryXp?.warrior, 0, SAFE_INTEGER_CAP, 0),
@@ -1571,7 +1641,12 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     gachaPityCounter: clampInt(payload.gachaPityCounter, 0, PITY_THRESHOLD - 1, 0),
     summonHistory,
     teamLoadouts,
+    teamSlotsUnlocked,
     heroFormationByUid,
+    lastDiceRollDay: payload.lastDiceRollDay == null ? null : clampInt(payload.lastDiceRollDay, 0, currentDay, currentDay),
+    lastRiftRunDay: payload.lastRiftRunDay == null ? null : clampInt(payload.lastRiftRunDay, 0, currentDay, currentDay),
+    lastDiceRollValue: payload.lastDiceRollValue == null ? null : clampInt(payload.lastDiceRollValue, 1, 20, 1),
+    lastRiftWavesCleared: clampInt(payload.lastRiftWavesCleared, 0, 5, 0),
     classMasteryXp,
     seasonPoints,
     bestSeasonPoints,
@@ -2072,9 +2147,12 @@ type Action =
   | { type: 'AUTO_EQUIP_BEST_HEROES' }
   | { type: 'SAVE_TEAM_LOADOUT'; slot: number }
   | { type: 'LOAD_TEAM_LOADOUT'; slot: number }
+  | { type: 'UNLOCK_TEAM_SLOT' }
   | { type: 'TOGGLE_EQUIP_HERO'; uid: string }
   | { type: 'SET_ACTIVE_TEAM'; heroIds: string[] }
   | { type: 'SET_HERO_FORMATION'; uid: string; role: HeroFormationRole }
+  | { type: 'PLAY_DICE_ROLL' }
+  | { type: 'RUN_RIFT_DUNGEON' }
   | { type: 'RECYCLE_HERO'; uid: string }
   | { type: 'AUTO_RECYCLE_HEROES' }
   | { type: 'SET_AUTO_RECYCLE_MAX_RARITY'; rarity: Rarity }
@@ -2424,7 +2502,7 @@ function reducer(state: GameState, action: Action): GameState {
         if (b.level !== a.level) return b.level - a.level;
         return b.teamBoost - a.teamBoost;
       });
-      const newTeam = sorted.slice(0, ACTIVE_TEAM_SIZE).map(h => h.uid);
+      const newTeam = normalizeTeamSelectionByRules(state, sorted.map(h => h.uid));
       const newMaxHp = getTeamMaxHp({ ...state, activeTeamHeroIds: newTeam });
       return progressTutorial({
         ...state,
@@ -2452,9 +2530,7 @@ function reducer(state: GameState, action: Action): GameState {
     case 'LOAD_TEAM_LOADOUT': {
       const slot = Math.max(0, Math.min(2, action.slot));
       const source = state.teamLoadouts[slot] ?? [];
-      const validIds = source
-        .filter(uid => state.heroRoster.some(h => h.uid === uid))
-        .slice(0, ACTIVE_TEAM_SIZE);
+      const validIds = normalizeTeamSelectionByRules(state, source);
       const newMaxHp = getTeamMaxHp({ ...state, activeTeamHeroIds: validIds });
       return queueReward(progressTutorial({
         ...state,
@@ -2469,6 +2545,29 @@ function reducer(state: GameState, action: Action): GameState {
       });
     }
 
+    case 'UNLOCK_TEAM_SLOT': {
+      const currentSlots = getUnlockedTeamSlotCap(state);
+      if (currentSlots >= ACTIVE_TEAM_SIZE) return state;
+
+      const targetSlots = currentSlots + 1;
+      const req = getTeamSlotUnlockRequirement(targetSlots);
+      if (!req) return state;
+      if (state.highestWaveReached < req.requiredWave) return state;
+      if (state.gold < req.goldCost || state.heroShards < req.shardCost) return state;
+
+      return queueReward({
+        ...state,
+        teamSlotsUnlocked: targetSlots,
+        gold: state.gold - req.goldCost,
+        heroShards: state.heroShards - req.shardCost,
+      }, {
+        id: `team_slot_unlock_${targetSlots}_${Date.now()}`,
+        kind: 'system',
+        title: `Team Slot ${targetSlots} Unlocked`,
+        detail: `-${req.goldCost} gold, -${req.shardCost} shards`,
+      });
+    }
+
     case 'TOGGLE_EQUIP_HERO': {
       const exists = state.heroRoster.some(h => h.uid === action.uid);
       if (!exists) return state;
@@ -2477,7 +2576,26 @@ function reducer(state: GameState, action: Action): GameState {
       if (active.includes(action.uid)) {
         newTeam = active.filter(id => id !== action.uid);
       } else {
-        if (active.length >= ACTIVE_TEAM_SIZE) return state;
+        const roleCounts = getTeamRoleCounts(state, active);
+        const hero = state.heroRoster.find(h => h.uid === action.uid);
+        if (!hero) return state;
+        const role = state.heroFormationByUid[action.uid] ?? defaultFormationForClass(hero.heroClass);
+        if (active.length >= getUnlockedTeamSlotCap(state)) {
+          return queueReward(state, {
+            id: `team_cap_${Date.now()}`,
+            kind: 'system',
+            title: 'Team Slot Locked',
+            detail: 'Unlock additional slots in the War Room roster panel.',
+          });
+        }
+        if (roleCounts[role] >= MAX_FORMATION_ROLE_HEROES) {
+          return queueReward(state, {
+            id: `formation_cap_${Date.now()}`,
+            kind: 'system',
+            title: 'Formation Limit Reached',
+            detail: `Maximum ${MAX_FORMATION_ROLE_HEROES} heroes in ${role.toUpperCase()} line.`,
+          });
+        }
         newTeam = [...active, action.uid];
       }
       const newMaxHp = getTeamMaxHp({ ...state, activeTeamHeroIds: newTeam });
@@ -2490,10 +2608,7 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'SET_ACTIVE_TEAM': {
-      // Validate that all hero IDs exist and limit to ACTIVE_TEAM_SIZE
-      const validIds = action.heroIds
-        .filter(uid => state.heroRoster.some(h => h.uid === uid))
-        .slice(0, ACTIVE_TEAM_SIZE);
+      const validIds = normalizeTeamSelectionByRules(state, action.heroIds);
       const newMaxHp = getTeamMaxHp({ ...state, activeTeamHeroIds: validIds });
       return progressTutorial({
         ...state,
@@ -3062,6 +3177,18 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'SET_HERO_FORMATION': {
       if (!state.heroRoster.some(h => h.uid === action.uid)) return state;
+      const activeTeamSet = new Set(state.activeTeamHeroIds);
+      if (activeTeamSet.has(action.uid)) {
+        const nextRoleCounts = getTeamRoleCounts(state, state.activeTeamHeroIds.filter(id => id !== action.uid));
+        if (nextRoleCounts[action.role] >= MAX_FORMATION_ROLE_HEROES) {
+          return queueReward(state, {
+            id: `formation_swap_blocked_${Date.now()}`,
+            kind: 'system',
+            title: 'Formation Limit Reached',
+            detail: `Maximum ${MAX_FORMATION_ROLE_HEROES} heroes in ${action.role.toUpperCase()} line.`,
+          });
+        }
+      }
       return {
         ...state,
         heroFormationByUid: {
@@ -3069,6 +3196,55 @@ function reducer(state: GameState, action: Action): GameState {
           [action.uid]: action.role,
         },
       };
+    }
+
+    case 'PLAY_DICE_ROLL': {
+      const today = toDayNumber(Date.now());
+      if (state.lastDiceRollDay === today) return state;
+
+      const roll = 1 + Math.floor(Math.random() * 20);
+      const diamonds = roll === 20 ? 30 : roll >= 17 ? 18 : roll >= 13 ? 12 : roll >= 9 ? 8 : 5;
+      const shardBonus = roll >= 15 ? Math.ceil(roll * 12) : 0;
+
+      return queueReward({
+        ...state,
+        diamonds: state.diamonds + diamonds,
+        heroShards: state.heroShards + shardBonus,
+        lastDiceRollDay: today,
+        lastDiceRollValue: roll,
+      }, {
+        id: `dice_roll_${today}`,
+        kind: 'system',
+        title: 'Dice Protocol Complete',
+        detail: `Rolled ${roll}/20: +${diamonds} diamonds${shardBonus > 0 ? `, +${shardBonus} shards` : ''}`,
+      });
+    }
+
+    case 'RUN_RIFT_DUNGEON': {
+      const today = toDayNumber(Date.now());
+      if (state.lastRiftRunDay === today) return state;
+
+      const teamPower = Math.max(1, getDps(state));
+      const expected = Math.min(5, Math.max(1, Math.floor((teamPower / Math.max(1, getMonsterMaxHp(state.wave) * 0.12)) * 2)));
+      const variance = Math.floor(Math.random() * 3) - 1;
+      const clearedWaves = Math.max(1, Math.min(5, expected + variance));
+      const diamonds = 8 + clearedWaves * 4 + (clearedWaves === 5 ? 8 : 0);
+      const shardReward = Math.ceil(clearedWaves * 90 * (1 + state.highestWaveReached / 250));
+      const essenceReward = clearedWaves >= 4 ? 1 : 0;
+
+      return queueReward({
+        ...state,
+        diamonds: state.diamonds + diamonds,
+        heroShards: state.heroShards + shardReward,
+        essence: state.essence + essenceReward,
+        lastRiftRunDay: today,
+        lastRiftWavesCleared: clearedWaves,
+      }, {
+        id: `rift_run_${today}`,
+        kind: 'system',
+        title: 'Rift Breach Cleared',
+        detail: `${clearedWaves}/5 waves: +${diamonds} diamonds, +${shardReward} shards${essenceReward > 0 ? `, +${essenceReward} essence` : ''}`,
+      });
     }
 
     case 'SET_AUTO_RECYCLE_ENABLED': {
@@ -3464,7 +3640,12 @@ function reducer(state: GameState, action: Action): GameState {
         gachaPityCounter: p.gachaPityCounter,
         summonHistory: p.summonHistory,
         teamLoadouts: p.teamLoadouts,
+        teamSlotsUnlocked: p.teamSlotsUnlocked,
         heroFormationByUid: p.heroFormationByUid,
+        lastDiceRollDay: p.lastDiceRollDay,
+        lastRiftRunDay: p.lastRiftRunDay,
+        lastDiceRollValue: p.lastDiceRollValue,
+        lastRiftWavesCleared: p.lastRiftWavesCleared,
         classMasteryXp: p.classMasteryXp,
         seasonPoints: p.seasonPoints,
         bestSeasonPoints: p.bestSeasonPoints,
@@ -3569,7 +3750,12 @@ interface SaveData {
   gachaPityCounter: number;
   summonHistory: SummonHistoryEntry[];
   teamLoadouts: string[][];
+  teamSlotsUnlocked?: number;
   heroFormationByUid: Record<string, HeroFormationRole>;
+  lastDiceRollDay?: number | null;
+  lastRiftRunDay?: number | null;
+  lastDiceRollValue?: number | null;
+  lastRiftWavesCleared?: number;
   classMasteryXp: Record<PlayerClass, number>;
   seasonPoints: number;
   bestSeasonPoints: number;
@@ -3665,7 +3851,12 @@ function serialize(state: GameState): SaveData {
     gachaPityCounter: state.gachaPityCounter,
     summonHistory: state.summonHistory,
     teamLoadouts: state.teamLoadouts,
+    teamSlotsUnlocked: state.teamSlotsUnlocked,
     heroFormationByUid: state.heroFormationByUid,
+    lastDiceRollDay: state.lastDiceRollDay,
+    lastRiftRunDay: state.lastRiftRunDay,
+    lastDiceRollValue: state.lastDiceRollValue,
+    lastRiftWavesCleared: state.lastRiftWavesCleared,
     classMasteryXp: state.classMasteryXp,
     seasonPoints: state.seasonPoints,
     bestSeasonPoints: state.bestSeasonPoints,
@@ -3905,11 +4096,14 @@ export function useGameState(saveSlot: string = 'default') {
   const autoEquipBestHeroes = useCallback(() => dispatch({ type: 'AUTO_EQUIP_BEST_HEROES' }), []);
   const saveTeamLoadout = useCallback((slot: number) => dispatch({ type: 'SAVE_TEAM_LOADOUT', slot }), []);
   const loadTeamLoadout = useCallback((slot: number) => dispatch({ type: 'LOAD_TEAM_LOADOUT', slot }), []);
+  const unlockTeamSlot = useCallback(() => dispatch({ type: 'UNLOCK_TEAM_SLOT' }), []);
   const toggleEquipHero = useCallback((uid: string) => dispatch({ type: 'TOGGLE_EQUIP_HERO', uid }), []);
   const setActiveTeam = useCallback((heroIds: string[]) => dispatch({ type: 'SET_ACTIVE_TEAM', heroIds }), []);
   const setHeroFormation = useCallback((uid: string, role: HeroFormationRole) => {
     dispatch({ type: 'SET_HERO_FORMATION', uid, role });
   }, []);
+  const playDiceRoll = useCallback(() => dispatch({ type: 'PLAY_DICE_ROLL' }), []);
+  const runRiftDungeon = useCallback(() => dispatch({ type: 'RUN_RIFT_DUNGEON' }), []);
   const recycleHero = useCallback((uid: string) => dispatch({ type: 'RECYCLE_HERO', uid }), []);
   const autoRecycleHeroes = useCallback(() => dispatch({ type: 'AUTO_RECYCLE_HEROES' }), []);
   const setAutoRecycleMaxRarity = useCallback((rarity: Rarity) => {
@@ -3996,6 +4190,25 @@ export function useGameState(saveSlot: string = 'default') {
     scrapCost: getShardToScrapCost(),
   }), [state]);
 
+  const getNextTeamSlotUnlock = useCallback(() => {
+    const currentSlots = getUnlockedTeamSlotCap(state);
+    if (currentSlots >= ACTIVE_TEAM_SIZE) {
+      return null;
+    }
+    const req = getTeamSlotUnlockRequirement(currentSlots + 1);
+    if (!req) {
+      return null;
+    }
+    return {
+      currentSlots,
+      targetSlots: currentSlots + 1,
+      requiredWave: req.requiredWave,
+      goldCost: req.goldCost,
+      shardCost: req.shardCost,
+      canUnlock: state.highestWaveReached >= req.requiredWave && state.gold >= req.goldCost && state.heroShards >= req.shardCost,
+    };
+  }, [state]);
+
   const getUpgradePlan = useCallback((itemId: string) => getEquipmentUpgradePlan(state, itemId), [state]);
 
   const getWeeklyEvent = useCallback(() => getCurrentWeeklyEvent(state), [state]);
@@ -4028,9 +4241,12 @@ export function useGameState(saveSlot: string = 'default') {
     autoEquipBestHeroes,
     saveTeamLoadout,
     loadTeamLoadout,
+    unlockTeamSlot,
     toggleEquipHero,
     setActiveTeam,
     setHeroFormation,
+    playDiceRoll,
+    runRiftDungeon,
     recycleHero,
     autoRecycleHeroes,
     setAutoRecycleMaxRarity,
@@ -4071,6 +4287,7 @@ export function useGameState(saveSlot: string = 'default') {
     getEssenceCost,
     getRebirthCoreCost,
     getShardForgeCosts,
+    getNextTeamSlotUnlock,
     getUpgradePlan,
     getWeeklyEvent,
     getMissionProgress,
