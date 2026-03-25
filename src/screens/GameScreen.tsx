@@ -538,7 +538,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     { id: 'dps', label: 'DPS', value: fmt(stats.dps) },
     { id: 'power', label: 'Power', value: fmt(teamPowerIndex) },
     { id: 'gear', label: 'Gear', value: fmt(gearScore) },
-    { id: 'bonus', label: 'Bonus', value: `+${(stats.achievementBonusPercent * 100).toFixed(0)}%` },
+    { id: 'bonus', label: 'Legacy Dmg/Gold/EXP', value: `+${(stats.achievementBonusPercent * 100).toFixed(0)}%` },
     { id: 'exp', label: 'EXP', value: `${expPct}%` },
     { id: 'streak', label: 'Streak', value: `${state.dailyLoginStreak}` },
     { id: 'peakwave', label: 'Peak Wave', value: `${state.highestWaveReached}` },
@@ -1416,7 +1416,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               {warPanels.growth && (
                 <View style={styles.warPanelBody}>
                   <Text style={styles.warPanelStat}>Level {state.level} • Unspent: {state.unspentStatPoints}</Text>
-                  <Text style={styles.warPanelStat}>Achievement Bonus: +{(stats.achievementBonusPercent * 100).toFixed(0)}%</Text>
+                  <Text style={styles.warPanelStat}>Achievement Bonus: +{(stats.achievementBonusPercent * 100).toFixed(0)}% to final DPS, tap damage, gold, and EXP</Text>
                   <Text style={styles.warPanelStat}>Rebirth Cores: {state.rebirthCores}</Text>
                   <View style={styles.warPanelActionRow}>
                     <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('stats')}>
@@ -1466,9 +1466,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Text style={styles.warPanelStat}>Rebirths Completed: {state.prestigeCount ?? 0}</Text>
                   {[
                     { n: 1, label: '1st Rebirth', bonus: 'Unlock Core Tree', done: prestige1Done },
-                    { n: 5, label: '5th Rebirth', bonus: '+5% all stats', done: prestige5Done },
+                    { n: 5, label: '5th Rebirth', bonus: '+5% final team DPS and team max HP', done: prestige5Done },
                     { n: 10, label: '10th Rebirth', bonus: 'Legendary Aura visual', done: prestige10Done },
-                    { n: 25, label: '25th Rebirth', bonus: '+15% core efficiency', done: prestige25Done },
+                    { n: 25, label: '25th Rebirth', bonus: '+15% rebirth core value (meta branch power per level)', done: prestige25Done },
                     { n: 50, label: '50th Rebirth', bonus: 'Grand Ascendant title', done: prestige50Done },
                   ].map(m => (
                     <View key={m.n} style={styles.prestigeMilestoneRow}>
@@ -2163,6 +2163,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             <View style={styles.metaBox}>
               <Text style={styles.sectionTitle}>🧭 Permanent Progression</Text>
               <Text style={styles.metaEssence}>Essence: {fmt(state.essence)}</Text>
+              <Text style={styles.sectionHelperText}>ⓘ Meta paths modify final run multipliers: Damage to DPS, Economy to gold, Survival to HP/defense.</Text>
               <View style={styles.passiveBanner}>
                 <Text style={styles.passiveTitle}>Class Passive: {classPassive.name}</Text>
                 <Text style={styles.passiveDesc}>{classPassive.description}</Text>
@@ -2174,7 +2175,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <View style={styles.metaUpgradeRow}>
                 <View style={styles.metaUpgradeInfo}>
                   <Text style={styles.metaUpgradeName}>Damage Path Lv {state.metaDamageLevel}</Text>
-                  <Text style={styles.metaUpgradeDesc}>+5% all DPS per level</Text>
+                  <Text style={styles.metaUpgradeDesc}>+5% to final auto-DPS and active skill damage per level</Text>
                 </View>
                 <Pressable
                   style={[styles.metaUpgradeBtn, state.essence < damageEssenceCost && styles.metaUpgradeBtnDisabled]}
@@ -2188,7 +2189,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <View style={styles.metaUpgradeRow}>
                 <View style={styles.metaUpgradeInfo}>
                   <Text style={styles.metaUpgradeName}>Economy Path Lv {state.metaEconomyLevel}</Text>
-                  <Text style={styles.metaUpgradeDesc}>+5% gold gains per level</Text>
+                  <Text style={styles.metaUpgradeDesc}>+5% to final gold gain multiplier per level</Text>
                 </View>
                 <Pressable
                   style={[styles.metaUpgradeBtn, state.essence < economyEssenceCost && styles.metaUpgradeBtnDisabled]}
@@ -2202,7 +2203,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <View style={styles.metaUpgradeRow}>
                 <View style={styles.metaUpgradeInfo}>
                   <Text style={styles.metaUpgradeName}>Survival Path Lv {state.metaSurvivalLevel}</Text>
-                  <Text style={styles.metaUpgradeDesc}>+5% team HP/defense per level</Text>
+                  <Text style={styles.metaUpgradeDesc}>+5% to team max HP and defense scaling per level</Text>
                 </View>
                 <Pressable
                   style={[styles.metaUpgradeBtn, state.essence < survivalEssenceCost && styles.metaUpgradeBtnDisabled]}
@@ -2216,10 +2217,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <View style={styles.rebirthTreeCard}>
                 <Text style={styles.rebirthTreeTitle}>♾️ Rebirth Tree</Text>
                 <Text style={styles.rebirthTreeCores}>Cores: {state.rebirthCores}</Text>
+                <Text style={styles.sectionHelperText}>ⓘ Rebirth branches are permanent multipliers applied on top of run stats after each ascension.</Text>
                 <View style={styles.metaUpgradeRow}>
                   <View style={styles.metaUpgradeInfo}>
                     <Text style={styles.metaUpgradeName}>Damage Branch Lv {state.rebirthDamagePath}</Text>
-                    <Text style={styles.metaUpgradeDesc}>+7% DPS per level</Text>
+                    <Text style={styles.metaUpgradeDesc}>+7% to final DPS multiplier per level (rebirth-only track)</Text>
                   </View>
                   <Pressable
                     style={[styles.metaUpgradeBtn, state.rebirthCores < rebirthDamageCost && styles.metaUpgradeBtnDisabled]}
@@ -2232,7 +2234,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <View style={styles.metaUpgradeRow}>
                   <View style={styles.metaUpgradeInfo}>
                     <Text style={styles.metaUpgradeName}>Economy Branch Lv {state.rebirthEconomyPath}</Text>
-                    <Text style={styles.metaUpgradeDesc}>+7% gold per level</Text>
+                    <Text style={styles.metaUpgradeDesc}>+7% to final gold multiplier per level (rebirth-only track)</Text>
                   </View>
                   <Pressable
                     style={[styles.metaUpgradeBtn, state.rebirthCores < rebirthEconomyCost && styles.metaUpgradeBtnDisabled]}
@@ -2245,7 +2247,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <View style={styles.metaUpgradeRow}>
                   <View style={styles.metaUpgradeInfo}>
                     <Text style={styles.metaUpgradeName}>Survival Branch Lv {state.rebirthSurvivalPath}</Text>
-                    <Text style={styles.metaUpgradeDesc}>+7% HP/defense per level</Text>
+                    <Text style={styles.metaUpgradeDesc}>+7% to team HP and defense scaling per level (rebirth-only track)</Text>
                   </View>
                   <Pressable
                     style={[styles.metaUpgradeBtn, state.rebirthCores < rebirthSurvivalCost && styles.metaUpgradeBtnDisabled]}
@@ -2278,10 +2280,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               </View>
               <Text style={styles.masteryHint}>{(state.playerClass ? state.classMasteryXp[state.playerClass] : 0) % 100}/100 mastery XP to next level</Text>
               {[
-                { lvl: 1, perk: '+10% class stat bonus', done: classMasteryLevel >= 1 },
-                { lvl: 5, perk: '+5% gold gains', done: classMasteryLevel >= 5 },
-                { lvl: 10, perk: '+15% DPS from passive skills', done: classMasteryLevel >= 10 },
-                { lvl: 25, perk: 'Mastery Aura: team-wide +8% HP', done: classMasteryLevel >= 25 },
+                { lvl: 1, perk: '+10% to class base stats used in DPS/HP formulas', done: classMasteryLevel >= 1 },
+                { lvl: 5, perk: '+5% to final gold gain multiplier', done: classMasteryLevel >= 5 },
+                { lvl: 10, perk: '+15% to passive-skill damage contribution', done: classMasteryLevel >= 10 },
+                { lvl: 25, perk: 'Mastery Aura: team-wide +8% max HP', done: classMasteryLevel >= 25 },
                 { lvl: 50, perk: 'Grand Mastery: unlock legendary passive', done: classMasteryLevel >= 50 },
               ].map(m => (
                 <View key={m.lvl} style={styles.masteryMilestoneRow}>
@@ -2449,10 +2451,16 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Text style={styles.achievementBonusValue}>+{(stats.achievementBonusPercent * 100).toFixed(0)}%</Text>
                 </View>
                 <Text style={styles.achievementBonusDesc}>
-                  Each unlocked achievement grants +{ACH_BONUS_PER_UNLOCK_PCT}% global combat/economy power.
+                  Each unlocked achievement grants +{ACH_BONUS_PER_UNLOCK_PCT}% to final DPS, tap damage, gold gain, and EXP gain multipliers.
                 </Text>
                 <Text style={styles.achievementBonusDesc}>
                   Cap: +{ACH_BONUS_CAP_PCT}% • Unlocked: {state.achievements.size}/{ACHIEVEMENTS.length}
+                </Text>
+                <Text style={styles.achievementBonusDesc}>
+                  Current multiplier: x{(1 + stats.achievementBonusPercent).toFixed(2)} applied after most build/class/rebirth modifiers.
+                </Text>
+                <Text style={styles.achievementBonusDesc}>
+                  Affects now: DPS x{(1 + stats.achievementBonusPercent).toFixed(2)} • Tap x{(1 + stats.achievementBonusPercent).toFixed(2)} • Gold x{(1 + stats.achievementBonusPercent).toFixed(2)} • EXP x{(1 + stats.achievementBonusPercent).toFixed(2)}
                 </Text>
                 <View style={styles.claimAllRow}>
                   <Text style={styles.claimAllInfo}>Claimable: {claimableWeeklyMilestones.length + claimableMissionIds.length}</Text>
@@ -2526,7 +2534,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     <Text style={[styles.achName, unlocked && styles.achNameUnlocked]}>{ach.name}</Text>
                     <Text style={styles.achDesc}>{ach.description}</Text>
                     <Text style={[styles.achBonusLine, unlocked && styles.achBonusLineUnlocked]}>
-                      {unlocked ? `+${ACH_BONUS_PER_UNLOCK_PCT}% Applied` : `+${ACH_BONUS_PER_UNLOCK_PCT}% on Unlock`}
+                      {unlocked
+                        ? `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/tap/gold/EXP applied`
+                        : `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/tap/gold/EXP on unlock`}
                     </Text>
                   </View>
                 </View>
@@ -2547,8 +2557,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       <Text key={r} style={styles.collectionStat}> • {r}: {count}</Text>
                     ) : null;
                   })}
-                  {state.heroRoster.length >= 10 && <Text style={styles.collectionBonus}>✅ Bonus: +5% team DPS</Text>}
-                  {state.heroRoster.length >= 25 && <Text style={styles.collectionBonus}>✅ Bonus: +10% hero boost</Text>}
+                  {state.heroRoster.length >= 10 && <Text style={styles.collectionBonus}>✅ Bonus: +5% final team DPS multiplier</Text>}
+                  {state.heroRoster.length >= 25 && <Text style={styles.collectionBonus}>✅ Bonus: +10% hero team-boost contribution</Text>}
                 </View>
 
                 <View style={styles.collectionCard}>
@@ -2563,7 +2573,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Text style={styles.collectionCardTitle}>👑 Bosses Defeated</Text>
                   <Text style={styles.collectionStat}>Highest wave: {state.wave}</Text>
                   <Text style={styles.collectionStat}>Boss waves cleared: {Math.floor(state.wave / 10)}</Text>
-                  {Math.floor(state.wave / 10) >= 5 && <Text style={styles.collectionBonus}>✅ Boss Veteran: +5% gold</Text>}
+                  {Math.floor(state.wave / 10) >= 5 && <Text style={styles.collectionBonus}>✅ Boss Veteran: +5% final gold multiplier</Text>}
                 </View>
 
                 <View style={styles.collectionCard}>
@@ -2582,7 +2592,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Text style={styles.collectionStat}>Times ascended: {state.prestigeCount ?? 0}</Text>
                   <Text style={styles.collectionStat}>Rebirth Cores: {state.rebirthCores}</Text>
                   {(state.prestigeCount ?? 0) >= 1 && <Text style={styles.collectionBonus}>✅ First Rebirth: Unlocked Core Tree</Text>}
-                  {(state.prestigeCount ?? 0) >= 5 && <Text style={styles.collectionBonus}>✅ Veteran: +5% core efficiency</Text>}
+                  {(state.prestigeCount ?? 0) >= 5 && <Text style={styles.collectionBonus}>✅ Veteran: +5% rebirth core branch effectiveness</Text>}
                 </View>
               </View>
             )}
