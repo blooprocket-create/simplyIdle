@@ -618,6 +618,17 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
     return null;
   }, [hoveredTopChipId, dpsBreakdown, powerFromDps, powerFromHp, powerFromDefense, powerFromGear, stats.dps, state.teamMaxHp, stats.teamDefense, gearScore, teamPowerIndex, gearScoreRows]);
+  const topChipTooltipAnchor = useMemo(() => {
+    const bubbleWidth = 280;
+    const railWidth = Math.max(320, viewportWidth - 24);
+    const maxLeft = Math.max(8, railWidth - bubbleWidth - 8);
+    const clampLeft = (value: number) => Math.max(8, Math.min(maxLeft, value));
+
+    if (hoveredTopChipId === 'dps') return { left: clampLeft(railWidth * 0.40) };
+    if (hoveredTopChipId === 'power') return { left: clampLeft(railWidth * 0.52) };
+    if (hoveredTopChipId === 'gear') return { left: clampLeft(railWidth * 0.64) };
+    return { left: clampLeft(railWidth * 0.50) };
+  }, [hoveredTopChipId, viewportWidth]);
 
   useEffect(() => {
     const unlockedIds = storyEntries.filter(entry => entry.unlocked).map(entry => entry.id);
@@ -1127,7 +1138,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           )}
         </ScrollView>
         {topChipTooltip && (
-          <View style={styles.statChipTooltipCard}>
+          <View pointerEvents="none" style={[styles.statChipTooltipBubble, topChipTooltipAnchor]}>
+            <View style={styles.statChipTooltipArrow} />
             <Text style={styles.statChipTooltipTitle}>{topChipTooltip.title}</Text>
             {topChipTooltip.lines.map(line => (
               <Text key={line} style={styles.statChipTooltipLine}>{line}</Text>
@@ -3477,6 +3489,8 @@ const styles = StyleSheet.create({
     paddingBottom: 7,
     zIndex: 1,
     gap: 6,
+    position: 'relative',
+    overflow: 'visible',
   },
   headerTopRow: {
     flexDirection: 'row',
@@ -3546,8 +3560,11 @@ const styles = StyleSheet.create({
   statChipValueWarn: {
     color: '#FBD484',
   },
-  statChipTooltipCard: {
-    marginTop: 6,
+  statChipTooltipBubble: {
+    position: 'absolute',
+    top: 60,
+    width: 280,
+    zIndex: 50,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#3A5A78',
@@ -3555,6 +3572,23 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 10,
     gap: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  statChipTooltipArrow: {
+    position: 'absolute',
+    top: -6,
+    left: 136,
+    width: 10,
+    height: 10,
+    backgroundColor: '#0F1C2A',
+    borderLeftWidth: 1,
+    borderTopWidth: 1,
+    borderColor: '#3A5A78',
+    transform: [{ rotate: '45deg' }],
   },
   statChipTooltipTitle: {
     color: '#D8ECFF',
