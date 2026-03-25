@@ -555,6 +555,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     stats: state.unspentStatPoints > 0 ? `+${state.unspentStatPoints}` : 'OK',
     equipment: `${state.inventoryItemIds.length}`,
     achievements: `${state.achievements.size}/${ACHIEVEMENTS.length}`,
+    guildhall: `${state.expeditionQueue.length}`,
   };
   const isNativeApp = Platform.OS !== 'web';
   const isCompactPhone = viewportWidth < 430;
@@ -835,6 +836,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       stats: 'open_stats_tab',
       equipment: null,
       achievements: 'open_achievements_tab',
+      guildhall: null,
     };
     const event = eventMap[nextTab];
     if (event) notifyQuestEvent(event);
@@ -922,7 +924,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   };
 
   const renderCommandDeck = () => {
-    const buttons = (['warroom', 'battle', 'heroes', 'stats', 'equipment', 'achievements'] as const).map(t => {
+    const buttons = (['warroom', 'battle', 'heroes', 'stats', 'equipment', 'achievements', 'guildhall'] as const).map(t => {
       const lockedOut = !!tutorialTargetTab && t !== tutorialTargetTab;
       const tutorialTarget = !!tutorialTargetTab && t === tutorialTargetTab;
       return (
