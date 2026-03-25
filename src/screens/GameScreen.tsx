@@ -1232,8 +1232,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             >
               <View style={[styles.statChipTooltipArrowModal, { left: topChipTooltipLayout.arrowLeft }]} />
               <Text style={styles.statChipTooltipTitle}>{topChipTooltip.title}</Text>
-              {topChipTooltip.lines.map(line => (
-                <Text key={line} style={styles.statChipTooltipLine}>{line}</Text>
+              {topChipTooltip.lines.map((line, idx) => (
+                <View key={`${topChipTooltip.title}_${idx}`} style={styles.statChipTooltipLineRow}>
+                  <View style={styles.statChipTooltipBullet} />
+                  <Text style={styles.statChipTooltipLine}>{line}</Text>
+                </View>
               ))}
             </View>
           </View>
@@ -3840,39 +3843,53 @@ const styles = StyleSheet.create({
   statChipTooltipBubbleModal: {
     position: 'absolute',
     zIndex: 10000,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#3A5A78',
-    backgroundColor: '#0F1C2A',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    gap: 3,
+    borderColor: '#4C6A89',
+    backgroundColor: '#0B1522',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 6,
     shadowColor: '#000',
-    shadowOpacity: 0.22,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 12,
+    shadowOpacity: 0.34,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 18,
   },
   statChipTooltipArrowModal: {
     position: 'absolute',
-    top: -6,
-    width: 10,
-    height: 10,
-    backgroundColor: '#0F1C2A',
+    top: -7,
+    width: 12,
+    height: 12,
+    backgroundColor: '#0B1522',
     borderLeftWidth: 1,
     borderTopWidth: 1,
-    borderColor: '#3A5A78',
+    borderColor: '#4C6A89',
     transform: [{ rotate: '45deg' }],
   },
   statChipTooltipTitle: {
-    color: '#D8ECFF',
-    fontSize: 11,
-    fontWeight: '700',
+    color: '#F2F9FF',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  statChipTooltipLineRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 7,
+  },
+  statChipTooltipBullet: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#74B4E8',
+    marginTop: 5,
   },
   statChipTooltipLine: {
-    color: '#A9C7DD',
+    flex: 1,
+    color: '#C4DDF0',
     fontSize: 10,
-    lineHeight: 14,
+    lineHeight: 15,
   },
   header: {
     flexDirection: 'row',
