@@ -224,6 +224,21 @@ export interface GameState {
   lastRiftRunDay: number | null;
   lastDiceRollValue: number | null;
   lastRiftWavesCleared: number;
+
+  // Guild Hall / Facilities
+  guildhallFacilities: Record<'training' | 'treasury' | 'forge' | 'tactics', { level: number }>;
+
+  // Expeditions
+  expeditionQueue: Array<{
+    id: string;
+    type: 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss';
+    rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
+    startTime: number;
+    durationMs: number;
+    reward: { diamonds: number; shards: number; essence: number; artifacts: number };
+  }>;
+  lastExpeditionDay: Record<'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss', number | null>;
+
   classMasteryXp: Record<PlayerClass, number>;
   seasonPoints: number;
   bestSeasonPoints: number;
@@ -340,6 +355,22 @@ const DEFAULT_STATE: GameState = {
   lastRiftRunDay: null,
   lastDiceRollValue: null,
   lastRiftWavesCleared: 0,
+
+  guildhallFacilities: {
+    training: { level: 0 },
+    treasury: { level: 0 },
+    forge: { level: 0 },
+    tactics: { level: 0 },
+  },
+  expeditionQueue: [],
+  lastExpeditionDay: {
+    artifact: null,
+    merchant: null,
+    ruins: null,
+    vault: null,
+    abyss: null,
+  },
+
   classMasteryXp: {
     warrior: 0,
     berserker: 0,
@@ -2191,6 +2222,10 @@ type Action =
   | { type: 'REBIRTH' }
   | { type: 'CLEAR_ACHIEVEMENT' }
   | { type: 'CLEAR_REWARD_POPUP' }
+  | { type: 'BATCH_LEVEL_HEROES'; heroIds: string[]; targetLevel: number }
+  | { type: 'UPGRADE_FACILITY'; facilityId: 'training' | 'treasury' | 'forge' | 'tactics' }
+  | { type: 'START_EXPEDITION'; expeditionType: 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss' }
+  | { type: 'COMPLETE_EXPEDITION'; expeditionId: string }
   | { type: 'LOAD'; payload: Partial<SaveData> };
 
 function reducer(state: GameState, action: Action): GameState {
@@ -3247,6 +3282,133 @@ function reducer(state: GameState, action: Action): GameState {
       });
     }
 
+    case 'BATCH_LEVEL_HEROES': {
+      let newState = state;
+      let totalCost = 0;
+
+      for (const heroId of action.heroIds) {
+        const hero = newState.heroRoster.find(h => h.uid === heroId);
+        if (!hero || hero.level >= action.targetLevel || hero.level >= HERO_LEVEL_CAP) continue;
+
+        for (let lvl = hero.level; lvl < Math.min(action.targetLevel, HERO_LEVEL_CAP); lvl++) {
+          const cost = getHeroGoldLevelCost(lvl);
+          if (newState.gold < cost) break;
+          totalCost += cost;
+          newState = {
+            ...newState,
+            gold: newState.gold - cost,
+            heroRoster: newState.heroRoster.map(h => h.uid === heroId ? { ...h, level: lvl + 1 } : h),
+          };
+        }
+      }
+
+      return newState;
+    }
+
+    case 'UPGRADE_FACILITY': {
+      const facility = state.guildhallFacilities[action.facilityId];
+      const currentLevel = facility.level;
+
+      const costs: Record<string, Record<number, number>> = {
+        training: { 0: 5000, 1: 12000, 2: 30000, 3: 75000, 4: 150000, 5: 300000 },
+        treasury: { 0: 4000, 1: 10000, 2: 25000, 3: 60000, 4: 120000, 5: 250000 },
+        forge: { 0: 6000, 1: 15000, 2: 40000, 3: 90000, 4: 180000, 5: 350000 },
+        tactics: { 0: 5000, 1: 12000, 2: 30000, 3: 75000, 4: 150000, 5: 300000 },
+      };
+
+      const cost = costs[action.facilityId]?.[currentLevel] ?? 0;
+      if (currentLevel >= 5 || state.gold < cost) return state;
+
+      return {
+        ...state,
+        gold: state.gold - cost,
+        guildhallFacilities: {
+          ...state.guildhallFacilities,
+          [action.facilityId]: { level: currentLevel + 1 },
+        },
+      };
+    }
+
+    case 'START_EXPEDITION': {
+      const today = toDayNumber(Date.now());
+      const lastDay = state.lastExpeditionDay[action.expeditionType];
+      if (lastDay === today) return state;
+
+      const expeditionConfigs: Record<string, { rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'godly'; goldCost: number; durationMs: number; reward: { diamonds: number; shards: number; essence: number; artifacts: number } }> = {
+        artifact: {
+          rarity: 'rare',
+          goldCost: 1500,
+          durationMs: 30000, // 30 seconds for testing, would be 5-10 minutes in production
+          reward: { diamonds: 50, shards: 200, essence: 0, artifacts: 1 },
+        },
+        merchant: {
+          rarity: 'common',
+          goldCost: 800,
+          durationMs: 15000, // 15 seconds
+          reward: { diamonds: 30, shards: 100, essence: 0, artifacts: 0 },
+        },
+        ruins: {
+          rarity: 'epic',
+          goldCost: 2500,
+          durationMs: 45000, // 45 seconds
+          reward: { diamonds: 80, shards: 350, essence: 1, artifacts: 2 },
+        },
+        vault: {
+          rarity: 'legendary',
+          goldCost: 4000,
+          durationMs: 60000, // 1 minute
+          reward: { diamonds: 120, shards: 500, essence: 2, artifacts: 3 },
+        },
+        abyss: {
+          rarity: 'godly',
+          goldCost: 6500,
+          durationMs: 90000, // 1.5 minutes
+          reward: { diamonds: 180, shards: 750, essence: 3, artifacts: 5 },
+        },
+      };
+
+      const config = expeditionConfigs[action.expeditionType];
+      if (!config || state.gold < config.goldCost) return state;
+
+      const expeditionId = `exp_${action.expeditionType}_${Date.now()}`;
+
+      return {
+        ...state,
+        gold: state.gold - config.goldCost,
+        expeditionQueue: [
+          ...state.expeditionQueue,
+          {
+            id: expeditionId,
+            type: action.expeditionType as any,
+            rarity: config.rarity,
+            startTime: Date.now(),
+            durationMs: config.durationMs,
+            reward: config.reward,
+          },
+        ],
+        lastExpeditionDay: {
+          ...state.lastExpeditionDay,
+          [action.expeditionType]: today,
+        },
+      };
+    }
+
+    case 'COMPLETE_EXPEDITION': {
+      const expIndex = state.expeditionQueue.findIndex(e => e.id === action.expeditionId);
+      if (expIndex === -1) return state;
+
+      const expedition = state.expeditionQueue[expIndex];
+      const newQueue = state.expeditionQueue.filter((_, i) => i !== expIndex);
+
+      return {
+        ...state,
+        diamonds: state.diamonds + expedition.reward.diamonds,
+        heroShards: state.heroShards + expedition.reward.shards,
+        essence: state.essence + expedition.reward.essence,
+        expeditionQueue: newQueue,
+      };
+    }
+
     case 'SET_AUTO_RECYCLE_ENABLED': {
       return {
         ...state,
@@ -3646,6 +3808,9 @@ function reducer(state: GameState, action: Action): GameState {
         lastRiftRunDay: p.lastRiftRunDay,
         lastDiceRollValue: p.lastDiceRollValue,
         lastRiftWavesCleared: p.lastRiftWavesCleared,
+        guildhallFacilities: p.guildhallFacilities ?? DEFAULT_STATE.guildhallFacilities,
+        expeditionQueue: p.expeditionQueue ?? DEFAULT_STATE.expeditionQueue,
+        lastExpeditionDay: p.lastExpeditionDay ?? DEFAULT_STATE.lastExpeditionDay,
         classMasteryXp: p.classMasteryXp,
         seasonPoints: p.seasonPoints,
         bestSeasonPoints: p.bestSeasonPoints,
@@ -3756,6 +3921,11 @@ interface SaveData {
   lastRiftRunDay?: number | null;
   lastDiceRollValue?: number | null;
   lastRiftWavesCleared?: number;
+
+  guildhallFacilities?: Record<'training' | 'treasury' | 'forge' | 'tactics', { level: number }>;
+  expeditionQueue?: Array<any>;
+  lastExpeditionDay?: Record<'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss', number | null>;
+
   classMasteryXp: Record<PlayerClass, number>;
   seasonPoints: number;
   bestSeasonPoints: number;
@@ -3857,6 +4027,9 @@ function serialize(state: GameState): SaveData {
     lastRiftRunDay: state.lastRiftRunDay,
     lastDiceRollValue: state.lastDiceRollValue,
     lastRiftWavesCleared: state.lastRiftWavesCleared,
+    guildhallFacilities: state.guildhallFacilities,
+    expeditionQueue: state.expeditionQueue,
+    lastExpeditionDay: state.lastExpeditionDay,
     classMasteryXp: state.classMasteryXp,
     seasonPoints: state.seasonPoints,
     bestSeasonPoints: state.bestSeasonPoints,
@@ -4220,6 +4393,22 @@ export function useGameState(saveSlot: string = 'default') {
     };
   }, [state]);
 
+  const batchLevelHeroes = useCallback((heroIds: string[], targetLevel: number) => {
+    dispatch({ type: 'BATCH_LEVEL_HEROES', heroIds, targetLevel });
+  }, []);
+
+  const upgradeFacility = useCallback((facilityId: 'training' | 'treasury' | 'forge' | 'tactics') => {
+    dispatch({ type: 'UPGRADE_FACILITY', facilityId });
+  }, []);
+
+  const startExpedition = useCallback((expeditionType: 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss') => {
+    dispatch({ type: 'START_EXPEDITION', expeditionType });
+  }, []);
+
+  const completeExpedition = useCallback((expeditionId: string) => {
+    dispatch({ type: 'COMPLETE_EXPEDITION', expeditionId });
+  }, []);
+
   const stats = computeStats(state);
 
   return {
@@ -4247,6 +4436,10 @@ export function useGameState(saveSlot: string = 'default') {
     setHeroFormation,
     playDiceRoll,
     runRiftDungeon,
+    batchLevelHeroes,
+    upgradeFacility,
+    startExpedition,
+    completeExpedition,
     recycleHero,
     autoRecycleHeroes,
     setAutoRecycleMaxRarity,
