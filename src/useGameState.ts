@@ -560,8 +560,8 @@ export const VALID_FORMATION_ROLES_FOR_CLASS: Record<PlayerClass, HeroFormationR
   warrior:   ['front'],
   berserker: ['front'],
   monk:      ['front', 'mid'],
-  mage:      ['mid', 'back'],
-  archer:    ['mid', 'back'],
+  mage:      ['mid'],
+  archer:    ['back'],
 };
 
 function defaultFormationForClass(playerClass: PlayerClass): HeroFormationRole {
@@ -569,11 +569,7 @@ function defaultFormationForClass(playerClass: PlayerClass): HeroFormationRole {
 }
 
 function getFormationRoleForHero(state: GameState, hero: HeroUnit): HeroFormationRole {
-  const stored = state.heroFormationByUid[hero.uid];
-  const valid = VALID_FORMATION_ROLES_FOR_CLASS[hero.heroClass];
-  // If the stored role isn't valid for this class, fall back to the class default
-  if (stored && valid.includes(stored)) return stored;
-  return valid[0];
+  return VALID_FORMATION_ROLES_FOR_CLASS[hero.heroClass][0];
 }
 
 function getTeamSlotUnlockRequirement(targetSlots: number): { requiredWave: number; goldCost: number; shardCost: number } | null {

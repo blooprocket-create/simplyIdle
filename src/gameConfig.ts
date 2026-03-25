@@ -1039,7 +1039,7 @@ export function getMonsterGold(wave: number): number {
 
 export function getMonsterExp(wave: number): number {
   const isBoss = wave % 10 === 0;
-  const base = Math.max(10, Math.floor(wave * 5));
+  const base = Math.max(5, Math.floor(5 * Math.pow(1.10, wave - 1)));
   return isBoss ? base * 4 : base;
 }
 
