@@ -32,8 +32,9 @@ const SESSION_KEY = 'idlerpg_current_account_v1';
 const STORAGE_PREFIXES_TO_CLEAR = ['idlerpg_', 'simplyidle_'];
 const HASH_ROUNDS = 12000;
 
-function randomSalt(): string {
-  return `${Date.now()}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
+async function randomSalt(): Promise<string> {
+  const bytes = await Crypto.getRandomBytesAsync(24);
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 async function hashPassword(password: string, salt: string): Promise<string> {
@@ -56,7 +57,7 @@ async function verifyPassword(record: AccountRecord, password: string): Promise<
 
 async function migrateLegacyRecord(record: AccountRecord): Promise<AccountRecord> {
   if (record.passwordHash && record.passwordSalt) return record;
-  const salt = randomSalt();
+  const salt = await randomSalt();
   const passwordHash = await hashPassword(record.password ?? '', salt);
   return {
     ...record,
@@ -80,6 +81,25 @@ async function loadAccounts(): Promise<AccountRecord[]> {
 
 async function saveAccounts(accounts: AccountRecord[]): Promise<void> {
   await AsyncStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+}
+
+export async function getValidStoredSession(): Promise<string | null> {
+  const rawSession = await AsyncStorage.getItem(SESSION_KEY);
+  if (!rawSession) return null;
+
+  const normalizedSession = rawSession.trim().toLowerCase();
+  if (!normalizedSession) {
+    await AsyncStorage.removeItem(SESSION_KEY);
+    return null;
+  }
+
+  const accounts = await loadAccounts();
+  if (accounts.some(account => account.username === normalizedSession)) {
+    return normalizedSession;
+  }
+
+  await AsyncStorage.removeItem(SESSION_KEY);
+  return null;
 }
 
 export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
@@ -115,7 +135,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           return;
         }
 
-        const salt = randomSalt();
+        const salt = await randomSalt();
         const passwordHash = await hashPassword(password, salt);
         const nextAccounts: AccountRecord[] = [
           ...accounts,
@@ -192,7 +212,8 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       <StatusBar barStyle="light-content" backgroundColor="#0A0A18" />
       <View style={styles.wrap}>
         <Text style={styles.title}>SimplyIdle</Text>
-        <Text style={styles.subtitle}>Create an account or log in to continue.</Text>
+        <Text style={styles.subtitle}>Create a local profile or log in on this device.</Text>
+        <Text style={styles.note}>Profiles are stored locally. Do not reuse a real password here.</Text>
 
         <View style={styles.modeRow}>
           <Pressable
@@ -292,6 +313,12 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 13,
     color: '#9A9AB8',
+    marginBottom: 6,
+  },
+  note: {
+    fontSize: 12,
+    color: '#C2A96A',
+    lineHeight: 18,
     marginBottom: 20,
   },
   modeRow: {

@@ -66,6 +66,24 @@ const SAVE_INTERVAL_MS = 5000;
 const STAT_POINTS_PER_LEVEL = 5;
 const OFFLINE_PROGRESS_CAP_MS = 8 * 60 * 60 * 1000;
 const PITY_THRESHOLD = 30;
+const SAFE_INTEGER_CAP = Number.MAX_SAFE_INTEGER;
+const MAX_SAVE_WAVE = 1_000_000;
+const MAX_SAVE_PLAYER_LEVEL = 1_000_000;
+const MAX_SAVE_COLLECTION = 500;
+const MAX_SAVE_LOG_ENTRIES = 100;
+const MAX_SAVE_SUMMON_HISTORY = 50;
+
+const VALID_PLAYER_CLASSES = new Set<PlayerClass>(['warrior', 'berserker', 'archer', 'mage', 'monk']);
+const VALID_RARITIES = new Set<Rarity>(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'godly']);
+const VALID_AUTO_RECYCLE_RARITIES = new Set<Rarity>(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'godly']);
+const VALID_PERMANENT_UNLOCKS = new Set<PermanentUnlockId>(['class_passive', 'advanced_consumables', 'mythic_equipment']);
+const VALID_HERO_FORMATION_ROLES = new Set<HeroFormationRole>(['front', 'mid', 'back']);
+const VALID_PARTY_IDS = new Set<PartyId>(PARTY.map(party => party.id));
+const VALID_SKILL_IDS = new Set(SKILLS.map(skill => skill.id));
+const VALID_ACHIEVEMENT_IDS = new Set(ACHIEVEMENTS.map(achievement => achievement.id));
+const VALID_MISSION_IDS = new Set(MISSION_BOARD_GOALS.map(mission => mission.id));
+const VALID_WEEKLY_TRACK_MILESTONES = new Set(WEEKLY_TRACK_MILESTONES);
+const VALID_TUTORIAL_QUEST_IDS = new Set(TUTORIAL_QUESTS.map(quest => quest.id));
 
 interface RewardPopup {
   id: string;
@@ -958,6 +976,320 @@ function normalizeHero(hero: HeroUnit): HeroUnit {
     ...hero,
     passiveTrait: hero.passiveTrait ?? defaultTraitForClass(hero.heroClass),
     activeSkillArchetype: hero.activeSkillArchetype ?? defaultActiveForClass(hero.heroClass),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(value)));
+}
+
+function clampFloat(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
+}
+
+function clampBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function clampString(value: unknown, fallback: string, maxLength: number): string {
+  if (typeof value !== 'string') return fallback;
+  return value.trim().slice(0, maxLength);
+}
+
+function sanitizeStringList(value: unknown, maxItems: number): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const sanitized: string[] = [];
+
+  for (const item of value) {
+    if (typeof item !== 'string') continue;
+    const trimmed = item.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    sanitized.push(trimmed);
+    if (sanitized.length >= maxItems) break;
+  }
+
+  return sanitized;
+}
+
+function sanitizeStatAllocation(raw: unknown, level: number): {
+  statsAlloc: StatBlock;
+  allocatedStatPoints: number;
+  unspentStatPoints: number;
+} {
+  const record = isRecord(raw) ? raw : {};
+  const budget = Math.max(0, (level - 1) * STAT_POINTS_PER_LEVEL);
+  const requested: StatBlock = {
+    strength: clampInt(record.strength, 0, budget, 0),
+    vitality: clampInt(record.vitality, 0, budget, 0),
+    agility: clampInt(record.agility, 0, budget, 0),
+    intelligence: clampInt(record.intelligence, 0, budget, 0),
+    spirit: clampInt(record.spirit, 0, budget, 0),
+  };
+
+  let remaining = budget;
+  const statsAlloc: StatBlock = {
+    strength: 0,
+    vitality: 0,
+    agility: 0,
+    intelligence: 0,
+    spirit: 0,
+  };
+
+  for (const key of ['strength', 'vitality', 'agility', 'intelligence', 'spirit'] as StatKey[]) {
+    const next = Math.min(requested[key], remaining);
+    statsAlloc[key] = next;
+    remaining -= next;
+  }
+
+  return {
+    statsAlloc,
+    allocatedStatPoints: budget - remaining,
+    unspentStatPoints: remaining,
+  };
+}
+
+function sanitizeLoadedHero(raw: unknown, index: number): HeroUnit | null {
+  if (!isRecord(raw) || typeof raw.id !== 'string') return null;
+
+  const template = HERO_POOL.find(hero => hero.id === raw.id);
+  if (!template) return null;
+
+  const rarity = typeof raw.rarity === 'string' && VALID_RARITIES.has(raw.rarity as Rarity)
+    ? raw.rarity as Rarity
+    : 'common';
+  const level = clampInt(raw.level, 1, HERO_LEVEL_CAP, 1);
+  const rank = clampInt(raw.rank, 1, 10, 1);
+  const uid = clampString(raw.uid, `${template.id}_${index}`, 64) || `${template.id}_${index}`;
+  const rarityMult = rarityConfig(rarity).boostMultiplier;
+
+  return normalizeHero({
+    ...template,
+    uid,
+    rarity,
+    level,
+    rank,
+    teamBoost: Number((template.baseTeamBoost * rarityMult).toFixed(4)),
+  });
+}
+
+function sanitizeSaveData(payload: SaveData) {
+  const now = Date.now();
+  const currentWeek = weekNumberForTimestamp(now);
+  const currentDay = toDayNumber(now);
+  const playerName = clampString(payload.playerName, '', 24);
+  const playerClass = typeof payload.playerClass === 'string' && VALID_PLAYER_CLASSES.has(payload.playerClass as PlayerClass)
+    ? payload.playerClass as PlayerClass
+    : null;
+  const characterCreated = clampBoolean(payload.characterCreated, false) && !!playerName && playerClass !== null;
+  const level = clampInt(payload.level, 1, MAX_SAVE_PLAYER_LEVEL, 1);
+  const wave = clampInt(payload.wave, 1, MAX_SAVE_WAVE, 1);
+  const highestWaveReached = Math.max(
+    wave,
+    clampInt(payload.highestWaveReached ?? payload.highestLevelReached, 1, MAX_SAVE_WAVE, 1),
+  );
+  const { statsAlloc, allocatedStatPoints, unspentStatPoints } = sanitizeStatAllocation(payload.statsAlloc, level);
+  const maxMonsterHp = getMonsterMaxHp(wave);
+  const monsterHp = clampFloat(payload.monsterHp, 0, maxMonsterHp, maxMonsterHp);
+  const teamMaxHp = Math.max(100, clampInt(payload.teamHp, 1, SAFE_INTEGER_CAP, 100));
+  const teamHp = clampFloat(payload.teamHp, 0, teamMaxHp, teamMaxHp);
+
+  const party = initialParty();
+  if (isRecord(payload.party)) {
+    for (const partyId of Object.keys(party) as PartyId[]) {
+      party[partyId] = clampInt(payload.party[partyId], 0, SAFE_INTEGER_CAP, 0);
+    }
+  }
+
+  const skills = sanitizeStringList(payload.skills, VALID_SKILL_IDS.size)
+    .filter(skillId => VALID_SKILL_IDS.has(skillId));
+
+  const heroRoster: HeroUnit[] = [];
+  const heroUidSet = new Set<string>();
+  if (Array.isArray(payload.heroRoster)) {
+    for (const [index, rawHero] of payload.heroRoster.entries()) {
+      if (heroRoster.length >= MAX_SAVE_COLLECTION) break;
+      const hero = sanitizeLoadedHero(rawHero, index);
+      if (!hero || heroUidSet.has(hero.uid)) continue;
+      heroUidSet.add(hero.uid);
+      heroRoster.push(hero);
+    }
+  }
+
+  const activeTeamHeroIds = sanitizeStringList(payload.activeTeamHeroIds, ACTIVE_TEAM_SIZE)
+    .filter(uid => heroUidSet.has(uid))
+    .slice(0, ACTIVE_TEAM_SIZE);
+
+  const teamLoadouts = Array.isArray(payload.teamLoadouts)
+    ? payload.teamLoadouts.slice(0, 3).map(loadout => sanitizeStringList(loadout, ACTIVE_TEAM_SIZE)
+      .filter(uid => heroUidSet.has(uid))
+      .slice(0, ACTIVE_TEAM_SIZE))
+    : [];
+  while (teamLoadouts.length < 3) teamLoadouts.push([]);
+
+  const heroFormationByUid: Record<string, HeroFormationRole> = {};
+  if (isRecord(payload.heroFormationByUid)) {
+    for (const uid of Object.keys(payload.heroFormationByUid)) {
+      if (!heroUidSet.has(uid)) continue;
+      const role = payload.heroFormationByUid[uid];
+      if (typeof role === 'string' && VALID_HERO_FORMATION_ROLES.has(role as HeroFormationRole)) {
+        heroFormationByUid[uid] = role as HeroFormationRole;
+      }
+    }
+  }
+
+  const classMasteryXp = {
+    warrior: clampInt(payload.classMasteryXp?.warrior, 0, SAFE_INTEGER_CAP, 0),
+    berserker: clampInt(payload.classMasteryXp?.berserker, 0, SAFE_INTEGER_CAP, 0),
+    archer: clampInt(payload.classMasteryXp?.archer, 0, SAFE_INTEGER_CAP, 0),
+    mage: clampInt(payload.classMasteryXp?.mage, 0, SAFE_INTEGER_CAP, 0),
+    monk: clampInt(payload.classMasteryXp?.monk, 0, SAFE_INTEGER_CAP, 0),
+  };
+
+  const inventoryItemIds = sanitizeStringList(payload.inventoryItemIds, MAX_SAVE_COLLECTION)
+    .filter(itemId => !!getEquipmentItem(itemId));
+
+  const equippedItems = {
+    weapon: null as string | null,
+    armor: null as string | null,
+    accessory: null as string | null,
+  };
+  for (const slot of ['weapon', 'armor', 'accessory'] as EquipmentSlot[]) {
+    const itemId = payload.equippedItems?.[slot];
+    if (typeof itemId !== 'string') continue;
+    const item = getEquipmentItem(itemId);
+    if (!item || item.slot !== slot) continue;
+    equippedItems[slot] = itemId;
+  }
+
+  const usableItemCounts: Record<string, number> = {};
+  if (isRecord(payload.usableItemCounts)) {
+    for (const [itemId, count] of Object.entries(payload.usableItemCounts)) {
+      if (!getUsableItem(itemId)) continue;
+      const sanitizedCount = clampInt(count, 0, SAFE_INTEGER_CAP, 0);
+      if (sanitizedCount > 0) {
+        usableItemCounts[itemId] = sanitizedCount;
+      }
+    }
+  }
+
+  const summonHistory = Array.isArray(payload.summonHistory)
+    ? payload.summonHistory
+      .slice(-MAX_SAVE_SUMMON_HISTORY)
+      .filter((entry): entry is SummonHistoryEntry => isRecord(entry))
+      .map((entry, index) => ({
+        id: clampString(entry.id, `summon_${index}`, 64) || `summon_${index}`,
+        heroName: clampString(entry.heroName, 'Unknown Hero', 64),
+        heroEmoji: clampString(entry.heroEmoji, '🛡️', 4),
+        rarity: typeof entry.rarity === 'string' && VALID_RARITIES.has(entry.rarity as Rarity)
+          ? entry.rarity as Rarity
+          : 'common',
+        ts: clampInt(entry.ts, 0, now, now),
+        pityTriggered: clampBoolean(entry.pityTriggered, false),
+      }))
+    : [];
+
+  const weeklyEventWeek = clampInt(payload.weeklyEventWeek, 0, 1_000_000, currentWeek);
+  const weeklyEventId = getWeeklyEventByWeek(weeklyEventWeek).id;
+  const seasonPoints = clampInt(payload.seasonPoints, 0, SAFE_INTEGER_CAP, 0);
+  const bestSeasonPoints = Math.max(seasonPoints, clampInt(payload.bestSeasonPoints, 0, SAFE_INTEGER_CAP, 0));
+
+  return {
+    playerName,
+    playerClass,
+    characterCreated,
+    gold: clampInt(payload.gold, 0, SAFE_INTEGER_CAP, 0),
+    totalGold: Math.max(clampInt(payload.gold, 0, SAFE_INTEGER_CAP, 0), clampInt(payload.totalGold, 0, SAFE_INTEGER_CAP, 0)),
+    exp: clampInt(payload.exp, 0, Math.max(0, expForLevel(level) - 1), 0),
+    totalExp: clampInt(payload.totalExp, 0, SAFE_INTEGER_CAP, 0),
+    level,
+    highestWaveReached,
+    unspentStatPoints,
+    statsAlloc,
+    totalKills: clampInt(payload.totalKills, 0, SAFE_INTEGER_CAP, 0),
+    wave,
+    monsterHp,
+    monsterMaxHp: maxMonsterHp,
+    teamHp,
+    teamMaxHp,
+    party,
+    skills,
+    heroRoster,
+    activeTeamHeroIds,
+    totalSummons: clampInt(payload.totalSummons, 0, SAFE_INTEGER_CAP, 0),
+    firstSummonGiven: clampBoolean(payload.firstSummonGiven, false),
+    freeSummonCharges: clampInt(payload.freeSummonCharges, 0, SAFE_INTEGER_CAP, 0),
+    heroShards: clampInt(payload.heroShards, 0, SAFE_INTEGER_CAP, 0),
+    essence: clampInt(payload.essence, 0, SAFE_INTEGER_CAP, 0),
+    rebirthCores: clampInt(payload.rebirthCores, 0, SAFE_INTEGER_CAP, 0),
+    rebirthDamagePath: clampInt(payload.rebirthDamagePath, 0, SAFE_INTEGER_CAP, 0),
+    rebirthEconomyPath: clampInt(payload.rebirthEconomyPath, 0, SAFE_INTEGER_CAP, 0),
+    rebirthSurvivalPath: clampInt(payload.rebirthSurvivalPath, 0, SAFE_INTEGER_CAP, 0),
+    autoRecycleMaxRarity: typeof payload.autoRecycleMaxRarity === 'string' && VALID_AUTO_RECYCLE_RARITIES.has(payload.autoRecycleMaxRarity as Rarity)
+      ? payload.autoRecycleMaxRarity as Rarity
+      : 'uncommon',
+    equipmentScrap: clampInt(payload.equipmentScrap, 0, SAFE_INTEGER_CAP, 0),
+    gachaPityCounter: clampInt(payload.gachaPityCounter, 0, PITY_THRESHOLD - 1, 0),
+    summonHistory,
+    teamLoadouts,
+    heroFormationByUid,
+    classMasteryXp,
+    seasonPoints,
+    bestSeasonPoints,
+    dailyLoginStreak: clampInt(payload.dailyLoginStreak, 0, 100_000, 0),
+    lastDailyLoginDay: payload.lastDailyLoginDay == null ? null : clampInt(payload.lastDailyLoginDay, 0, currentDay, currentDay),
+    streakInsuranceCharges: clampInt(payload.streakInsuranceCharges, 0, SAFE_INTEGER_CAP, 1),
+    weeklyEventWeek,
+    weeklyEventId,
+    weeklyKills: clampInt(payload.weeklyKills, 0, SAFE_INTEGER_CAP, 0),
+    weeklyTrackClaimed: sanitizeStringList(payload.weeklyTrackClaimed, WEEKLY_TRACK_MILESTONES.length)
+      .map(value => Number(value))
+      .filter((value): value is number => Number.isFinite(value) && VALID_WEEKLY_TRACK_MILESTONES.has(value))
+      .map(value => Math.floor(value)),
+    claimedMissionIds: sanitizeStringList(payload.claimedMissionIds, VALID_MISSION_IDS.size)
+      .filter(id => VALID_MISSION_IDS.has(id)),
+    seenHintIds: sanitizeStringList(payload.seenHintIds, MAX_SAVE_LOG_ENTRIES),
+    permanentUnlocks: sanitizeStringList(payload.permanentUnlocks, VALID_PERMANENT_UNLOCKS.size)
+      .filter((id): id is PermanentUnlockId => VALID_PERMANENT_UNLOCKS.has(id as PermanentUnlockId)),
+    metaDamageLevel: clampInt(payload.metaDamageLevel, 0, SAFE_INTEGER_CAP, 0),
+    metaEconomyLevel: clampInt(payload.metaEconomyLevel, 0, SAFE_INTEGER_CAP, 0),
+    metaSurvivalLevel: clampInt(payload.metaSurvivalLevel, 0, SAFE_INTEGER_CAP, 0),
+    inventoryItemIds,
+    equippedItems,
+    usableItemCounts,
+    autoUsePotionEnabled: clampBoolean(payload.autoUsePotionEnabled, false),
+    autoUsePotionThresholdPct: clampFloat(payload.autoUsePotionThresholdPct, 0.05, 1, 0.35),
+    autoRecycleEnabled: clampBoolean(payload.autoRecycleEnabled, false),
+    autoSummonEnabled: clampBoolean(payload.autoSummonEnabled, false),
+    autoSummonMode: payload.autoSummonMode === 'x10' ? 'x10' : 'single',
+    autoSummonReserveGold: clampInt(payload.autoSummonReserveGold, 0, SAFE_INTEGER_CAP, 5000),
+    lastActiveAt: clampInt(payload.lastActiveAt, 0, now, now),
+    tutorialEnabled: clampBoolean(payload.tutorialEnabled, true),
+    tutorialCurrentQuestIndex: clampInt(payload.tutorialCurrentQuestIndex, 0, TUTORIAL_QUESTS.length, 0),
+    tutorialCompletedQuestIds: sanitizeStringList(payload.tutorialCompletedQuestIds, TUTORIAL_QUESTS.length)
+      .filter(id => VALID_TUTORIAL_QUEST_IDS.has(id)),
+    allocatedStatPoints,
+    prestigeCount: clampInt(payload.prestigeCount, 0, SAFE_INTEGER_CAP, 0),
+    achievements: sanitizeStringList(payload.achievements, VALID_ACHIEVEMENT_IDS.size)
+      .filter(id => VALID_ACHIEVEMENT_IDS.has(id)),
+    combatLog: sanitizeStringList(payload.combatLog, MAX_SAVE_LOG_ENTRIES),
+    damageBuffPct: clampFloat(payload.damageBuffPct, 0, 1, 0),
+    damageBuffMs: clampInt(payload.damageBuffMs, 0, 600_000, 0),
+    damageReductionBuffPct: clampFloat(payload.damageReductionBuffPct, 0, 1, 0),
+    damageReductionBuffMs: clampInt(payload.damageReductionBuffMs, 0, 600_000, 0),
+    heroActiveCdMs: Object.fromEntries(
+      Object.entries(isRecord(payload.heroActiveCdMs) ? payload.heroActiveCdMs : {})
+        .filter(([uid]) => heroUidSet.has(uid))
+        .map(([uid, ms]) => [uid, clampInt(ms, 0, 600_000, 0)])
+        .filter(([, ms]) => ms > 0),
+    ),
   };
 }
 
@@ -2304,110 +2636,93 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'LOAD': {
-      const p = action.payload;
-      const wave = p.wave ?? 1;
-      const maxHp = getMonsterMaxHp(wave);
-      const teamHp = p.teamHp ?? 100;
-      const loadedEquippedItems = {
-        weapon: p.equippedItems?.weapon ?? null,
-        armor: p.equippedItems?.armor ?? null,
-        accessory: p.equippedItems?.accessory ?? null,
-      };
+      const p = sanitizeSaveData(action.payload);
       return {
         ...DEFAULT_STATE,
-        playerName: p.playerName ?? '',
-        playerClass: p.playerClass ?? null,
-        characterCreated: p.characterCreated ?? false,
+        playerName: p.playerName,
+        playerClass: p.playerClass,
+        characterCreated: p.characterCreated,
 
-        gold: p.gold ?? 0,
-        totalGold: p.totalGold ?? 0,
-        exp: p.exp ?? 0,
-        totalExp: p.totalExp ?? 0,
-        level: p.level ?? 1,
-        highestWaveReached: Math.max(p.highestWaveReached ?? p.highestLevelReached ?? 1, p.wave ?? 1),
-        unspentStatPoints: p.unspentStatPoints ?? 0,
-        statsAlloc: {
-          ...blankStats,
-          ...(p.statsAlloc ?? {}),
-        },
+        gold: p.gold,
+        totalGold: p.totalGold,
+        exp: p.exp,
+        totalExp: p.totalExp,
+        level: p.level,
+        highestWaveReached: p.highestWaveReached,
+        unspentStatPoints: p.unspentStatPoints,
+        statsAlloc: p.statsAlloc,
 
-        totalKills: p.totalKills ?? 0,
-        wave,
-        monsterHp: Math.min(p.monsterHp ?? maxHp, maxHp),
-        monsterMaxHp: maxHp,
-        teamHp,
-        teamMaxHp: p.teamHp ?? 100,
+        totalKills: p.totalKills,
+        wave: p.wave,
+        monsterHp: p.monsterHp,
+        monsterMaxHp: p.monsterMaxHp,
+        teamHp: p.teamHp,
+        teamMaxHp: p.teamMaxHp,
 
-        party: { ...initialParty(), ...(p.party ?? {}) },
-        skills: new Set(p.skills ?? []),
+        party: p.party,
+        skills: new Set(p.skills),
 
-        heroRoster: (p.heroRoster ?? []).map(normalizeHero),
-        activeTeamHeroIds: p.activeTeamHeroIds ?? [],
-        totalSummons: p.totalSummons ?? 0,
-        firstSummonGiven: p.firstSummonGiven ?? false,
-        freeSummonCharges: p.freeSummonCharges ?? 0,
-        heroShards: p.heroShards ?? 0,
-        essence: p.essence ?? 0,
-        rebirthCores: p.rebirthCores ?? 0,
-        rebirthDamagePath: p.rebirthDamagePath ?? 0,
-        rebirthEconomyPath: p.rebirthEconomyPath ?? 0,
-        rebirthSurvivalPath: p.rebirthSurvivalPath ?? 0,
-        autoRecycleMaxRarity: p.autoRecycleMaxRarity ?? 'uncommon',
-        equipmentScrap: p.equipmentScrap ?? 0,
-        gachaPityCounter: p.gachaPityCounter ?? 0,
-        summonHistory: p.summonHistory ?? [],
-        teamLoadouts: p.teamLoadouts ?? [[], [], []],
-        heroFormationByUid: p.heroFormationByUid ?? {},
-        classMasteryXp: {
-          warrior: p.classMasteryXp?.warrior ?? 0,
-          berserker: p.classMasteryXp?.berserker ?? 0,
-          archer: p.classMasteryXp?.archer ?? 0,
-          mage: p.classMasteryXp?.mage ?? 0,
-          monk: p.classMasteryXp?.monk ?? 0,
-        },
-        seasonPoints: p.seasonPoints ?? 0,
-        bestSeasonPoints: p.bestSeasonPoints ?? 0,
-        dailyLoginStreak: p.dailyLoginStreak ?? 0,
-        lastDailyLoginDay: p.lastDailyLoginDay ?? null,
-        streakInsuranceCharges: p.streakInsuranceCharges ?? 1,
-        weeklyEventWeek: p.weeklyEventWeek ?? weekNumberForTimestamp(Date.now()),
-        weeklyEventId: p.weeklyEventId ?? getWeeklyEventForTimestamp(Date.now()).id,
-        weeklyKills: p.weeklyKills ?? 0,
-        weeklyTrackClaimed: p.weeklyTrackClaimed ?? [],
-        claimedMissionIds: p.claimedMissionIds ?? [],
-        seenHintIds: p.seenHintIds ?? [],
-        permanentUnlocks: p.permanentUnlocks ?? [],
-        metaDamageLevel: p.metaDamageLevel ?? 0,
-        metaEconomyLevel: p.metaEconomyLevel ?? 0,
-        metaSurvivalLevel: p.metaSurvivalLevel ?? 0,
+        heroRoster: p.heroRoster,
+        activeTeamHeroIds: p.activeTeamHeroIds,
+        totalSummons: p.totalSummons,
+        firstSummonGiven: p.firstSummonGiven,
+        freeSummonCharges: p.freeSummonCharges,
+        heroShards: p.heroShards,
+        essence: p.essence,
+        rebirthCores: p.rebirthCores,
+        rebirthDamagePath: p.rebirthDamagePath,
+        rebirthEconomyPath: p.rebirthEconomyPath,
+        rebirthSurvivalPath: p.rebirthSurvivalPath,
+        autoRecycleMaxRarity: p.autoRecycleMaxRarity,
+        equipmentScrap: p.equipmentScrap,
+        gachaPityCounter: p.gachaPityCounter,
+        summonHistory: p.summonHistory,
+        teamLoadouts: p.teamLoadouts,
+        heroFormationByUid: p.heroFormationByUid,
+        classMasteryXp: p.classMasteryXp,
+        seasonPoints: p.seasonPoints,
+        bestSeasonPoints: p.bestSeasonPoints,
+        dailyLoginStreak: p.dailyLoginStreak,
+        lastDailyLoginDay: p.lastDailyLoginDay,
+        streakInsuranceCharges: p.streakInsuranceCharges,
+        weeklyEventWeek: p.weeklyEventWeek,
+        weeklyEventId: p.weeklyEventId,
+        weeklyKills: p.weeklyKills,
+        weeklyTrackClaimed: p.weeklyTrackClaimed,
+        claimedMissionIds: p.claimedMissionIds,
+        seenHintIds: p.seenHintIds,
+        permanentUnlocks: p.permanentUnlocks,
+        metaDamageLevel: p.metaDamageLevel,
+        metaEconomyLevel: p.metaEconomyLevel,
+        metaSurvivalLevel: p.metaSurvivalLevel,
 
-        inventoryItemIds: p.inventoryItemIds ?? [],
-        equippedItems: loadedEquippedItems,
-        usableItemCounts: p.usableItemCounts ?? {},
-        autoUsePotionEnabled: p.autoUsePotionEnabled ?? false,
-        autoUsePotionThresholdPct: p.autoUsePotionThresholdPct ?? 0.35,
-        autoRecycleEnabled: p.autoRecycleEnabled ?? false,
-        autoSummonEnabled: p.autoSummonEnabled ?? false,
-        autoSummonMode: p.autoSummonMode ?? 'single',
-        autoSummonReserveGold: p.autoSummonReserveGold ?? 5000,
+        inventoryItemIds: p.inventoryItemIds,
+        equippedItems: p.equippedItems,
+        usableItemCounts: p.usableItemCounts,
+        autoUsePotionEnabled: p.autoUsePotionEnabled,
+        autoUsePotionThresholdPct: p.autoUsePotionThresholdPct,
+        autoRecycleEnabled: p.autoRecycleEnabled,
+        autoSummonEnabled: p.autoSummonEnabled,
+        autoSummonMode: p.autoSummonMode,
+        autoSummonReserveGold: p.autoSummonReserveGold,
         autoSummonCooldownMs: 0,
-        lastActiveAt: p.lastActiveAt ?? Date.now(),
+        lastActiveAt: p.lastActiveAt,
 
-        tutorialEnabled: p.tutorialEnabled ?? true,
-        tutorialCurrentQuestIndex: p.tutorialCurrentQuestIndex ?? 0,
-        tutorialCompletedQuestIds: p.tutorialCompletedQuestIds ?? [],
-        allocatedStatPoints: p.allocatedStatPoints ?? 0,
+        tutorialEnabled: p.tutorialEnabled,
+        tutorialCurrentQuestIndex: p.tutorialCurrentQuestIndex,
+        tutorialCompletedQuestIds: p.tutorialCompletedQuestIds,
+        allocatedStatPoints: p.allocatedStatPoints,
 
-        prestigeCount: p.prestigeCount ?? 0,
-        achievements: new Set(p.achievements ?? []),
+        prestigeCount: p.prestigeCount,
+        achievements: new Set(p.achievements),
         newAchievement: null,
         rewardQueue: [],
-        combatLog: p.combatLog ?? [],
-        damageBuffPct: p.damageBuffPct ?? 0,
-        damageBuffMs: p.damageBuffMs ?? 0,
-        damageReductionBuffPct: p.damageReductionBuffPct ?? 0,
-        damageReductionBuffMs: p.damageReductionBuffMs ?? 0,
-        heroActiveCdMs: p.heroActiveCdMs ?? {},
+        combatLog: p.combatLog,
+        damageBuffPct: p.damageBuffPct,
+        damageBuffMs: p.damageBuffMs,
+        damageReductionBuffPct: p.damageReductionBuffPct,
+        damageReductionBuffMs: p.damageReductionBuffMs,
+        heroActiveCdMs: p.heroActiveCdMs,
       };
     }
 
