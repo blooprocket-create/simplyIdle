@@ -98,9 +98,9 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
             <View style={styles.batchLevelingSection}>
               <Text style={styles.batchLevelTitle}>📚 Level Multiple Heroes at Once</Text>
               <View style={styles.batchLevelControls}>
-                <View style={styles.targetLevelControl}>
+                <View style={[styles.targetLevelControl, isNarrow && { gap: 6 }] }>
                   <Text style={styles.targetLevelLabel}>Level Increase: </Text>
-                  <View style={styles.targetLevelButtons}>
+                  <View style={[styles.targetLevelButtons, isNarrow && { flexWrap: 'wrap' }]}>
                     {([10, 50, 100, 'max'] as const).map(mode => (
                       <Pressable
                         key={String(mode)}
@@ -151,7 +151,7 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
                       key={hero.uid}
                       style={[
                         styles.batchHeroCard,
-                        { width: batchCardWidth },
+                        { width: batchCardWidth, alignItems: isNarrow ? 'flex-start' : 'center', paddingVertical: isNarrow ? 8 : 10, paddingHorizontal: isNarrow ? 8 : 10 },
                         isSelected && styles.batchHeroCardSelected,
                         isOnTeam && styles.heroCardActive,
                       ]}
@@ -165,17 +165,19 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
                         setBatchLevelSelected(updated);
                       }}
                     >
-                      <View style={styles.batchHeroCheckbox}>
+                      <View style={[styles.batchHeroCheckbox, isNarrow && { marginTop: 2 }]}>
                         {isSelected && <View style={styles.batchHeroCheckboxInner} />}
                       </View>
-                      <View style={[styles.batchHeroInfo, isNarrow && { gap: 2 }]}> 
+                      <View style={[styles.batchHeroInfo, isNarrow && { gap: 3, minWidth: 0 }]}> 
                         <Text style={[styles.batchHeroName, isNarrow && { fontSize: 12 }]} numberOfLines={1}>{hero.emoji} {hero.name}</Text>
                         <Text style={[styles.batchHeroLevel, isNarrow && { fontSize: 11 }]} numberOfLines={1}>
                           {isNarrow ? `Lv ${hero.level} -> ${projectedLevel}` : `Level ${hero.level} → ${projectedLevel}`}
                         </Text>
-                        <Text style={[styles.batchHeroTeamTag, isNarrow && { fontSize: 10 }]} numberOfLines={1}>
-                          {isOnTeam ? '🛡️ Active Team' : `⭐ Rank ${hero.rank}/10`}
-                        </Text>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                          <Text style={[styles.batchHeroTeamTag, isNarrow && { fontSize: 10 }]} numberOfLines={1}>
+                            {isOnTeam ? '🛡️ Active Team' : `⭐ Rank ${hero.rank}/10`}
+                          </Text>
+                        </View>
                         <Text style={[styles.batchHerosCost, isNarrow && { fontSize: 10 }]} numberOfLines={1}>
                           {batchLevelMode === 'max'
                             ? `Affordable now: ${fmt(totalCost)} 💰`

@@ -209,7 +209,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
             <>
               <View style={styles.heroRosterHeader}>
                 <Text style={styles.sectionTitle}>👥 Roster Command</Text>
-                <View style={styles.heroRosterActions}>
+                <View style={[styles.heroRosterActions, isNarrow && { width: '100%', justifyContent: 'space-between' }] }>
                   <Pressable style={styles.autoEquipBtn} onPress={autoEquipBestHeroes}>
                     <Text style={styles.autoEquipBtnText}>⚡ Auto Equip</Text>
                   </Pressable>
@@ -221,9 +221,9 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
               <Text style={styles.rosterCount}>
                 {state.heroRoster.length} heroes • {state.activeTeamHeroIds.length}/{teamSlotCap} in active team
               </Text>
-              <View style={styles.loadoutRow}>
+              <View style={[styles.loadoutRow, isNarrow && { flexWrap: 'wrap' }]}>
                 {[0, 1, 2].map(slot => (
-                  <View key={slot} style={styles.loadoutCell}>
+                  <View key={slot} style={[styles.loadoutCell, isNarrow && { minWidth: '31%' }]}>
                     <Text style={styles.loadoutLabel}>L{slot + 1}</Text>
                     <View style={styles.loadoutBtnsWrap}>
                       <Pressable style={styles.loadoutSaveBtn} onPress={() => saveTeamLoadout(slot)}>
@@ -270,48 +270,95 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                     >
                       <View style={[styles.heroCardRarityBar, { backgroundColor: rarity.color }]} />
                       <View style={[styles.heroCardBody, isNarrow && { paddingHorizontal: 8, paddingVertical: 8 }]}> 
-                        <View style={styles.heroCardTopRow}>
-                          <View style={[styles.heroPortraitFrame, { borderColor: rarity.color }]}>
-                            <Text style={styles.heroEmoji}>{hero.emoji}</Text>
-                          </View>
-                          <View style={styles.heroCardInfo}>
-                            <Text style={[styles.heroName, isNarrow && { fontSize: 13 }]} numberOfLines={1}>{hero.name}</Text>
-                            <Text style={[styles.heroDetail, isNarrow && { fontSize: 11 }]} numberOfLines={1}>
-                              <Text style={{ color: rarity.color }}>{hero.rarity}</Text>
-                              {' • '}{isNarrow ? cls.name.slice(0, 3).toUpperCase() : cls.name}
-                            </Text>
-                            <View style={styles.heroTagRow}>
-                              <Text style={styles.heroFactionTag}>{faction}</Text>
-                              {!isNarrow && <Text style={styles.heroArchetypeTag}>{activeArchetype.name}</Text>}
+                        {isNarrow ? (
+                          <>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <View style={[styles.heroPortraitFrame, { borderColor: rarity.color, width: 42, height: 42, borderRadius: 21 }]}>
+                                <Text style={styles.heroEmoji}>{hero.emoji}</Text>
+                              </View>
+                              <View style={{ flex: 1, minWidth: 0 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                  <Text style={[styles.heroName, { fontSize: 14, marginBottom: 0, flex: 1 }]} numberOfLines={1}>{hero.name}</Text>
+                                  <Text style={[styles.heroLevel, { fontSize: 14 }]} numberOfLines={1}>Lv {hero.level}</Text>
+                                </View>
+                                <Text style={[styles.heroDetail, { fontSize: 11, marginTop: 2 }]} numberOfLines={1}>
+                                  <Text style={{ color: rarity.color }}>{hero.rarity}</Text>
+                                  {' • '}{cls.name}
+                                </Text>
+                                <View style={[styles.heroTagRow, { marginTop: 4, marginBottom: 0 }]}>
+                                  <Text style={styles.heroFactionTag}>{faction}</Text>
+                                  <Text style={styles.heroArchetypeTag}>R{hero.rank}</Text>
+                                </View>
+                              </View>
                             </View>
-                            <Text style={[styles.heroRank, isNarrow && { fontSize: 11 }]}>⭐ R{hero.rank}/10</Text>
-                          </View>
-                          <View style={styles.heroCardRight}>
-                            <Text style={[styles.heroLevel, isNarrow && { fontSize: 13 }]}>Lv {hero.level}</Text>
-                            <Pressable
-                              style={[styles.toggleBtn, inActiveTeam && styles.toggleBtnActive]}
-                              onPress={() => toggleEquipHero(hero.uid)}
-                            >
-                              <Text style={styles.toggleBtnText}>{inActiveTeam ? '✔ Team' : '+ Add'}</Text>
-                            </Pressable>
-                            <Pressable
-                              style={styles.expandBtn}
-                              onPress={() => {
-                                const s = new Set(expandedHeroes);
-                                if (s.has(hero.uid)) s.delete(hero.uid); else s.add(hero.uid);
-                                setExpandedHeroes(s);
-                              }}
-                            >
-                              <Text style={styles.expandBtnText}>{isExpanded ? 'Hide' : 'More'}</Text>
-                            </Pressable>
-                          </View>
-                        </View>
 
-                        <Text style={[styles.heroDetail, isNarrow && { fontSize: 11 }]} numberOfLines={1}>
-                          {isNarrow
-                            ? `⭐ R${hero.rank} • +${(hero.teamBoost * 100).toFixed(1)}%`
-                            : `⭐ Rank ${hero.rank}/10 • +${(hero.teamBoost * 100).toFixed(1)}% boost`}
-                        </Text>
+                            <Text style={[styles.heroDetail, { fontSize: 11, marginTop: 8 }]} numberOfLines={1}>
+                              +{(hero.teamBoost * 100).toFixed(1)}% team boost
+                            </Text>
+
+                            <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+                              <Pressable
+                                style={[styles.toggleBtn, inActiveTeam && styles.toggleBtnActive, { flex: 1, alignItems: 'center', paddingVertical: 8 }]}
+                                onPress={() => toggleEquipHero(hero.uid)}
+                              >
+                                <Text style={styles.toggleBtnText}>{inActiveTeam ? '✔ Team' : '+ Add'}</Text>
+                              </Pressable>
+                              <Pressable
+                                style={[styles.expandBtn, { minWidth: 72, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 }]}
+                                onPress={() => {
+                                  const s = new Set(expandedHeroes);
+                                  if (s.has(hero.uid)) s.delete(hero.uid); else s.add(hero.uid);
+                                  setExpandedHeroes(s);
+                                }}
+                              >
+                                <Text style={styles.expandBtnText}>{isExpanded ? 'Hide' : 'More'}</Text>
+                              </Pressable>
+                            </View>
+                          </>
+                        ) : (
+                          <>
+                            <View style={styles.heroCardTopRow}>
+                              <View style={[styles.heroPortraitFrame, { borderColor: rarity.color }]}>
+                                <Text style={styles.heroEmoji}>{hero.emoji}</Text>
+                              </View>
+                              <View style={styles.heroCardInfo}>
+                                <Text style={styles.heroName} numberOfLines={1}>{hero.name}</Text>
+                                <Text style={styles.heroDetail} numberOfLines={1}>
+                                  <Text style={{ color: rarity.color }}>{hero.rarity}</Text>
+                                  {' • '}{cls.name}
+                                </Text>
+                                <View style={styles.heroTagRow}>
+                                  <Text style={styles.heroFactionTag}>{faction}</Text>
+                                  <Text style={styles.heroArchetypeTag}>{activeArchetype.name}</Text>
+                                </View>
+                                <Text style={styles.heroRank}>⭐ Rank {hero.rank}/10</Text>
+                              </View>
+                              <View style={styles.heroCardRight}>
+                                <Text style={styles.heroLevel}>Lv {hero.level}</Text>
+                                <Pressable
+                                  style={[styles.toggleBtn, inActiveTeam && styles.toggleBtnActive]}
+                                  onPress={() => toggleEquipHero(hero.uid)}
+                                >
+                                  <Text style={styles.toggleBtnText}>{inActiveTeam ? '✔ Team' : '+ Add'}</Text>
+                                </Pressable>
+                                <Pressable
+                                  style={styles.expandBtn}
+                                  onPress={() => {
+                                    const s = new Set(expandedHeroes);
+                                    if (s.has(hero.uid)) s.delete(hero.uid); else s.add(hero.uid);
+                                    setExpandedHeroes(s);
+                                  }}
+                                >
+                                  <Text style={styles.expandBtnText}>{isExpanded ? 'Hide' : 'More'}</Text>
+                                </Pressable>
+                              </View>
+                            </View>
+
+                            <Text style={styles.heroDetail} numberOfLines={1}>
+                              ⭐ Rank {hero.rank}/10 • +{(hero.teamBoost * 100).toFixed(1)}% boost
+                            </Text>
+                          </>
+                        )}
 
                         {isExpanded && (
                           <>
