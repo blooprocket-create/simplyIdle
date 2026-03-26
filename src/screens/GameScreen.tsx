@@ -1513,11 +1513,30 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             <Text style={styles.hpText}>{Math.ceil(state.monsterHp)}/{Math.ceil(state.monsterMaxHp)} HP</Text>
             <View style={styles.affixRow}>
               {monsterAffixes.map(affix => (
-                <View key={affix.id} style={[styles.affixChip, { borderColor: affix.color }]}>
+                <Pressable
+                  key={affix.id}
+                  style={[
+                    styles.affixChip,
+                    { borderColor: affix.color },
+                    activeAffixTooltipId === affix.id && styles.affixChipActive,
+                  ]}
+                  onPress={() => setActiveAffixTooltipId(current => current === affix.id ? null : affix.id)}
+                  onPressIn={() => setActiveAffixTooltipId(affix.id)}
+                  onHoverIn={() => setActiveAffixTooltipId(affix.id)}
+                  onHoverOut={() => setActiveAffixTooltipId(current => current === affix.id ? null : current)}
+                >
                   <Text style={[styles.affixChipText, { color: affix.color }]}>{affix.name}</Text>
-                </View>
+                </Pressable>
               ))}
             </View>
+            {activeAffixTooltip && (
+              <View style={styles.affixTooltipCard}>
+                <Text style={[styles.affixTooltipTitle, { color: activeAffixTooltip.color }]}>
+                  {activeAffixTooltip.name}
+                </Text>
+                <Text style={styles.affixTooltipText}>{activeAffixTooltip.description}</Text>
+              </View>
+            )}
             <Text style={styles.teamSynergyInline}>
               TTK {ttkSeconds >= 99 ? '99s+' : `${ttkSeconds.toFixed(1)}s`} • Danger {dangerLabel} ({dangerScore.toFixed(0)}%)
             </Text>
@@ -5598,6 +5617,13 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 10,
     marginTop: 4,
     marginBottom: 4,
+    alignSelf: 'center',
+    zIndex: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
   },
   affixTooltipTitle: {
     fontSize: 11,
