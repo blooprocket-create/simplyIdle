@@ -56,6 +56,8 @@ import {
 import { fmt } from '../utils';
 import AchievementToast from '../components/AchievementToast';
 import RebirthModal from '../components/PrestigeModal';
+import BottomNavigation, { BottomTabType } from '../components/BottomNavigation';
+import GameHeader from '../components/GameHeader';
 
 type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'guildhall';
 type HeroesSubTab = 'summon' | 'roster';
@@ -65,6 +67,10 @@ type GuildhallSubTab = 'batch' | 'facilities' | 'expeditions';
 type ShopTab = 'diamond' | 'gold' | 'dollar';
 type ExpeditionType = 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss';
 type ExpeditionRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
+
+type HubLegacyTab = 'warroom' | 'achievements' | 'guildhall';
+
+const HUB_LEGACY_TABS: HubLegacyTab[] = ['warroom', 'achievements', 'guildhall'];
 
 type MomentCue = 'none' | 'mythic' | 'boss' | 'rebirth' | 'ultimate';
 
@@ -256,6 +262,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   } = useGameState(selectedCharacterClass ? getCharacterSaveSlot(accountName, selectedCharacterClass) : '__character_slot_preview__');
 
   const [tab, setTab] = useState<Tab>('warroom');
+  const [mobileTab, setMobileTab] = useState<BottomTabType>('hub');
+  const [lastHubTab, setLastHubTab] = useState<HubLegacyTab>('warroom');
   const [rebirthOpen, setRebirthOpen] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [draftClass, setDraftClass] = useState<PlayerClass>('warrior');
@@ -869,9 +877,22 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     if (forceBuildTeamStep && heroesSubTab !== 'roster') setHeroesSubTab('roster');
   }, [state.tutorialEnabled, currentQuest, forceFreeSummonStep, forceBuildTeamStep, heroesSubTab]);
 
+  const mapLegacyToMobileTab = (legacyTab: Tab): BottomTabType => {
+    if (legacyTab === 'battle') return 'battle';
+    if (legacyTab === 'heroes') return 'heroes';
+    if (legacyTab === 'stats') return 'progression';
+    if (legacyTab === 'equipment') return 'armory';
+    return 'hub';
+  };
+
   const onTabChange = (nextTab: Tab) => {
     if (tutorialTargetTab && nextTab !== tutorialTargetTab) return;
     setTab(nextTab);
+    const nextMobileTab = mapLegacyToMobileTab(nextTab);
+    setMobileTab(nextMobileTab);
+    if (HUB_LEGACY_TABS.includes(nextTab as HubLegacyTab)) {
+      setLastHubTab(nextTab as HubLegacyTab);
+    }
     const eventMap: Record<Tab, TutorialEvent | null> = {
       warroom: null,
       battle: 'open_battle_tab',
@@ -883,6 +904,20 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     };
     const event = eventMap[nextTab];
     if (event) notifyQuestEvent(event);
+  };
+
+  const onMobileTabChange = (nextMobileTab: BottomTabType) => {
+    if (nextMobileTab === mobileTab) return;
+    if (nextMobileTab === 'battle') onTabChange('battle');
+    else if (nextMobileTab === 'heroes') onTabChange('heroes');
+    else if (nextMobileTab === 'progression') onTabChange('stats');
+    else if (nextMobileTab === 'armory') onTabChange('equipment');
+    else {
+      const tutorialHubTarget = tutorialTargetTab && HUB_LEGACY_TABS.includes(tutorialTargetTab as HubLegacyTab)
+        ? (tutorialTargetTab as HubLegacyTab)
+        : null;
+      onTabChange(tutorialHubTarget ?? lastHubTab);
+    }
   };
 
   const getDiceOutcome = (roll: number) => {
@@ -1096,54 +1131,25 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   };
 
   const renderCommandDeck = () => {
-    const buttons = (['warroom', 'battle', 'heroes', 'stats', 'equipment', 'achievements', 'guildhall'] as const).map(t => {
-      const lockedOut = !!tutorialTargetTab && t !== tutorialTargetTab;
-      const tutorialTarget = !!tutorialTargetTab && t === tutorialTargetTab;
-      return (
-        <Pressable
-          key={t}
-          style={[
-            styles.tab,
-            tab === t && styles.tabActive,
-            lockedOut && styles.tabLocked,
-            tutorialTarget && styles.tutorialPulse,
-            useCompactCommandTabs && styles.tabCompact,
-            useCompactCommandTabs && { width: compactCommandTabWidth },
-          ]}
-          onPress={() => onTabChange(t)}
-          disabled={lockedOut}
-        >
-          <View style={styles.tabIconWrap}>
-            <Text style={[styles.tabIcon, tab === t && styles.tabIconActive]}>{TAB_META[t].icon}</Text>
-            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.tabText, tab === t && styles.tabTextActive]}>{TAB_META[t].label}</Text>
-            {!useCompactCommandTabs && (
-              <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.tabSubText, tab === t && styles.tabSubTextActive]}>{TAB_META[t].mood}</Text>
-            )}
-            <View style={styles.tabSignalPill}>
-              <Text style={styles.tabSignalText}>{tabSignals[t]}</Text>
-            </View>
-            {((t === 'stats' && hasStatsNotification) || (t === 'heroes' && hasGachaNotification) || (t === 'warroom' && hasWarRoomNotification) || (t === 'equipment' && hasEquipmentNotification) || (t === 'achievements' && hasAchievementsNotification)) && (
-              <View style={styles.redDot} />
-            )}
-          </View>
-        </Pressable>
-      );
-    });
+    const hubNotificationCount =
+      (hasWarRoomNotification ? 1 : 0)
+      + (hasAchievementsNotification ? 1 : 0)
+      + (state.expeditionQueue.length > 0 ? 1 : 0);
 
-    if (useCompactCommandTabs) {
-      return (
-        <ScrollView
-          horizontal={true}
-          showsHorizontalScrollIndicator={false}
-          style={styles.tabBarScroll}
-          contentContainerStyle={styles.tabBarCompact}
-        >
-          {buttons}
-        </ScrollView>
-      );
-    }
+    const notifications: Partial<Record<BottomTabType, number>> = {
+      heroes: hasGachaNotification ? 1 : 0,
+      progression: hasStatsNotification ? 1 : 0,
+      armory: hasEquipmentNotification ? 1 : 0,
+      hub: hubNotificationCount,
+    };
 
-    return <View style={styles.tabBar}>{buttons}</View>;
+    return (
+      <BottomNavigation
+        activeTab={mobileTab}
+        onTabChange={onMobileTabChange}
+        notifications={notifications}
+      />
+    );
   };
 
   const seasonScore = state.seasonPoints;
@@ -1396,59 +1402,34 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       )}
 
       {/* Header */}
-      <View style={styles.headerCompact}>
-        <View style={styles.headerTopRow}>
-          <View style={styles.identityCluster}>
-            <Text style={styles.playerLabel}>{state.playerName}</Text>
-            <Text style={styles.classLabel}>{stats.className} • Lv {state.level} • @{accountName}</Text>
-          </View>
-          <View style={styles.headerActionRow}>
-            <Pressable style={styles.headerActionBtn} onPress={() => setEventsOpen(true)}>
-              <Text style={styles.headerActionBtnText}>🗓️</Text>
-            </Pressable>
-            <Pressable style={styles.headerActionBtn} onPress={() => setShopOpen(true)}>
-              <Text style={styles.headerActionBtnText}>🛒</Text>
-            </Pressable>
-            <Pressable style={styles.headerActionBtn} onPress={() => setSettingsOpen(true)}>
-              <Text style={styles.headerActionBtnText}>⚙️</Text>
-            </Pressable>
-            <Pressable style={[styles.headerActionBtn, styles.headerActionBtnLogout]} onPress={onLogout}>
-              <Text style={styles.headerActionBtnText}>⎋</Text>
-            </Pressable>
-          </View>
-        </View>
-        <ScrollView horizontal={true} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statChipRail}>
-          {topStatChips.map(chip => (
-            <Pressable
-              key={chip.id}
-              style={[styles.statChip, hoveredTopChipId === chip.id && styles.statChipActive]}
-              ref={ref => {
-                if (isTopChipWithTooltip(chip.id)) topChipRefs.current[chip.id] = ref;
-              }}
-              onHoverIn={() => {
-                if (isTopChipWithTooltip(chip.id)) showTopChipTooltip(chip.id);
-              }}
-              onHoverOut={() => {
-                if (isTopChipWithTooltip(chip.id)) hideTopChipTooltip(chip.id);
-              }}
-              onPressIn={() => {
-                if (isTopChipWithTooltip(chip.id)) showTopChipTooltip(chip.id);
-              }}
-              onPressOut={() => {
-                if (isTopChipWithTooltip(chip.id)) hideTopChipTooltip(chip.id);
-              }}
-            >
-              <Text style={styles.statChipLabel}>{chip.label}</Text>
-              <Text style={styles.statChipValue}>{chip.value}</Text>
-            </Pressable>
-          ))}
-          {state.unspentStatPoints > 0 && (
-            <View style={[styles.statChip, styles.statChipHighlight]}>
-              <Text style={styles.statChipLabel}>Spend</Text>
-              <Text style={[styles.statChipValue, styles.statChipValueWarn]}>+{state.unspentStatPoints} Pts</Text>
-            </View>
-          )}
-        </ScrollView>
+      <GameHeader
+        playerName={state.playerName}
+        playerClass={`${stats.className} • Lv ${state.level}`}
+        gold={state.gold}
+        diamonds={state.diamonds}
+        dps={Math.max(1, Math.floor(stats.dps))}
+        power={teamPowerIndex}
+        onActionPress={(action) => {
+          if (action === 'settings') setSettingsOpen(true);
+          else if (action === 'shop') setShopOpen(true);
+          else if (action === 'events') setEventsOpen(true);
+          else if (action === 'stats') {
+            onTabChange('stats');
+            setAchievementsSubTab('overview');
+          }
+        }}
+      />
+
+      <View style={styles.headerQuickActionsRow}>
+        <Pressable style={styles.headerQuickActionBtn} onPress={() => setEventsOpen(true)}>
+          <Text style={styles.headerQuickActionText}>🗓️ Events</Text>
+        </Pressable>
+        <Pressable style={styles.headerQuickActionBtn} onPress={() => setShopOpen(true)}>
+          <Text style={styles.headerQuickActionText}>🛒 Shop</Text>
+        </Pressable>
+        <Pressable style={[styles.headerQuickActionBtn, styles.headerQuickActionBtnLogout]} onPress={onLogout}>
+          <Text style={styles.headerQuickActionText}>⎋ Logout</Text>
+        </Pressable>
       </View>
 
       {topChipTooltip && topChipTooltipLayout && (
@@ -1716,9 +1697,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           </View>
         </>
       )}
-
-      {/* Command Deck */}
-      {renderCommandDeck()}
 
       {/* Tab Content */}
       <ScrollView
@@ -3436,6 +3414,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         )}
       </ScrollView>
 
+      {/* Bottom Navigation */}
+      {renderCommandDeck()}
+
       {storyUnlockToast && (
         <Pressable
           style={[styles.storyToast, styles.storyToastActive]}
@@ -4843,6 +4824,33 @@ const styles = StyleSheet.create({
   settingsBtnText: {
     fontSize: 10,
     color: '#E8F2FF',
+    fontWeight: '700',
+  },
+  headerQuickActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    paddingBottom: 4,
+  },
+  headerQuickActionBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2A4055',
+    backgroundColor: '#0E1622',
+    paddingVertical: 7,
+  },
+  headerQuickActionBtnLogout: {
+    backgroundColor: '#201A2A',
+    borderColor: '#4B3E61',
+  },
+  headerQuickActionText: {
+    fontSize: 10,
+    color: '#E6F1FF',
     fontWeight: '700',
   },
 
