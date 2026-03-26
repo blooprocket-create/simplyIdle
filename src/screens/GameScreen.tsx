@@ -68,8 +68,6 @@ type ShopTab = 'diamond' | 'gold' | 'dollar';
 type ExpeditionType = 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss';
 type ExpeditionRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
 
-type MomentCue = 'none' | 'mythic' | 'boss' | 'rebirth' | 'ultimate';
-
 type SummonReveal = {
   id: string;
   heroName: string;
@@ -277,8 +275,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [eventsOpen, setEventsOpen] = useState(false);
   const [chapterMapOpen, setChapterMapOpen] = useState(false);
   const [compareItemId, setCompareItemId] = useState<string | null>(null);
-  const [momentCue, setMomentCue] = useState<MomentCue>('none');
-  const [ultimateTagline, setUltimateTagline] = useState('LIMIT BREAK');
   const [summonReveal, setSummonReveal] = useState<SummonReveal | null>(null);
   const [idleChestReady, setIdleChestReady] = useState(false);
   const [idleChestOpen, setIdleChestOpen] = useState(false);
@@ -826,26 +822,18 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     if (text.includes('offline progress')) return;
     const timer = setTimeout(() => {
       clearRewardPopup();
-    }, 3200);
+    }, 1500);
     return () => clearTimeout(timer);
   }, [rewardPopup, clearRewardPopup]);
 
   useEffect(() => {
     if (!rewardPopup) return;
     const t = `${rewardPopup.title} ${rewardPopup.detail}`.toLowerCase();
-    if (t.includes('mythic drop')) setMomentCue('mythic');
-    else if (t.includes('boss defeated')) setMomentCue('boss');
-    else if (t.includes('rebirth complete') || t.includes('shockwave')) {
-      setUltimateTagline('REBIRTH ASCENSION');
-      setMomentCue('ultimate');
-    } else if (t.includes('offline progress')) {
+    if (t.includes('offline progress')) {
       setIdleChestReward(rewardPopup);
       setIdleChestReady(true);
       return;
     }
-    else return;
-    const timer = setTimeout(() => setMomentCue('none'), 900);
-    return () => clearTimeout(timer);
   }, [rewardPopup]);
 
   useEffect(() => {
@@ -1338,32 +1326,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           </View>
         </View>
       )}
-      {momentCue !== 'none' && (
-        <View pointerEvents="none" style={[
-          styles.momentCueOverlay,
-          momentCue === 'mythic'
-            ? styles.momentCueMythic
-            : momentCue === 'boss'
-              ? styles.momentCueBoss
-              : momentCue === 'ultimate'
-                ? styles.momentCueUltimate
-                : styles.momentCueRebirth,
-        ]}>
-          {momentCue === 'ultimate' && <View style={[styles.momentCueSlash, { backgroundColor: classCutinTone.stripe }]} />}
-          <Text style={styles.momentCueText}>
-            {momentCue === 'mythic'
-              ? 'MYTHIC'
-              : momentCue === 'boss'
-                ? 'BOSS DOWN'
-                : momentCue === 'ultimate'
-                  ? `${classConfig.name.toUpperCase()} ULT`
-                  : 'REBIRTH'}
-          </Text>
-          {momentCue === 'ultimate' && (
-            <Text style={[styles.momentCueSubText, { color: classCutinTone.glow }]}>{ultimateTagline} • {classCutinTone.callout}</Text>
-          )}
-        </View>
-      )}
+
 
       {/* Header */}
       <GameHeader
@@ -2006,9 +1969,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   onPress={() => {
                     const hits = 4 * battleSpeed;
                     burst(hits);
-                    setUltimateTagline('LIMIT BREAK');
-                    setMomentCue('ultimate');
-                    setTimeout(() => setMomentCue('none'), 700);
                   }}
                 >
                   <Text style={styles.burstBtnText}>{canBurst ? `Burst x${4 * battleSpeed}` : 'Charging'}</Text>
@@ -4294,47 +4254,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#1A2A34',
     opacity: 0.2,
-  },
-  momentCueOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  momentCueMythic: {
-    backgroundColor: 'rgba(130, 60, 10, 0.28)',
-  },
-  momentCueBoss: {
-    backgroundColor: 'rgba(120, 10, 18, 0.25)',
-  },
-  momentCueRebirth: {
-    backgroundColor: 'rgba(255, 90, 138, 0.22)',
-  },
-  momentCueUltimate: {
-    backgroundColor: 'rgba(20, 28, 44, 0.5)',
-  },
-  momentCueSlash: {
-    width: 240,
-    height: 12,
-    transform: [{ rotate: '-11deg' }],
-    borderRadius: 12,
-    marginBottom: 8,
-    opacity: 0.88,
-  },
-  momentCueText: {
-    fontSize: 28,
-    color: '#FFF4D6',
-    fontWeight: '800',
-    letterSpacing: 2,
-    textShadowColor: '#000',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
-  },
-  momentCueSubText: {
-    marginTop: 4,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.7,
   },
   summonRevealOverlay: {
     position: 'absolute',
@@ -7060,8 +6979,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   rewardToast: {
-    marginHorizontal: 12,
-    marginBottom: 8,
+    position: 'absolute',
+    bottom: 120,
+    alignSelf: 'center',
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 6,
@@ -7071,6 +6991,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    zIndex: 99,
+    pointerEvents: 'box-none',
   },
   rewardToastActive: {
     shadowColor: '#6DDB7B',
