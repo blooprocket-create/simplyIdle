@@ -16,7 +16,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ENABLE_SIMULATED_DOLLAR_PURCHASES, getCharacterSaveSlot, getDpsBreakdown, getEquipmentCraftCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState, VALID_FORMATION_ROLES_FOR_CLASS } from '../useGameState';
+import { ENABLE_SIMULATED_DOLLAR_PURCHASES, EXPEDITION_CONTRACT_REFRESH_GOLD_COST, EXPEDITION_CONTRACT_REFRESH_MS, getCharacterSaveSlot, getDpsBreakdown, getEquipmentCraftCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState, VALID_FORMATION_ROLES_FOR_CLASS } from '../useGameState';
 import { trackEvent } from '../telemetry';
 import {
   ACHIEVEMENTS,
@@ -85,16 +85,6 @@ type RiftBuffChoice = {
   defenseMult: number;
 };
 
-type ExpeditionOffer = {
-  type: ExpeditionType;
-  rarity: ExpeditionRarity;
-  icon: string;
-  name: string;
-  goldCost: number;
-  durationMs: number;
-  rewardsLabel: string;
-};
-
 interface GameScreenProps {
   accountName: string;
   onLogout: () => void;
@@ -161,7 +151,6 @@ const EXPEDITION_TYPE_META: Record<ExpeditionType, { icon: string; name: string 
   vault: { icon: '🔐', name: 'Vault Heist' },
   abyss: { icon: '🌑', name: 'Abyss Dive' },
 };
-const EXPEDITION_RARITIES: ExpeditionRarity[] = ['common', 'rare', 'epic', 'legendary', 'godly'];
 const EXPEDITION_RARITY_META: Record<ExpeditionRarity, { goldCost: number; durationMs: number; rewardsLabel: string }> = {
   common: { goldCost: 25_000, durationMs: 5 * 60 * 1000, rewardsLabel: '+35💎 +150✨' },
   rare: { goldCost: 75_000, durationMs: 20 * 60 * 1000, rewardsLabel: '+75💎 +320✨ +1⚡' },
@@ -176,33 +165,6 @@ function formatDurationShort(ms: number): string {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
-}
-
-function buildRandomExpeditionOffers(): Record<ExpeditionType, ExpeditionOffer> {
-  const offers: Record<ExpeditionType, ExpeditionOffer> = {
-    artifact: { type: 'artifact', rarity: 'common', icon: '', name: '', goldCost: 0, durationMs: 0, rewardsLabel: '' },
-    merchant: { type: 'merchant', rarity: 'common', icon: '', name: '', goldCost: 0, durationMs: 0, rewardsLabel: '' },
-    ruins: { type: 'ruins', rarity: 'common', icon: '', name: '', goldCost: 0, durationMs: 0, rewardsLabel: '' },
-    vault: { type: 'vault', rarity: 'common', icon: '', name: '', goldCost: 0, durationMs: 0, rewardsLabel: '' },
-    abyss: { type: 'abyss', rarity: 'common', icon: '', name: '', goldCost: 0, durationMs: 0, rewardsLabel: '' },
-  };
-
-  for (const type of EXPEDITION_TYPES) {
-    const rarity = EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)];
-    const rarityMeta = EXPEDITION_RARITY_META[rarity];
-    const typeMeta = EXPEDITION_TYPE_META[type];
-    offers[type] = {
-      type,
-      rarity,
-      icon: typeMeta.icon,
-      name: typeMeta.name,
-      goldCost: rarityMeta.goldCost,
-      durationMs: rarityMeta.durationMs,
-      rewardsLabel: rarityMeta.rewardsLabel,
-    };
-  }
-
-  return offers;
 }
 
 interface CharacterSlotSummary {
@@ -289,6 +251,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     batchLevelHeroes,
     upgradeFacility,
     startExpedition,
+    refreshExpeditionContracts,
     completeExpedition,
   } = useGameState(selectedCharacterClass ? getCharacterSaveSlot(accountName, selectedCharacterClass) : '__character_slot_preview__');
 
@@ -359,7 +322,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   // Timer tick for expedition countdown display
   const [timerTick, setTimerTick] = useState(0);
-  const [expeditionOffers, setExpeditionOffers] = useState<Record<ExpeditionType, ExpeditionOffer>>(() => buildRandomExpeditionOffers());
 
   useEffect(() => {
     let cancelled = false;
@@ -1239,12 +1201,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   // Manage expedition queue timer display (ticks every second to update countdown display)
   useEffect(() => {
-    if (state.expeditionQueue.length === 0) return;
+    const watchingExpeditionsTab = tab === 'guildhall' && guildhallSubTab === 'expeditions';
+    if (state.expeditionQueue.length === 0 && !watchingExpeditionsTab) return;
     const timer = setInterval(() => {
       setTimerTick(prev => prev + 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, [state.expeditionQueue]);
+  }, [state.expeditionQueue, tab, guildhallSubTab]);
 
 
   const isBossImminent = state.wave % 10 >= 8;
@@ -3397,22 +3360,48 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 )}
 
                 <View style={styles.expeditionStartSection}>
+                  {(() => {
+                    const nowMs = Date.now();
+                    const autoRefreshRemainingMs = Math.max(
+                      0,
+                      EXPEDITION_CONTRACT_REFRESH_MS - (nowMs - (state.expeditionContractsRefreshedAt ?? nowMs)),
+                    );
+                    const activeExpeditionTypes = new Set(state.expeditionQueue.map(exp => exp.type as ExpeditionType));
+                    const launchableTypes = EXPEDITION_TYPES.filter(type => !activeExpeditionTypes.has(type));
+                    const canAffordRefresh = state.gold >= EXPEDITION_CONTRACT_REFRESH_GOLD_COST;
+
+                    return (
+                      <>
                   <View style={styles.expeditionStartHeaderRow}>
                     <Text style={styles.expeditionStartTitle}>Launch Expedition</Text>
                     <Pressable
-                      style={styles.expeditionRefreshBtn}
-                      onPress={() => setExpeditionOffers(buildRandomExpeditionOffers())}
+                      style={[styles.expeditionRefreshBtn, !canAffordRefresh && styles.expeditionRefreshBtnDisabled]}
+                      disabled={!canAffordRefresh}
+                      onPress={refreshExpeditionContracts}
                     >
-                      <Text style={styles.expeditionRefreshBtnText}>Refresh Contracts</Text>
+                      <Text style={styles.expeditionRefreshBtnText}>Refresh ({fmt(EXPEDITION_CONTRACT_REFRESH_GOLD_COST)} 💰)</Text>
                     </Pressable>
                   </View>
-                  {EXPEDITION_TYPES.map(type => {
-                    const today = Math.floor(Date.now() / 86_400_000);
-                    const lastDay = state.lastExpeditionDay[type];
-                    const canStart = lastDay !== today;
-                    const cfg = expeditionOffers[type];
+                  <Text style={styles.expeditionRefreshTimerText}>
+                    Next free contract refresh in {formatDurationShort(autoRefreshRemainingMs)}
+                  </Text>
+                  {launchableTypes.length === 0 && (
+                    <Text style={styles.expeditionNoLaunchText}>All contracts are currently active. Claim one to launch a new run.</Text>
+                  )}
+                  {launchableTypes.map(type => {
+                    const rarity = state.expeditionContractOffers[type] ?? 'common';
+                    const typeMeta = EXPEDITION_TYPE_META[type];
+                    const rarityMeta = EXPEDITION_RARITY_META[rarity as ExpeditionRarity];
+                    const cfg = {
+                      icon: typeMeta.icon,
+                      name: typeMeta.name,
+                      rarity,
+                      goldCost: rarityMeta.goldCost,
+                      durationMs: rarityMeta.durationMs,
+                      rewardsLabel: rarityMeta.rewardsLabel,
+                    };
                     const hasGold = state.gold >= cfg.goldCost;
-                    const canStartNow = canStart && hasGold;
+                    const canStartNow = hasGold;
 
                     return (
                       <Pressable
@@ -3431,12 +3420,15 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                             {fmt(cfg.goldCost)} 💰
                           </Text>
                           <Text style={[styles.expeditionStartCardStatus, !canStartNow && styles.expeditionStartCardStatusDisabled]}>
-                            {!canStart ? 'Done' : hasGold ? 'Available' : 'Need Gold'}
+                            {hasGold ? 'Available' : 'Need Gold'}
                           </Text>
                         </View>
                       </Pressable>
                     );
                   })}
+                      </>
+                    );
+                  })()}
                 </View>
               </View>
             )}
@@ -8948,10 +8940,23 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
   },
+  expeditionRefreshBtnDisabled: {
+    opacity: 0.45,
+  },
   expeditionRefreshBtnText: {
     fontSize: 10,
     fontWeight: '700',
     color: '#D9ECFF',
+  },
+  expeditionRefreshTimerText: {
+    fontSize: 10,
+    color: '#A9C0E8',
+    fontWeight: '600',
+  },
+  expeditionNoLaunchText: {
+    fontSize: 10,
+    color: '#9CDEC0',
+    fontStyle: 'italic',
   },
   expeditionStartCard: {
     flexDirection: 'row',

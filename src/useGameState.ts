@@ -167,12 +167,18 @@ interface SummonHistoryEntry {
 type HeroFormationRole = 'front' | 'mid' | 'back';
 type CombatTempo = 1 | 2 | 4;
 type AutoTempoTarget = 2 | 4;
+type ExpeditionType = 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss';
+type ExpeditionRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
 type GoldShopOfferId = 'exp_cache' | 'potion_bundle' | 'armory_crate';
 type DiamondShopOfferId = 'coolant_i_pack' | 'coolant_ii_pack' | 'elite_supply';
 type DollarShopOfferId = 'usd_499' | 'usd_1999' | 'usd_4999' | 'usd_9999';
 
 const ACHIEVEMENT_BONUS_PER_UNLOCK = 0.03;
 const ACHIEVEMENT_BONUS_CAP = 0.75;
+export const EXPEDITION_CONTRACT_REFRESH_MS = 8 * 60 * 60 * 1000;
+export const EXPEDITION_CONTRACT_REFRESH_GOLD_COST = 100_000;
+const EXPEDITION_TYPES: ExpeditionType[] = ['artifact', 'merchant', 'ruins', 'vault', 'abyss'];
+const EXPEDITION_RARITIES: ExpeditionRarity[] = ['common', 'rare', 'epic', 'legendary', 'godly'];
 
 export interface GameState {
   playerName: string;
@@ -231,13 +237,15 @@ export interface GameState {
   // Expeditions
   expeditionQueue: Array<{
     id: string;
-    type: 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss';
-    rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
+    type: ExpeditionType;
+    rarity: ExpeditionRarity;
     startTime: number;
     durationMs: number;
     reward: { diamonds: number; shards: number; essence: number; artifacts: number };
   }>;
-  lastExpeditionDay: Record<'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss', number | null>;
+  lastExpeditionDay: Record<ExpeditionType, number | null>;
+  expeditionContractOffers: Record<ExpeditionType, ExpeditionRarity>;
+  expeditionContractsRefreshedAt: number;
 
   classMasteryXp: Record<PlayerClass, number>;
   seasonPoints: number;
@@ -370,6 +378,8 @@ const DEFAULT_STATE: GameState = {
     vault: null,
     abyss: null,
   },
+  expeditionContractOffers: rollExpeditionContractOffers(),
+  expeditionContractsRefreshedAt: Date.now(),
 
   classMasteryXp: {
     warrior: 0,
@@ -1698,6 +1708,30 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     abyss: payload.lastExpeditionDay?.abyss == null ? null : clampInt(payload.lastExpeditionDay.abyss, 0, currentDay, currentDay),
   };
 
+  const expeditionContractOffers: Record<ExpeditionType, ExpeditionRarity> = {
+    artifact: typeof payload.expeditionContractOffers?.artifact === 'string' && validExpeditionRarities.has(payload.expeditionContractOffers.artifact)
+      ? payload.expeditionContractOffers.artifact as ExpeditionRarity
+      : EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)],
+    merchant: typeof payload.expeditionContractOffers?.merchant === 'string' && validExpeditionRarities.has(payload.expeditionContractOffers.merchant)
+      ? payload.expeditionContractOffers.merchant as ExpeditionRarity
+      : EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)],
+    ruins: typeof payload.expeditionContractOffers?.ruins === 'string' && validExpeditionRarities.has(payload.expeditionContractOffers.ruins)
+      ? payload.expeditionContractOffers.ruins as ExpeditionRarity
+      : EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)],
+    vault: typeof payload.expeditionContractOffers?.vault === 'string' && validExpeditionRarities.has(payload.expeditionContractOffers.vault)
+      ? payload.expeditionContractOffers.vault as ExpeditionRarity
+      : EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)],
+    abyss: typeof payload.expeditionContractOffers?.abyss === 'string' && validExpeditionRarities.has(payload.expeditionContractOffers.abyss)
+      ? payload.expeditionContractOffers.abyss as ExpeditionRarity
+      : EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)],
+  };
+  const expeditionContractsRefreshedAt = clampInt(
+    payload.expeditionContractsRefreshedAt,
+    0,
+    now,
+    now,
+  );
+
   return {
     playerName,
     playerClass,
@@ -1749,6 +1783,8 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     guildhallFacilities,
     expeditionQueue,
     lastExpeditionDay,
+    expeditionContractOffers,
+    expeditionContractsRefreshedAt,
     classMasteryXp,
     seasonPoints,
     bestSeasonPoints,
@@ -2232,6 +2268,32 @@ function applyBurst(state: GameState, hits: number): GameState {
   return queueCombatLog(working, `Burst unleashed for ${burstHits} amplified strikes`);
 }
 
+function rollExpeditionContractOffers(): Record<ExpeditionType, ExpeditionRarity> {
+  const offers = {
+    artifact: 'common',
+    merchant: 'common',
+    ruins: 'common',
+    vault: 'common',
+    abyss: 'common',
+  } as Record<ExpeditionType, ExpeditionRarity>;
+
+  for (const type of EXPEDITION_TYPES) {
+    offers[type] = EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)];
+  }
+
+  return offers;
+}
+
+function maybeAutoRefreshExpeditionContracts(state: GameState, nowMs: number): GameState {
+  if (!Number.isFinite(state.expeditionContractsRefreshedAt)) return state;
+  if (nowMs - state.expeditionContractsRefreshedAt < EXPEDITION_CONTRACT_REFRESH_MS) return state;
+  return {
+    ...state,
+    expeditionContractOffers: rollExpeditionContractOffers(),
+    expeditionContractsRefreshedAt: nowMs,
+  };
+}
+
 type Action =
   | { type: 'CREATE_CHARACTER'; name: string; playerClass: PlayerClass }
   | { type: 'QUEST_EVENT'; event: TutorialEvent }
@@ -2296,7 +2358,8 @@ type Action =
   | { type: 'CLEAR_REWARD_POPUP' }
   | { type: 'BATCH_LEVEL_HEROES'; heroIds: string[]; addLevels: number | 'max' }
   | { type: 'UPGRADE_FACILITY'; facilityId: 'training' | 'treasury' | 'forge' | 'tactics' }
-  | { type: 'START_EXPEDITION'; expeditionType: 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss'; offeredRarity?: 'common' | 'rare' | 'epic' | 'legendary' | 'godly' }
+  | { type: 'START_EXPEDITION'; expeditionType: ExpeditionType; offeredRarity?: ExpeditionRarity }
+  | { type: 'REFRESH_EXPEDITION_CONTRACTS' }
   | { type: 'COMPLETE_EXPEDITION'; expeditionId: string }
   | { type: 'LOAD'; payload: Partial<SaveData> };
 
@@ -2335,9 +2398,10 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'TICK': {
       if (!state.characterCreated) return state;
+      const refreshedState = maybeAutoRefreshExpeditionContracts(state, Date.now());
       const withAutoTempo = state.autoTempoEnabled && state.combatHeat <= 0 && state.combatTempo === 1
-        ? { ...state, combatTempo: state.autoTempoTarget }
-        : state;
+        ? { ...refreshedState, combatTempo: refreshedState.autoTempoTarget }
+        : refreshedState;
       const scaledElapsed = action.elapsed * withAutoTempo.combatTempo;
       let working = decayBuffs(withAutoTempo, scaledElapsed);
       working = tickHeroActives(working, scaledElapsed);
@@ -3463,14 +3527,12 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'START_EXPEDITION': {
-      const today = toDayNumber(Date.now());
-      const lastDay = state.lastExpeditionDay[action.expeditionType];
-      if (lastDay === today) return state;
+      const refreshedState = maybeAutoRefreshExpeditionContracts(state, Date.now());
 
       const rarityPool = ['common', 'rare', 'epic', 'legendary', 'godly'] as const;
       const rarity = action.offeredRarity && rarityPool.includes(action.offeredRarity)
         ? action.offeredRarity
-        : rarityPool[Math.floor(Math.random() * rarityPool.length)];
+        : refreshedState.expeditionContractOffers[action.expeditionType] ?? rarityPool[Math.floor(Math.random() * rarityPool.length)];
 
       const configByRarity: Record<typeof rarityPool[number], { goldCost: number; durationMs: number; reward: { diamonds: number; shards: number; essence: number; artifacts: number } }> = {
         common: {
@@ -3501,15 +3563,15 @@ function reducer(state: GameState, action: Action): GameState {
       };
 
       const config = configByRarity[rarity];
-      if (!config || state.gold < config.goldCost) return state;
+      if (!config || refreshedState.gold < config.goldCost) return refreshedState;
 
       const expeditionId = `exp_${action.expeditionType}_${Date.now()}`;
 
       return {
-        ...state,
-        gold: state.gold - config.goldCost,
+        ...refreshedState,
+        gold: refreshedState.gold - config.goldCost,
         expeditionQueue: [
-          ...state.expeditionQueue,
+          ...refreshedState.expeditionQueue,
           {
             id: expeditionId,
             type: action.expeditionType as any,
@@ -3519,10 +3581,18 @@ function reducer(state: GameState, action: Action): GameState {
             reward: config.reward,
           },
         ],
-        lastExpeditionDay: {
-          ...state.lastExpeditionDay,
-          [action.expeditionType]: today,
-        },
+      };
+    }
+
+    case 'REFRESH_EXPEDITION_CONTRACTS': {
+      const refreshedState = maybeAutoRefreshExpeditionContracts(state, Date.now());
+      if (refreshedState.gold < EXPEDITION_CONTRACT_REFRESH_GOLD_COST) return refreshedState;
+
+      return {
+        ...refreshedState,
+        gold: refreshedState.gold - EXPEDITION_CONTRACT_REFRESH_GOLD_COST,
+        expeditionContractOffers: rollExpeditionContractOffers(),
+        expeditionContractsRefreshedAt: Date.now(),
       };
     }
 
@@ -3895,7 +3965,7 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'LOAD': {
       const p = sanitizeSaveData(action.payload);
-      return {
+      return maybeAutoRefreshExpeditionContracts({
         ...DEFAULT_STATE,
         playerName: p.playerName,
         playerClass: p.playerClass,
@@ -3949,6 +4019,8 @@ function reducer(state: GameState, action: Action): GameState {
         guildhallFacilities: p.guildhallFacilities ?? DEFAULT_STATE.guildhallFacilities,
         expeditionQueue: p.expeditionQueue ?? DEFAULT_STATE.expeditionQueue,
         lastExpeditionDay: p.lastExpeditionDay ?? DEFAULT_STATE.lastExpeditionDay,
+        expeditionContractOffers: p.expeditionContractOffers ?? DEFAULT_STATE.expeditionContractOffers,
+        expeditionContractsRefreshedAt: p.expeditionContractsRefreshedAt ?? DEFAULT_STATE.expeditionContractsRefreshedAt,
         classMasteryXp: p.classMasteryXp,
         seasonPoints: p.seasonPoints,
         bestSeasonPoints: p.bestSeasonPoints,
@@ -4002,7 +4074,7 @@ function reducer(state: GameState, action: Action): GameState {
         damageReductionBuffPct: p.damageReductionBuffPct,
         damageReductionBuffMs: p.damageReductionBuffMs,
         heroActiveCdMs: p.heroActiveCdMs,
-      };
+      }, Date.now());
     }
 
     default:
@@ -4062,7 +4134,9 @@ interface SaveData {
 
   guildhallFacilities?: Record<'training' | 'treasury' | 'forge' | 'tactics', { level: number }>;
   expeditionQueue?: Array<any>;
-  lastExpeditionDay?: Record<'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss', number | null>;
+  lastExpeditionDay?: Record<ExpeditionType, number | null>;
+  expeditionContractOffers?: Record<ExpeditionType, ExpeditionRarity>;
+  expeditionContractsRefreshedAt?: number;
 
   classMasteryXp: Record<PlayerClass, number>;
   seasonPoints: number;
@@ -4168,6 +4242,8 @@ function serialize(state: GameState): SaveData {
     guildhallFacilities: state.guildhallFacilities,
     expeditionQueue: state.expeditionQueue,
     lastExpeditionDay: state.lastExpeditionDay,
+    expeditionContractOffers: state.expeditionContractOffers,
+    expeditionContractsRefreshedAt: state.expeditionContractsRefreshedAt,
     classMasteryXp: state.classMasteryXp,
     seasonPoints: state.seasonPoints,
     bestSeasonPoints: state.bestSeasonPoints,
@@ -4558,6 +4634,10 @@ export function useGameState(saveSlot: string = 'default') {
     dispatch({ type: 'START_EXPEDITION', expeditionType, offeredRarity });
   }, []);
 
+  const refreshExpeditionContracts = useCallback(() => {
+    dispatch({ type: 'REFRESH_EXPEDITION_CONTRACTS' });
+  }, []);
+
   const completeExpedition = useCallback((expeditionId: string) => {
     dispatch({ type: 'COMPLETE_EXPEDITION', expeditionId });
   }, []);
@@ -4592,6 +4672,7 @@ export function useGameState(saveSlot: string = 'default') {
     batchLevelHeroes,
     upgradeFacility,
     startExpedition,
+    refreshExpeditionContracts,
     completeExpedition,
     recycleHero,
     autoRecycleHeroes,
