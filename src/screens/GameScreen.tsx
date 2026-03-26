@@ -68,10 +68,6 @@ type ShopTab = 'diamond' | 'gold' | 'dollar';
 type ExpeditionType = 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss';
 type ExpeditionRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
 
-type HubLegacyTab = 'warroom' | 'achievements' | 'guildhall';
-
-const HUB_LEGACY_TABS: HubLegacyTab[] = ['warroom', 'achievements', 'guildhall'];
-
 type MomentCue = 'none' | 'mythic' | 'boss' | 'rebirth' | 'ultimate';
 
 type SummonReveal = {
@@ -262,8 +258,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   } = useGameState(selectedCharacterClass ? getCharacterSaveSlot(accountName, selectedCharacterClass) : '__character_slot_preview__');
 
   const [tab, setTab] = useState<Tab>('warroom');
-  const [mobileTab, setMobileTab] = useState<BottomTabType>('hub');
-  const [lastHubTab, setLastHubTab] = useState<HubLegacyTab>('warroom');
   const [rebirthOpen, setRebirthOpen] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [draftClass, setDraftClass] = useState<PlayerClass>('warrior');
@@ -877,22 +871,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     if (forceBuildTeamStep && heroesSubTab !== 'roster') setHeroesSubTab('roster');
   }, [state.tutorialEnabled, currentQuest, forceFreeSummonStep, forceBuildTeamStep, heroesSubTab]);
 
-  const mapLegacyToMobileTab = (legacyTab: Tab): BottomTabType => {
-    if (legacyTab === 'battle') return 'battle';
-    if (legacyTab === 'heroes') return 'heroes';
-    if (legacyTab === 'stats') return 'progression';
-    if (legacyTab === 'equipment') return 'armory';
-    return 'hub';
-  };
-
   const onTabChange = (nextTab: Tab) => {
     if (tutorialTargetTab && nextTab !== tutorialTargetTab) return;
     setTab(nextTab);
-    const nextMobileTab = mapLegacyToMobileTab(nextTab);
-    setMobileTab(nextMobileTab);
-    if (HUB_LEGACY_TABS.includes(nextTab as HubLegacyTab)) {
-      setLastHubTab(nextTab as HubLegacyTab);
-    }
     const eventMap: Record<Tab, TutorialEvent | null> = {
       warroom: null,
       battle: 'open_battle_tab',
@@ -904,20 +885,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     };
     const event = eventMap[nextTab];
     if (event) notifyQuestEvent(event);
-  };
-
-  const onMobileTabChange = (nextMobileTab: BottomTabType) => {
-    if (nextMobileTab === mobileTab) return;
-    if (nextMobileTab === 'battle') onTabChange('battle');
-    else if (nextMobileTab === 'heroes') onTabChange('heroes');
-    else if (nextMobileTab === 'progression') onTabChange('stats');
-    else if (nextMobileTab === 'armory') onTabChange('equipment');
-    else {
-      const tutorialHubTarget = tutorialTargetTab && HUB_LEGACY_TABS.includes(tutorialTargetTab as HubLegacyTab)
-        ? (tutorialTargetTab as HubLegacyTab)
-        : null;
-      onTabChange(tutorialHubTarget ?? lastHubTab);
-    }
   };
 
   const getDiceOutcome = (roll: number) => {
@@ -1131,22 +1098,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   };
 
   const renderCommandDeck = () => {
-    const hubNotificationCount =
-      (hasWarRoomNotification ? 1 : 0)
-      + (hasAchievementsNotification ? 1 : 0)
-      + (state.expeditionQueue.length > 0 ? 1 : 0);
-
-    const notifications: Partial<Record<BottomTabType, number>> = {
+    const notifications: Partial<Record<Tab, number>> = {
+      warroom: hasWarRoomNotification ? 1 : 0,
       heroes: hasGachaNotification ? 1 : 0,
-      progression: hasStatsNotification ? 1 : 0,
-      armory: hasEquipmentNotification ? 1 : 0,
-      hub: hubNotificationCount,
+      stats: hasStatsNotification ? 1 : 0,
+      achievements: hasAchievementsNotification ? 1 : 0,
+      equipment: hasEquipmentNotification ? 1 : 0,
+      guildhall: state.expeditionQueue.length > 0 ? 1 : 0,
     };
 
     return (
       <BottomNavigation
-        activeTab={mobileTab}
-        onTabChange={onMobileTabChange}
+        activeTab={tab as BottomTabType}
+        onTabChange={(nextTab: BottomTabType) => onTabChange(nextTab as Tab)}
         notifications={notifications}
       />
     );
@@ -1407,6 +1371,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         playerClass={`${stats.className} • Lv ${state.level}`}
         gold={state.gold}
         diamonds={state.diamonds}
+        bossTearsOrdered={state.bossTears}
+        essenceShards={state.essence}
         dps={Math.max(1, Math.floor(stats.dps))}
         power={teamPowerIndex}
         onActionPress={(action) => {
@@ -7590,7 +7556,7 @@ const styles = StyleSheet.create({
   bottomSheetBox: {
     width: '100%',
     maxWidth: 900,
-    maxHeight: '88%',
+    maxHeight: '70%',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderBottomLeftRadius: 0,

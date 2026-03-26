@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet, Pressable, Text, Platform } from 'react-native';
 import { THEME, SPACING, RADIUS, Z_INDEX } from '../theme';
 
-export type BottomTabType = 'battle' | 'heroes' | 'progression' | 'armory' | 'hub';
+export type BottomTabType = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'guildhall';
 
 interface BottomNavigationProps {
   activeTab: BottomTabType;
@@ -11,11 +11,13 @@ interface BottomNavigationProps {
 }
 
 const TAB_CONFIG: Record<BottomTabType, { icon: string; label: string }> = {
+  warroom: { icon: '🎖️', label: 'War' },
   battle: { icon: '⚔️', label: 'Battle' },
   heroes: { icon: '👥', label: 'Heroes' },
-  progression: { icon: '📊', label: 'Growth' },
-  armory: { icon: '🎒', label: 'Armory' },
-  hub: { icon: '⚓', label: 'Hub' },
+  stats: { icon: '📊', label: 'Stats' },
+  achievements: { icon: '🏆', label: 'Achv' },
+  equipment: { icon: '🎒', label: 'Gear' },
+  guildhall: { icon: '🏛️', label: 'Guild' },
 };
 
 export default function BottomNavigation({ activeTab, onTabChange, notifications = {} }: BottomNavigationProps) {

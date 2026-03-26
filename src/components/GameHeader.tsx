@@ -7,6 +7,8 @@ interface GameHeaderProps {
   playerClass: string;
   gold: number;
   diamonds: number;
+  bossTearsOrdered: number;
+  essenceShards: number;
   dps: number;
   power: number;
   onActionPress: (action: 'stats' | 'shop' | 'settings' | 'events') => void;
@@ -17,6 +19,8 @@ export default function GameHeader({
   playerClass,
   gold,
   diamonds,
+  bossTearsOrdered,
+  essenceShards,
   dps,
   power,
   onActionPress,
@@ -51,6 +55,14 @@ export default function GameHeader({
         <Pressable style={styles.resourceChip} onPress={() => {}}>
           <Text style={styles.resourceIcon}>💎</Text>
           <Text style={styles.resourceValue}>{formatNumber(diamonds)}</Text>
+        </Pressable>
+        <Pressable style={styles.resourceChip} onPress={() => {}}>
+          <Text style={styles.resourceIcon}>😭</Text>
+          <Text style={styles.resourceValue}>{formatNumber(bossTearsOrdered)}</Text>
+        </Pressable>
+        <Pressable style={styles.resourceChip} onPress={() => {}}>
+          <Text style={styles.resourceIcon}>✨</Text>
+          <Text style={styles.resourceValue}>{formatNumber(essenceShards)}</Text>
         </Pressable>
       </View>
 
@@ -106,8 +118,8 @@ const styles = StyleSheet.create({
   },
 
   left: {
-    flex: 0.4,
-    minWidth: 60,
+    flex: 0.2,
+    minWidth: 50,
   },
   playerName: {
     ...TYPOGRAPHY.section,
@@ -121,27 +133,28 @@ const styles = StyleSheet.create({
   },
 
   center: {
-    flex: 0.3,
+    flex: 0.5,
     flexDirection: 'row',
     gap: SPACING.xs,
   },
   resourceChip: {
     flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: THEME.card.default,
     borderRadius: RADIUS.md,
     paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.sm,
-    gap: 3,
+    paddingHorizontal: SPACING.xs,
+    gap: 2,
     borderWidth: 1,
     borderColor: THEME.surface.border,
   },
   resourceIcon: {
-    fontSize: 12,
+    fontSize: 10,
   },
   resourceValue: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '700',
     color: THEME.text.primary,
   },
