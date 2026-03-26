@@ -122,6 +122,22 @@ export const ACH_BONUS_CAP_PCT = 75;
 const FEEDBACK_FORM_URL = 'https://forms.gle/replace-with-your-beta-form';
 const HAS_BETA_FEEDBACK_FORM = !FEEDBACK_FORM_URL.includes('replace-with-your-beta-form');
 const GEAR_RARITY_POINTS: Record<string, number> = { common: 40, rare: 90, epic: 170, legendary: 280, mythic: 430, transcendent: 680 };
+
+function scoreEquipmentForClass(item: { rarity: string; bonus: Record<string, number | undefined | null> }, playerClass: PlayerClass | null): number {
+  const cls = getClassConfig(playerClass ?? 'warrior');
+  const statWeights = {
+    strength: cls.physWeight,
+    vitality: cls.teamWeight,
+    agility: playerClass === 'archer' ? cls.physWeight * 1.15 : cls.physWeight * 0.65,
+    intelligence: cls.magicWeight,
+    spirit: cls.magicWeight * 0.7 + cls.teamWeight * 0.35,
+  };
+  const statScore = Object.entries(item.bonus).reduce((sum, [key, value]) => {
+    const weight = statWeights[key as keyof typeof statWeights] ?? 0;
+    return sum + (value ?? 0) * weight;
+  }, 0);
+  return statScore * 12 + (GEAR_RARITY_POINTS[item.rarity] ?? 0);
+}
 const VIP_LEVEL_THRESHOLDS = [0, 50, 150, 350, 700, 1500, 3000, 6500, 15000, 35000, 100000] as const;
 const GOLD_SHOP_OFFERS = [
   { id: 'exp_cache', name: 'Training Cache', desc: '+6 Training Scrolls', cost: 2800 },
@@ -560,31 +576,32 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   }, [canRebirthNow, state.activeTeamHeroIds.length, state.unspentStatPoints, missionCards, currentAct.bossWave, teamSlotCap]);
   const nextGuidance = guidanceList[0];
   const extraGuidanceCount = Math.max(0, guidanceList.length - 1);
+  const equipmentInventory = state.equipmentInventory ?? {};
+  const getOwnedEquipmentItem = (id: string | null) => (id ? equipmentInventory[id] ?? getEquipmentItem(id) : null);
   const equippedItemsForScore = useMemo(
-    () => Object.values(state.equippedItems).map(id => (id ? getEquipmentItem(id) : null)).filter(Boolean),
-    [state.equippedItems],
+    () => Object.values(state.equippedItems).map(id => getOwnedEquipmentItem(id)).filter(Boolean),
+    [state.equippedItems, state.equipmentInventory],
   );
   const gearScore = useMemo(() => {
     return equippedItemsForScore.reduce((sum, item) => {
       if (!item) return sum;
-      const statValue = Object.values(item.bonus).reduce((s, v) => s + (v ?? 0), 0);
-      return sum + (GEAR_RARITY_POINTS[item.rarity] ?? 0) + statValue * 12;
+      return sum + scoreEquipmentForClass(item, state.playerClass);
     }, 0);
-  }, [equippedItemsForScore]);
+  }, [equippedItemsForScore, state.playerClass]);
   const gearScoreRows = useMemo(() => {
     return equippedItemsForScore.map(item => {
       if (!item) return null;
       const rarityPoints = GEAR_RARITY_POINTS[item.rarity] ?? 0;
-      const statValue = Object.values(item.bonus).reduce((s, v) => s + (v ?? 0), 0);
+      const statValue = Object.values(item.bonus).reduce((s: number, v) => s + Number(v ?? 0), 0);
       const statPoints = statValue * 12;
       return {
         name: item.name ?? item.id,
         rarityPoints,
         statPoints,
-        total: rarityPoints + statPoints,
+        total: scoreEquipmentForClass(item, state.playerClass),
       };
     }).filter((row): row is { name: string; rarityPoints: number; statPoints: number; total: number } => !!row);
-  }, [equippedItemsForScore]);
+  }, [equippedItemsForScore, state.playerClass]);
   const dpsBreakdown = useMemo(() => getDpsBreakdown(state), [state]);
   const powerFromDps = stats.dps * 0.45;
   const powerFromHp = state.teamMaxHp * 0.25;
@@ -1046,18 +1063,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   const optimizeEquipment = () => {
     const slots: EquipmentSlot[] = ['weapon', 'armor', 'accessory'];
-    const rarityOrder: Record<string, number> = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4 };
     slots.forEach(slot => {
       const slotItems = state.inventoryItemIds
-        .map(id => getEquipmentItem(id))
-        .filter((item): item is NonNullable<ReturnType<typeof getEquipmentItem>> => !!item && item.slot === slot);
+        .map(id => equipmentInventory[id] ?? getEquipmentItem(id))
+        .filter(item => !!item && item.slot === slot);
       if (slotItems.length === 0) return;
       const best = [...slotItems].sort((a, b) => {
-        const rd = (rarityOrder[b.rarity] ?? 0) - (rarityOrder[a.rarity] ?? 0);
-        if (rd !== 0) return rd;
-        const aVal = Object.values(a.bonus).reduce((s, v) => s + (v ?? 0), 0);
-        const bVal = Object.values(b.bonus).reduce((s, v) => s + (v ?? 0), 0);
-        return bVal - aVal;
+        return scoreEquipmentForClass(b, state.playerClass) - scoreEquipmentForClass(a, state.playerClass);
       })[0];
       if (best) equipItem(best.id);
     });
@@ -1725,7 +1737,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             setCompareItemId,
             shardForgeCosts,
             getEquipmentCraftCost,
-            getEquipmentItem,
+            getEquipmentItem: getOwnedEquipmentItem,
             getUpgradePlan,
             equipmentRarityConfig,
             optimizeEquipment,

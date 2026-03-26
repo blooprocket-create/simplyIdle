@@ -7,6 +7,7 @@ interface EquippedItem {
 
 interface GameState {
   equippedItems: Record<string, string | null>;
+  equipmentInventory: Record<string, Equipment>;
 }
 
 interface Equipment {
@@ -34,8 +35,10 @@ export interface GearScoreRow {
 
 export function useGearScore(state: GameState) {
   const equippedItemsForScore = useMemo(
-    () => Object.values(state.equippedItems).map(id => (id ? getEquipmentItem(id) : null)).filter(Boolean) as Equipment[],
-    [state.equippedItems],
+    () => Object.values(state.equippedItems)
+      .map(id => (id ? state.equipmentInventory[id] ?? getEquipmentItem(id) : null))
+      .filter(Boolean) as Equipment[],
+    [state.equippedItems, state.equipmentInventory],
   );
 
   const gearScore = useMemo(() => {

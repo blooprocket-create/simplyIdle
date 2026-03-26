@@ -46,6 +46,8 @@ import {
   getStarterEquipmentForClass,
   EQUIPMENT_CATALOG,
   equipmentRarityConfig,
+  EquipmentItem,
+  EquipmentRarity,
   getUsableItem,
   rollUsableItem,
   rollEquipmentRarityByTier,
@@ -291,6 +293,7 @@ export interface GameState {
   dollarFirstPurchaseClaimedOfferIds: DollarShopOfferId[];
 
   inventoryItemIds: string[];
+  equipmentInventory: Record<string, EquipmentInstance>;
   equippedItems: Record<EquipmentSlot, string | null>;
   usableItemCounts: Record<string, number>;
   autoUsePotionEnabled: boolean;
@@ -334,6 +337,22 @@ const blankStats: StatBlock = {
   intelligence: 0,
   spirit: 0,
 };
+
+type EquipmentSource = 'starter' | 'drop' | 'craft' | 'crate' | 'upgrade' | 'legacy';
+
+export interface EquipmentInstance {
+  id: string;
+  baseItemId: string;
+  name: string;
+  emoji: string;
+  slot: EquipmentSlot;
+  rarity: EquipmentRarity;
+  allowedClasses: PlayerClass[];
+  description: string;
+  bonus: Partial<StatBlock>;
+  itemLevel: number;
+  source: EquipmentSource;
+}
 
 const DEFAULT_STATE: GameState = {
   playerName: '',
@@ -431,6 +450,7 @@ const DEFAULT_STATE: GameState = {
   dollarFirstPurchaseClaimedOfferIds: [],
 
   inventoryItemIds: [],
+  equipmentInventory: {},
   equippedItems: {
     weapon: null,
     armor: null,
@@ -478,6 +498,171 @@ function sumStats(a: StatBlock, b: StatBlock): StatBlock {
   };
 }
 
+function sumBonusStats(bonus: Partial<StatBlock>): number {
+  return (bonus.strength ?? 0)
+    + (bonus.vitality ?? 0)
+    + (bonus.agility ?? 0)
+    + (bonus.intelligence ?? 0)
+    + (bonus.spirit ?? 0);
+}
+
+function getEquipmentEntry(state: GameState, itemId: string): EquipmentInstance | EquipmentItem | null {
+  return state.equipmentInventory[itemId] ?? getEquipmentItem(itemId) ?? null;
+}
+
+function equipmentBudgetFor(baseItem: EquipmentItem, itemLevel: number): number {
+  const rarityMultiplier: Record<EquipmentRarity, number> = {
+    common: 1,
+    rare: 1.25,
+    epic: 1.6,
+    legendary: 2,
+    mythic: 2.55,
+    transcendent: 3.1,
+  };
+  const slotMultiplier: Record<EquipmentSlot, number> = {
+    weapon: 1.18,
+    armor: 1.08,
+    accessory: 1,
+  };
+  const levelMultiplier = 1 + Math.max(0, itemLevel - 1) * 0.07;
+  return Math.max(2, Math.round(sumBonusStats(baseItem.bonus) * rarityMultiplier[baseItem.rarity] * slotMultiplier[baseItem.slot] * levelMultiplier));
+}
+
+function getEquipmentStatWeights(playerClass: PlayerClass, slot: EquipmentSlot): Record<keyof StatBlock, number> {
+  const cls = getClassConfig(playerClass);
+  const offenseWeight = slot === 'weapon' ? 1.2 : slot === 'accessory' ? 1 : 0.82;
+  const defenseWeight = slot === 'armor' ? 1.2 : slot === 'accessory' ? 0.95 : 0.8;
+  const utilityWeight = slot === 'accessory' ? 1.15 : 0.9;
+  return {
+    strength: Math.max(0.15, cls.physWeight * offenseWeight),
+    vitality: Math.max(0.15, cls.teamWeight * defenseWeight),
+    agility: Math.max(0.15, (playerClass === 'archer' ? cls.physWeight * 1.18 : cls.physWeight * 0.62) * utilityWeight),
+    intelligence: Math.max(0.15, cls.magicWeight * offenseWeight),
+    spirit: Math.max(0.15, (cls.magicWeight * 0.72 + cls.teamWeight * 0.38) * utilityWeight),
+  };
+}
+
+function randomizeEquipmentBonus(baseItem: EquipmentItem, itemLevel: number): Partial<StatBlock> {
+  const playerClass = baseItem.allowedClasses[0] ?? 'warrior';
+  const weights = getEquipmentStatWeights(playerClass, baseItem.slot);
+  const keys = Object.keys(weights) as Array<keyof StatBlock>;
+  const budget = equipmentBudgetFor(baseItem, itemLevel);
+  const rolledWeights = keys.reduce<Record<keyof StatBlock, number>>((acc, key) => {
+    acc[key] = weights[key] * (0.82 + Math.random() * 0.45);
+    return acc;
+  }, { strength: 0, vitality: 0, agility: 0, intelligence: 0, spirit: 0 });
+  const totalWeight = keys.reduce((sum, key) => sum + rolledWeights[key], 0);
+  const bonus: Partial<StatBlock> = {};
+  let assigned = 0;
+
+  keys.forEach((key, index) => {
+    const remaining = budget - assigned;
+    if (remaining <= 0) return;
+    const rawValue = index === keys.length - 1
+      ? remaining
+      : Math.max(0, Math.round((budget * rolledWeights[key]) / totalWeight));
+    const value = Math.min(remaining, rawValue);
+    if (value > 0) {
+      bonus[key] = value;
+      assigned += value;
+    }
+  });
+
+  const anchorStats = Object.entries(baseItem.bonus)
+    .filter(([, value]) => (value ?? 0) > 0)
+    .map(([key]) => key as keyof StatBlock);
+  for (const statKey of anchorStats) {
+    bonus[statKey] = Math.max(1, bonus[statKey] ?? 0);
+  }
+
+  return bonus;
+}
+
+function createEquipmentInstance(baseItem: EquipmentItem, itemLevel: number, source: EquipmentSource): EquipmentInstance {
+  const instanceId = `eq_${source}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const clampedLevel = Math.max(1, Math.floor(itemLevel));
+  return {
+    id: instanceId,
+    baseItemId: baseItem.id,
+    name: baseItem.name,
+    emoji: baseItem.emoji,
+    slot: baseItem.slot,
+    rarity: baseItem.rarity,
+    allowedClasses: [...baseItem.allowedClasses],
+    description: baseItem.description,
+    bonus: randomizeEquipmentBonus(baseItem, clampedLevel),
+    itemLevel: clampedLevel,
+    source,
+  };
+}
+
+function getEquipmentScrapGain(item: EquipmentInstance | EquipmentItem): number {
+  const baseValue = equipmentScrapValue(item.rarity);
+  if (!('source' in item)) return baseValue;
+  const sourceMultiplier: Record<EquipmentSource, number> = {
+    starter: 0.2,
+    drop: 1,
+    craft: 0.42,
+    crate: 0.58,
+    upgrade: 0.5,
+    legacy: 0.9,
+  };
+  return Math.max(1, Math.floor(baseValue * sourceMultiplier[item.source]));
+}
+
+function migrateLegacyEquipmentIds(
+  inventoryItemIds: string[],
+  equippedItems: Record<EquipmentSlot, string | null>,
+  equipmentInventory: Record<string, EquipmentInstance>,
+  playerLevel: number,
+): {
+  inventoryItemIds: string[];
+  equippedItems: Record<EquipmentSlot, string | null>;
+  equipmentInventory: Record<string, EquipmentInstance>;
+} {
+  const nextInventory = { ...equipmentInventory };
+  const legacyMap = new Map<string, string>();
+  const migratedInventoryIds: string[] = [];
+
+  for (const itemId of inventoryItemIds) {
+    if (nextInventory[itemId]) {
+      migratedInventoryIds.push(itemId);
+      continue;
+    }
+    const baseItem = getEquipmentItem(itemId);
+    if (!baseItem) continue;
+    let migratedId = legacyMap.get(itemId);
+    if (!migratedId) {
+      const instance = createEquipmentInstance(baseItem, playerLevel, 'legacy');
+      nextInventory[instance.id] = instance;
+      migratedId = instance.id;
+      legacyMap.set(itemId, migratedId);
+    }
+    if (migratedId) {
+      migratedInventoryIds.push(migratedId);
+    }
+  }
+
+  const migratedEquipped = { ...equippedItems };
+  for (const slot of ['weapon', 'armor', 'accessory'] as EquipmentSlot[]) {
+    const equippedId = migratedEquipped[slot];
+    if (!equippedId) continue;
+    if (nextInventory[equippedId]) continue;
+    const mappedId = legacyMap.get(equippedId);
+    if (mappedId && nextInventory[mappedId]?.slot === slot) {
+      migratedEquipped[slot] = mappedId;
+      continue;
+    }
+    migratedEquipped[slot] = null;
+  }
+
+  return {
+    inventoryItemIds: migratedInventoryIds,
+    equippedItems: migratedEquipped,
+    equipmentInventory: nextInventory,
+  };
+}
+
 function getEquipmentBonusStats(state: GameState): StatBlock {
   const bonus: StatBlock = {
     strength: 0,
@@ -489,7 +674,7 @@ function getEquipmentBonusStats(state: GameState): StatBlock {
 
   for (const itemId of Object.values(state.equippedItems)) {
     if (!itemId) continue;
-    const item = getEquipmentItem(itemId);
+    const item = getEquipmentEntry(state, itemId);
     if (!item) continue;
     bonus.strength += item.bonus.strength ?? 0;
     bonus.vitality += item.bonus.vitality ?? 0;
@@ -1313,7 +1498,8 @@ function getEquipmentUpgradePlan(state: GameState, itemId: string): {
   goldCost: number;
   reason?: string;
 } {
-  const item = getEquipmentItem(itemId);
+  const ownedItem = getEquipmentEntry(state, itemId);
+  const item = ownedItem && 'baseItemId' in ownedItem ? getEquipmentItem(ownedItem.baseItemId) : ownedItem;
   if (!item) {
     return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, goldCost: 0, reason: 'Missing item' };
   }
@@ -1540,6 +1726,46 @@ function sanitizeLoadedHero(raw: unknown, index: number): HeroUnit | null {
   });
 }
 
+function sanitizeEquipmentInventoryRecord(raw: unknown, fallbackLevel: number): Record<string, EquipmentInstance> {
+  const inventory: Record<string, EquipmentInstance> = {};
+  if (!isRecord(raw)) return inventory;
+
+  for (const [instanceId, entry] of Object.entries(raw)) {
+    if (!isRecord(entry)) continue;
+    const bonusRecord = isRecord(entry.bonus) ? entry.bonus : {};
+    const baseItemId = typeof entry.baseItemId === 'string' ? entry.baseItemId : null;
+    const baseItem = baseItemId ? getEquipmentItem(baseItemId) : null;
+    if (!baseItem) continue;
+    const rarity = typeof entry.rarity === 'string' && EQUIP_RARITY_ORDER.includes(entry.rarity as EquipmentRarity)
+      ? entry.rarity as EquipmentRarity
+      : baseItem.rarity;
+    const source = typeof entry.source === 'string' && ['starter', 'drop', 'craft', 'crate', 'upgrade', 'legacy'].includes(entry.source)
+      ? entry.source as EquipmentSource
+      : 'legacy';
+    inventory[instanceId] = {
+      id: instanceId,
+      baseItemId: baseItem.id,
+      name: clampString(entry.name, baseItem.name, 80) || baseItem.name,
+      emoji: clampString(entry.emoji, baseItem.emoji, 4) || baseItem.emoji,
+      slot: baseItem.slot,
+      rarity,
+      allowedClasses: [...baseItem.allowedClasses],
+      description: clampString(entry.description, baseItem.description, 160) || baseItem.description,
+      bonus: {
+        strength: clampInt(bonusRecord.strength, 0, SAFE_INTEGER_CAP, 0),
+        vitality: clampInt(bonusRecord.vitality, 0, SAFE_INTEGER_CAP, 0),
+        agility: clampInt(bonusRecord.agility, 0, SAFE_INTEGER_CAP, 0),
+        intelligence: clampInt(bonusRecord.intelligence, 0, SAFE_INTEGER_CAP, 0),
+        spirit: clampInt(bonusRecord.spirit, 0, SAFE_INTEGER_CAP, 0),
+      },
+      itemLevel: clampInt(entry.itemLevel, 1, MAX_SAVE_PLAYER_LEVEL, fallbackLevel),
+      source,
+    };
+  }
+
+  return inventory;
+}
+
 function sanitizeSaveData(payload: Partial<SaveData>) {
   const now = Date.now();
   const currentWeek = weekNumberForTimestamp(now);
@@ -1628,8 +1854,10 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     monk: clampInt(payload.classMasteryXp?.monk, 0, SAFE_INTEGER_CAP, 0),
   };
 
-  const inventoryItemIds = sanitizeStringList(payload.inventoryItemIds, MAX_SAVE_COLLECTION)
-    .filter(itemId => !!getEquipmentItem(itemId));
+  const equipmentInventory = sanitizeEquipmentInventoryRecord(payload.equipmentInventory, level);
+
+  const rawInventoryItemIds = sanitizeStringList(payload.inventoryItemIds, MAX_SAVE_COLLECTION)
+    .filter(itemId => !!equipmentInventory[itemId] || !!getEquipmentItem(itemId));
 
   const equippedItems = {
     weapon: null as string | null,
@@ -1639,10 +1867,16 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
   for (const slot of ['weapon', 'armor', 'accessory'] as EquipmentSlot[]) {
     const itemId = payload.equippedItems?.[slot];
     if (typeof itemId !== 'string') continue;
-    const item = getEquipmentItem(itemId);
-    if (!item || item.slot !== slot || !inventoryItemIds.includes(itemId)) continue;
+    const item = equipmentInventory[itemId] ?? getEquipmentItem(itemId);
+    if (!item || item.slot !== slot || !rawInventoryItemIds.includes(itemId)) continue;
     equippedItems[slot] = itemId;
   }
+  const { inventoryItemIds, equippedItems: migratedEquippedItems, equipmentInventory: migratedEquipmentInventory } = migrateLegacyEquipmentIds(
+    rawInventoryItemIds,
+    equippedItems,
+    equipmentInventory,
+    level,
+  );
 
   const usableItemCounts: Record<string, number> = {};
   if (isRecord(payload.usableItemCounts)) {
@@ -1833,7 +2067,8 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     dollarFirstPurchaseClaimedOfferIds: sanitizeStringList(payload.dollarFirstPurchaseClaimedOfferIds, VALID_DOLLAR_SHOP_OFFER_IDS.size)
       .filter((id): id is DollarShopOfferId => VALID_DOLLAR_SHOP_OFFER_IDS.has(id as DollarShopOfferId)),
     inventoryItemIds,
-    equippedItems,
+    equipmentInventory: migratedEquipmentInventory,
+    equippedItems: migratedEquippedItems,
     usableItemCounts,
     autoUsePotionEnabled: clampBoolean(payload.autoUsePotionEnabled, false),
     autoUseCoolantEnabled: clampBoolean(payload.autoUseCoolantEnabled, false),
@@ -2149,16 +2384,21 @@ function killMonster(state: GameState): GameState {
     );
     const source = pool.length > 0 ? pool : fallbackPool;
     if (source.length > 0) {
-      const item = source[Math.floor(Math.random() * source.length)];
+      const baseItem = source[Math.floor(Math.random() * source.length)];
+      const item = createEquipmentInstance(baseItem, Math.max(1, newState.level), 'drop');
       if (!newState.inventoryItemIds.includes(item.id)) {
         newState = queueReward({
           ...newState,
+          equipmentInventory: {
+            ...newState.equipmentInventory,
+            [item.id]: item,
+          },
           inventoryItemIds: [...newState.inventoryItemIds, item.id],
         }, {
           id: `item_${item.id}_${Date.now()}`,
           kind: 'item',
           title: `Equipment Drop: ${item.emoji} ${item.name}`,
-          detail: `${equipmentRarityConfig(item.rarity).label} ${item.slot}`,
+          detail: `${equipmentRarityConfig(item.rarity).label} ${item.slot} • iLv ${item.itemLevel}`,
         });
         newState = queueCombatLog(newState, `Loot drop: ${item.emoji} ${item.name}`);
         if (item.rarity === 'mythic') {
@@ -2169,18 +2409,6 @@ function killMonster(state: GameState): GameState {
             detail: `${item.emoji} ${item.name} • Arc flash triggered`,
           });
         }
-      } else {
-        const duplicateScrap = equipmentScrapValue(item.rarity) + Math.floor(state.wave * 0.4);
-        newState = queueReward({
-          ...newState,
-          equipmentScrap: newState.equipmentScrap + duplicateScrap,
-        }, {
-          id: `dup_${item.id}_${Date.now()}`,
-          kind: 'item',
-          title: `Duplicate ${item.name}`,
-          detail: `Converted to +${duplicateScrap} scrap`,
-        });
-        newState = queueCombatLog(newState, `Duplicate ${item.name} converted into ${duplicateScrap} scrap`);
       }
     }
   }
@@ -2390,15 +2618,17 @@ function reducer(state: GameState, action: Action): GameState {
     case 'CREATE_CHARACTER': {
       const name = action.name.trim().slice(0, 24);
       if (!name) return state;
-      const starterItemIds = getStarterEquipmentForClass(action.playerClass);
+      const starterItems = getStarterEquipmentForClass(action.playerClass)
+        .map(itemId => getEquipmentItem(itemId))
+        .filter((item): item is EquipmentItem => !!item)
+        .map(item => createEquipmentInstance(item, 1, 'starter'));
       const starterEquip: Record<EquipmentSlot, string | null> = {
         weapon: null,
         armor: null,
         accessory: null,
       };
-      for (const itemId of starterItemIds) {
-        const item = getEquipmentItem(itemId);
-        if (item) starterEquip[item.slot] = item.id;
+      for (const item of starterItems) {
+        starterEquip[item.slot as EquipmentSlot] = item.id;
       }
 
       const newState: GameState = {
@@ -2408,7 +2638,8 @@ function reducer(state: GameState, action: Action): GameState {
         playerClass: action.playerClass,
         unspentStatPoints: 10,   // starting stat points to customise immediately
         gold: 100,               // starting gold to feel snappy
-        inventoryItemIds: starterItemIds,
+        inventoryItemIds: starterItems.map(item => item.id),
+        equipmentInventory: Object.fromEntries(starterItems.map(item => [item.id, item])),
         equippedItems: starterEquip,
       };
       const maxHp = getTeamMaxHp(newState);
@@ -2570,16 +2801,16 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'EQUIP_ITEM': {
       if (!state.playerClass) return state;
-      const item = getEquipmentItem(action.itemId);
+      const item = getEquipmentEntry(state, action.itemId);
       if (!item) return state;
       if (!item.allowedClasses.includes(state.playerClass)) return state;
-      if (!state.inventoryItemIds.includes(item.id)) return state;
+      if (!state.inventoryItemIds.includes(action.itemId)) return state;
 
       return {
         ...state,
         equippedItems: {
           ...state.equippedItems,
-          [item.slot]: item.id,
+          [item.slot]: action.itemId,
         },
       };
     }
@@ -2900,12 +3131,15 @@ function reducer(state: GameState, action: Action): GameState {
     case 'DISMANTLE_EQUIPMENT': {
       if (!state.inventoryItemIds.includes(action.itemId)) return state;
       if (Object.values(state.equippedItems).includes(action.itemId)) return state;
-      const item = getEquipmentItem(action.itemId);
+      const item = getEquipmentEntry(state, action.itemId);
       if (!item) return state;
-      const gain = equipmentScrapValue(item.rarity);
+      const gain = getEquipmentScrapGain(item);
+      const nextEquipmentInventory = { ...state.equipmentInventory };
+      delete nextEquipmentInventory[action.itemId];
       return queueReward({
         ...state,
         inventoryItemIds: state.inventoryItemIds.filter(id => id !== action.itemId),
+        equipmentInventory: nextEquipmentInventory,
         equipmentScrap: state.equipmentScrap + gain,
       }, {
         id: `dismantle_${action.itemId}_${Date.now()}`,
@@ -2921,15 +3155,18 @@ function reducer(state: GameState, action: Action): GameState {
       );
       const candidates = state.inventoryItemIds
         .filter(itemId => !equippedIds.has(itemId))
-        .map(itemId => ({ itemId, item: getEquipmentItem(itemId) }))
-        .filter((entry): entry is { itemId: string; item: NonNullable<ReturnType<typeof getEquipmentItem>> } => !!entry.item);
+        .map(itemId => ({ itemId, item: getEquipmentEntry(state, itemId) }))
+        .filter((entry): entry is { itemId: string; item: EquipmentInstance | EquipmentItem } => !!entry.item);
       if (candidates.length === 0) return state;
 
       const dismantleIds = new Set(candidates.map(entry => entry.itemId));
-      const gain = candidates.reduce((sum, entry) => sum + equipmentScrapValue(entry.item.rarity), 0);
+      const gain = candidates.reduce((sum, entry) => sum + getEquipmentScrapGain(entry.item), 0);
+      const nextEquipmentInventory = { ...state.equipmentInventory };
+      for (const itemId of dismantleIds) delete nextEquipmentInventory[itemId];
       return queueReward({
         ...state,
         inventoryItemIds: state.inventoryItemIds.filter(id => !dismantleIds.has(id)),
+        equipmentInventory: nextEquipmentInventory,
         equipmentScrap: state.equipmentScrap + gain,
       }, {
         id: `auto_dismantle_${Date.now()}`,
@@ -2952,65 +3189,58 @@ function reducer(state: GameState, action: Action): GameState {
       const rolledRarity = rollEquipmentRarityByTier(Math.random(), hasUnlock(state, 'mythic_equipment'));
       const rarityPool = classSlotItems.filter(i => i.rarity === rolledRarity);
       const source = rarityPool.length > 0 ? rarityPool : classSlotItems;
-      const item = source[Math.floor(Math.random() * source.length)];
-      const alreadyOwned = state.inventoryItemIds.includes(item.id);
-
-      if (alreadyOwned) {
-        const refund = Math.ceil(equipmentScrapValue(item.rarity) * 0.75);
-        return queueReward({
-          ...state,
-          equipmentScrap: state.equipmentScrap - cost.scrap + refund,
-          gold: state.gold - cost.gold,
-        }, {
-          id: `craft_dup_${item.id}_${Date.now()}`,
-          kind: 'item',
-          title: `Crafted Duplicate ${item.name}`,
-          detail: `Spent ${cost.gold} gold, recovered +${refund} scrap`,
-        });
-      }
+      const item = createEquipmentInstance(source[Math.floor(Math.random() * source.length)], Math.max(1, state.level), 'craft');
 
       return queueReward({
         ...state,
         equipmentScrap: state.equipmentScrap - cost.scrap,
         gold: state.gold - cost.gold,
+        equipmentInventory: {
+          ...state.equipmentInventory,
+          [item.id]: item,
+        },
         inventoryItemIds: [...state.inventoryItemIds, item.id],
       }, {
         id: `craft_${item.id}_${Date.now()}`,
         kind: 'item',
         title: `Crafted ${item.emoji} ${item.name}`,
-        detail: `${equipmentRarityConfig(item.rarity).label} ${item.slot} • -${cost.gold} gold`,
+        detail: `${equipmentRarityConfig(item.rarity).label} ${item.slot} • iLv ${item.itemLevel} • -${cost.gold} gold`,
       });
     }
 
     case 'UPGRADE_EQUIPMENT_RARITY': {
       if (!state.inventoryItemIds.includes(action.itemId)) return state;
-      const item = getEquipmentItem(action.itemId);
-      if (!item) return state;
+      const ownedItem = getEquipmentEntry(state, action.itemId);
+      const item = ownedItem && 'baseItemId' in ownedItem ? getEquipmentItem(ownedItem.baseItemId) : ownedItem;
+      if (!item || !ownedItem) return state;
       const plan = getEquipmentUpgradePlan(state, action.itemId);
       if (!plan.targetItemId || !plan.targetRarity) return state;
       if (state.equipmentScrap < plan.scrapCost || state.essence < plan.essenceCost || state.gold < plan.goldCost) return state;
       const target = getEquipmentItem(plan.targetItemId);
       if (!target) return state;
 
-      const alreadyOwned = state.inventoryItemIds.includes(target.id);
-      const withReplacedInventory = state.inventoryItemIds.filter(id => id !== item.id);
-      const nextInventory = alreadyOwned ? withReplacedInventory : [...withReplacedInventory, target.id];
-      const refund = alreadyOwned ? Math.floor(equipmentScrapValue(target.rarity) * 0.8) : 0;
+      const upgradedItem = createEquipmentInstance(target, 'itemLevel' in ownedItem ? ownedItem.itemLevel + 2 : Math.max(1, state.level), 'upgrade');
+      const withReplacedInventory = state.inventoryItemIds.filter(id => id !== action.itemId);
+      const nextInventory = [...withReplacedInventory, upgradedItem.id];
+      const nextEquipmentInventory = { ...state.equipmentInventory };
+      delete nextEquipmentInventory[action.itemId];
+      nextEquipmentInventory[upgradedItem.id] = upgradedItem;
 
       return queueReward({
         ...state,
         inventoryItemIds: nextInventory,
-        equipmentScrap: state.equipmentScrap - plan.scrapCost + refund,
+        equipmentInventory: nextEquipmentInventory,
+        equipmentScrap: state.equipmentScrap - plan.scrapCost,
         essence: state.essence - plan.essenceCost,
         gold: state.gold - plan.goldCost,
         equippedItems: Object.fromEntries(
-          Object.entries(state.equippedItems).map(([slot, equippedId]) => [slot, equippedId === item.id ? target.id : equippedId]),
+          Object.entries(state.equippedItems).map(([slot, equippedId]) => [slot, equippedId === action.itemId ? upgradedItem.id : equippedId]),
         ) as Record<EquipmentSlot, string | null>,
       }, {
-        id: `upgrade_${item.id}_${Date.now()}`,
+        id: `upgrade_${action.itemId}_${Date.now()}`,
         kind: 'item',
         title: `Upgraded ${item.name}`,
-        detail: `Now ${target.emoji} ${target.name} (${plan.targetRarity.toUpperCase()}) • -${plan.goldCost} gold`,
+        detail: `Now ${target.emoji} ${target.name} (${plan.targetRarity.toUpperCase()}) • iLv ${upgradedItem.itemLevel} • -${plan.goldCost} gold`,
       });
     }
 
@@ -3837,33 +4067,22 @@ function reducer(state: GameState, action: Action): GameState {
       const rolledRarity = rollEquipmentRarityByTier(Math.random(), hasUnlock(state, 'mythic_equipment'));
       const rarityPool = classItems.filter(item => item.rarity === rolledRarity);
       const source = rarityPool.length > 0 ? rarityPool : classItems;
-      const item = source[Math.floor(Math.random() * source.length)];
+      const item = createEquipmentInstance(source[Math.floor(Math.random() * source.length)], Math.max(1, state.level), 'crate');
       if (!item) return state;
-
-      const alreadyOwned = state.inventoryItemIds.includes(item.id);
-      if (alreadyOwned) {
-        const scrapGain = equipmentScrapValue(item.rarity) + 40;
-        return queueReward({
-          ...state,
-          gold: state.gold - cost,
-          equipmentScrap: state.equipmentScrap + scrapGain,
-        }, {
-          id: `shop_gold_gear_dup_${Date.now()}`,
-          kind: 'item',
-          title: 'Gold Shop Purchase: Armory Crate',
-          detail: `Duplicate ${item.name} converted to +${scrapGain} scrap`,
-        });
-      }
 
       return queueReward({
         ...state,
         gold: state.gold - cost,
+        equipmentInventory: {
+          ...state.equipmentInventory,
+          [item.id]: item,
+        },
         inventoryItemIds: [...state.inventoryItemIds, item.id],
       }, {
         id: `shop_gold_gear_${Date.now()}`,
         kind: 'item',
         title: `Gold Shop Purchase: ${item.emoji} ${item.name}`,
-        detail: `${equipmentRarityConfig(item.rarity).label} gear • -12000 gold`,
+        detail: `${equipmentRarityConfig(item.rarity).label} gear • iLv ${item.itemLevel} • -12000 gold`,
       });
     }
 
@@ -4065,6 +4284,7 @@ function reducer(state: GameState, action: Action): GameState {
         dollarFirstPurchaseClaimedOfferIds: p.dollarFirstPurchaseClaimedOfferIds,
 
         inventoryItemIds: p.inventoryItemIds,
+    equipmentInventory: p.equipmentInventory,
         equippedItems: p.equippedItems,
         usableItemCounts: p.usableItemCounts,
         autoUsePotionEnabled: p.autoUsePotionEnabled,
@@ -4182,6 +4402,7 @@ interface SaveData {
   dollarFirstPurchaseClaimedOfferIds?: string[];
 
   inventoryItemIds: string[];
+  equipmentInventory?: Record<string, EquipmentInstance>;
   equippedItems: Record<EquipmentSlot, string | null>;
   usableItemCounts: Record<string, number>;
   autoUsePotionEnabled: boolean;
@@ -4288,6 +4509,7 @@ function serialize(state: GameState): SaveData {
     dollarFirstPurchaseClaimedOfferIds: state.dollarFirstPurchaseClaimedOfferIds,
 
     inventoryItemIds: state.inventoryItemIds,
+    equipmentInventory: state.equipmentInventory,
     equippedItems: state.equippedItems,
     usableItemCounts: state.usableItemCounts,
     autoUsePotionEnabled: state.autoUsePotionEnabled,

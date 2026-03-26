@@ -80,7 +80,7 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
               <Pressable style={styles.equipDismantleBtn} onPress={autoDismantleEquipment}>
                 <Text style={styles.equipDismantleBtnText}>🧰 Auto Dismantle</Text>
               </Pressable>
-              <Text style={styles.equipOptimizeHint}>Optimize equips best item per slot. Auto dismantle scraps all unequipped items.</Text>
+              <Text style={styles.equipOptimizeHint}>Optimize equips the highest-scoring rolled item per slot for your class. Auto dismantle scraps all unequipped items.</Text>
             </View>
           )}
           {equipmentSubTab === 'craft' && (
@@ -119,7 +119,7 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
                       <Text style={styles.invEquipName}>{item.emoji} {item.name}</Text>
                       <Text style={[styles.invEquipRarity2, { color: rarity.color }]}>{item.rarity}</Text>
                     </View>
-                    <Text style={styles.invEquipSlot}>{item.slot.toUpperCase()}</Text>
+                    <Text style={styles.invEquipSlot}>{item.slot.toUpperCase()} • iLv {item.itemLevel ?? 1}</Text>
                     <Text style={styles.invEquipBonus}>
                       {Object.entries(item.bonus)
                         .filter(([_, v]) => v)
