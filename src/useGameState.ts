@@ -4,7 +4,6 @@ import {
   PARTY,
   SKILLS,
   ACHIEVEMENTS,
-  TUTORIAL_QUESTS,
   COST_SCALE,
   REBIRTH_BONUS,
   REBIRTH_WAVE_THRESHOLD,
@@ -15,7 +14,6 @@ import {
   EquipmentSlot,
   HeroUnit,
   Rarity,
-  TutorialEvent,
   PermanentUnlockId,
   HeroPassiveTraitId,
   HeroActiveSkillArchetypeId,
@@ -139,7 +137,6 @@ const VALID_SKILL_IDS = new Set(SKILLS.map(skill => skill.id));
 const VALID_ACHIEVEMENT_IDS = new Set(ACHIEVEMENTS.map(achievement => achievement.id));
 const VALID_MISSION_IDS = new Set(MISSION_BOARD_GOALS.map(mission => mission.id));
 const VALID_WEEKLY_TRACK_MILESTONES = new Set(WEEKLY_TRACK_MILESTONES);
-const VALID_TUTORIAL_QUEST_IDS = new Set(TUTORIAL_QUESTS.map(quest => quest.id));
 const VALID_DOLLAR_SHOP_OFFER_IDS = new Set<DollarShopOfferId>(['usd_499', 'usd_1999', 'usd_4999', 'usd_9999']);
 
 export function getCharacterSaveSlot(accountName: string, playerClass: PlayerClass): string {
@@ -310,11 +307,6 @@ export interface GameState {
   autoSummonCooldownMs: number;
   lastActiveAt: number;
 
-  tutorialEnabled: boolean;
-  tutorialCurrentQuestIndex: number;
-  tutorialCompletedQuestIds: string[];
-  allocatedStatPoints: number;
-
   prestigeCount: number;
   achievements: Set<string>;
   newAchievement: string | null;
@@ -470,11 +462,6 @@ const DEFAULT_STATE: GameState = {
   autoSummonReserveGold: 5000,
   autoSummonCooldownMs: 0,
   lastActiveAt: Date.now(),
-
-  tutorialEnabled: false,
-  tutorialCurrentQuestIndex: 0,
-  tutorialCompletedQuestIds: [],
-  allocatedStatPoints: 0,
 
   prestigeCount: 0,
   achievements: new Set(),
@@ -689,71 +676,6 @@ function getEquipmentBonusStats(state: GameState): StatBlock {
 function derivedStats(state: GameState): StatBlock {
   const cls = getClassConfig(state.playerClass ?? 'warrior');
   return sumStats(sumStats(cls.baseStats, state.statsAlloc), getEquipmentBonusStats(state));
-}
-
-function getCurrentTutorialQuest(state: GameState) {
-  if (!state.tutorialEnabled) return null;
-  return TUTORIAL_QUESTS[state.tutorialCurrentQuestIndex] ?? null;
-}
-
-function isQuestCompleteForState(state: GameState, event?: TutorialEvent): boolean {
-  const quest = getCurrentTutorialQuest(state);
-  if (!quest) return false;
-
-  if (quest.requiredEvent && quest.requiredEvent !== event) {
-    return false;
-  }
-
-  const req = quest.requiredState;
-  if (!req) return true;
-
-  if ((req.minKills ?? 0) > state.totalKills) return false;
-  if ((req.minSummons ?? 0) > state.totalSummons) return false;
-  if ((req.minActiveTeam ?? 0) > state.activeTeamHeroIds.length) return false;
-  if ((req.minAllocatedStats ?? 0) > state.allocatedStatPoints) return false;
-  if ((req.minWave ?? 0) > state.wave) return false;
-
-  return true;
-}
-
-function progressTutorial(state: GameState, event?: TutorialEvent): GameState {
-  if (!state.tutorialEnabled) return state;
-
-  let next = state;
-  let consumedEvent = event;
-
-  while (next.tutorialCurrentQuestIndex < TUTORIAL_QUESTS.length) {
-    if (!isQuestCompleteForState(next, consumedEvent)) break;
-
-    const quest = TUTORIAL_QUESTS[next.tutorialCurrentQuestIndex];
-    const rewardGold = quest.rewardGold ?? 0;
-    const rewardDiamonds = quest.rewardDiamonds ?? 0;
-    const nextIndex = next.tutorialCurrentQuestIndex + 1;
-
-    next = {
-      ...next,
-      tutorialCurrentQuestIndex: nextIndex,
-      tutorialCompletedQuestIds: [...next.tutorialCompletedQuestIds, quest.id],
-      gold: next.gold + rewardGold,
-      diamonds: next.diamonds + rewardDiamonds,
-      totalGold: next.totalGold + rewardGold,
-      tutorialEnabled: nextIndex < TUTORIAL_QUESTS.length,
-    };
-
-    if (rewardGold > 0 || rewardDiamonds > 0) {
-      next = queueReward(next, {
-        id: `quest_${quest.id}_${Date.now()}`,
-        kind: 'gold',
-        title: `Quest Complete: ${quest.title}`,
-        detail: `+${rewardGold} gold${rewardDiamonds > 0 ? `, +${rewardDiamonds} diamonds` : ''}`,
-      });
-    }
-
-    // Event requirements should only satisfy a single quest at a time.
-    consumedEvent = undefined;
-  }
-
-  return next;
 }
 
 function getTeamHeroBoost(state: GameState): number {
@@ -1128,7 +1050,7 @@ function maybeAutoSummonTick(state: GameState): GameState {
       ts: Date.now(),
       pityTriggered: roll.pityTriggered,
     };
-    let nextState = withAchievement(progressTutorial({
+    let nextState = withAchievement(({
       ...state,
       bossTears: canUseFree ? state.bossTears : state.bossTears - 1,
       heroRoster: [hero, ...state.heroRoster],
@@ -1177,7 +1099,7 @@ function maybeAutoSummonTick(state: GameState): GameState {
       });
     }
 
-    let nextState = withAchievement(progressTutorial({
+    let nextState = withAchievement(({
       ...state,
       bossTears: state.bossTears - paidUses,
       heroRoster: [...summoned, ...state.heroRoster],
@@ -1667,7 +1589,6 @@ function sanitizeIntList(value: unknown, maxItems: number): number[] {
 
 function sanitizeStatAllocation(raw: unknown, level: number): {
   statsAlloc: StatBlock;
-  allocatedStatPoints: number;
   unspentStatPoints: number;
 } {
   const record = isRecord(raw) ? raw : {};
@@ -1697,7 +1618,6 @@ function sanitizeStatAllocation(raw: unknown, level: number): {
 
   return {
     statsAlloc,
-    allocatedStatPoints: budget - remaining,
     unspentStatPoints: remaining,
   };
 }
@@ -1782,7 +1702,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     wave,
     clampInt(payload.highestWaveReached ?? payload.highestLevelReached, 1, MAX_SAVE_WAVE, 1),
   );
-  const { statsAlloc, allocatedStatPoints, unspentStatPoints } = sanitizeStatAllocation(payload.statsAlloc, level);
+  const { statsAlloc, unspentStatPoints } = sanitizeStatAllocation(payload.statsAlloc, level);
   const maxMonsterHp = getMonsterMaxHp(wave);
   const monsterHp = clampFloat(payload.monsterHp, 0, maxMonsterHp, maxMonsterHp);
   const teamMaxHp = Math.max(100, clampInt(payload.teamHp, 1, SAFE_INTEGER_CAP, 100));
@@ -2082,10 +2002,6 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     autoTempoTarget: payload.autoTempoTarget === 4 ? 4 : 2,
     autoSummonReserveGold: clampInt(payload.autoSummonReserveGold, 0, SAFE_INTEGER_CAP, 5000),
     lastActiveAt: clampInt(payload.lastActiveAt, 0, now, now),
-    tutorialEnabled: false,
-    tutorialCurrentQuestIndex: 0,
-    tutorialCompletedQuestIds: [],
-    allocatedStatPoints,
     prestigeCount: clampInt(payload.prestigeCount, 0, SAFE_INTEGER_CAP, 0),
     achievements: sanitizeStringList(payload.achievements, VALID_ACHIEVEMENT_IDS.size)
       .filter(id => VALID_ACHIEVEMENT_IDS.has(id)),
@@ -2460,7 +2376,7 @@ function killMonster(state: GameState): GameState {
     newState = queueCombatLog(newState, `Boss drop: +1 Boss Tear 💧`);
   }
 
-  return withAchievement(progressTutorial(newState));
+  return withAchievement((newState));
 }
 
 function checkAchievements(state: GameState): string | null {
@@ -2545,7 +2461,6 @@ function maybeAutoRefreshExpeditionContracts(state: GameState, nowMs: number): G
 
 type Action =
   | { type: 'CREATE_CHARACTER'; name: string; playerClass: PlayerClass }
-  | { type: 'QUEST_EVENT'; event: TutorialEvent }
   | { type: 'TICK'; elapsed: number }
   | { type: 'ATTACK' }
   | { type: 'BUY_PARTY'; id: PartyId; amount: number }
@@ -2642,11 +2557,8 @@ function reducer(state: GameState, action: Action): GameState {
         equippedItems: starterEquip,
       };
       const maxHp = getTeamMaxHp(newState);
-      return progressTutorial({ ...newState, teamHp: maxHp, teamMaxHp: maxHp });
+      return { ...newState, teamHp: maxHp, teamMaxHp: maxHp };
     }
-
-    case 'QUEST_EVENT':
-      return progressTutorial(state, action.event);
 
     case 'TICK': {
       if (!state.characterCreated) return state;
@@ -2760,11 +2672,10 @@ function reducer(state: GameState, action: Action): GameState {
         ...state.statsAlloc,
         [action.stat]: state.statsAlloc[action.stat] + 1,
       };
-      return progressTutorial({
+      return ({
         ...state,
         statsAlloc,
         unspentStatPoints: state.unspentStatPoints - 1,
-        allocatedStatPoints: state.allocatedStatPoints + 1,
       });
     }
 
@@ -2775,11 +2686,10 @@ function reducer(state: GameState, action: Action): GameState {
         ...state.statsAlloc,
         [action.stat]: state.statsAlloc[action.stat] + spend,
       };
-      return progressTutorial({
+      return ({
         ...state,
         statsAlloc,
         unspentStatPoints: 0,
-        allocatedStatPoints: state.allocatedStatPoints + spend,
       });
     }
 
@@ -2790,11 +2700,10 @@ function reducer(state: GameState, action: Action): GameState {
         ...state.statsAlloc,
         [action.stat]: state.statsAlloc[action.stat] + spend,
       };
-      return progressTutorial({
+      return ({
         ...state,
         statsAlloc,
         unspentStatPoints: state.unspentStatPoints - spend,
-        allocatedStatPoints: state.allocatedStatPoints + spend,
       });
     }
 
@@ -2841,7 +2750,7 @@ function reducer(state: GameState, action: Action): GameState {
         pityTriggered: roll.pityTriggered,
       };
 
-      let nextState = withAchievement(progressTutorial({
+      let nextState = withAchievement(({
         ...state,
         bossTears: canUseFree ? state.bossTears : state.bossTears - 1,
         heroRoster: [hero, ...state.heroRoster],
@@ -2898,7 +2807,7 @@ function reducer(state: GameState, action: Action): GameState {
         });
       }
 
-      let nextState = withAchievement(progressTutorial({
+      let nextState = withAchievement(({
         ...state,
         bossTears: state.bossTears - paidUses,
         heroRoster: [...summoned, ...state.heroRoster],
@@ -2927,7 +2836,7 @@ function reducer(state: GameState, action: Action): GameState {
       });
       const newTeam = normalizeTeamSelectionByRules(state, sorted.map(h => h.uid));
       const newMaxHp = getTeamMaxHp({ ...state, activeTeamHeroIds: newTeam });
-      return progressTutorial({
+      return ({
         ...state,
         activeTeamHeroIds: newTeam,
         teamMaxHp: newMaxHp,
@@ -2955,7 +2864,7 @@ function reducer(state: GameState, action: Action): GameState {
       const source = state.teamLoadouts[slot] ?? [];
       const validIds = normalizeTeamSelectionByRules(state, source);
       const newMaxHp = getTeamMaxHp({ ...state, activeTeamHeroIds: validIds });
-      return queueReward(progressTutorial({
+      return queueReward(({
         ...state,
         activeTeamHeroIds: validIds,
         teamMaxHp: newMaxHp,
@@ -3022,7 +2931,7 @@ function reducer(state: GameState, action: Action): GameState {
         newTeam = [...active, action.uid];
       }
       const newMaxHp = getTeamMaxHp({ ...state, activeTeamHeroIds: newTeam });
-      return withAchievement(progressTutorial({
+      return withAchievement(({
         ...state,
         activeTeamHeroIds: newTeam,
         teamMaxHp: newMaxHp,
@@ -3033,7 +2942,7 @@ function reducer(state: GameState, action: Action): GameState {
     case 'SET_ACTIVE_TEAM': {
       const validIds = normalizeTeamSelectionByRules(state, action.heroIds);
       const newMaxHp = getTeamMaxHp({ ...state, activeTeamHeroIds: validIds });
-      return progressTutorial({
+      return ({
         ...state,
         activeTeamHeroIds: validIds,
         teamMaxHp: newMaxHp,
@@ -3124,7 +3033,7 @@ function reducer(state: GameState, action: Action): GameState {
         });
       }
 
-      return withAchievement(progressTutorial(nextState));
+      return withAchievement((nextState));
     }
 
     case 'DISMANTLE_EQUIPMENT': {
@@ -3441,7 +3350,7 @@ function reducer(state: GameState, action: Action): GameState {
         title: 'Offline Progress',
         detail: `+${killsGained} kills • +${wavesGained} waves • +${goldGain} gold • +${expGain} EXP`,
       });
-      return withAchievement(progressTutorial(next));
+      return withAchievement((next));
     }
 
     case 'APPLY_DAILY_LOGIN': {
@@ -3475,7 +3384,7 @@ function reducer(state: GameState, action: Action): GameState {
         detail: `+${goldReward} gold, +${shardReward} shards${freeSummonBonus > 0 ? ', +1 free summon' : ''}${usedInsurance ? ', streak insurance consumed' : ''}${insuranceEarned > 0 ? ', +1 streak insurance' : ''}`,
       });
 
-      return withAchievement(progressTutorial(next));
+      return withAchievement((next));
     }
 
     case 'REBIRTH': {
@@ -4300,11 +4209,6 @@ function reducer(state: GameState, action: Action): GameState {
         autoSummonCooldownMs: 0,
         lastActiveAt: p.lastActiveAt,
 
-        tutorialEnabled: p.tutorialEnabled,
-        tutorialCurrentQuestIndex: p.tutorialCurrentQuestIndex,
-        tutorialCompletedQuestIds: p.tutorialCompletedQuestIds,
-        allocatedStatPoints: p.allocatedStatPoints,
-
         prestigeCount: p.prestigeCount,
         achievements: new Set(p.achievements),
         newAchievement: null,
@@ -4417,11 +4321,6 @@ interface SaveData {
   autoSummonReserveGold: number;
   lastActiveAt: number;
 
-  tutorialEnabled: boolean;
-  tutorialCurrentQuestIndex: number;
-  tutorialCompletedQuestIds: string[];
-  allocatedStatPoints: number;
-
   prestigeCount: number;
   achievements: string[];
   combatLog: string[];
@@ -4524,11 +4423,6 @@ function serialize(state: GameState): SaveData {
     autoSummonReserveGold: state.autoSummonReserveGold,
     lastActiveAt: Date.now(),
 
-    tutorialEnabled: state.tutorialEnabled,
-    tutorialCurrentQuestIndex: state.tutorialCurrentQuestIndex,
-    tutorialCompletedQuestIds: state.tutorialCompletedQuestIds,
-    allocatedStatPoints: state.allocatedStatPoints,
-
     prestigeCount: state.prestigeCount,
     achievements: Array.from(state.achievements),
     combatLog: state.combatLog,
@@ -4553,7 +4447,6 @@ export function useGameState(saveSlot: string = 'default') {
   const prevSummonsRef = useRef(0);
   const prevHighestWaveRef = useRef(1);
   const prevPrestigeRef = useRef(0);
-  const prevFtueCountRef = useRef(0);
   stateRef.current = state;
 
   useEffect(() => {
@@ -4564,7 +4457,6 @@ export function useGameState(saveSlot: string = 'default') {
     prevSummonsRef.current = 0;
     prevHighestWaveRef.current = 1;
     prevPrestigeRef.current = 0;
-    prevFtueCountRef.current = 0;
     claimFingerprintRef.current = '';
     lastTickRef.current = Date.now();
     lastSaveRef.current = Date.now();
@@ -4641,14 +4533,13 @@ export function useGameState(saveSlot: string = 'default') {
     prevSummonsRef.current = state.totalSummons;
     prevHighestWaveRef.current = state.highestWaveReached;
     prevPrestigeRef.current = state.prestigeCount;
-    prevFtueCountRef.current = state.tutorialCompletedQuestIds.length;
     void trackEvent('session_start', {
       saveSlot,
       level: state.level,
       wave: state.wave,
       highestWave: state.highestWaveReached,
     });
-  }, [state.characterCreated, state.level, state.wave, state.highestWaveReached, state.prestigeCount, state.totalSummons, state.tutorialCompletedQuestIds.length, saveSlot]);
+  }, [state.characterCreated, state.level, state.wave, state.highestWaveReached, state.prestigeCount, state.totalSummons, saveSlot]);
 
   useEffect(() => {
     return () => {
@@ -4691,24 +4582,10 @@ export function useGameState(saveSlot: string = 'default') {
       });
     }
 
-    if (state.tutorialCompletedQuestIds.length > prevFtueCountRef.current) {
-      const newQuestIds = state.tutorialCompletedQuestIds.slice(prevFtueCountRef.current);
-      prevFtueCountRef.current = state.tutorialCompletedQuestIds.length;
-      newQuestIds.forEach(questId => {
-        void trackEvent('ftue_step_completed', {
-          questId,
-          stepIndex: state.tutorialCompletedQuestIds.indexOf(questId) + 1,
-        });
-      });
-    }
-  }, [state.totalSummons, state.highestWaveReached, state.prestigeCount, state.wave, state.tutorialCompletedQuestIds]);
+  }, [state.totalSummons, state.highestWaveReached, state.prestigeCount, state.wave]);
 
   const createCharacter = useCallback((name: string, playerClass: PlayerClass) => {
     dispatch({ type: 'CREATE_CHARACTER', name, playerClass });
-  }, []);
-
-  const notifyQuestEvent = useCallback((event: TutorialEvent) => {
-    dispatch({ type: 'QUEST_EVENT', event });
   }, []);
 
   const attack = useCallback(() => dispatch({ type: 'ATTACK' }), []);
@@ -4892,7 +4769,6 @@ export function useGameState(saveSlot: string = 'default') {
     state,
     stats,
     createCharacter,
-    notifyQuestEvent,
     attack,
     buyParty,
     buySkill,
@@ -4963,3 +4839,4 @@ export function useGameState(saveSlot: string = 'default') {
     getMissionProgress,
   };
 }
+

@@ -1086,14 +1086,6 @@ export const styles = StyleSheet.create({
   tabLocked: {
     opacity: 0.35,
   },
-  tutorialPulse: {
-    borderColor: '#FFD36B',
-    shadowColor: '#FFD36B',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.55,
-    shadowRadius: 8,
-    elevation: 8,
-  },
   tabIcon: {
     fontSize: 16,
     marginBottom: 2,

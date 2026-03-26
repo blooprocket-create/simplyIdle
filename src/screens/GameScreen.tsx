@@ -1043,7 +1043,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     active: boolean;
     onPress: () => void;
     disabled?: boolean;
-    pulse?: boolean;
   }>) => {
     const buttons = items.map(item => (
       <Pressable
@@ -1052,7 +1051,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           styles.subTabBtn,
           item.active && styles.subTabBtnActive,
           item.disabled && styles.subTabBtnLocked,
-          item.pulse && styles.tutorialPulse,
           isCompactPhone && styles.subTabBtnCompact,
           isCompactPhone && { minWidth: compactSubTabMinWidth },
         ]}
