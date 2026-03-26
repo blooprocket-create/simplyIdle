@@ -44,6 +44,8 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
   renderSubTabBar,
 }) => {
   const { width: viewportWidth } = useWindowDimensions();
+  const isNarrow = viewportWidth < 390;
+  const isUltraNarrow = viewportWidth < 330;
   const activeTeamSet = useMemo(() => new Set(state.activeTeamHeroIds), [state.activeTeamHeroIds]);
 
   const rarityRank = useMemo(() => {
@@ -71,11 +73,11 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
       });
   }, [activeTeamSet, rarityRank, state.heroRoster]);
 
-  const batchColumns = viewportWidth >= 980 ? 4 : viewportWidth >= 700 ? 3 : 2;
-  const batchGap = 8;
-  const batchHorizontalPadding = 44;
+  const batchColumns = isUltraNarrow ? 1 : viewportWidth >= 980 ? 4 : viewportWidth >= 700 ? 3 : 2;
+  const batchGap = isNarrow ? 6 : 8;
+  const batchHorizontalPadding = isNarrow ? 36 : 44;
   const batchCardWidth = Math.max(
-    140,
+    isUltraNarrow ? 220 : 130,
     Math.floor((viewportWidth - batchHorizontalPadding - batchGap * (batchColumns - 1)) / batchColumns),
   );
 
@@ -118,7 +120,7 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
               <ScrollView
                 style={styles.batchHeroList}
                 nestedScrollEnabled
-                contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 8 }}
+                contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: batchGap, paddingBottom: 8 }}
               >
                 {sortedBatchHeroes.map(hero => {
                   const isSelected = batchLevelSelected.has(hero.uid);
@@ -166,11 +168,15 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
                       <View style={styles.batchHeroCheckbox}>
                         {isSelected && <View style={styles.batchHeroCheckboxInner} />}
                       </View>
-                      <View style={styles.batchHeroInfo}>
-                        <Text style={styles.batchHeroName}>{hero.emoji} {hero.name}</Text>
-                        <Text style={styles.batchHeroLevel}>Level {hero.level} → {projectedLevel}</Text>
-                        <Text style={styles.batchHeroTeamTag}>{isOnTeam ? '🛡️ Active Team' : `⭐ Rank ${hero.rank}/10`}</Text>
-                        <Text style={styles.batchHerosCost}>
+                      <View style={[styles.batchHeroInfo, isNarrow && { gap: 2 }]}> 
+                        <Text style={[styles.batchHeroName, isNarrow && { fontSize: 12 }]} numberOfLines={1}>{hero.emoji} {hero.name}</Text>
+                        <Text style={[styles.batchHeroLevel, isNarrow && { fontSize: 11 }]} numberOfLines={1}>
+                          {isNarrow ? `Lv ${hero.level} -> ${projectedLevel}` : `Level ${hero.level} → ${projectedLevel}`}
+                        </Text>
+                        <Text style={[styles.batchHeroTeamTag, isNarrow && { fontSize: 10 }]} numberOfLines={1}>
+                          {isOnTeam ? '🛡️ Active Team' : `⭐ Rank ${hero.rank}/10`}
+                        </Text>
+                        <Text style={[styles.batchHerosCost, isNarrow && { fontSize: 10 }]} numberOfLines={1}>
                           {batchLevelMode === 'max'
                             ? `Affordable now: ${fmt(totalCost)} 💰`
                             : `Cost: ${fmt(totalCost)} 💰`}

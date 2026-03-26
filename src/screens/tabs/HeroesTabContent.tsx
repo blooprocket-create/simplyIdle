@@ -79,6 +79,8 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
   renderSubTabBar,
 }) => {
   const { width: viewportWidth } = useWindowDimensions();
+  const isNarrow = viewportWidth < 390;
+  const isUltraNarrow = viewportWidth < 330;
 
   const rarityRank = useMemo(() => {
     const rankMap: Record<string, number> = {};
@@ -103,11 +105,11 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
     });
   }, [activeTeamSet, rarityRank, state.heroRoster]);
 
-  const rosterColumns = viewportWidth >= 980 ? 4 : viewportWidth >= 700 ? 3 : 2;
-  const rosterGap = 8;
-  const rosterHorizontalPadding = 44;
+  const rosterColumns = isUltraNarrow ? 1 : viewportWidth >= 980 ? 4 : viewportWidth >= 700 ? 3 : 2;
+  const rosterGap = isNarrow ? 6 : 8;
+  const rosterHorizontalPadding = isNarrow ? 36 : 44;
   const rosterCardWidth = Math.max(
-    140,
+    isUltraNarrow ? 220 : 130,
     Math.floor((viewportWidth - rosterHorizontalPadding - rosterGap * (rosterColumns - 1)) / rosterColumns),
   );
 
@@ -237,7 +239,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
               {state.heroRoster.length === 0 ? (
                 <Text style={styles.emptyMsg}>Summon your first hero!</Text>
               ) : (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: rosterGap }}>
                 {sortedRoster.map(hero => {
                   const inActiveTeam = activeTeamSet.has(hero.uid);
                   const cls = getClassConfig(hero.heroClass);
@@ -267,25 +269,25 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                       ]}
                     >
                       <View style={[styles.heroCardRarityBar, { backgroundColor: rarity.color }]} />
-                      <View style={styles.heroCardBody}>
+                      <View style={[styles.heroCardBody, isNarrow && { paddingHorizontal: 8, paddingVertical: 8 }]}> 
                         <View style={styles.heroCardTopRow}>
                           <View style={[styles.heroPortraitFrame, { borderColor: rarity.color }]}>
                             <Text style={styles.heroEmoji}>{hero.emoji}</Text>
                           </View>
                           <View style={styles.heroCardInfo}>
-                            <Text style={styles.heroName}>{hero.name}</Text>
-                            <Text style={styles.heroDetail}>
+                            <Text style={[styles.heroName, isNarrow && { fontSize: 13 }]} numberOfLines={1}>{hero.name}</Text>
+                            <Text style={[styles.heroDetail, isNarrow && { fontSize: 11 }]} numberOfLines={1}>
                               <Text style={{ color: rarity.color }}>{hero.rarity}</Text>
-                              {' • '}{cls.name}
+                              {' • '}{isNarrow ? cls.name.slice(0, 3).toUpperCase() : cls.name}
                             </Text>
                             <View style={styles.heroTagRow}>
                               <Text style={styles.heroFactionTag}>{faction}</Text>
-                              <Text style={styles.heroArchetypeTag}>{activeArchetype.name}</Text>
+                              {!isNarrow && <Text style={styles.heroArchetypeTag}>{activeArchetype.name}</Text>}
                             </View>
-                            <Text style={styles.heroRank}>⭐ Rank {hero.rank}/10</Text>
+                            <Text style={[styles.heroRank, isNarrow && { fontSize: 11 }]}>⭐ R{hero.rank}/10</Text>
                           </View>
                           <View style={styles.heroCardRight}>
-                            <Text style={styles.heroLevel}>Lv {hero.level}</Text>
+                            <Text style={[styles.heroLevel, isNarrow && { fontSize: 13 }]}>Lv {hero.level}</Text>
                             <Pressable
                               style={[styles.toggleBtn, inActiveTeam && styles.toggleBtnActive]}
                               onPress={() => toggleEquipHero(hero.uid)}
@@ -305,7 +307,11 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                           </View>
                         </View>
 
-                        <Text style={styles.heroDetail}>⭐ Rank {hero.rank}/10 • +{(hero.teamBoost * 100).toFixed(1)}% boost</Text>
+                        <Text style={[styles.heroDetail, isNarrow && { fontSize: 11 }]} numberOfLines={1}>
+                          {isNarrow
+                            ? `⭐ R${hero.rank} • +${(hero.teamBoost * 100).toFixed(1)}%`
+                            : `⭐ Rank ${hero.rank}/10 • +${(hero.teamBoost * 100).toFixed(1)}% boost`}
+                        </Text>
 
                         {isExpanded && (
                           <>
