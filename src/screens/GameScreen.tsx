@@ -29,7 +29,6 @@ import {
   REBIRTH_WAVE_THRESHOLD,
   TUTORIAL_QUESTS,
   TutorialEvent,
-  getEquipmentItem,
   equipmentRarityConfig,
   getMonsterForWave,
   getActForWave,
@@ -576,8 +575,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   }, [canRebirthNow, state.activeTeamHeroIds.length, state.unspentStatPoints, missionCards, currentAct.bossWave, teamSlotCap]);
   const nextGuidance = guidanceList[0];
   const extraGuidanceCount = Math.max(0, guidanceList.length - 1);
-  const equipmentInventory = state.equipmentInventory ?? {};
-  const getOwnedEquipmentItem = (id: string | null) => (id ? equipmentInventory[id] ?? getEquipmentItem(id) : null);
+  const equipmentInventory = state.equipmentInventory;
+  const getOwnedEquipmentItem = (id: string | null) => (id ? equipmentInventory[id] ?? null : null);
   const equippedItemsForScore = useMemo(
     () => Object.values(state.equippedItems).map(id => getOwnedEquipmentItem(id)).filter(Boolean),
     [state.equippedItems, state.equipmentInventory],
@@ -1065,7 +1064,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     const slots: EquipmentSlot[] = ['weapon', 'armor', 'accessory'];
     slots.forEach(slot => {
       const slotItems = state.inventoryItemIds
-        .map(id => equipmentInventory[id] ?? getEquipmentItem(id))
+        .map(id => equipmentInventory[id] ?? null)
         .filter(item => !!item && item.slot === slot);
       if (slotItems.length === 0) return;
       const best = [...slotItems].sort((a, b) => {
