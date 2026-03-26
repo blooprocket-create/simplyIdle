@@ -3546,8 +3546,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         animationType="slide"
         onRequestClose={() => setShopOpen(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.eventsModalBox}>
+        <View style={styles.bottomSheetOverlay}>
+          <View style={[styles.eventsModalBox, styles.bottomSheetBox]}>
             <View style={styles.eventsHeaderRow}>
               <Text style={styles.eventsModalTitle}>🛒 Shop</Text>
               <Pressable style={styles.settingsCloseBtn} onPress={() => setShopOpen(false)}>
@@ -3700,8 +3700,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         animationType="slide"
         onRequestClose={() => setEventsOpen(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.eventsModalBox}>
+        <View style={styles.bottomSheetOverlay}>
+          <View style={[styles.eventsModalBox, styles.bottomSheetBox]}>
             <View style={styles.eventsHeaderRow}>
               <Text style={styles.eventsModalTitle}>🗓️ Events & Seasons</Text>
               <Pressable style={styles.settingsCloseBtn} onPress={() => setEventsOpen(false)}>
@@ -3918,11 +3918,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       <Modal
         visible={settingsOpen}
         transparent={true}
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setSettingsOpen(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.settingsModalBox}>
+        <View style={styles.bottomSheetOverlay}>
+          <View style={[styles.settingsModalBox, styles.bottomSheetBox]}>
             <View style={styles.settingsHeaderRow}>
               <Text style={styles.modalTitle}>⚙️ Settings & Automation</Text>
               <Pressable style={styles.settingsCloseBtn} onPress={() => setSettingsOpen(false)}>
@@ -7580,6 +7580,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  bottomSheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  bottomSheetBox: {
+    width: '100%',
+    maxWidth: 900,
+    maxHeight: '88%',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    paddingBottom: Platform.OS === 'ios' ? 18 : 12,
   },
   modalBox: {
     backgroundColor: '#15151F',
