@@ -2,7 +2,7 @@ import 'react-native-reanimated';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import GameScreen from './src/screens/GameScreen.tsx';
+import MobileGameScreen from './src/screens/MobileGameScreen.tsx';
 import AuthScreen, { AUTH_STORAGE_KEYS, getValidStoredSession } from './src/screens/AuthScreen.tsx';
 
 export default function App() {
@@ -52,7 +52,7 @@ export default function App() {
   }
 
   return (
-    <GameScreen
+    <MobileGameScreen
       accountName={accountName}
       onLogout={async () => {
         await AsyncStorage.removeItem(AUTH_STORAGE_KEYS.session);
