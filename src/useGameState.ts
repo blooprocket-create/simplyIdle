@@ -471,7 +471,7 @@ const DEFAULT_STATE: GameState = {
   autoSummonCooldownMs: 0,
   lastActiveAt: Date.now(),
 
-  tutorialEnabled: true,
+  tutorialEnabled: false,
   tutorialCurrentQuestIndex: 0,
   tutorialCompletedQuestIds: [],
   allocatedStatPoints: 0,
@@ -2082,10 +2082,9 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     autoTempoTarget: payload.autoTempoTarget === 4 ? 4 : 2,
     autoSummonReserveGold: clampInt(payload.autoSummonReserveGold, 0, SAFE_INTEGER_CAP, 5000),
     lastActiveAt: clampInt(payload.lastActiveAt, 0, now, now),
-    tutorialEnabled: clampBoolean(payload.tutorialEnabled, true),
-    tutorialCurrentQuestIndex: clampInt(payload.tutorialCurrentQuestIndex, 0, TUTORIAL_QUESTS.length, 0),
-    tutorialCompletedQuestIds: sanitizeStringList(payload.tutorialCompletedQuestIds, TUTORIAL_QUESTS.length)
-      .filter(id => VALID_TUTORIAL_QUEST_IDS.has(id)),
+    tutorialEnabled: false,
+    tutorialCurrentQuestIndex: 0,
+    tutorialCompletedQuestIds: [],
     allocatedStatPoints,
     prestigeCount: clampInt(payload.prestigeCount, 0, SAFE_INTEGER_CAP, 0),
     achievements: sanitizeStringList(payload.achievements, VALID_ACHIEVEMENT_IDS.size)

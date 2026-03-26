@@ -18,7 +18,6 @@ export interface StatsTabContentProps {
   rebirthDamageCost: number;
   rebirthEconomyCost: number;
   rebirthSurvivalCost: number;
-  forceSpendStatStep: boolean;
   classPassive: any;
   allocateStat: (stat: StatKey) => void;
   allocateStatN: (stat: StatKey, n: number) => void;
@@ -39,7 +38,6 @@ export const StatsTabContent: React.FC<StatsTabContentProps> = ({
   rebirthDamageCost,
   rebirthEconomyCost,
   rebirthSurvivalCost,
-  forceSpendStatStep,
   classPassive,
   allocateStat,
   allocateStatN,
@@ -69,22 +67,22 @@ export const StatsTabContent: React.FC<StatsTabContentProps> = ({
                     </View>
                     <View style={styles.statBtnGroup}>
                       <Pressable
-                        style={[styles.statBtn, state.unspentStatPoints === 0 && styles.statBtnDisabled, forceSpendStatStep && styles.tutorialPulse]}
+                        style={[styles.statBtn, state.unspentStatPoints === 0 && styles.statBtnDisabled]}
                         disabled={state.unspentStatPoints === 0}
                         onPress={() => allocateStat(stat as any)}
                       >
                         <Text style={styles.statBtnText}>+1</Text>
                       </Pressable>
                       <Pressable
-                        style={[styles.statBtn, state.unspentStatPoints === 0 && styles.statBtnDisabled, forceSpendStatStep && styles.statBtnDisabled]}
-                        disabled={state.unspentStatPoints === 0 || forceSpendStatStep}
+                        style={[styles.statBtn, state.unspentStatPoints === 0 && styles.statBtnDisabled]}
+                        disabled={state.unspentStatPoints === 0}
                         onPress={() => allocateStatN(stat as any, 5)}
                       >
                         <Text style={styles.statBtnText}>+5</Text>
                       </Pressable>
                       <Pressable
-                        style={[styles.statBtn, state.unspentStatPoints === 0 && styles.statBtnDisabled, forceSpendStatStep && styles.statBtnDisabled]}
-                        disabled={state.unspentStatPoints === 0 || forceSpendStatStep}
+                        style={[styles.statBtn, state.unspentStatPoints === 0 && styles.statBtnDisabled]}
+                        disabled={state.unspentStatPoints === 0}
                         onPress={() => allocateStatN(stat as any, 10)}
                       >
                         <Text style={styles.statBtnText}>+10</Text>
@@ -94,9 +92,8 @@ export const StatsTabContent: React.FC<StatsTabContentProps> = ({
                           styles.statBtn,
                           styles.statBtnMax,
                           state.unspentStatPoints === 0 && styles.statBtnDisabled,
-                          forceSpendStatStep && styles.statBtnDisabled,
                         ]}
-                        disabled={state.unspentStatPoints === 0 || forceSpendStatStep}
+                        disabled={state.unspentStatPoints === 0}
                         onPress={() => allocateStatMax(stat as any)}
                       >
                         <Text style={styles.statBtnText}>+MAX</Text>

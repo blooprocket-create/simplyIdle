@@ -11,8 +11,6 @@ export interface HeroesTabContentProps {
   stats: Stats;
   heroesSubTab: string;
   setHeroesSubTab: (tab: string) => void;
-  forceFreeSummonStep: boolean;
-  forceBuildTeamStep: boolean;
   canGachaX10: boolean;
   canGachaOnce: boolean;
   pityRemaining: number;
@@ -49,8 +47,6 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
   stats,
   heroesSubTab,
   setHeroesSubTab,
-  forceFreeSummonStep,
-  forceBuildTeamStep,
   canGachaX10,
   canGachaOnce,
   pityRemaining,
@@ -89,8 +85,6 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
             label: st === 'summon' ? 'Summon Bay' : 'Roster',
             active: heroesSubTab === st,
             onPress: () => setHeroesSubTab(st),
-            disabled: (forceFreeSummonStep && st !== 'summon') || (forceBuildTeamStep && st !== 'roster'),
-            pulse: (forceFreeSummonStep && st === 'summon') || (forceBuildTeamStep && st === 'roster'),
           })))}
 
           {heroesSubTab === 'summon' && (
@@ -110,9 +104,8 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                   style={[
                     styles.featuredSummonBtn,
                     !canGachaX10 && styles.featuredSummonBtnDisabled,
-                    forceFreeSummonStep && styles.featuredSummonBtnDisabled,
                   ]}
-                  disabled={!canGachaX10 || forceFreeSummonStep}
+                  disabled={!canGachaX10}
                   onPress={summonHeroX10}
                 >
                   <Text style={styles.featuredSummonBtnText}>Cinematic x10 Summon</Text>
@@ -130,7 +123,6 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                     styles.gachaBtn,
                     !canGachaOnce && styles.gachaBtnDisabled,
                     hasGachaNotification && styles.gachaBtnNotify,
-                    forceFreeSummonStep && styles.tutorialPulse,
                   ]}
                   disabled={!canGachaOnce}
                   onPress={summonHero}
@@ -143,9 +135,8 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                     styles.gachaBtn,
                     styles.gachaBtnX10,
                     !canGachaX10 && styles.gachaBtnDisabled,
-                    forceFreeSummonStep && styles.gachaBtnDisabled,
                   ]}
-                  disabled={!canGachaX10 || forceFreeSummonStep}
+                  disabled={!canGachaX10}
                   onPress={summonHeroX10}
                 >
                   <Text style={[styles.gachaBtnText, styles.gachaBtnTextLight]}>Summon x10</Text>

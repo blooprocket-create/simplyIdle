@@ -26,8 +26,6 @@ import {
   RARITIES,
   ACTIVE_TEAM_SIZE,
   REBIRTH_WAVE_THRESHOLD,
-  TUTORIAL_QUESTS,
-  TutorialEvent,
   equipmentRarityConfig,
   getMonsterForWave,
   getActForWave,
@@ -212,7 +210,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     state,
     stats,
     createCharacter,
-    notifyQuestEvent,
     attack,
     setActiveTeam,
     summonHero,
@@ -481,21 +478,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const hasStatsNotification = state.unspentStatPoints > 0;
   const hasGachaNotification = canGachaOnce;
 
-  const currentQuest = state.tutorialEnabled
-    ? TUTORIAL_QUESTS[state.tutorialCurrentQuestIndex] ?? null
-    : null;
-  const tutorialTargetTab = state.tutorialEnabled && currentQuest ? currentQuest.targetTab : null;
-  const tutorialStepId = currentQuest?.id ?? null;
-  const forceFreeSummonStep = tutorialStepId === 'q_use_free_summon';
-  const forceBuildTeamStep = tutorialStepId === 'q_build_team';
-  const forceSpendStatStep = tutorialStepId === 'q_spend_stat';
-  const tutorialActionHint = useMemo(() => {
-    if (!currentQuest) return null;
-    if (forceFreeSummonStep) return 'Tap the highlighted Summon Hero button.';
-    if (forceBuildTeamStep) return 'Tap Edit, pick a hero, then Confirm Team.';
-    if (forceSpendStatStep) return 'Tap a highlighted +1 button to spend exactly one stat point.';
-    return 'Only the highlighted tab is enabled for this step.';
-  }, [currentQuest, forceFreeSummonStep, forceBuildTeamStep, forceSpendStatStep]);
   const weeklyEvent = getWeeklyEvent();
   const shardForgeCosts = getShardForgeCosts();
   const rebirthDamageCost = getRebirthCoreCost('damage');
@@ -534,7 +516,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   }, [state.permanentUnlocks, state.seenHintIds]);
   const activeHint = hintCandidates[0] ?? null;
 
-  const tutorialProgressLabel = `${Math.min(state.tutorialCurrentQuestIndex, TUTORIAL_QUESTS.length)}/${TUTORIAL_QUESTS.length}`;
   const rewardPopup = state.rewardQueue[0] ?? null;
   const isOfflineRewardPopup = !!rewardPopup && `${rewardPopup.title} ${rewardPopup.detail}`.toLowerCase().includes('offline progress');
   const classCutinTone = useMemo(() => {
@@ -889,26 +870,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     }
   }, [rewardPopup, idleChestOpen]);
 
-  useEffect(() => {
-    if (!state.tutorialEnabled || !currentQuest) return;
-    if (forceFreeSummonStep && heroesSubTab !== 'summon') setHeroesSubTab('summon');
-    if (forceBuildTeamStep && heroesSubTab !== 'roster') setHeroesSubTab('roster');
-  }, [state.tutorialEnabled, currentQuest, forceFreeSummonStep, forceBuildTeamStep, heroesSubTab]);
-
   const onTabChange = (nextTab: Tab) => {
-    if (tutorialTargetTab && nextTab !== tutorialTargetTab) return;
     setTab(nextTab);
-    const eventMap: Record<Tab, TutorialEvent | null> = {
-      warroom: null,
-      battle: 'open_battle_tab',
-      heroes: 'open_heroes_tab',
-      stats: 'open_stats_tab',
-      equipment: null,
-      achievements: 'open_achievements_tab',
-      guildhall: null,
-    };
-    const event = eventMap[nextTab];
-    if (event) notifyQuestEvent(event);
   };
 
   const getDiceOutcome = (roll: number) => {
@@ -1418,19 +1381,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         </Modal>
       )}
 
-      {currentQuest && (
-        <View style={styles.questBanner}>
-          <View style={styles.questBannerHeader}>
-            <Text style={styles.questBannerTitle}>📜 Tutorial Quest</Text>
-            <Text style={styles.questProgress}>{tutorialProgressLabel}</Text>
-          </View>
-          <Text style={styles.questName}>{currentQuest.title}</Text>
-          <Text style={styles.questDesc}>{currentQuest.description}</Text>
-          <Text style={styles.questHint}>Go to: {currentQuest.targetTab.toUpperCase()} tab</Text>
-          {tutorialActionHint && <Text style={styles.questForceHint}>👉 {tutorialActionHint}</Text>}
-        </View>
-      )}
-
       {activeHint && (
         <View style={styles.hintBanner}>
           <View style={styles.hintBannerTop}>
@@ -1669,8 +1619,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             stats,
             heroesSubTab,
             setHeroesSubTab,
-            forceFreeSummonStep,
-            forceBuildTeamStep,
             canGachaX10,
             canGachaOnce,
             pityRemaining,
@@ -1715,7 +1663,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             rebirthDamageCost,
             rebirthEconomyCost,
             rebirthSurvivalCost,
-            forceSpendStatStep,
             classPassive,
             allocateStat,
             allocateStatN,
