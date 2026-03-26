@@ -2294,9 +2294,9 @@ type Action =
   | { type: 'REBIRTH' }
   | { type: 'CLEAR_ACHIEVEMENT' }
   | { type: 'CLEAR_REWARD_POPUP' }
-  | { type: 'BATCH_LEVEL_HEROES'; heroIds: string[]; targetLevel: number }
+  | { type: 'BATCH_LEVEL_HEROES'; heroIds: string[]; addLevels: number | 'max' }
   | { type: 'UPGRADE_FACILITY'; facilityId: 'training' | 'treasury' | 'forge' | 'tactics' }
-  | { type: 'START_EXPEDITION'; expeditionType: 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss' }
+  | { type: 'START_EXPEDITION'; expeditionType: 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss'; offeredRarity?: 'common' | 'rare' | 'epic' | 'legendary' | 'godly' }
   | { type: 'COMPLETE_EXPEDITION'; expeditionId: string }
   | { type: 'LOAD'; payload: Partial<SaveData> };
 
@@ -3380,26 +3380,62 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'BATCH_LEVEL_HEROES': {
-      let newState = state;
-      let totalCost = 0;
+      const selected = new Set(action.heroIds);
+      if (selected.size === 0) return state;
 
-      for (const heroId of action.heroIds) {
-        const hero = newState.heroRoster.find(h => h.uid === heroId);
-        if (!hero || hero.level >= action.targetLevel || hero.level >= HERO_LEVEL_CAP) continue;
-
-        for (let lvl = hero.level; lvl < Math.min(action.targetLevel, HERO_LEVEL_CAP); lvl++) {
-          const cost = getHeroGoldLevelCost(lvl);
-          if (newState.gold < cost) break;
-          totalCost += cost;
-          newState = {
-            ...newState,
-            gold: newState.gold - cost,
-            heroRoster: newState.heroRoster.map(h => h.uid === heroId ? { ...h, level: lvl + 1 } : h),
-          };
+      const levelsByUid: Record<string, number> = {};
+      for (const hero of state.heroRoster) {
+        if (selected.has(hero.uid)) {
+          levelsByUid[hero.uid] = hero.level;
         }
       }
 
-      return newState;
+      let gold = state.gold;
+
+      if (action.addLevels === 'max') {
+        // Greedy strategy: always buy the cheapest next level among selected heroes.
+        while (true) {
+          let cheapestUid: string | null = null;
+          let cheapestCost = Number.POSITIVE_INFINITY;
+
+          for (const uid of Object.keys(levelsByUid)) {
+            const lvl = levelsByUid[uid];
+            if (lvl >= HERO_LEVEL_CAP) continue;
+            const nextCost = getHeroGoldLevelCost(lvl);
+            if (nextCost < cheapestCost) {
+              cheapestCost = nextCost;
+              cheapestUid = uid;
+            }
+          }
+
+          if (!cheapestUid || !Number.isFinite(cheapestCost) || gold < cheapestCost) break;
+          gold -= cheapestCost;
+          levelsByUid[cheapestUid] += 1;
+        }
+      } else {
+        const steps = Math.max(0, Math.floor(action.addLevels));
+        for (let step = 0; step < steps; step++) {
+          for (const uid of Object.keys(levelsByUid)) {
+            const lvl = levelsByUid[uid];
+            if (lvl >= HERO_LEVEL_CAP) continue;
+            const cost = getHeroGoldLevelCost(lvl);
+            if (gold < cost) continue;
+            gold -= cost;
+            levelsByUid[uid] = lvl + 1;
+          }
+        }
+      }
+
+      const heroRoster = state.heroRoster.map(hero => {
+        const nextLevel = levelsByUid[hero.uid];
+        return nextLevel == null ? hero : { ...hero, level: nextLevel };
+      });
+
+      return {
+        ...state,
+        gold,
+        heroRoster,
+      };
     }
 
     case 'UPGRADE_FACILITY': {
@@ -3431,40 +3467,40 @@ function reducer(state: GameState, action: Action): GameState {
       const lastDay = state.lastExpeditionDay[action.expeditionType];
       if (lastDay === today) return state;
 
-      const expeditionConfigs: Record<string, { rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'godly'; goldCost: number; durationMs: number; reward: { diamonds: number; shards: number; essence: number; artifacts: number } }> = {
-        artifact: {
-          rarity: 'rare',
-          goldCost: 1500,
-          durationMs: 30000, // 30 seconds for testing, would be 5-10 minutes in production
-          reward: { diamonds: 50, shards: 200, essence: 0, artifacts: 1 },
+      const rarityPool = ['common', 'rare', 'epic', 'legendary', 'godly'] as const;
+      const rarity = action.offeredRarity && rarityPool.includes(action.offeredRarity)
+        ? action.offeredRarity
+        : rarityPool[Math.floor(Math.random() * rarityPool.length)];
+
+      const configByRarity: Record<typeof rarityPool[number], { goldCost: number; durationMs: number; reward: { diamonds: number; shards: number; essence: number; artifacts: number } }> = {
+        common: {
+          goldCost: 25_000,
+          durationMs: 5 * 60 * 1000,
+          reward: { diamonds: 35, shards: 150, essence: 0, artifacts: 0 },
         },
-        merchant: {
-          rarity: 'common',
-          goldCost: 800,
-          durationMs: 15000, // 15 seconds
-          reward: { diamonds: 30, shards: 100, essence: 0, artifacts: 0 },
+        rare: {
+          goldCost: 75_000,
+          durationMs: 20 * 60 * 1000,
+          reward: { diamonds: 75, shards: 320, essence: 0, artifacts: 1 },
         },
-        ruins: {
-          rarity: 'epic',
-          goldCost: 2500,
-          durationMs: 45000, // 45 seconds
-          reward: { diamonds: 80, shards: 350, essence: 1, artifacts: 2 },
+        epic: {
+          goldCost: 220_000,
+          durationMs: 90 * 60 * 1000,
+          reward: { diamonds: 140, shards: 700, essence: 1, artifacts: 2 },
         },
-        vault: {
-          rarity: 'legendary',
-          goldCost: 4000,
-          durationMs: 60000, // 1 minute
-          reward: { diamonds: 120, shards: 500, essence: 2, artifacts: 3 },
+        legendary: {
+          goldCost: 500_000,
+          durationMs: 4 * 60 * 60 * 1000,
+          reward: { diamonds: 240, shards: 1300, essence: 2, artifacts: 4 },
         },
-        abyss: {
-          rarity: 'godly',
-          goldCost: 6500,
-          durationMs: 90000, // 1.5 minutes
-          reward: { diamonds: 180, shards: 750, essence: 3, artifacts: 5 },
+        godly: {
+          goldCost: 1_000_000,
+          durationMs: 8 * 60 * 60 * 1000,
+          reward: { diamonds: 400, shards: 2400, essence: 4, artifacts: 8 },
         },
       };
 
-      const config = expeditionConfigs[action.expeditionType];
+      const config = configByRarity[rarity];
       if (!config || state.gold < config.goldCost) return state;
 
       const expeditionId = `exp_${action.expeditionType}_${Date.now()}`;
@@ -3477,7 +3513,7 @@ function reducer(state: GameState, action: Action): GameState {
           {
             id: expeditionId,
             type: action.expeditionType as any,
-            rarity: config.rarity,
+            rarity,
             startTime: Date.now(),
             durationMs: config.durationMs,
             reward: config.reward,
@@ -4507,16 +4543,19 @@ export function useGameState(saveSlot: string = 'default') {
     };
   }, [state]);
 
-  const batchLevelHeroes = useCallback((heroIds: string[], targetLevel: number) => {
-    dispatch({ type: 'BATCH_LEVEL_HEROES', heroIds, targetLevel });
+  const batchLevelHeroes = useCallback((heroIds: string[], addLevels: number | 'max') => {
+    dispatch({ type: 'BATCH_LEVEL_HEROES', heroIds, addLevels });
   }, []);
 
   const upgradeFacility = useCallback((facilityId: 'training' | 'treasury' | 'forge' | 'tactics') => {
     dispatch({ type: 'UPGRADE_FACILITY', facilityId });
   }, []);
 
-  const startExpedition = useCallback((expeditionType: 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss') => {
-    dispatch({ type: 'START_EXPEDITION', expeditionType });
+  const startExpedition = useCallback((
+    expeditionType: 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss',
+    offeredRarity?: 'common' | 'rare' | 'epic' | 'legendary' | 'godly',
+  ) => {
+    dispatch({ type: 'START_EXPEDITION', expeditionType, offeredRarity });
   }, []);
 
   const completeExpedition = useCallback((expeditionId: string) => {

@@ -63,6 +63,8 @@ type EquipmentSubTab = 'inventory' | 'craft' | 'forge';
 type AchievementsSubTab = 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex';
 type GuildhallSubTab = 'batch' | 'facilities' | 'expeditions';
 type ShopTab = 'diamond' | 'gold' | 'dollar';
+type ExpeditionType = 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss';
+type ExpeditionRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
 
 type MomentCue = 'none' | 'mythic' | 'boss' | 'rebirth' | 'ultimate';
 
@@ -81,6 +83,16 @@ type RiftBuffChoice = {
   dpsMult: number;
   hpMult: number;
   defenseMult: number;
+};
+
+type ExpeditionOffer = {
+  type: ExpeditionType;
+  rarity: ExpeditionRarity;
+  icon: string;
+  name: string;
+  goldCost: number;
+  durationMs: number;
+  rewardsLabel: string;
 };
 
 interface GameScreenProps {
@@ -140,6 +152,58 @@ const VIP_REWARD_MILESTONES = [
   { level: 9, diamonds: 3200, gold: 145000, shards: 1550, essence: 13 },
   { level: 10, diamonds: 5000, gold: 220000, shards: 2200, essence: 20 },
 ] as const;
+
+const EXPEDITION_TYPES: ExpeditionType[] = ['artifact', 'merchant', 'ruins', 'vault', 'abyss'];
+const EXPEDITION_TYPE_META: Record<ExpeditionType, { icon: string; name: string }> = {
+  artifact: { icon: '🗿', name: 'Artifact Hunt' },
+  merchant: { icon: '🏪', name: 'Merchant Convoy' },
+  ruins: { icon: '🏛️', name: 'Ancient Ruins' },
+  vault: { icon: '🔐', name: 'Vault Heist' },
+  abyss: { icon: '🌑', name: 'Abyss Dive' },
+};
+const EXPEDITION_RARITIES: ExpeditionRarity[] = ['common', 'rare', 'epic', 'legendary', 'godly'];
+const EXPEDITION_RARITY_META: Record<ExpeditionRarity, { goldCost: number; durationMs: number; rewardsLabel: string }> = {
+  common: { goldCost: 25_000, durationMs: 5 * 60 * 1000, rewardsLabel: '+35💎 +150✨' },
+  rare: { goldCost: 75_000, durationMs: 20 * 60 * 1000, rewardsLabel: '+75💎 +320✨ +1⚡' },
+  epic: { goldCost: 220_000, durationMs: 90 * 60 * 1000, rewardsLabel: '+140💎 +700✨ +1⚡' },
+  legendary: { goldCost: 500_000, durationMs: 4 * 60 * 60 * 1000, rewardsLabel: '+240💎 +1300✨ +2⚡' },
+  godly: { goldCost: 1_000_000, durationMs: 8 * 60 * 60 * 1000, rewardsLabel: '+400💎 +2400✨ +4⚡' },
+};
+
+function formatDurationShort(ms: number): string {
+  const totalMinutes = Math.max(1, Math.floor(ms / 60_000));
+  if (totalMinutes < 60) return `${totalMinutes}m`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+}
+
+function buildRandomExpeditionOffers(): Record<ExpeditionType, ExpeditionOffer> {
+  const offers: Record<ExpeditionType, ExpeditionOffer> = {
+    artifact: { type: 'artifact', rarity: 'common', icon: '', name: '', goldCost: 0, durationMs: 0, rewardsLabel: '' },
+    merchant: { type: 'merchant', rarity: 'common', icon: '', name: '', goldCost: 0, durationMs: 0, rewardsLabel: '' },
+    ruins: { type: 'ruins', rarity: 'common', icon: '', name: '', goldCost: 0, durationMs: 0, rewardsLabel: '' },
+    vault: { type: 'vault', rarity: 'common', icon: '', name: '', goldCost: 0, durationMs: 0, rewardsLabel: '' },
+    abyss: { type: 'abyss', rarity: 'common', icon: '', name: '', goldCost: 0, durationMs: 0, rewardsLabel: '' },
+  };
+
+  for (const type of EXPEDITION_TYPES) {
+    const rarity = EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)];
+    const rarityMeta = EXPEDITION_RARITY_META[rarity];
+    const typeMeta = EXPEDITION_TYPE_META[type];
+    offers[type] = {
+      type,
+      rarity,
+      icon: typeMeta.icon,
+      name: typeMeta.name,
+      goldCost: rarityMeta.goldCost,
+      durationMs: rarityMeta.durationMs,
+      rewardsLabel: rarityMeta.rewardsLabel,
+    };
+  }
+
+  return offers;
+}
 
 interface CharacterSlotSummary {
   classId: PlayerClass;
@@ -285,7 +349,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   // Batch leveling state
   const [batchLevelSelected, setBatchLevelSelected] = useState<Set<string>>(new Set());
-  const [batchLevelTarget, setBatchLevelTarget] = useState<number>(1);
+  const [batchLevelMode, setBatchLevelMode] = useState<10 | 50 | 100 | 'max'>(10);
 
   // Rift bonus state
   const [riftBonusRound, setRiftBonusRound] = useState(0);
@@ -295,6 +359,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   // Timer tick for expedition countdown display
   const [timerTick, setTimerTick] = useState(0);
+  const [expeditionOffers, setExpeditionOffers] = useState<Record<ExpeditionType, ExpeditionOffer>>(() => buildRandomExpeditionOffers());
 
   useEffect(() => {
     let cancelled = false;
@@ -956,6 +1021,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
     setDiceIsRolling(true);
     const rolled = 1 + Math.floor(Math.random() * 20);
+    setDiceFace(rolled);
 
     Animated.parallel([
       Animated.timing(diceRotate, {
@@ -979,7 +1045,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         }),
       ]),
     ]).start(() => {
-      setDiceFace(rolled);
       setDiceRollResult(getDiceOutcome(rolled));
       setDiceIsRolling(false);
       diceRotate.setValue(0);
@@ -1843,7 +1908,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       disabled={!canPlayDiceToday}
                       onPress={() => {
                         setDiceRollResult(null);
-                        setDiceFace(1);
                         setDiceIsRolling(false);
                         setDiceRollModalOpen(true);
                       }}
@@ -2521,7 +2585,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                             style={styles.recycleBtn}
                             onPress={() => setRecycleConfirmUid(hero.uid)}
                           >
-                            <Text style={styles.recycleBtnText}>♻️ Recycle for {shardValue} 💎</Text>
+                            <Text style={styles.recycleBtnText}>♻️ Recycle for {shardValue} ✨</Text>
                           </Pressable>
                         </View>
                       </View>
@@ -3129,15 +3193,17 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Text style={styles.batchLevelTitle}>📚 Level Multiple Heroes at Once</Text>
                 <View style={styles.batchLevelControls}>
                   <View style={styles.targetLevelControl}>
-                    <Text style={styles.targetLevelLabel}>Target Level: </Text>
+                    <Text style={styles.targetLevelLabel}>Level Increase: </Text>
                     <View style={styles.targetLevelButtons}>
-                      {[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(level => (
+                      {([10, 50, 100, 'max'] as const).map(mode => (
                         <Pressable
-                          key={level}
-                          style={[styles.levelBtn, batchLevelTarget === level && styles.levelBtnActive]}
-                          onPress={() => setBatchLevelTarget(level)}
+                          key={String(mode)}
+                          style={[styles.levelBtn, batchLevelMode === mode && styles.levelBtnActive]}
+                          onPress={() => setBatchLevelMode(mode)}
                         >
-                          <Text style={[styles.levelBtnText, batchLevelTarget === level && styles.levelBtnTextActive]}>{level}</Text>
+                          <Text style={[styles.levelBtnText, batchLevelMode === mode && styles.levelBtnTextActive]}>
+                            {mode === 'max' ? '+MAX' : `+${mode}`}
+                          </Text>
                         </Pressable>
                       ))}
                     </View>
@@ -3149,14 +3215,22 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   {state.heroRoster.map(hero => {
                     const isSelected = batchLevelSelected.has(hero.uid);
                     const maxLevel = HERO_LEVEL_CAP;
-                    if (hero.level >= batchLevelTarget) return null;
+                    if (hero.level >= maxLevel) return null;
+                    const isOnTeam = state.activeTeamHeroIds.includes(hero.uid);
 
-                    const costsForLevels: number[] = [];
                     let totalCost = 0;
-                    for (let lvl = hero.level; lvl < Math.min(batchLevelTarget, maxLevel); lvl++) {
-                      const cost = getHeroGoldLevelCost(lvl);
-                      costsForLevels.push(cost);
-                      totalCost += cost;
+                    let projectedLevel = hero.level;
+
+                    if (batchLevelMode === 'max') {
+                      for (let lvl = hero.level; lvl < maxLevel; lvl++) {
+                        totalCost += getHeroGoldLevelCost(lvl);
+                      }
+                      projectedLevel = maxLevel;
+                    } else {
+                      for (let lvl = hero.level; lvl < Math.min(hero.level + batchLevelMode, maxLevel); lvl++) {
+                        totalCost += getHeroGoldLevelCost(lvl);
+                      }
+                      projectedLevel = Math.min(hero.level + batchLevelMode, maxLevel);
                     }
 
                     return (
@@ -3178,7 +3252,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                         </View>
                         <View style={styles.batchHeroInfo}>
                           <Text style={styles.batchHeroName}>{hero.emoji} {hero.name}</Text>
-                          <Text style={styles.batchHeroLevel}>Level {hero.level} → {Math.min(batchLevelTarget, maxLevel)}</Text>
+                          <Text style={styles.batchHeroLevel}>Level {hero.level} → {projectedLevel}</Text>
+                          {isOnTeam && <Text style={styles.batchHeroTeamTag}>🛡️ Active Team</Text>}
                           <Text style={styles.batchHerosCost}>Cost: {fmt(totalCost)} 💰</Text>
                         </View>
                       </Pressable>
@@ -3190,11 +3265,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Pressable
                     style={styles.batchLevelConfirmBtn}
                     onPress={() => {
-                      batchLevelHeroes(Array.from(batchLevelSelected), batchLevelTarget);
+                      batchLevelHeroes(Array.from(batchLevelSelected), batchLevelMode);
                       setBatchLevelSelected(new Set());
                     }}
                   >
-                    <Text style={styles.batchLevelConfirmText}>Level {batchLevelSelected.size} Heroes</Text>
+                    <Text style={styles.batchLevelConfirmText}>
+                      Apply {batchLevelMode === 'max' ? '+MAX' : `+${batchLevelMode}`} to {batchLevelSelected.size} Heroes
+                    </Text>
                   </Pressable>
                 )}
               </View>
@@ -3302,7 +3379,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                           </View>
 
                           <Text style={styles.expeditionTimeRemaining}>
-                            {isComplete ? '✓ Ready to claim' : `${Math.ceil(remaining / 1000)}s remaining`}
+                            {isComplete ? '✓ Ready to claim' : `${formatDurationShort(remaining)} remaining`}
                           </Text>
 
                           {isComplete && (
@@ -3320,39 +3397,41 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 )}
 
                 <View style={styles.expeditionStartSection}>
-                  <Text style={styles.expeditionStartTitle}>Launch Expedition</Text>
-                  {(['artifact', 'merchant', 'ruins', 'vault', 'abyss'] as const).map(type => {
+                  <View style={styles.expeditionStartHeaderRow}>
+                    <Text style={styles.expeditionStartTitle}>Launch Expedition</Text>
+                    <Pressable
+                      style={styles.expeditionRefreshBtn}
+                      onPress={() => setExpeditionOffers(buildRandomExpeditionOffers())}
+                    >
+                      <Text style={styles.expeditionRefreshBtnText}>Refresh Contracts</Text>
+                    </Pressable>
+                  </View>
+                  {EXPEDITION_TYPES.map(type => {
                     const today = Math.floor(Date.now() / 86_400_000);
                     const lastDay = state.lastExpeditionDay[type];
                     const canStart = lastDay !== today;
-
-                    const configs = {
-                      artifact: { icon: '🗿', name: 'Artifact Hunt', rarity: 'rare', cost: '1,500', time: '30s', rewards: '+50💎 +200✨' },
-                      merchant: { icon: '🏪', name: 'Merchant Convoy', rarity: 'common', cost: '800', time: '15s', rewards: '+30💎 +100✨' },
-                      ruins: { icon: '🏛️', name: 'Ancient Ruins', rarity: 'epic', cost: '2,500', time: '45s', rewards: '+80💎 +350✨ +1⚡' },
-                      vault: { icon: '🔐', name: 'Vault Heist', rarity: 'legendary', cost: '4,000', time: '60s', rewards: '+120💎 +500✨ +2⚡' },
-                      abyss: { icon: '🌑', name: 'Abyss Dive', rarity: 'godly', cost: '6,500', time: '90s', rewards: '+180💎 +750✨ +3⚡' },
-                    };
-                    const cfg = configs[type];
+                    const cfg = expeditionOffers[type];
+                    const hasGold = state.gold >= cfg.goldCost;
+                    const canStartNow = canStart && hasGold;
 
                     return (
                       <Pressable
                         key={type}
-                        style={[styles.expeditionStartCard, !canStart && styles.expeditionStartCardDisabled]}
-                        disabled={!canStart}
-                        onPress={() => startExpedition(type)}
+                        style={[styles.expeditionStartCard, !canStartNow && styles.expeditionStartCardDisabled]}
+                        disabled={!canStartNow}
+                        onPress={() => startExpedition(type, cfg.rarity)}
                       >
                         <View style={styles.expeditionStartCardLeft}>
                           <Text style={styles.expeditionStartCardName}>{cfg.icon} {cfg.name}</Text>
-                          <Text style={styles.expeditionStartCardMeta}>{cfg.rarity} • {cfg.time}</Text>
-                          <Text style={styles.expeditionStartCardRewards}>{cfg.rewards}</Text>
+                          <Text style={styles.expeditionStartCardMeta}>{cfg.rarity} • {formatDurationShort(cfg.durationMs)}</Text>
+                          <Text style={styles.expeditionStartCardRewards}>{cfg.rewardsLabel}</Text>
                         </View>
                         <View style={styles.expeditionStartCardRight}>
-                          <Text style={[styles.expeditionStartCardCost, !canStart && styles.expeditionStartCardCostDisabled]}>
-                            {cfg.cost} 💰
+                          <Text style={[styles.expeditionStartCardCost, !canStartNow && styles.expeditionStartCardCostDisabled]}>
+                            {fmt(cfg.goldCost)} 💰
                           </Text>
-                          <Text style={[styles.expeditionStartCardStatus,  !canStart && styles.expeditionStartCardStatusDisabled]}>
-                            {canStart ? 'Available' : 'Done'}
+                          <Text style={[styles.expeditionStartCardStatus, !canStartNow && styles.expeditionStartCardStatusDisabled]}>
+                            {!canStart ? 'Done' : hasGold ? 'Available' : 'Need Gold'}
                           </Text>
                         </View>
                       </Pressable>
@@ -3799,7 +3878,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <View style={styles.modalBox}>
                 <Text style={styles.modalTitle}>Recycle Hero?</Text>
                 <Text style={styles.modalContent}>
-                  {hero.emoji} {hero.name} will be sacrificed for {shardValue} 💎
+                  {hero.emoji} {hero.name} will be sacrificed for {shardValue} ✨
                 </Text>
                 <Text style={styles.modalWarning}>
                   This is irreversible!
@@ -8670,6 +8749,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#A9C0E8',
   },
+  batchHeroTeamTag: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#6DDB7B',
+  },
   batchHerosCost: {
     fontSize: 11,
     color: '#FFD700',
@@ -8850,6 +8934,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#A9C0E8',
+  },
+  expeditionStartHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  expeditionRefreshBtn: {
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#4A6FA5',
+    backgroundColor: '#1A2F47',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  expeditionRefreshBtnText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#D9ECFF',
   },
   expeditionStartCard: {
     flexDirection: 'row',
