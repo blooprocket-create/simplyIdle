@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView, useWindowDimensions } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import { RARITIES, HERO_LEVEL_CAP } from '../../gameConfig';
 import { fmt } from '../../utils';
@@ -78,6 +78,8 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
   setRecycleConfirmUid,
   renderSubTabBar,
 }) => {
+  const { width: viewportWidth } = useWindowDimensions();
+
   const rarityRank = useMemo(() => {
     const rankMap: Record<string, number> = {};
     RARITIES.forEach((rarity, index) => {
@@ -100,6 +102,14 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
       return a.name.localeCompare(b.name);
     });
   }, [activeTeamSet, rarityRank, state.heroRoster]);
+
+  const rosterColumns = viewportWidth >= 980 ? 4 : viewportWidth >= 700 ? 3 : 2;
+  const rosterGap = 8;
+  const rosterHorizontalPadding = 44;
+  const rosterCardWidth = Math.max(
+    140,
+    Math.floor((viewportWidth - rosterHorizontalPadding - rosterGap * (rosterColumns - 1)) / rosterColumns),
+  );
 
   return (
     <>
@@ -253,7 +263,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                       style={[
                         styles.heroCard,
                         inActiveTeam && styles.heroCardActive,
-                        { width: '48%', minWidth: 170, marginBottom: 0 },
+                        { width: rosterCardWidth, marginBottom: 0 },
                       ]}
                     >
                       <View style={[styles.heroCardRarityBar, { backgroundColor: rarity.color }]} />

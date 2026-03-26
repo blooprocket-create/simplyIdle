@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView, useWindowDimensions } from 'react-native';
 import { GameState, Stats, EXPEDITION_CONTRACT_REFRESH_MS, EXPEDITION_CONTRACT_REFRESH_GOLD_COST } from '../../useGameState';
 import { HERO_LEVEL_CAP, RARITIES } from '../../gameConfig';
 import { EXPEDITION_TYPES, EXPEDITION_TYPE_META, EXPEDITION_RARITY_META, formatDurationShort, ExpeditionType, ExpeditionRarity } from '../GameScreen';
@@ -43,6 +43,7 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
   refreshExpeditionContracts,
   renderSubTabBar,
 }) => {
+  const { width: viewportWidth } = useWindowDimensions();
   const activeTeamSet = useMemo(() => new Set(state.activeTeamHeroIds), [state.activeTeamHeroIds]);
 
   const rarityRank = useMemo(() => {
@@ -69,6 +70,14 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
         return a.name.localeCompare(b.name);
       });
   }, [activeTeamSet, rarityRank, state.heroRoster]);
+
+  const batchColumns = viewportWidth >= 980 ? 4 : viewportWidth >= 700 ? 3 : 2;
+  const batchGap = 8;
+  const batchHorizontalPadding = 44;
+  const batchCardWidth = Math.max(
+    140,
+    Math.floor((viewportWidth - batchHorizontalPadding - batchGap * (batchColumns - 1)) / batchColumns),
+  );
 
   return (
     <>
@@ -140,7 +149,7 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
                       key={hero.uid}
                       style={[
                         styles.batchHeroCard,
-                        { width: '48%', minWidth: 170 },
+                        { width: batchCardWidth },
                         isSelected && styles.batchHeroCardSelected,
                         isOnTeam && styles.heroCardActive,
                       ]}
