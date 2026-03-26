@@ -1521,10 +1521,18 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               </Text>
             )}
             {(stats.damageBuffPct > 0 || stats.damageReductionBuffPct > 0) && (
-              <Text style={styles.buffText}>
-                Buffs: {stats.damageBuffPct > 0 ? `+${Math.round(stats.damageBuffPct * 100)}% DPS ` : ''}
-                {stats.damageReductionBuffPct > 0 ? `• -${Math.round(stats.damageReductionBuffPct * 100)}% incoming` : ''}
-              </Text>
+              <View style={styles.monsterBuffFloatWrap} pointerEvents="none">
+                {stats.damageBuffPct > 0 && (
+                  <View style={styles.monsterBuffIconChip}>
+                    <Text style={styles.monsterBuffIconText}>⚔️ +{Math.round(stats.damageBuffPct * 100)}%</Text>
+                  </View>
+                )}
+                {stats.damageReductionBuffPct > 0 && (
+                  <View style={[styles.monsterBuffIconChip, styles.monsterBuffIconChipDefense]}>
+                    <Text style={styles.monsterBuffIconText}>🛡️ -{Math.round(stats.damageReductionBuffPct * 100)}%</Text>
+                  </View>
+                )}
+              </View>
             )}
           </View>
         </>
@@ -1558,6 +1566,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             isBoss,
             monster,
             canRebirthNow,
+            rebirthWavesLeft,
+            currentAct,
+            actProgressPct,
+            nextBossUnlock,
+            unlockLabel,
             dangerLabel,
             dangerScore,
             teamSlotCap,
@@ -1601,26 +1614,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             canBurst,
             burstCost,
             burstChargePct,
-            canRebirthNow,
-            rebirthWavesLeft,
-            currentAct,
-            actProgressPct,
-            isBoss,
-            monster,
-            monsterAffixes,
             teamSlotCap,
             getClassConfig,
-            ttkSeconds,
-            dangerScore,
-            dangerLabel,
             usableInventory,
-            nextBossUnlock,
-            unlockLabel,
             setCombatTempo,
             burst,
             buyPremiumCoolant,
             useUsableItem,
-            setRebirthOpen,
           } as any)}
         />
         <HeroesTabContent
@@ -3437,6 +3437,7 @@ export const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#2A2A4A',
     marginBottom: 8,
+    position: 'relative',
   },
   monsterHpBarBg: {
     width: '88%',
@@ -3470,6 +3471,30 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFF',
     marginBottom: 8,
+  },
+  monsterBuffFloatWrap: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  monsterBuffIconChip: {
+    borderWidth: 1,
+    borderColor: '#3E7A5C',
+    backgroundColor: 'rgba(16, 38, 30, 0.95)',
+    borderRadius: 999,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  monsterBuffIconChipDefense: {
+    borderColor: '#4B6E98',
+    backgroundColor: 'rgba(20, 30, 46, 0.95)',
+  },
+  monsterBuffIconText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#D8F6E5',
   },
 
   // Team Info

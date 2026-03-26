@@ -1,9 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
-import { REBIRTH_WAVE_THRESHOLD, StatKey, EquipmentSlot, rarityConfig } from '../../gameConfig';
-import { STAT_LABELS } from '../GameScreen';
-import { fmt } from '../../utils';
+import { rarityConfig } from '../../gameConfig';
 import { styles } from '../GameScreen';
 
 export interface BattleTabContentProps {
@@ -16,26 +14,13 @@ export interface BattleTabContentProps {
   canBurst: boolean;
   burstCost: number;
   burstChargePct: number;
-  canRebirthNow: boolean;
-  rebirthWavesLeft: number;
-  currentAct: any;
-  actProgressPct: number;
-  isBoss: boolean;
-  monster: any;
-  monsterAffixes: any[];
   teamSlotCap: number;
   getClassConfig: (heroClass: string) => any;
-  ttkSeconds: number;
-  dangerScore: number;
-  dangerLabel: string;
   usableInventory: any[];
-  nextBossUnlock: any;
-  unlockLabel: (unlock: string) => string;
   setCombatTempo: (tempo: number) => void;
   burst: (hits: number) => void;
   buyPremiumCoolant: (itemId: string) => void;
   useUsableItem: (itemId: string) => void;
-  setRebirthOpen: (open: boolean) => void;
 }
 
 export const BattleTabContent: React.FC<BattleTabContentProps> = ({
@@ -48,26 +33,13 @@ export const BattleTabContent: React.FC<BattleTabContentProps> = ({
   canBurst,
   burstCost,
   burstChargePct,
-  canRebirthNow,
-  rebirthWavesLeft,
-  currentAct,
-  actProgressPct,
-  isBoss,
-  monster,
-  monsterAffixes,
   teamSlotCap,
   getClassConfig,
-  ttkSeconds,
-  dangerScore,
-  dangerLabel,
   usableInventory,
-  nextBossUnlock,
-  unlockLabel,
   setCombatTempo,
   burst,
   buyPremiumCoolant,
   useUsableItem,
-  setRebirthOpen,
 }) => {
   return (
     <>
@@ -157,40 +129,6 @@ export const BattleTabContent: React.FC<BattleTabContentProps> = ({
             <Text style={styles.burstHint}>{canBurst ? 'Burst ready: cash in now for a wave skip push.' : `${burstCost - state.burstCharge} kills to next burst`}</Text>
           </View>
 
-          <View style={styles.battleSection}>
-            <Text style={styles.battleSectionTitle}>♾️ Rebirth</Text>
-            <Text style={styles.rebirthInlineText}>
-              {canRebirthNow
-                ? 'You can rebirth now. This resets run progress for permanent cores and scaling.'
-                : `Reach Wave ${REBIRTH_WAVE_THRESHOLD} to unlock rebirth. ${rebirthWavesLeft} waves remaining.`}
-            </Text>
-            <Pressable
-              style={[styles.rebirthInlineBtn, !canRebirthNow && styles.rebirthInlineBtnDisabled]}
-              disabled={!canRebirthNow}
-              onPress={() => setRebirthOpen(true)}
-            >
-              <Text style={styles.rebirthInlineBtnText}>{canRebirthNow ? 'Open Rebirth' : 'Rebirth Locked'}</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.battleSection}>
-            <Text style={styles.battleSectionTitle}>Act Progression</Text>
-            <Text style={styles.actTitle}>{currentAct.emoji} Act {currentAct.id}: {currentAct.name}</Text>
-            <Text style={styles.actTheme}>{currentAct.theme}</Text>
-            <View style={styles.hpBarBg}>
-              <View style={[styles.hpBarFill, { width: `${actProgressPct}%`, backgroundColor: '#5DA8FF' }]} />
-            </View>
-            <Text style={styles.actProgress}>Wave {state.wave} • Boss at Wave {currentAct.bossWave}</Text>
-            {nextBossUnlock ? (
-              <Text style={styles.actUnlockHint}>Next boss unlock: {unlockLabel(nextBossUnlock)}</Text>
-            ) : (
-              <Text style={styles.actUnlockHint}>Boss reward: bonus essence cache</Text>
-            )}
-            <Text style={styles.actUnlockOwned}>
-              Unlocks: {state.permanentUnlocks.length === 0 ? 'None yet' : state.permanentUnlocks.map(unlockLabel).join(' • ')}
-            </Text>
-          </View>
-          
           {/* Team Composition */}
           <View style={styles.battleSection}>
             <Text style={styles.battleSectionTitle}>Your Team ({state.activeTeamHeroIds.length}/{teamSlotCap})</Text>

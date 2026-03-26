@@ -19,6 +19,11 @@ export interface WarroomTabContentProps {
   isBoss: boolean;
   monster: any;
   canRebirthNow: boolean;
+  rebirthWavesLeft: number;
+  currentAct: any;
+  actProgressPct: number;
+  nextBossUnlock: any;
+  unlockLabel: (unlock: string) => string;
   dangerLabel: string;
   dangerScore: number;
   teamSlotCap: number;
@@ -64,6 +69,11 @@ export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
   isBoss,
   monster,
   canRebirthNow,
+  rebirthWavesLeft,
+  currentAct,
+  actProgressPct,
+  nextBossUnlock,
+  unlockLabel,
   dangerLabel,
   dangerScore,
   teamSlotCap,
@@ -168,6 +178,17 @@ export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
                 <Text style={styles.warPanelStat}>Wave {state.wave} • {monster.name} {isBoss ? '(Boss)' : ''}</Text>
                 <Text style={styles.warPanelStat}>Team HP: {Math.ceil(state.teamHp)} / {state.teamMaxHp}</Text>
                 <Text style={styles.warPanelStat}>Danger: {dangerLabel} ({dangerScore.toFixed(0)}%)</Text>
+                <Text style={styles.actTitle}>{currentAct.emoji} Act {currentAct.id}: {currentAct.name}</Text>
+                <Text style={styles.actTheme}>{currentAct.theme}</Text>
+                <View style={styles.hpBarBg}>
+                  <View style={[styles.hpBarFill, { width: `${actProgressPct}%`, backgroundColor: '#5DA8FF' }]} />
+                </View>
+                <Text style={styles.actProgress}>Wave {state.wave} • Boss at Wave {currentAct.bossWave}</Text>
+                {nextBossUnlock ? (
+                  <Text style={styles.actUnlockHint}>Next boss unlock: {unlockLabel(nextBossUnlock)}</Text>
+                ) : (
+                  <Text style={styles.actUnlockHint}>Boss reward: bonus essence cache</Text>
+                )}
                 <View style={styles.warPanelActionRow}>
                   <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('battle')}>
                     <Text style={styles.warPanelActionText}>Open Warfront</Text>
@@ -352,6 +373,11 @@ export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
             {warPanels.prestige && (
               <View style={styles.warPanelBody}>
                 <Text style={styles.warPanelStat}>Rebirths Completed: {state.prestigeCount ?? 0}</Text>
+                <Text style={styles.warPanelStat}>
+                  {canRebirthNow
+                    ? 'Rebirth is ready. Reset now for permanent cores and stronger scaling.'
+                    : `Rebirth unlocks at Wave ${REBIRTH_WAVE_THRESHOLD}. ${rebirthWavesLeft} waves remaining.`}
+                </Text>
                 {[
                   { n: 1, label: '1st Rebirth', bonus: 'Unlock Core Tree', done: prestige1Done },
                   { n: 5, label: '5th Rebirth', bonus: '+5% final team DPS and team max HP', done: prestige5Done },
