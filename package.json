@@ -10,6 +10,7 @@
     "build:web": "npx expo export --platform web && node scripts/patch-web.mjs",
     "build:android": "npx eas build --platform android --profile production",
     "build:android:apk": "npx eas build --platform android --profile preview",
+    "build:ios:preview": "npx eas build --platform ios --profile preview",
     "build:ios": "npx eas build --platform ios --profile production"
   },
   "dependencies": {
