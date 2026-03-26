@@ -180,6 +180,28 @@ export const EXPEDITION_CONTRACT_REFRESH_GOLD_COST = 100_000;
 const EXPEDITION_TYPES: ExpeditionType[] = ['artifact', 'merchant', 'ruins', 'vault', 'abyss'];
 const EXPEDITION_RARITIES: ExpeditionRarity[] = ['common', 'rare', 'epic', 'legendary', 'godly'];
 
+export interface Stats {
+  className: string;
+  dps: number;
+  teamDefense: number;
+  damageBuffPct: number;
+  damageReductionBuffPct: number;
+  achievementBonusPercent: number;
+  expNeeded: number;
+  expProgress: number;
+  teamBoostPercent: number;
+  vipLevel: number;
+  vipPoints: number;
+  vipDamageBonusPct: number;
+  vipGoldBonusPct: number;
+  vipExpBonusPct: number;
+  combined: StatBlock;
+  equipmentBonus: StatBlock;
+  heroDetails: Record<string, { dps: number; hp: number; str: number; vit: number; agi: number; int: number; spr: number; }>;
+  formation: { front: number; mid: number; back: number; dpsBonusPct: number; hpBonusPct: number; incomingDeltaPct: number; };
+  synergies: Array<{ id: string; name: string; effect: string; }>;
+}
+
 export interface GameState {
   playerName: string;
   playerClass: PlayerClass | null;

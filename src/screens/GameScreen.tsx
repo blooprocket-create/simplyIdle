@@ -58,15 +58,24 @@ import AchievementToast from '../components/AchievementToast';
 import RebirthModal from '../components/PrestigeModal';
 import BottomNavigation, { BottomTabType } from '../components/BottomNavigation';
 import GameHeader from '../components/GameHeader';
+import {
+  BattleTabContent,
+  WarroomTabContent,
+  HeroesTabContent,
+  StatsTabContent,
+  EquipmentTabContent,
+  AchievementsTabContent,
+  GuildhallTabContent,
+} from './tabs';
 
-type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'guildhall';
+export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'guildhall';
 type HeroesSubTab = 'summon' | 'roster';
 type EquipmentSubTab = 'inventory' | 'craft' | 'forge';
 type AchievementsSubTab = 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex';
 type GuildhallSubTab = 'batch' | 'facilities' | 'expeditions';
 type ShopTab = 'diamond' | 'gold' | 'dollar';
-type ExpeditionType = 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss';
-type ExpeditionRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
+export type ExpeditionType = 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss';
+export type ExpeditionRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
 
 type SummonReveal = {
   id: string;
@@ -90,7 +99,7 @@ interface GameScreenProps {
   onLogout: () => void;
 }
 
-const STAT_LABELS = {
+export const STAT_LABELS = {
   strength: 'STR',
   vitality: 'VIT',
   agility: 'AGI',
@@ -108,8 +117,8 @@ const TAB_META: Record<Tab, { icon: string; label: string; mood: string }> = {
   guildhall: { icon: '🏰', label: 'Guild Hall', mood: 'Infrastructure' },
 };
 
-const ACH_BONUS_PER_UNLOCK_PCT = 3;
-const ACH_BONUS_CAP_PCT = 75;
+export const ACH_BONUS_PER_UNLOCK_PCT = 3;
+export const ACH_BONUS_CAP_PCT = 75;
 const FEEDBACK_FORM_URL = 'https://forms.gle/replace-with-your-beta-form';
 const HAS_BETA_FEEDBACK_FORM = !FEEDBACK_FORM_URL.includes('replace-with-your-beta-form');
 const GEAR_RARITY_POINTS: Record<string, number> = { common: 40, rare: 90, epic: 170, legendary: 280, mythic: 430, transcendent: 680 };
@@ -143,15 +152,15 @@ const VIP_REWARD_MILESTONES = [
   { level: 10, diamonds: 5000, gold: 220000, shards: 2200, essence: 20 },
 ] as const;
 
-const EXPEDITION_TYPES: ExpeditionType[] = ['artifact', 'merchant', 'ruins', 'vault', 'abyss'];
-const EXPEDITION_TYPE_META: Record<ExpeditionType, { icon: string; name: string }> = {
+export const EXPEDITION_TYPES: ExpeditionType[] = ['artifact', 'merchant', 'ruins', 'vault', 'abyss'];
+export const EXPEDITION_TYPE_META: Record<ExpeditionType, { icon: string; name: string }> = {
   artifact: { icon: '🗿', name: 'Artifact Hunt' },
   merchant: { icon: '🏪', name: 'Merchant Convoy' },
   ruins: { icon: '🏛️', name: 'Ancient Ruins' },
   vault: { icon: '🔐', name: 'Vault Heist' },
   abyss: { icon: '🌑', name: 'Abyss Dive' },
 };
-const EXPEDITION_RARITY_META: Record<ExpeditionRarity, { goldCost: number; durationMs: number; rewardsLabel: string }> = {
+export const EXPEDITION_RARITY_META: Record<ExpeditionRarity, { goldCost: number; durationMs: number; rewardsLabel: string }> = {
   common: { goldCost: 25_000, durationMs: 5 * 60 * 1000, rewardsLabel: '+35💎 +150✨' },
   rare: { goldCost: 75_000, durationMs: 20 * 60 * 1000, rewardsLabel: '+75💎 +320✨ +1⚡' },
   epic: { goldCost: 220_000, durationMs: 90 * 60 * 1000, rewardsLabel: '+140💎 +700✨ +1⚡' },
@@ -159,7 +168,7 @@ const EXPEDITION_RARITY_META: Record<ExpeditionRarity, { goldCost: number; durat
   godly: { goldCost: 1_000_000, durationMs: 8 * 60 * 60 * 1000, rewardsLabel: '+400💎 +2400✨ +4⚡' },
 };
 
-function formatDurationShort(ms: number): string {
+export function formatDurationShort(ms: number): string {
   const totalMinutes = Math.max(1, Math.floor(ms / 60_000));
   if (totalMinutes < 60) return `${totalMinutes}m`;
   const hours = Math.floor(totalMinutes / 60);
@@ -1640,1704 +1649,216 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         ]}
       >
 
-        {tab === 'warroom' && (
-          <View style={styles.warRoomTab}>
-            <Text style={styles.sectionTitle}>🛰️ War Room Command</Text>
-            <Text style={styles.warRoomIntro}>One-screen operations hub. Expand panels for details, jump to deep tabs when needed.</Text>
-
-            <View style={styles.campaignRail}>
-              <View style={styles.campaignRailCard}>
-                <Text style={styles.campaignRailLabel}>Campaign</Text>
-                <Text style={styles.campaignRailValue}>Chapter {campaignChapter} • Stage {campaignStage}</Text>
-                <View style={styles.hpBarBg}>
-                  <View style={[styles.hpBarFill, { width: `${(campaignStage / campaignBossStage) * 100}%`, backgroundColor: '#5DA8FF' }]} />
-                </View>
-              </View>
-              <View style={styles.campaignRailCard}>
-                <Text style={styles.campaignRailLabel}>Boss Gate</Text>
-                <Text style={styles.campaignRailValue}>Stage {campaignBossStage} • Every 10 Waves</Text>
-                <Text style={styles.campaignRailHint}>{isBossImminent ? 'Pressure Rising' : 'Stabilize & Push'}</Text>
-              </View>
-              <View style={styles.campaignRailCard}>
-                <Text style={styles.campaignRailLabel}>Legion Score</Text>
-                <Text style={styles.campaignRailValue}>{fmt(teamPowerIndex)} ({powerTier})</Text>
-                <Text style={styles.campaignRailHint}>Aim for next tier via gear + mastery</Text>
-              </View>
-            </View>
-
-            <View style={styles.warNearUnlockCard}>
-              <View style={styles.warNearUnlockHeader}>
-                <Text style={styles.warNearUnlockTitle}>🏆 Near Unlocks</Text>
-                <Pressable
-                  style={styles.warNearUnlockBtn}
-                  onPress={() => {
-                    onTabChange('achievements');
-                    setAchievementsSubTab('achievements');
-                  }}
-                >
-                  <Text style={styles.warNearUnlockBtnText}>Open Records</Text>
-                </Pressable>
-              </View>
-              {nearUnlockAchievements.length === 0 ? (
-                <Text style={styles.warNearUnlockEmpty}>All achievements unlocked. You have completed the current records board.</Text>
-              ) : (
-                nearUnlockAchievements.map(item => (
-                  <View key={item.ach.id} style={styles.warNearUnlockRow}>
-                    <View style={styles.warNearUnlockTop}>
-                      <Text style={styles.warNearUnlockName}>{item.ach.emoji} {item.ach.name}</Text>
-                      <Text style={styles.warNearUnlockPct}>{Math.round(item.ratio * 100)}%</Text>
-                    </View>
-                    <Text style={styles.warNearUnlockDesc}>{item.ach.description}</Text>
-                    {item.progress && (
-                      <Text style={styles.warNearUnlockProgress}>
-                        {item.progress.label}: {fmt(item.progress.value)} / {fmt(item.progress.target)}
-                        {item.remaining != null ? ` • ${fmt(item.remaining)} to go` : ''}
-                      </Text>
-                    )}
-                    <View style={styles.hpBarBg}>
-                      <View style={[styles.hpBarFill, { width: `${Math.max(4, Math.round(item.ratio * 100))}%`, backgroundColor: '#7BD9A8' }]} />
-                    </View>
-                  </View>
-                ))
-              )}
-            </View>
-
-            <View style={styles.warPanel}>
-              <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('frontline')}>
-                <Text style={styles.warPanelTitle}>⚔️ Frontline</Text>
-                <Text style={styles.warPanelChevron}>{warPanels.frontline ? '−' : '+'}</Text>
-              </Pressable>
-              {warPanels.frontline && (
-                <View style={styles.warPanelBody}>
-                  <Text style={styles.warPanelStat}>Wave {state.wave} • {monster.name} {isBoss ? '(Boss)' : ''}</Text>
-                  <Text style={styles.warPanelStat}>Team HP: {Math.ceil(state.teamHp)} / {state.teamMaxHp}</Text>
-                  <Text style={styles.warPanelStat}>Danger: {dangerLabel} ({dangerScore.toFixed(0)}%)</Text>
-                  <View style={styles.warPanelActionRow}>
-                    <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('battle')}>
-                      <Text style={styles.warPanelActionText}>Open Warfront</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.warPanelActionBtn, !canRebirthNow && styles.warPanelActionBtnDisabled]}
-                      disabled={!canRebirthNow}
-                      onPress={() => setRebirthOpen(true)}
-                    >
-                      <Text style={styles.warPanelActionText}>{canRebirthNow ? 'Rebirth' : `Rebirth @ W${REBIRTH_WAVE_THRESHOLD}`}</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.warPanel}>
-              <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('roster')}>
-                <Text style={styles.warPanelTitle}>👥 Roster</Text>
-                <Text style={styles.warPanelChevron}>{warPanels.roster ? '−' : '+'}</Text>
-              </Pressable>
-              {warPanels.roster && (
-                <View style={styles.warPanelBody}>
-                  <Text style={styles.warPanelStat}>Active Team: {state.activeTeamHeroIds.length}/{teamSlotCap}</Text>
-                  <Text style={styles.warPanelStat}>Total Heroes: {state.heroRoster.length}</Text>
-                  <Text style={styles.warPanelStat}>Shards: {fmt(state.heroShards)}</Text>
-                                    <Text style={styles.warPanelStat}>Boss Tears: {state.bossTears} 💧 (summon currency)</Text>
-                  <View style={styles.warPanelActionRow}>
-                    <Pressable style={styles.warPanelActionBtn} onPress={autoEquipBestHeroes}>
-                      <Text style={styles.warPanelActionText}>Auto Equip</Text>
-                    </Pressable>
-                    <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('heroes')}>
-                      <Text style={styles.warPanelActionText}>Manage Roster</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.warPanel}>
-              <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('operations')}>
-                <Text style={styles.warPanelTitle}>🎲 Operations</Text>
-                <Text style={styles.warPanelChevron}>{warPanels.operations ? '−' : '+'}</Text>
-              </Pressable>
-              {warPanels.operations && (
-                <View style={styles.warPanelBody}>
-                  <Text style={styles.warPanelStat}>Daily Dice: {canPlayDiceToday ? 'Ready' : 'Claimed today'}</Text>
-                  <Text style={styles.warPanelStat}>Rift Challenge: {canRunRiftToday ? 'Ready' : 'Cleared today'}{state.lastRiftWavesCleared > 0 ? ` • Last clear ${state.lastRiftWavesCleared}/5` : ''}</Text>
-                  {state.lastDiceRollValue != null && (
-                    <Text style={styles.warPanelStat}>Last Dice Roll: {state.lastDiceRollValue}/20</Text>
-                  )}
-                  <Text style={styles.warPanelStat}>Formation Rule: Max 2 Front, 2 Mid, 2 Back</Text>
-                  <Text style={styles.warPanelStat}>Team Slots: {state.activeTeamHeroIds.length}/{teamSlotCap}</Text>
-                  {nextTeamSlotUnlock ? (
-                    <Text style={styles.warPanelStat}>
-                      Next Slot {nextTeamSlotUnlock.targetSlots}: Wave {nextTeamSlotUnlock.requiredWave}, {fmt(nextTeamSlotUnlock.goldCost)} gold, {fmt(nextTeamSlotUnlock.shardCost)} shards
-                    </Text>
-                  ) : (
-                    <Text style={styles.warPanelStat}>All team slots unlocked.</Text>
-                  )}
-                  <View style={styles.warPanelActionRow}>
-                    <Pressable
-                      style={[styles.warPanelActionBtn, !canPlayDiceToday && styles.warPanelActionBtnDisabled]}
-                      disabled={!canPlayDiceToday}
-                      onPress={() => {
-                        setDiceRollResult(null);
-                        setDiceIsRolling(false);
-                        setDiceRollModalOpen(true);
-                      }}
-                    >
-                      <View style={{ position: 'relative', alignItems: 'center' }}>
-                        <Text style={styles.warPanelActionText}>Roll Dice (+Diamonds)</Text>
-                        {canPlayDiceToday && <View style={[styles.redDot, { position: 'absolute', top: -2, right: 0 }]} />}
-                      </View>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.warPanelActionBtn, !canRunRiftToday && styles.warPanelActionBtnDisabled]}
-                      disabled={!canRunRiftToday}
-                      onPress={openRiftChallenge}
-                    >
-                      <View style={{ position: 'relative', alignItems: 'center' }}>
-                        <Text style={styles.warPanelActionText}>Run Rift (+Diamonds)</Text>
-                        {canRunRiftToday && <View style={[styles.redDot, { position: 'absolute', top: -2, right: 0 }]} />}
-                      </View>
-                    </Pressable>
-                  </View>
-                  <View style={styles.warPanelActionRow}>
-                    <Pressable
-                      style={[
-                        styles.warPanelActionBtn,
-                        (!nextTeamSlotUnlock || !nextTeamSlotUnlock.canUnlock) && styles.warPanelActionBtnDisabled,
-                      ]}
-                      disabled={!nextTeamSlotUnlock || !nextTeamSlotUnlock.canUnlock}
-                      onPress={unlockTeamSlot}
-                    >
-                      <Text style={styles.warPanelActionText}>
-                        {nextTeamSlotUnlock ? `Unlock Slot ${nextTeamSlotUnlock.targetSlots}` : 'Slots Maxed'}
-                      </Text>
-                    </Pressable>
-                    <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('heroes')}>
-                      <Text style={styles.warPanelActionText}>Edit Team</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.warPanel}>
-              <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('armory')}>
-                <Text style={styles.warPanelTitle}>🎒 Armory</Text>
-                <Text style={styles.warPanelChevron}>{warPanels.armory ? '−' : '+'}</Text>
-              </Pressable>
-              {warPanels.armory && (
-                <View style={styles.warPanelBody}>
-                  <Text style={styles.warPanelStat}>Items: {state.inventoryItemIds.length}</Text>
-                  <Text style={styles.warPanelStat}>Scrap: {fmt(state.equipmentScrap)} • Essence: {fmt(state.essence)}</Text>
-                  <View style={styles.warPanelActionRow}>
-                    <Pressable style={styles.warPanelActionBtn} onPress={() => craftEquipment('weapon')}>
-                      <Text style={styles.warPanelActionText}>Craft Weapon</Text>
-                    </Pressable>
-                    <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('equipment')}>
-                      <Text style={styles.warPanelActionText}>Open Armory</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.warPanel}>
-              <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('growth')}>
-                <Text style={styles.warPanelTitle}>📈 Growth</Text>
-                <Text style={styles.warPanelChevron}>{warPanels.growth ? '−' : '+'}</Text>
-              </Pressable>
-              {warPanels.growth && (
-                <View style={styles.warPanelBody}>
-                  <Text style={styles.warPanelStat}>Level {state.level} • Unspent: {state.unspentStatPoints}</Text>
-                  <Text style={styles.warPanelStat}>Achievement Bonus: +{(stats.achievementBonusPercent * 100).toFixed(0)}% to final DPS, gold, and EXP</Text>
-                  <Text style={styles.warPanelStat}>Rebirth Cores: {state.rebirthCores}</Text>
-                  <View style={styles.warPanelActionRow}>
-                    <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('stats')}>
-                      <Text style={styles.warPanelActionText}>Power Grid</Text>
-                    </Pressable>
-                    <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('achievements')}>
-                      <Text style={styles.warPanelActionText}>Legends</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.warPanel}>
-              <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('objectives')}>
-                <Text style={styles.warPanelTitle}>🎯 Objectives</Text>
-                <Text style={styles.warPanelChevron}>{warPanels.objectives ? '−' : '+'}</Text>
-              </Pressable>
-              {warPanels.objectives && (
-                <View style={styles.warPanelBody}>
-                  <Text style={styles.warPanelStat}>Weekly Kills: {state.weeklyKills}</Text>
-                  <Text style={styles.warPanelStat}>Missions Ready: {missionCards.filter(m => !m.claimed && m.progress.done).length}</Text>
-                  <Text style={styles.warPanelStat}>Current Event: {weeklyEvent.emoji} {weeklyEvent.name}</Text>
-                  <View style={styles.warPanelActionRow}>
-                    <Pressable
-                      style={[styles.warPanelActionBtn, !hasClaimableRewards && styles.warPanelActionBtnDisabled]}
-                      disabled={!hasClaimableRewards}
-                      onPress={claimAllRewards}
-                    >
-                      <Text style={styles.warPanelActionText}>Claim All ({claimableWeeklyMilestones.length + claimableMissionIds.length})</Text>
-                    </Pressable>
-                    <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('achievements')}>
-                      <Text style={styles.warPanelActionText}>Open Objectives</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.warPanel}>
-              <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('prestige')}>
-                <Text style={styles.warPanelTitle}>♾️ Prestige Milestones</Text>
-                <Text style={styles.warPanelChevron}>{warPanels.prestige ? '−' : '+'}</Text>
-              </Pressable>
-              {warPanels.prestige && (
-                <View style={styles.warPanelBody}>
-                  <Text style={styles.warPanelStat}>Rebirths Completed: {state.prestigeCount ?? 0}</Text>
-                  {[
-                    { n: 1, label: '1st Rebirth', bonus: 'Unlock Core Tree', done: prestige1Done },
-                    { n: 5, label: '5th Rebirth', bonus: '+5% final team DPS and team max HP', done: prestige5Done },
-                    { n: 10, label: '10th Rebirth', bonus: 'Legendary Aura visual', done: prestige10Done },
-                    { n: 25, label: '25th Rebirth', bonus: '+15% rebirth core value (meta branch power per level)', done: prestige25Done },
-                    { n: 50, label: '50th Rebirth', bonus: 'Grand Ascendant title', done: prestige50Done },
-                  ].map(m => (
-                    <View key={m.n} style={styles.prestigeMilestoneRow}>
-                      <Text style={[styles.prestigeMilestoneCheck, m.done && styles.prestigeMilestoneDone]}>{m.done ? '✅' : '○'}</Text>
-                      <View>
-                        <Text style={styles.prestigeMilestoneLabel}>{m.label}</Text>
-                        <Text style={styles.prestigeMilestoneBonus}>{m.bonus}</Text>
-                      </View>
-                    </View>
-                  ))}
-                  <View style={styles.warPanelActionRow}>
-                    <Pressable
-                      style={[styles.warPanelActionBtn, !canRebirthNow && styles.warPanelActionBtnDisabled]}
-                      disabled={!canRebirthNow}
-                      onPress={() => setRebirthOpen(true)}
-                    >
-                      <Text style={styles.warPanelActionText}>{canRebirthNow ? 'Rebirth Now' : `Rebirth @ W${REBIRTH_WAVE_THRESHOLD}`}</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
-
-        {tab === 'battle' && (
-          <View style={styles.battleTab}>
-            <Text style={styles.sectionTitle}>⚔️ Battle Overview</Text>
-
-            <View style={styles.battleTempoCard}>
-              <View style={styles.battleTempoHeader}>
-                <Text style={styles.battleTempoTitle}>Combat Tempo</Text>
-                <View style={styles.battleTempoRow}>
-                  {([1, 2, 4] as const).map(mult => (
-                    <Pressable
-                      key={mult}
-                      style={[styles.battleTempoBtn, battleSpeed === mult && styles.battleTempoBtnActive]}
-                      onPress={() => setCombatTempo(mult)}
-                    >
-                      <Text style={[styles.battleTempoBtnText, battleSpeed === mult && styles.battleTempoBtnTextActive]}>{mult}x</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-              <Text style={styles.battleTempoHint}>Higher tempo speeds up passive combat and burst payout.</Text>
-              <Text style={styles.battleTempoHint}>Heat: {Math.ceil(state.combatHeat)}/{Math.ceil(maxHeat)} {state.combatTempo > 1 ? '(building)' : '(recovering)'}</Text>
-              <View style={styles.hpBarBg}>
-                <View
-                  style={[
-                    styles.hpBarFill,
-                    {
-                      width: `${heatPct}%`,
-                      backgroundColor: heatPct >= 85 ? '#FF5B5B' : heatPct >= 55 ? '#FFB347' : '#64D39D',
-                    },
-                  ]}
-                />
-              </View>
-              <View style={styles.burstRow}>
-                <View style={styles.burstInfo}>
-                  <Text style={styles.burstTitle}>Burst Gauge</Text>
-                  <Text style={styles.burstSub}>Charge from kills ({state.burstCharge}/{burstCost}) • bosses grant +3 • spend for amplified strikes</Text>
-                </View>
-                <Pressable
-                  style={[styles.burstBtn, !canBurst && styles.burstBtnDisabled]}
-                  disabled={!canBurst}
-                  onPress={() => {
-                    const hits = 4 * battleSpeed;
-                    burst(hits);
-                  }}
-                >
-                  <Text style={styles.burstBtnText}>{canBurst ? `Burst x${4 * battleSpeed}` : 'Charging'}</Text>
-                </Pressable>
-              </View>
-              <View style={styles.hpBarBg}>
-                <View style={[styles.hpBarFill, { width: `${burstChargePct}%`, backgroundColor: '#FFB347' }]} />
-              </View>
-              <Text style={styles.burstHint}>{canBurst ? 'Burst ready: cash in now for a wave skip push.' : `${burstCost - state.burstCharge} kills to next burst`}</Text>
-              <View style={styles.heatStoreRow}>
-                <Pressable
-                  style={[styles.heatStoreBtn, state.diamonds < 8 && styles.heatStoreBtnDisabled]}
-                  disabled={state.diamonds < 8}
-                  onPress={() => buyPremiumCoolant('coolant_mk1')}
-                >
-                  <Text style={styles.heatStoreBtnText}>Buy 🧊 x1 (8💎)</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.heatStoreBtn, state.diamonds < 18 && styles.heatStoreBtnDisabled]}
-                  disabled={state.diamonds < 18}
-                  onPress={() => buyPremiumCoolant('coolant_mk2')}
-                >
-                  <Text style={styles.heatStoreBtnText}>Buy ❄️ x1 (18💎)</Text>
-                </Pressable>
-              </View>
-              <View style={styles.heatStoreRow}>
-                <Pressable
-                  style={[styles.heatUseBtn, (state.usableItemCounts['coolant_mk1'] ?? 0) <= 0 && styles.heatStoreBtnDisabled]}
-                  disabled={(state.usableItemCounts['coolant_mk1'] ?? 0) <= 0}
-                  onPress={() => useUsableItem('coolant_mk1')}
-                >
-                  <Text style={styles.heatStoreBtnText}>Use 🧊 ({state.usableItemCounts['coolant_mk1'] ?? 0})</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.heatUseBtn, (state.usableItemCounts['coolant_mk2'] ?? 0) <= 0 && styles.heatStoreBtnDisabled]}
-                  disabled={(state.usableItemCounts['coolant_mk2'] ?? 0) <= 0}
-                  onPress={() => useUsableItem('coolant_mk2')}
-                >
-                  <Text style={styles.heatStoreBtnText}>Use ❄️ ({state.usableItemCounts['coolant_mk2'] ?? 0})</Text>
-                </Pressable>
-              </View>
-            </View>
-
-            <View style={styles.battleSection}>
-              <Text style={styles.battleSectionTitle}>♾️ Rebirth</Text>
-              <Text style={styles.rebirthInlineText}>
-                {canRebirthNow
-                  ? 'You can rebirth now. This resets run progress for permanent cores and scaling.'
-                  : `Reach Wave ${REBIRTH_WAVE_THRESHOLD} to unlock rebirth. ${rebirthWavesLeft} waves remaining.`}
-              </Text>
-              <Pressable
-                style={[styles.rebirthInlineBtn, !canRebirthNow && styles.rebirthInlineBtnDisabled]}
-                disabled={!canRebirthNow}
-                onPress={() => setRebirthOpen(true)}
-              >
-                <Text style={styles.rebirthInlineBtnText}>{canRebirthNow ? 'Open Rebirth' : 'Rebirth Locked'}</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.battleSection}>
-              <Text style={styles.battleSectionTitle}>Act Progression</Text>
-              <Text style={styles.actTitle}>{currentAct.emoji} Act {currentAct.id}: {currentAct.name}</Text>
-              <Text style={styles.actTheme}>{currentAct.theme}</Text>
-              <View style={styles.hpBarBg}>
-                <View style={[styles.hpBarFill, { width: `${actProgressPct}%`, backgroundColor: '#5DA8FF' }]} />
-              </View>
-              <Text style={styles.actProgress}>Wave {state.wave} • Boss at Wave {currentAct.bossWave}</Text>
-              {nextBossUnlock ? (
-                <Text style={styles.actUnlockHint}>Next boss unlock: {unlockLabel(nextBossUnlock)}</Text>
-              ) : (
-                <Text style={styles.actUnlockHint}>Boss reward: bonus essence cache</Text>
-              )}
-              <Text style={styles.actUnlockOwned}>
-                Unlocks: {state.permanentUnlocks.length === 0 ? 'None yet' : state.permanentUnlocks.map(unlockLabel).join(' • ')}
-              </Text>
-            </View>
-            
-            {/* Enemy Info */}
-            <View style={styles.battleSection}>
-              <Text style={styles.battleSectionTitle}>Enemy {isBoss ? '👹 BOSS' : '🦹'}</Text>
-              <Text style={styles.battleMonsterName}>{monster.name} {isBoss && '(Boss)' }</Text>
-              <Text style={styles.battleMonsterWave}>Wave {state.wave} {isBoss && '- 10x Danger'}</Text>
-              <View style={styles.affixRow}>
-                {monsterAffixes.map(affix => (
-                  <View key={affix.id} style={[styles.affixChip, { borderColor: affix.color }]}>
-                    <Text style={[styles.affixChipText, { color: affix.color }]}>{affix.name}</Text>
-                  </View>
-                ))}
-              </View>
-              {monsterAffixes.map(affix => (
-                <Text key={`${affix.id}_desc`} style={styles.affixDesc}>{affix.description}</Text>
-              ))}
-            </View>
-
-            {/* Team Composition */}
-            <View style={styles.battleSection}>
-              <Text style={styles.battleSectionTitle}>Your Team ({state.activeTeamHeroIds.length}/{teamSlotCap})</Text>
-              {state.activeTeamHeroIds.length === 0 ? (
-                <Text style={styles.emptyMsg}>No team selected! Tap "Edit Team" above to assemble your squad.</Text>
-              ) : (
-                state.activeTeamHeroIds.map((heroId, idx) => {
-                  const hero = state.heroRoster.find(h => h.uid === heroId);
-                  if (!hero) return null;
-                  const cls = getClassConfig(hero.heroClass);
-                  const detail = stats.heroDetails[hero.uid];
-                  return (
-                    <View key={heroId} style={styles.battleHeroRow}>
-                      <Text style={styles.battleHeroSlot}>#{idx + 1}</Text>
-                      <Text style={styles.battleHeroInfo}>
-                        {hero.emoji} {hero.name}
-                      </Text>
-                      <Text style={styles.battleHeroStats}>
-                        ⭐{hero.rank} Lv{hero.level} • {cls.name}
-                      </Text>
-                      {detail && <Text style={styles.battleHeroDps}>{Math.floor(detail.dps)} DPS</Text>}
-                    </View>
-                  );
-                })
-              )}
-            </View>
-
-            {/* Combat Stats */}
-            <View style={styles.battleSection}>
-              <Text style={styles.battleSectionTitle}>Combat Stats</Text>
-              <View style={styles.battleStatRow}>
-                <Text style={styles.battleStatLabel}>Team DPS:</Text>
-                <Text style={styles.battleStatValue}>{Math.floor(stats.dps)}</Text>
-              </View>
-              <View style={styles.battleStatRow}>
-                <Text style={styles.battleStatLabel}>Team HP:</Text>
-                <Text style={styles.battleStatValue}>{Math.ceil(state.teamHp)} / {state.teamMaxHp}</Text>
-              </View>
-              <View style={styles.battleStatRow}>
-                <Text style={styles.battleStatLabel}>Enemy HP:</Text>
-                <Text style={styles.battleStatValue}>{Math.ceil(state.monsterHp)} / {state.monsterMaxHp}</Text>
-              </View>
-              {(stats.damageBuffPct > 0 || stats.damageReductionBuffPct > 0) && (
-                <Text style={styles.buffText}>
-                  Buffs: {stats.damageBuffPct > 0 ? `+${Math.round(stats.damageBuffPct * 100)}% DPS ` : ''}
-                  {stats.damageReductionBuffPct > 0 ? `• -${Math.round(stats.damageReductionBuffPct * 100)}% incoming` : ''}
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.battleSection}>
-              <Text style={styles.battleSectionTitle}>Forecast</Text>
-              <View style={styles.battleStatRow}>
-                <Text style={styles.battleStatLabel}>Expected TTK:</Text>
-                <Text style={styles.battleStatValue}>{ttkSeconds >= 99 ? '99s+' : `${ttkSeconds.toFixed(1)}s`}</Text>
-              </View>
-              <View style={styles.battleStatRow}>
-                <Text style={styles.battleStatLabel}>Danger:</Text>
-                <Text style={[styles.battleStatValue, dangerScore >= 80 ? styles.dangerCritical : dangerScore >= 55 ? styles.dangerHigh : styles.dangerLow]}>
-                  {dangerLabel} ({dangerScore.toFixed(0)}%)
-                </Text>
-              </View>
-              <View style={styles.hpBarBg}>
-                <View
-                  style={[
-                    styles.hpBarFill,
-                    {
-                      width: `${dangerScore}%`,
-                      backgroundColor: dangerScore >= 80 ? '#FF5B8A' : dangerScore >= 55 ? '#FFB347' : '#6DDB7B',
-                    },
-                  ]}
-                />
-              </View>
-            </View>
-
-            {/* Wave Rewards */}
-            <View style={styles.battleSection}>
-              <Text style={styles.battleSectionTitle}>Wave Rewards</Text>
-              <Text style={styles.battleRewardLabel}>
-                💰 {fmt(getMonsterGold(state.wave))} gold
-              </Text>
-              <Text style={styles.battleRewardLabel}>
-               ✨ {fmt(getMonsterExp(state.wave))} EXP
-              </Text>
-              {isBoss && (
-                <Text style={styles.battleBossReward}>👹 Bonus drops on boss defeat!</Text>
-              )}
-            </View>
-
-            <View style={styles.battleSection}>
-              <Text style={styles.battleSectionTitle}>🧰 Usable Items</Text>
-              <Text style={styles.sectionHelperText}>Automation toggles moved to Settings.</Text>
-              {usableInventory.length === 0 ? (
-                <Text style={styles.emptyMsg}>No consumables yet. Keep pushing waves for drops.</Text>
-              ) : (
-                usableInventory.map(({ item, count }) => {
-                  if (!item) return null;
-                  return (
-                    <View key={item.id} style={styles.usableRow}>
-                      <View style={styles.usableInfo}>
-                        <Text style={styles.usableName}>{item.emoji} {item.name} x{count}</Text>
-                        <Text style={styles.usableDesc}>{item.description}</Text>
-                      </View>
-                      <Pressable style={styles.useItemBtn} onPress={() => useUsableItem(item.id)}>
-                        <Text style={styles.useItemBtnText}>Use</Text>
-                      </Pressable>
-                    </View>
-                  );
-                })
-              )}
-            </View>
-
-            <View style={styles.battleSection}>
-              <Text style={styles.battleSectionTitle}>Live Combat Log</Text>
-              {state.combatLog.length === 0 ? (
-                <Text style={styles.emptyMsg}>No events yet. Start attacking to see crits and skill triggers.</Text>
-              ) : (
-                state.combatLog.slice(0, 8).map((line, idx) => (
-                  <Text key={`${idx}_${line}`} style={styles.combatLogLine}>{line}</Text>
-                ))
-              )}
-            </View>
-
-            {state.activeTeamHeroIds.length === 0 && (
-              <View style={styles.warningBox}>
-                <Text style={styles.warningText}>⚠️ No team selected! Tap the Edit Team button above to assemble your squad.</Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {tab === 'heroes' && (
-          <View style={styles.heroesTab}>
-            {renderSubTabBar((['summon', 'roster'] as const).map(st => ({
-              id: st,
-              label: st === 'summon' ? 'Summon Bay' : 'Roster',
-              active: heroesSubTab === st,
-              onPress: () => setHeroesSubTab(st),
-              disabled: (forceFreeSummonStep && st !== 'summon') || (forceBuildTeamStep && st !== 'roster'),
-              pulse: (forceFreeSummonStep && st === 'summon') || (forceBuildTeamStep && st === 'roster'),
-            })))}
-
-            {heroesSubTab === 'summon' && (
-              <View style={styles.gachaSection}>
-                <Text style={styles.sectionTitle}>✨ Gacha Summon</Text>
-                <View style={styles.featuredSummonCard}>
-                  <Text style={styles.featuredSummonTitle}>🌌 Featured Banner: Astral Vanguard</Text>
-                  <Text style={styles.featuredSummonDesc}>Higher odds for EPIC+ drops during this rotation. Mythic trigger creates full-screen flash.</Text>
-                  <View style={styles.featuredSummonMeterRow}>
-                    <Text style={styles.featuredSummonMeterLabel}>Legendary Pity</Text>
-                    <Text style={styles.featuredSummonMeterValue}>{state.gachaPityCounter}/30</Text>
-                  </View>
-                  <View style={styles.hpBarBg}>
-                    <View style={[styles.hpBarFill, { width: `${Math.min(100, (state.gachaPityCounter / 30) * 100)}%`, backgroundColor: '#C77DFF' }]} />
-                  </View>
-                  <Pressable
-                    style={[
-                      styles.featuredSummonBtn,
-                      !canGachaX10 && styles.featuredSummonBtnDisabled,
-                      forceFreeSummonStep && styles.featuredSummonBtnDisabled,
-                    ]}
-                    disabled={!canGachaX10 || forceFreeSummonStep}
-                    onPress={summonHeroX10}
-                  >
-                    <Text style={styles.featuredSummonBtnText}>Cinematic x10 Summon</Text>
-                  </Pressable>
-                </View>
-                <Text style={styles.pityLabel}>Pity: {state.gachaPityCounter}/30 • {pityRemaining} until guaranteed Legendary+</Text>
-                {state.freeSummonCharges > 0 ? (
-                  <Text style={styles.gachaFree}>Free Summon Ready ({state.freeSummonCharges})</Text>
-                ) : (
-                  <Text style={styles.gachaCost}>Cost: 💧 1 Boss Tear ({state.bossTears} owned)</Text>
-                )}
-                <View style={styles.gachaBtnRow}>
-                  <Pressable
-                    style={[
-                      styles.gachaBtn,
-                      !canGachaOnce && styles.gachaBtnDisabled,
-                      hasGachaNotification && styles.gachaBtnNotify,
-                      forceFreeSummonStep && styles.tutorialPulse,
-                    ]}
-                    disabled={!canGachaOnce}
-                    onPress={summonHero}
-                  >
-                    <Text style={styles.gachaBtnText}>{state.freeSummonCharges > 0 ? 'Use Free Summon' : 'Summon Hero'}</Text>
-                    {hasGachaNotification && <View style={styles.gachaBtnDot} />}
-                  </Pressable>
-                  <Pressable
-                    style={[
-                      styles.gachaBtn,
-                      styles.gachaBtnX10,
-                      !canGachaX10 && styles.gachaBtnDisabled,
-                      forceFreeSummonStep && styles.gachaBtnDisabled,
-                    ]}
-                    disabled={!canGachaX10 || forceFreeSummonStep}
-                    onPress={summonHeroX10}
-                  >
-                    <Text style={[styles.gachaBtnText, styles.gachaBtnTextLight]}>Summon x10</Text>
-                    <Text style={styles.gachaX10Cost}>💧 {paidX10} Boss Tears</Text>
-                  </Pressable>
-                </View>
-                <View style={styles.rarityInfo}>
-                  {RARITIES.map(r => (
-                    <View key={r.id} style={styles.rarityRow}>
-                      <View style={[styles.rarityDot, { backgroundColor: r.color }]} />
-                      <Text style={styles.rarityLabel}>{r.label}</Text>
-                      <Text style={styles.rarityChance}>{(r.chance * 100).toFixed(1)}%</Text>
-                    </View>
-                  ))}
-                </View>
-                <View style={styles.summonHistoryBox}>
-                  <Text style={styles.summonHistoryTitle}>Recent Summons</Text>
-                  <View style={styles.timelineRow}>
-                    {summonTimeline.length === 0 ? (
-                      <Text style={styles.timelineEmpty}>No summons yet</Text>
-                    ) : (
-                      summonTimeline.map(entry => {
-                        const rarity = rarityConfig(entry.rarity);
-                        return <View key={entry.id} style={[styles.timelineDot, { backgroundColor: rarity.color }]} />;
-                      })
-                    )}
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {heroesSubTab === 'roster' && (
-              <>
-                <View style={styles.heroRosterHeader}>
-                  <Text style={styles.sectionTitle}>👥 Roster Command</Text>
-                  <View style={styles.heroRosterActions}>
-                    <Pressable style={styles.autoEquipBtn} onPress={autoEquipBestHeroes}>
-                      <Text style={styles.autoEquipBtnText}>⚡ Auto Equip</Text>
-                    </Pressable>
-                    <Pressable style={styles.autoRecycleBtn} onPress={autoRecycleHeroes}>
-                      <Text style={styles.autoRecycleBtnText}>♻ Auto Recycle</Text>
-                    </Pressable>
-                  </View>
-                </View>
-                <Text style={styles.rosterCount}>
-                  {state.heroRoster.length} heroes • {state.activeTeamHeroIds.length}/{teamSlotCap} in active team
-                </Text>
-                <View style={styles.loadoutRow}>
-                  {[0, 1, 2].map(slot => (
-                    <View key={slot} style={styles.loadoutCell}>
-                      <Text style={styles.loadoutLabel}>L{slot + 1}</Text>
-                      <View style={styles.loadoutBtnsWrap}>
-                        <Pressable style={styles.loadoutSaveBtn} onPress={() => saveTeamLoadout(slot)}>
-                          <Text style={styles.loadoutBtnText}>Save</Text>
-                        </Pressable>
-                        <Pressable style={styles.loadoutLoadBtn} onPress={() => loadTeamLoadout(slot)}>
-                          <Text style={styles.loadoutBtnText}>Load</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-                {state.heroRoster.length === 0 ? (
-                  <Text style={styles.emptyMsg}>Summon your first hero!</Text>
-                ) : (
-                  state.heroRoster.map(hero => {
-                    const inActiveTeam = activeTeamSet.has(hero.uid);
-                    const cls = getClassConfig(hero.heroClass);
-                    const rarity = rarityConfig(hero.rarity);
-                    const details = stats.heroDetails[hero.uid];
-                    const isExpanded = expandedHeroes.has(hero.uid);
-                    const shardValue = calculateShardReward(hero.rarity, hero.level);
-                    const nextRankCost = hero.rank < 10 ? getRankUpShardCost(hero.rarity, hero.rank + 1) : null;
-                    const canRankUp = !!nextRankCost && state.heroShards >= nextRankCost;
-                    const trait = getHeroPassiveTraitInfo(hero.passiveTrait);
-                    const activeArchetype = getHeroActiveArchetypeInfo(hero.activeSkillArchetype);
-                    const faction = hero.heroClass === 'warrior' || hero.heroClass === 'berserker'
-                      ? 'Vanguard'
-                      : hero.heroClass === 'archer'
-                        ? 'Ranger'
-                        : hero.heroClass === 'mage'
-                          ? 'Arcanum'
-                          : 'Aegis';
-
-                    return (
-                      <View key={hero.uid} style={[styles.heroCard, inActiveTeam && styles.heroCardActive]}>
-                        <View style={[styles.heroCardRarityBar, { backgroundColor: rarity.color }]} />
-                        <View style={styles.heroCardBody}>
-                          <View style={styles.heroCardTopRow}>
-                            <View style={[styles.heroPortraitFrame, { borderColor: rarity.color }]}>
-                              <Text style={styles.heroEmoji}>{hero.emoji}</Text>
-                            </View>
-                            <View style={styles.heroCardInfo}>
-                              <Text style={styles.heroName}>{hero.name}</Text>
-                              <Text style={styles.heroDetail}>
-                                <Text style={{ color: rarity.color }}>{hero.rarity}</Text>
-                                {' • '}{cls.name}
-                              </Text>
-                              <View style={styles.heroTagRow}>
-                                <Text style={styles.heroFactionTag}>{faction}</Text>
-                                <Text style={styles.heroArchetypeTag}>{activeArchetype.name}</Text>
-                              </View>
-                              <Text style={styles.heroRank}>⭐ Rank {hero.rank}/10</Text>
-                            </View>
-                            <View style={styles.heroCardRight}>
-                              <Text style={styles.heroLevel}>Lv {hero.level}</Text>
-                              <Pressable
-                                style={[styles.toggleBtn, inActiveTeam && styles.toggleBtnActive]}
-                                onPress={() => toggleEquipHero(hero.uid)}
-                              >
-                                <Text style={styles.toggleBtnText}>{inActiveTeam ? '✔ Team' : '+ Add'}</Text>
-                              </Pressable>
-                            </View>
-                          </View>
-
-                          {nextRankCost && (
-                            <View style={styles.rankUpSection}>
-                              <Text style={styles.rankUpLabel}>Rank Up Cost: {nextRankCost} ✨</Text>
-                              <Pressable
-                                style={[styles.rankUpBtn, !canRankUp && styles.rankUpBtnDisabled]}
-                                disabled={!canRankUp}
-                                onPress={() => rankUpHero(hero.uid)}
-                              >
-                                <Text style={styles.rankUpBtnText}>{canRankUp ? 'Rank Up' : `Need ${nextRankCost - state.heroShards} more`}</Text>
-                              </Pressable>
-                            </View>
-                          )}
-                          {hero.rank === 10 && <Text style={styles.maxRankMsg}>✓ Max Rank!</Text>}
-
-                          {details && (
-                            <View style={styles.heroStatsRow}>
-                              <View style={styles.heroStatBadge}>
-                                <Text style={styles.heroStatBadgeLabel}>DPS</Text>
-                                <Text style={styles.heroStatBadgeValue}>{details.dps.toFixed(1)}</Text>
-                              </View>
-                              <View style={styles.heroStatBadge}>
-                                <Text style={styles.heroStatBadgeLabel}>HP</Text>
-                                <Text style={styles.heroStatBadgeValue}>{details.hp}</Text>
-                              </View>
-                              <View style={styles.heroStatBadge}>
-                                <Text style={styles.heroStatBadgeLabel}>Boost</Text>
-                                <Text style={styles.heroStatBadgeValue}>+{(hero.teamBoost * 100).toFixed(1)}%</Text>
-                              </View>
-                              <Pressable
-                                style={styles.expandBtn}
-                                onPress={() => setExpandedHeroes(prev => {
-                                  const s = new Set(prev);
-                                  if (s.has(hero.uid)) s.delete(hero.uid); else s.add(hero.uid);
-                                  return s;
-                                })}
-                              >
-                                <Text style={styles.expandBtnText}>{isExpanded ? '▲' : '▼'}</Text>
-                              </Pressable>
-                            </View>
-                          )}
-
-                          <View style={styles.heroIdentityBox}>
-                            <Text style={styles.heroIdentityLine}>Passive: {trait.name}</Text>
-                            <Text style={styles.heroIdentitySub}>{trait.description}</Text>
-                            <Text style={styles.heroIdentityLine}>Active: {activeArchetype.name}</Text>
-                            <Text style={styles.heroIdentitySub}>{activeArchetype.description}</Text>
-                          </View>
-
-                          {isExpanded && details && (
-                            <View style={styles.heroExpandedStats}>
-                              {(['STR', 'VIT', 'AGI', 'INT', 'SPR'] as const).map((lbl, i) => {
-                                const val = [details.str, details.vit, details.agi, details.int, details.spr][i];
-                                return (
-                                  <View key={lbl} style={styles.heroStatItem}>
-                                    <Text style={styles.heroStatItemLabel}>{lbl}</Text>
-                                    <Text style={styles.heroStatItemValue}>{val}</Text>
-                                  </View>
-                                );
-                              })}
-                            </View>
-                          )}
-
-                          {hero.level < 999 && (() => {
-                            const lvlCost = getHeroGoldLevelCost(hero.level);
-                            const canAfford = state.gold >= lvlCost;
-                            return (
-                              <Pressable
-                                style={[styles.heroLvlUpBtn, !canAfford && styles.heroLvlUpBtnDisabled]}
-                                disabled={!canAfford}
-                                onPress={() => levelUpHeroGold(hero.uid)}
-                              >
-                                <Text style={styles.heroLvlUpBtnText}>⬆ Level Up  {fmt(lvlCost)}g</Text>
-                              </Pressable>
-                            );
-                          })()}
-                          <Pressable
-                            style={styles.recycleBtn}
-                            onPress={() => setRecycleConfirmUid(hero.uid)}
-                          >
-                            <Text style={styles.recycleBtnText}>♻️ Recycle for {shardValue} ✨</Text>
-                          </Pressable>
-                        </View>
-                      </View>
-                    );
-                  })
-                )}
-              </>
-            )}
-          </View>
-        )}
-
-        {tab === 'stats' && (
-          <View style={styles.statsTab}>
-            <Text style={styles.sectionTitle}>⬆️ Stat Allocation</Text>
-            <Text style={styles.unspentLabel}>
-              Unspent Points: <Text style={styles.unspentCount}>{state.unspentStatPoints}</Text>
-            </Text>
-
-            <View style={styles.statsGrid}>
-              {(Object.keys(STAT_LABELS) as Array<keyof typeof STAT_LABELS>).map(stat => {
-                const val = stats.combined[stat];
-                const desc = classConfig.statDescriptions[stat as StatKey];
-                return (
-                  <View key={stat} style={styles.statRow}>
-                    <View style={styles.statRowTop}>
-                      <View style={styles.statLabel}>
-                        <Text style={styles.statAbr}>{STAT_LABELS[stat]}</Text>
-                        <Text style={styles.statValue}>{val}</Text>
-                      </View>
-                      <View style={styles.statBtnGroup}>
-                        <Pressable
-                          style={[styles.statBtn, state.unspentStatPoints === 0 && styles.statBtnDisabled, forceSpendStatStep && styles.tutorialPulse]}
-                          disabled={state.unspentStatPoints === 0}
-                          onPress={() => allocateStat(stat as any)}
-                        >
-                          <Text style={styles.statBtnText}>+1</Text>
-                        </Pressable>
-                        <Pressable
-                          style={[styles.statBtn, state.unspentStatPoints === 0 && styles.statBtnDisabled, forceSpendStatStep && styles.statBtnDisabled]}
-                          disabled={state.unspentStatPoints === 0 || forceSpendStatStep}
-                          onPress={() => allocateStatN(stat as any, 5)}
-                        >
-                          <Text style={styles.statBtnText}>+5</Text>
-                        </Pressable>
-                        <Pressable
-                          style={[styles.statBtn, state.unspentStatPoints === 0 && styles.statBtnDisabled, forceSpendStatStep && styles.statBtnDisabled]}
-                          disabled={state.unspentStatPoints === 0 || forceSpendStatStep}
-                          onPress={() => allocateStatN(stat as any, 10)}
-                        >
-                          <Text style={styles.statBtnText}>+10</Text>
-                        </Pressable>
-                        <Pressable
-                          style={[
-                            styles.statBtn,
-                            styles.statBtnMax,
-                            state.unspentStatPoints === 0 && styles.statBtnDisabled,
-                            forceSpendStatStep && styles.statBtnDisabled,
-                          ]}
-                          disabled={state.unspentStatPoints === 0 || forceSpendStatStep}
-                          onPress={() => allocateStatMax(stat as any)}
-                        >
-                          <Text style={styles.statBtnText}>+MAX</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                    <Text style={styles.statDesc}>{desc}</Text>
-                  </View>
-                );
-              })}
-            </View>
-
-            <View style={styles.heroBoostBox}>
-              <Text style={styles.heroBoostLabel}>💪 Hero Boost (Equipped Heroes)</Text>
-              <Text style={styles.heroBoostValue}>
-                +{(stats.teamBoostPercent * 100).toFixed(2)}% to Team DPS
-              </Text>
-            </View>
-
-            <View style={styles.metaBox}>
-              <Text style={styles.sectionTitle}>🧭 Permanent Progression</Text>
-              <Text style={styles.metaEssence}>Essence: {fmt(state.essence)}</Text>
-              <Text style={styles.sectionHelperText}>ⓘ Meta paths modify final run multipliers: Damage to DPS, Economy to gold, Survival to HP/defense.</Text>
-              <View style={styles.passiveBanner}>
-                <Text style={styles.passiveTitle}>Class Passive: {classPassive.name}</Text>
-                <Text style={styles.passiveDesc}>{classPassive.description}</Text>
-                <Text style={styles.passiveState}>
-                  {state.permanentUnlocks.includes('class_passive') ? 'Unlocked' : 'Locked (Defeat Act 1 Boss)'}
-                </Text>
-              </View>
-
-              <View style={styles.metaUpgradeRow}>
-                <View style={styles.metaUpgradeInfo}>
-                  <Text style={styles.metaUpgradeName}>Damage Path Lv {state.metaDamageLevel}</Text>
-                  <Text style={styles.metaUpgradeDesc}>+5% to final auto-DPS and active skill damage per level</Text>
-                </View>
-                <Pressable
-                  style={[styles.metaUpgradeBtn, state.essence < damageEssenceCost && styles.metaUpgradeBtnDisabled]}
-                  disabled={state.essence < damageEssenceCost}
-                  onPress={() => spendEssenceUpgrade('damage')}
-                >
-                  <Text style={styles.metaUpgradeBtnText}>{damageEssenceCost} 🜂</Text>
-                </Pressable>
-              </View>
-
-              <View style={styles.metaUpgradeRow}>
-                <View style={styles.metaUpgradeInfo}>
-                  <Text style={styles.metaUpgradeName}>Economy Path Lv {state.metaEconomyLevel}</Text>
-                  <Text style={styles.metaUpgradeDesc}>+5% to final gold gain multiplier per level</Text>
-                </View>
-                <Pressable
-                  style={[styles.metaUpgradeBtn, state.essence < economyEssenceCost && styles.metaUpgradeBtnDisabled]}
-                  disabled={state.essence < economyEssenceCost}
-                  onPress={() => spendEssenceUpgrade('economy')}
-                >
-                  <Text style={styles.metaUpgradeBtnText}>{economyEssenceCost} 🜂</Text>
-                </Pressable>
-              </View>
-
-              <View style={styles.metaUpgradeRow}>
-                <View style={styles.metaUpgradeInfo}>
-                  <Text style={styles.metaUpgradeName}>Survival Path Lv {state.metaSurvivalLevel}</Text>
-                  <Text style={styles.metaUpgradeDesc}>+5% to team max HP and defense scaling per level</Text>
-                </View>
-                <Pressable
-                  style={[styles.metaUpgradeBtn, state.essence < survivalEssenceCost && styles.metaUpgradeBtnDisabled]}
-                  disabled={state.essence < survivalEssenceCost}
-                  onPress={() => spendEssenceUpgrade('survival')}
-                >
-                  <Text style={styles.metaUpgradeBtnText}>{survivalEssenceCost} 🜂</Text>
-                </Pressable>
-              </View>
-
-              <View style={styles.rebirthTreeCard}>
-                <Text style={styles.rebirthTreeTitle}>♾️ Rebirth Tree</Text>
-                <Text style={styles.rebirthTreeCores}>Cores: {state.rebirthCores}</Text>
-                <Text style={styles.sectionHelperText}>ⓘ Rebirth branches are permanent multipliers applied on top of run stats after each ascension.</Text>
-                <View style={styles.metaUpgradeRow}>
-                  <View style={styles.metaUpgradeInfo}>
-                    <Text style={styles.metaUpgradeName}>Damage Branch Lv {state.rebirthDamagePath}</Text>
-                    <Text style={styles.metaUpgradeDesc}>+7% to final DPS multiplier per level (rebirth-only track)</Text>
-                  </View>
-                  <Pressable
-                    style={[styles.metaUpgradeBtn, state.rebirthCores < rebirthDamageCost && styles.metaUpgradeBtnDisabled]}
-                    disabled={state.rebirthCores < rebirthDamageCost}
-                    onPress={() => spendRebirthCore('damage')}
-                  >
-                    <Text style={styles.metaUpgradeBtnText}>{rebirthDamageCost} Core</Text>
-                  </Pressable>
-                </View>
-                <View style={styles.metaUpgradeRow}>
-                  <View style={styles.metaUpgradeInfo}>
-                    <Text style={styles.metaUpgradeName}>Economy Branch Lv {state.rebirthEconomyPath}</Text>
-                    <Text style={styles.metaUpgradeDesc}>+7% to final gold multiplier per level (rebirth-only track)</Text>
-                  </View>
-                  <Pressable
-                    style={[styles.metaUpgradeBtn, state.rebirthCores < rebirthEconomyCost && styles.metaUpgradeBtnDisabled]}
-                    disabled={state.rebirthCores < rebirthEconomyCost}
-                    onPress={() => spendRebirthCore('economy')}
-                  >
-                    <Text style={styles.metaUpgradeBtnText}>{rebirthEconomyCost} Core</Text>
-                  </Pressable>
-                </View>
-                <View style={styles.metaUpgradeRow}>
-                  <View style={styles.metaUpgradeInfo}>
-                    <Text style={styles.metaUpgradeName}>Survival Branch Lv {state.rebirthSurvivalPath}</Text>
-                    <Text style={styles.metaUpgradeDesc}>+7% to team HP and defense scaling per level (rebirth-only track)</Text>
-                  </View>
-                  <Pressable
-                    style={[styles.metaUpgradeBtn, state.rebirthCores < rebirthSurvivalCost && styles.metaUpgradeBtnDisabled]}
-                    disabled={state.rebirthCores < rebirthSurvivalCost}
-                    onPress={() => spendRebirthCore('survival')}
-                  >
-                    <Text style={styles.metaUpgradeBtnText}>{rebirthSurvivalCost} Core</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.equipmentBox}>
-              <Text style={styles.sectionTitle}>🧰 Equipment Bonuses</Text>
-              <Text style={styles.equipmentDesc}>Manage equip/upgrade actions in the Equipment tab.</Text>
-              <View style={styles.equipmentBonusRow}>
-                <Text style={styles.equipmentBonusText}>+STR {stats.equipmentBonus.strength}</Text>
-                <Text style={styles.equipmentBonusText}>+VIT {stats.equipmentBonus.vitality}</Text>
-                <Text style={styles.equipmentBonusText}>+AGI {stats.equipmentBonus.agility}</Text>
-                <Text style={styles.equipmentBonusText}>+INT {stats.equipmentBonus.intelligence}</Text>
-                <Text style={styles.equipmentBonusText}>+SPR {stats.equipmentBonus.spirit}</Text>
-              </View>
-            </View>
-
-            <View style={styles.masteryCard}>
-              <Text style={styles.masteryTitle}>⚡ Class Mastery: {stats.className}</Text>
-              <Text style={styles.masteryLevel}>Mastery Level {classMasteryLevel} <Text style={styles.masteryLevelSub}>(1 level per 100 mastery XP)</Text></Text>
-              <View style={styles.hpBarBg}>
-                <View style={[styles.hpBarFill, { width: `${((state.playerClass ? state.classMasteryXp[state.playerClass] : 0) % 100)}%`, backgroundColor: '#7BD9A8' }]} />
-              </View>
-              <Text style={styles.masteryHint}>{(state.playerClass ? state.classMasteryXp[state.playerClass] : 0) % 100}/100 mastery XP to next level</Text>
-              {[
-                { lvl: 1, perk: '+10% to class base stats used in DPS/HP formulas', done: classMasteryLevel >= 1 },
-                { lvl: 5, perk: '+5% to final gold gain multiplier', done: classMasteryLevel >= 5 },
-                { lvl: 10, perk: '+15% to passive-skill damage contribution', done: classMasteryLevel >= 10 },
-                { lvl: 25, perk: 'Mastery Aura: team-wide +8% max HP', done: classMasteryLevel >= 25 },
-                { lvl: 50, perk: 'Grand Mastery: unlock legendary passive', done: classMasteryLevel >= 50 },
-              ].map(m => (
-                <View key={m.lvl} style={styles.masteryMilestoneRow}>
-                  <Text style={[styles.masteryMilestoneCheck, m.done && styles.masteryMilestoneDone]}>{m.done ? '✅' : '○'}</Text>
-                  <View>
-                    <Text style={styles.masteryMilestoneLvl}>Lv {m.lvl}</Text>
-                    <Text style={styles.masteryMilestonePerk}>{m.perk}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {tab === 'equipment' && (
-          <View style={styles.equipmentTab}>
-            <View style={styles.equipHeaderRow}>
-              <Text style={styles.sectionTitle}>🎒 Equipment Inventory</Text>
-            </View>
-            {renderSubTabBar((['inventory', 'craft', 'forge'] as const).map(st => ({
-              id: st,
-              label: st === 'inventory' ? 'Inventory' : st === 'craft' ? 'Crafting' : 'Forge',
-              active: equipmentSubTab === st,
-              onPress: () => setEquipmentSubTab(st),
-            })))}
-            <Text style={styles.equipInventoryCount}>
-              Total: {state.inventoryItemIds.length} items • Shards: <Text style={{ color: '#FFB347' }}>{state.heroShards}</Text>
-            </Text>
-            <Text style={styles.scrapLabel}>🔩 Scrap: {fmt(state.equipmentScrap)}</Text>
-            <Text style={styles.mythicTierLabel}>
-              Mythic Tier: {state.permanentUnlocks.includes('mythic_equipment') ? 'Unlocked' : 'Locked (Defeat Act 3 Boss)'}
-            </Text>
-            {equipmentSubTab === 'inventory' && (
-              <View style={styles.equipOptimizeRow}>
-                <Pressable style={styles.equipOptimizeBtn} onPress={optimizeEquipment}>
-                  <Text style={styles.equipOptimizeBtnText}>⚡ Optimize Gear</Text>
-                </Pressable>
-                <Pressable style={styles.equipDismantleBtn} onPress={autoDismantleEquipment}>
-                  <Text style={styles.equipDismantleBtnText}>🧰 Auto Dismantle</Text>
-                </Pressable>
-                <Text style={styles.equipOptimizeHint}>Optimize equips best item per slot. Auto dismantle scraps all unequipped items.</Text>
-              </View>
-            )}
-            {equipmentSubTab === 'craft' && (
-              <View style={styles.craftRow}>
-                {(['weapon', 'armor', 'accessory'] as EquipmentSlot[]).map(slot => {
-                  const cost = getEquipmentCraftCost(slot);
-                  const canCraft = state.equipmentScrap >= cost.scrap && state.gold >= cost.gold;
-                  return (
-                    <Pressable
-                      key={slot}
-                      style={[styles.craftBtn, !canCraft && styles.craftBtnDisabled]}
-                      disabled={!canCraft}
-                      onPress={() => craftEquipment(slot)}
-                    >
-                      <Text style={styles.craftBtnText}>{slot.toUpperCase()}</Text>
-                      <Text style={styles.craftCostText}>{cost.scrap}🔩 • {fmt(cost.gold)}g</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            )}
-            {equipmentSubTab === 'inventory' && state.inventoryItemIds.length === 0 ? (
-              <Text style={styles.emptyMsg}>No equipment yet! Kill monsters to find better gear.</Text>
-            ) : equipmentSubTab === 'inventory' ? (
-              state.inventoryItemIds.map(itemId => {
-                const item = getEquipmentItem(itemId);
-                if (!item) return null;
-                const isEquipped = Object.values(state.equippedItems).includes(itemId);
-                const rarity = equipmentRarityConfig(item.rarity);
-                const upgradePlan = getUpgradePlan(item.id);
-                return (
-                  <View key={itemId} style={[styles.invEquipCard, isEquipped && styles.invEquipCardEquipped]}>
-                    <View style={[styles.invEquipRarity, { backgroundColor: rarity.color }]} />
-                    <View style={styles.invEquipContent}>
-                      <View style={styles.invEquipHeader}>
-                        <Text style={styles.invEquipName}>{item.emoji} {item.name}</Text>
-                        <Text style={[styles.invEquipRarity2, { color: rarity.color }]}>{item.rarity}</Text>
-                      </View>
-                      <Text style={styles.invEquipSlot}>{item.slot.toUpperCase()}</Text>
-                      <Text style={styles.invEquipBonus}>
-                        {Object.entries(item.bonus)
-                          .filter(([_, v]) => v)
-                          .map(([k, v]) => `+${v} ${k === 'strength' ? 'STR' : k === 'vitality' ? 'VIT' : k === 'agility' ? 'AGI' : k === 'intelligence' ? 'INT' : 'SPR'}`)
-                          .join(' • ')}
-                      </Text>
-                      {isEquipped && <Text style={styles.invEquipActive}>✓ Equipped</Text>}
-                      <View style={styles.equipActionRow}>
-                        {!isEquipped && (
-                          <>
-                            <Pressable style={styles.equipNowBtn} onPress={() => equipItem(item.id)}>
-                              <Text style={styles.equipNowBtnText}>Equip</Text>
-                            </Pressable>
-                            <Pressable style={styles.compareBtn} onPress={() => setCompareItemId(compareItemId === item.id ? null : item.id)}>
-                              <Text style={styles.compareBtnText}>vs</Text>
-                            </Pressable>
-                          </>
-                        )}
-                        <Pressable
-                          style={[styles.upgradeGearBtn, !upgradePlan.canUpgrade && styles.upgradeGearBtnDisabled]}
-                          disabled={!upgradePlan.canUpgrade}
-                          onPress={() => upgradeEquipmentRarity(item.id)}
-                        >
-                          <Text style={styles.upgradeGearBtnText}>
-                            {upgradePlan.targetRarity
-                              ? `Upgrade → ${upgradePlan.targetRarity.toUpperCase()} (${upgradePlan.scrapCost}🔩 ${upgradePlan.essenceCost}🜂 ${fmt(upgradePlan.goldCost)}g)`
-                              : 'Upgrade Unavailable'}
-                          </Text>
-                        </Pressable>
-                      </View>
-                      {!isEquipped && compareItemId === item.id && (() => {
-                        const curId = state.equippedItems[item.slot as EquipmentSlot];
-                        const curItem = curId ? getEquipmentItem(curId) : null;
-                        const allStats = ['strength', 'vitality', 'agility', 'intelligence', 'spirit'] as const;
-                        return (
-                          <View style={styles.comparePanel}>
-                            <Text style={styles.comparePanelTitle}>vs Current: {curItem ? `${curItem.name} (${curItem.rarity})` : 'Empty slot'}</Text>
-                            <View style={styles.compareStatRow}>
-                              {allStats.map(stat => {
-                                const nv = item.bonus[stat] ?? 0;
-                                const cv = curItem?.bonus[stat] ?? 0;
-                                const diff = nv - cv;
-                                if (nv === 0 && cv === 0) return null;
-                                return (
-                                  <Text key={stat} style={[
-                                    styles.compareStat,
-                                    diff > 0 ? styles.compareStatUp : diff < 0 ? styles.compareStatDown : styles.compareStatNeutral,
-                                  ]}>
-                                    {stat.slice(0, 3).toUpperCase()}: {diff >= 0 ? '+' : ''}{diff}
-                                  </Text>
-                                );
-                              })}
-                            </View>
-                          </View>
-                        );
-                      })()}
-                      {!isEquipped && (
-                        <Pressable style={styles.dismantleBtn} onPress={() => dismantleEquipment(item.id)}>
-                          <Text style={styles.dismantleBtnText}>Dismantle</Text>
-                        </Pressable>
-                      )}
-                    </View>
-                  </View>
-                );
-              })
-            ) : equipmentSubTab === 'forge' ? (
-              <>
-                <View style={styles.shardForgeCard}>
-                  <Text style={styles.shardForgeTitle}>Shard Forge</Text>
-                  <Text style={styles.shardForgeDesc}>Spend overflow shards for persistent value and keep the roster economy under control.</Text>
-                  <View style={styles.shardForgeRow}>
-                    <Pressable
-                      style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.essenceCost && styles.shardForgeBtnDisabled]}
-                      disabled={state.heroShards < shardForgeCosts.essenceCost}
-                      onPress={convertShardsToEssence}
-                    >
-                      <Text style={styles.shardForgeBtnText}>Essence • {shardForgeCosts.essenceCost} ✨</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.scrapCost && styles.shardForgeBtnDisabled]}
-                      disabled={state.heroShards < shardForgeCosts.scrapCost}
-                      onPress={convertShardsToScrap}
-                    >
-                      <Text style={styles.shardForgeBtnText}>Scrap • {shardForgeCosts.scrapCost} ✨</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              </>
-            ) : (
-              <Text style={styles.sectionHelperText}>Select Inventory to manage equipped items and upgrades.</Text>
-            )}
-          </View>
-        )}
-
-        {tab === 'achievements' && (
-          <View style={styles.achievementsTab}>
-            {renderSubTabBar((['overview', 'weekly', 'missions', 'achievements', 'collection', 'codex'] as const).map(st => ({
-              id: st,
-              label: st === 'overview' ? 'Overview' : st === 'weekly' ? 'Weekly' : st === 'missions' ? 'Missions' : st === 'achievements' ? 'Records' : st === 'collection' ? 'Collection' : 'Codex',
-              active: achievementsSubTab === st,
-              onPress: () => setAchievementsSubTab(st),
-            })))}
-
-            {(achievementsSubTab === 'overview' || achievementsSubTab === 'weekly' || achievementsSubTab === 'missions') && (
-              <View style={styles.achievementBonusCard}>
-                <View style={styles.achievementBonusHeader}>
-                  <Text style={styles.achievementBonusTitle}>Legacy Bonus Engine</Text>
-                  <Text style={styles.achievementBonusValue}>+{(stats.achievementBonusPercent * 100).toFixed(0)}%</Text>
-                </View>
-                <Text style={styles.achievementBonusDesc}>
-                  Each unlocked achievement grants +{ACH_BONUS_PER_UNLOCK_PCT}% to final DPS, gold gain, and EXP gain multipliers.
-                </Text>
-                <Text style={styles.achievementBonusDesc}>
-                  Cap: +{ACH_BONUS_CAP_PCT}% • Unlocked: {state.achievements.size}/{ACHIEVEMENTS.length}
-                </Text>
-                <Text style={styles.achievementBonusDesc}>
-                  Current multiplier: x{(1 + stats.achievementBonusPercent).toFixed(2)} applied after most build/class/rebirth modifiers.
-                </Text>
-                <Text style={styles.achievementBonusDesc}>
-                  Affects now: DPS x{(1 + stats.achievementBonusPercent).toFixed(2)} • Gold x{(1 + stats.achievementBonusPercent).toFixed(2)} • EXP x{(1 + stats.achievementBonusPercent).toFixed(2)}
-                </Text>
-                <View style={styles.claimAllRow}>
-                  <Text style={styles.claimAllInfo}>Claimable: {claimableWeeklyMilestones.length + claimableMissionIds.length}</Text>
-                  <Pressable
-                    style={[styles.claimAllBtn, !hasClaimableRewards && styles.claimAllBtnDisabled]}
-                    disabled={!hasClaimableRewards}
-                    onPress={claimAllRewards}
-                  >
-                    <Text style={styles.claimAllBtnText}>Claim All Rewards</Text>
-                  </Pressable>
-                </View>
-              </View>
-            )}
-
-            {(achievementsSubTab === 'overview' || achievementsSubTab === 'weekly') && (
-              <View style={styles.weeklyEventCard}>
-              <Text style={styles.weeklyEventTitle}>{weeklyEvent.emoji} Weekly Event: {weeklyEvent.name}</Text>
-              <Text style={styles.weeklyEventDesc}>{weeklyEvent.description}</Text>
-              <Text style={styles.weeklyProgressLabel}>Weekly Kills: {state.weeklyKills}</Text>
-              {WEEKLY_TRACK_MILESTONES.map(ms => {
-                const done = state.weeklyKills >= ms;
-                const claimed = state.weeklyTrackClaimed.includes(ms);
-                return (
-                  <View key={ms} style={styles.weeklyTrackRow}>
-                    <Text style={styles.weeklyTrackText}>Milestone {ms}</Text>
-                    <Pressable
-                      style={[
-                        styles.weeklyClaimBtn,
-                        (!done || claimed) && styles.weeklyClaimBtnDisabled,
-                      ]}
-                      disabled={!done || claimed}
-                      onPress={() => claimWeeklyTrack(ms)}
-                    >
-                      <Text style={styles.weeklyClaimBtnText}>{claimed ? 'Claimed' : done ? 'Claim' : 'Locked'}</Text>
-                    </Pressable>
-                  </View>
-                );
-              })}
-              </View>
-            )}
-
-            {(achievementsSubTab === 'overview' || achievementsSubTab === 'missions') && (
-              <View style={styles.missionBoardCard}>
-              <Text style={styles.sectionTitle}>🎯 Mission Board</Text>
-              {missionCards.map(({ mission, progress, claimed }) => (
-                <View key={mission.id} style={styles.missionRow}>
-                  <View style={styles.missionInfo}>
-                    <Text style={styles.missionTitle}>{mission.title} ({mission.horizon})</Text>
-                    <Text style={styles.missionDesc}>{mission.description}</Text>
-                    <Text style={styles.missionProgress}>{Math.min(progress.value, mission.target)}/{mission.target}</Text>
-                  </View>
-                  <Pressable
-                    style={[styles.missionClaimBtn, (!progress.done || claimed) && styles.missionClaimBtnDisabled]}
-                    disabled={!progress.done || claimed}
-                    onPress={() => claimMission(mission.id)}
-                  >
-                    <Text style={styles.missionClaimBtnText}>{claimed ? 'Claimed' : progress.done ? 'Claim' : 'Locked'}</Text>
-                  </Pressable>
-                </View>
-              ))}
-              </View>
-            )}
-
-            {(achievementsSubTab === 'overview' || achievementsSubTab === 'achievements') && <Text style={styles.sectionTitle}>🏆 Achievements</Text>}
-            {(achievementsSubTab === 'overview' || achievementsSubTab === 'achievements') && ACHIEVEMENTS.map(ach => {
-              const unlocked = state.achievements.has(ach.id);
-              return (
-                <View key={ach.id} style={[styles.achCard, unlocked && styles.achCardUnlocked]}>
-                  <Text style={styles.achEmoji}>{ach.emoji}</Text>
-                  <View style={styles.achCardInfo}>
-                    <Text style={[styles.achName, unlocked && styles.achNameUnlocked]}>{ach.name}</Text>
-                    <Text style={styles.achDesc}>{ach.description}</Text>
-                    <Text style={[styles.achBonusLine, unlocked && styles.achBonusLineUnlocked]}>
-                      {unlocked
-                        ? `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/gold/EXP applied`
-                        : `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/gold/EXP on unlock`}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
-
-            {achievementsSubTab === 'collection' && (
-              <View>
-                <Text style={styles.sectionTitle}>📚 Collection Log</Text>
-                <Text style={styles.sectionHelperText}>Track everything you've collected. Completion grants bonus power.</Text>
-
-                <View style={styles.collectionCard}>
-                  <Text style={styles.collectionCardTitle}>👥 Heroes</Text>
-                  <Text style={styles.collectionStat}>{state.heroRoster.length} heroes summoned</Text>
-                  {(['common','rare','epic','legendary','mythic'] as const).map(r => {
-                    const count = state.heroRoster.filter(h => h.rarity === r).length;
-                    return count > 0 ? (
-                      <Text key={r} style={styles.collectionStat}> • {r}: {count}</Text>
-                    ) : null;
-                  })}
-                  {state.heroRoster.length >= 10 && <Text style={styles.collectionBonus}>✅ Bonus: +5% final team DPS multiplier</Text>}
-                  {state.heroRoster.length >= 25 && <Text style={styles.collectionBonus}>✅ Bonus: +10% hero team-boost contribution</Text>}
-                </View>
-
-                <View style={styles.collectionCard}>
-                  <Text style={styles.collectionCardTitle}>🎒 Equipment</Text>
-                  <Text style={styles.collectionStat}>{state.inventoryItemIds.length} items held</Text>
-                  <Text style={styles.collectionStat}>{Object.values(state.equippedItems).filter(Boolean).length} / 3 slots filled</Text>
-                  {state.permanentUnlocks.includes('mythic_equipment') && <Text style={styles.collectionBonus}>✅ Mythic Tier Unlocked</Text>}
-                  {!state.permanentUnlocks.includes('mythic_equipment') && <Text style={styles.collectionHint}>🔒 Defeat Act 3 Boss to unlock Mythic</Text>}
-                </View>
-
-                <View style={styles.collectionCard}>
-                  <Text style={styles.collectionCardTitle}>👑 Bosses Defeated</Text>
-                  <Text style={styles.collectionStat}>Highest wave: {state.wave}</Text>
-                  <Text style={styles.collectionStat}>Boss waves cleared: {Math.floor(state.wave / 10)}</Text>
-                  {Math.floor(state.wave / 10) >= 5 && <Text style={styles.collectionBonus}>✅ Boss Veteran: +5% final gold multiplier</Text>}
-                </View>
-
-                <View style={styles.collectionCard}>
-                  <Text style={styles.collectionCardTitle}>🔓 Unlocks & Relics</Text>
-                  {state.permanentUnlocks.length === 0 ? (
-                    <Text style={styles.collectionStat}>No unlocks yet. Defeat bosses to progress.</Text>
-                  ) : (
-                    state.permanentUnlocks.map(u => (
-                      <Text key={u} style={styles.collectionBonus}>✅ {u.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</Text>
-                    ))
-                  )}
-                </View>
-
-                <View style={styles.collectionCard}>
-                  <Text style={styles.collectionCardTitle}>♾️ Rebirths</Text>
-                  <Text style={styles.collectionStat}>Times ascended: {state.prestigeCount ?? 0}</Text>
-                  <Text style={styles.collectionStat}>Rebirth Cores: {state.rebirthCores}</Text>
-                  {(state.prestigeCount ?? 0) >= 1 && <Text style={styles.collectionBonus}>✅ First Rebirth: Unlocked Core Tree</Text>}
-                  {(state.prestigeCount ?? 0) >= 5 && <Text style={styles.collectionBonus}>✅ Veteran: +5% rebirth core branch effectiveness</Text>}
-                </View>
-              </View>
-            )}
-
-            {achievementsSubTab === 'codex' && (
-              <View>
-                <Text style={styles.sectionTitle}>📖 Legacy Codex</Text>
-                <Text style={styles.sectionHelperText}>Long-term milestones that define your legend. Each grants a permanent title.</Text>
-                <View style={styles.storyCardWrap}>
-                  <Text style={styles.storyCardTitle}>🧭 War Chronicle</Text>
-                  <Text style={styles.storyCardSubtitle}>
-                    Unlocked chapters: {storyEntries.filter(entry => entry.unlocked).length}/{storyEntries.length}
-                  </Text>
-                  {storyEntries.map(entry => (
-                    <View key={entry.id} style={[styles.storyBeatCard, entry.unlocked && styles.storyBeatCardUnlocked]}>
-                      <Text style={[styles.storyBeatChapter, entry.unlocked && styles.storyBeatChapterUnlocked]}>
-                        {entry.unlocked ? '✅' : '🔒'} {entry.chapter} - {entry.title}
-                      </Text>
-                      <Text style={styles.storyBeatBody}>{entry.unlocked ? entry.body : 'Classified until campaign requirements are met.'}</Text>
-                      <Text style={styles.storyBeatReq}>
-                        Req: Wave {entry.unlockWave}
-                        {entry.unlockPrestige != null ? ` • Rebirth ${entry.unlockPrestige}+` : ''}
-                      </Text>
-                    </View>
-                  ))}
-                  {nextStoryEntry && (
-                    <Text style={styles.storyNextHint}>
-                      Next chapter unlock: Wave {nextStoryEntry.unlockWave}
-                      {nextStoryEntry.unlockPrestige != null ? ` and Rebirth ${nextStoryEntry.unlockPrestige}+` : ''}
-                    </Text>
-                  )}
-                </View>
-                {[
-                  { id: 'codex_wave100', title: 'Warlord', desc: 'Reach Wave 100', done: state.wave >= 100, reward: 'Title: Warlord' },
-                  { id: 'codex_wave500', title: 'Conqueror', desc: 'Reach Wave 500', done: state.wave >= 500, reward: 'Title: Conqueror' },
-                  { id: 'codex_wave1000', title: 'Legend', desc: 'Reach Wave 1000', done: state.wave >= 1000, reward: 'Title: Legend' },
-                  { id: 'codex_rebirth1', title: 'Reborn', desc: 'Complete 1 Rebirth', done: (state.prestigeCount ?? 0) >= 1, reward: 'Title: Reborn' },
-                  { id: 'codex_rebirth10', title: 'Eternal', desc: 'Complete 10 Rebirths', done: (state.prestigeCount ?? 0) >= 10, reward: 'Title: Eternal' },
-                  { id: 'codex_rebirth25', title: 'Immortal', desc: 'Complete 25 Rebirths', done: (state.prestigeCount ?? 0) >= 25, reward: 'Title: Immortal' },
-                  { id: 'codex_heroes25', title: 'Commander', desc: 'Summon 25 heroes', done: state.heroRoster.length >= 25, reward: 'Title: Commander' },
-                  { id: 'codex_ach10', title: 'Achiever', desc: 'Unlock 10 achievements', done: state.achievements.size >= 10, reward: 'Title: Achiever' },
-                  { id: 'codex_allunlocks', title: 'Sovereign', desc: 'Collect all permanent unlocks', done: state.permanentUnlocks.length >= 3, reward: 'Title: Sovereign' },
-                  { id: 'codex_streak30', title: 'Devoted', desc: 'Maintain a 30-day login streak', done: (state.dailyLoginStreak ?? 0) >= 30, reward: 'Title: Devoted' },
-                ].map(entry => (
-                  <View key={entry.id} style={[styles.codexEntry, entry.done && styles.codexEntryDone]}>
-                    <View style={styles.codexEntryLeft}>
-                      <Text style={[styles.codexTitle, entry.done && styles.codexTitleDone]}>{entry.done ? '✅' : '🔒'} {entry.title}</Text>
-                      <Text style={styles.codexDesc}>{entry.desc}</Text>
-                      <Text style={styles.codexReward}>{entry.reward}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
-
-        {tab === 'guildhall' && (
-          <View style={styles.guildhallTab}>
-            <Text style={styles.sectionTitle}>⚔️ Guild Headquarters</Text>
-            {renderSubTabBar((['batch', 'facilities', 'expeditions'] as const).map(st => ({
-              id: st,
-              label: st === 'batch' ? 'Batch Level' : st === 'facilities' ? 'Facilities' : 'Expeditions',
-              active: guildhallSubTab === st,
-              onPress: () => setGuildhallSubTab(st),
-            })))}
-
-            {/* BATCH LEVELING TAB */}
-            {guildhallSubTab === 'batch' && (
-              <View style={styles.batchLevelingSection}>
-                <Text style={styles.batchLevelTitle}>📚 Level Multiple Heroes at Once</Text>
-                <View style={styles.batchLevelControls}>
-                  <View style={styles.targetLevelControl}>
-                    <Text style={styles.targetLevelLabel}>Level Increase: </Text>
-                    <View style={styles.targetLevelButtons}>
-                      {([10, 50, 100, 'max'] as const).map(mode => (
-                        <Pressable
-                          key={String(mode)}
-                          style={[styles.levelBtn, batchLevelMode === mode && styles.levelBtnActive]}
-                          onPress={() => setBatchLevelMode(mode)}
-                        >
-                          <Text style={[styles.levelBtnText, batchLevelMode === mode && styles.levelBtnTextActive]}>
-                            {mode === 'max' ? '+MAX' : `+${mode}`}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </View>
-                </View>
-
-                <Text style={styles.selectHeroesLabel}>Select Heroes to Level</Text>
-                <ScrollView style={styles.batchHeroList} nestedScrollEnabled>
-                  {state.heroRoster.map(hero => {
-                    const isSelected = batchLevelSelected.has(hero.uid);
-                    const maxLevel = HERO_LEVEL_CAP;
-                    if (hero.level >= maxLevel) return null;
-                    const isOnTeam = state.activeTeamHeroIds.includes(hero.uid);
-
-                    let totalCost = 0;
-                    let projectedLevel = hero.level;
-
-                    if (batchLevelMode === 'max') {
-                      for (let lvl = hero.level; lvl < maxLevel; lvl++) {
-                        totalCost += getHeroGoldLevelCost(lvl);
-                      }
-                      projectedLevel = maxLevel;
-                    } else {
-                      for (let lvl = hero.level; lvl < Math.min(hero.level + batchLevelMode, maxLevel); lvl++) {
-                        totalCost += getHeroGoldLevelCost(lvl);
-                      }
-                      projectedLevel = Math.min(hero.level + batchLevelMode, maxLevel);
-                    }
-
-                    return (
-                      <Pressable
-                        key={hero.uid}
-                        style={[styles.batchHeroCard, isSelected && styles.batchHeroCardSelected]}
-                        onPress={() => {
-                          const updated = new Set(batchLevelSelected);
-                          if (updated.has(hero.uid)) {
-                            updated.delete(hero.uid);
-                          } else {
-                            updated.add(hero.uid);
-                          }
-                          setBatchLevelSelected(updated);
-                        }}
-                      >
-                        <View style={styles.batchHeroCheckbox}>
-                          {isSelected && <View style={styles.batchHeroCheckboxInner} />}
-                        </View>
-                        <View style={styles.batchHeroInfo}>
-                          <Text style={styles.batchHeroName}>{hero.emoji} {hero.name}</Text>
-                          <Text style={styles.batchHeroLevel}>Level {hero.level} → {projectedLevel}</Text>
-                          {isOnTeam && <Text style={styles.batchHeroTeamTag}>🛡️ Active Team</Text>}
-                          <Text style={styles.batchHerosCost}>Cost: {fmt(totalCost)} 💰</Text>
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-
-                {batchLevelSelected.size > 0 && (
-                  <Pressable
-                    style={styles.batchLevelConfirmBtn}
-                    onPress={() => {
-                      batchLevelHeroes(Array.from(batchLevelSelected), batchLevelMode);
-                      setBatchLevelSelected(new Set());
-                    }}
-                  >
-                    <Text style={styles.batchLevelConfirmText}>
-                      Apply {batchLevelMode === 'max' ? '+MAX' : `+${batchLevelMode}`} to {batchLevelSelected.size} Heroes
-                    </Text>
-                  </Pressable>
-                )}
-              </View>
-            )}
-
-            {/* FACILITIES TAB */}
-            {guildhallSubTab === 'facilities' && (
-              <View style={styles.facilitiesSection}>
-                <Text style={styles.facilitiesTitle}>🏰 Guild Facilities</Text>
-                <Text style={styles.facilitiesDesc}>Invest gold in permanent facilities to gain passive bonuses</Text>
-
-                {(['training', 'treasury', 'forge', 'tactics'] as const).map(facility => {
-                  const level = state.guildhallFacilities[facility].level;
-                  const costs: Record<string, number[]> = {
-                    training: [5000, 12000, 30000, 75000, 150000, 300000],
-                    treasury: [4000, 10000, 25000, 60000, 120000, 250000],
-                    forge: [6000, 15000, 40000, 90000, 180000, 350000],
-                    tactics: [5000, 12000, 30000, 75000, 150000, 300000],
-                  };
-
-                  const nextCost = costs[facility][level];
-                  const canUpgrade = level < 5 && state.gold >= nextCost;
-                  const bonuses: Record<string, string[]> = {
-                    training: ['+5% XP gain', '+10% XP gain', '+15% XP gain', '+20% XP gain', '+25% XP gain'],
-                    treasury: ['+2% gold gain', '+4% gold gain', '+6% gold gain', '+8% gold gain', '+10% gold gain'],
-                    forge: ['+3% gear rarity', '+6% gear rarity', '+9% gear rarity', '+12% gear rarity', '+15% gear rarity'],
-                    tactics: ['+1% team power', '+2% team power', '+3% team power', '+4% team power', '+5% team power'],
-                  };
-
-                  const icons = { training: '📚', treasury: '💰', forge: '⚒️', tactics: '🎯' };
-
-                  return (
-                    <View key={facility} style={styles.facilityCard}>
-                      <View style={styles.facilityHeader}>
-                        <Text style={styles.facilityName}>{icons[facility]} {facility === 'training' ? 'Training Hall' : facility === 'treasury' ? 'Treasury' : facility === 'forge' ? 'Equipment Forge' : 'Tactics Room'}</Text>
-                        <Text style={styles.facilityLevel}>Level {level}/5</Text>
-                      </View>
-
-                      <View style={styles.facilityBonusBar}>
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <View
-                            key={i}
-                            style={[
-                              styles.facilityBonusSegment,
-                              i < level && styles.facilityBonusSegmentActive,
-                            ]}
-                          />
-                        ))}
-                      </View>
-
-                      {level > 0 && (
-                        <Text style={styles.facilityBonusText}>Current: {bonuses[facility][level - 1]}</Text>
-                      )}
-                      {level < 5 && (
-                        <Text style={styles.facilityNextBonus}>Next: {bonuses[facility][level]}</Text>
-                      )}
-
-                      {level < 5 ? (
-                        <Pressable
-                          style={[styles.facilityUpgradeBtn, !canUpgrade && styles.facilityUpgradeBtnDisabled]}
-                          disabled={!canUpgrade}
-                          onPress={() => upgradeFacility(facility)}
-                        >
-                          <Text style={styles.facilityUpgradeBtnText}>Upgrade • {fmt(nextCost)} 💰</Text>
-                        </Pressable>
-                      ) : (
-                        <View style={[styles.facilityUpgradeBtn, styles.facilityUpgradeBtnMaxed]}>
-                          <Text style={styles.facilityUpgradeBtnText}>Maxed</Text>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-              </View>
-            )}
-
-            {/* EXPEDITIONS TAB */}
-            {guildhallSubTab === 'expeditions' && (
-              <View style={styles.expeditionsSection}>
-                <Text style={styles.expeditionsTitle}>🗺️ Expeditions</Text>
-                <Text style={styles.expeditionsDesc}>Send parties on time-gated expeditions for rewards</Text>
-
-                {state.expeditionQueue.length > 0 && (
-                  <View style={styles.expeditionQueueSection}>
-                    <Text style={styles.expeditionQueueTitle}>Active Expeditions</Text>
-                    {state.expeditionQueue.map(exp => {
-                      const elapsed = Date.now() - exp.startTime;
-                      const remaining = Math.max(0, exp.durationMs - elapsed);
-                      const progress = (elapsed / exp.durationMs) * 100;
-                      const isComplete = remaining <= 0;
-
-                      return (
-                        <View key={exp.id} style={styles.expeditionQueueCard}>
-                          <Text style={styles.expeditionQueueName}>
-                            {exp.type === 'artifact' && '🗿'}
-                            {exp.type === 'merchant' && '🏪'}
-                            {exp.type === 'ruins' && '🏛️'}
-                            {exp.type === 'vault' && '🔐'}
-                            {exp.type === 'abyss' && '🌑'}
-                            {' '}{exp.type.charAt(0).toUpperCase() + exp.type.slice(1)} • {exp.rarity}
-                          </Text>
-
-                          <View style={styles.expeditionProgressBg}>
-                            <View style={[styles.expeditionProgressFill, { width: `${Math.min(100, progress)}%` }]} />
-                          </View>
-
-                          <Text style={styles.expeditionTimeRemaining}>
-                            {isComplete ? '✓ Ready to claim' : `${formatDurationShort(remaining)} remaining`}
-                          </Text>
-
-                          {isComplete && (
-                            <Pressable
-                              style={styles.expeditionClaimBtn}
-                              onPress={() => completeExpedition(exp.id)}
-                            >
-                              <Text style={styles.expeditionClaimBtnText}>Claim Rewards</Text>
-                            </Pressable>
-                          )}
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-
-                <View style={styles.expeditionStartSection}>
-                  {(() => {
-                    const nowMs = Date.now();
-                    const autoRefreshRemainingMs = Math.max(
-                      0,
-                      EXPEDITION_CONTRACT_REFRESH_MS - (nowMs - (state.expeditionContractsRefreshedAt ?? nowMs)),
-                    );
-                    const activeExpeditionTypes = new Set(state.expeditionQueue.map(exp => exp.type as ExpeditionType));
-                    const launchableTypes = EXPEDITION_TYPES.filter(type => !activeExpeditionTypes.has(type));
-                    const canAffordRefresh = state.gold >= EXPEDITION_CONTRACT_REFRESH_GOLD_COST;
-
-                    return (
-                      <>
-                  <View style={styles.expeditionStartHeaderRow}>
-                    <Text style={styles.expeditionStartTitle}>Launch Expedition</Text>
-                    <Pressable
-                      style={[styles.expeditionRefreshBtn, !canAffordRefresh && styles.expeditionRefreshBtnDisabled]}
-                      disabled={!canAffordRefresh}
-                      onPress={refreshExpeditionContracts}
-                    >
-                      <Text style={styles.expeditionRefreshBtnText}>Refresh ({fmt(EXPEDITION_CONTRACT_REFRESH_GOLD_COST)} 💰)</Text>
-                    </Pressable>
-                  </View>
-                  <Text style={styles.expeditionRefreshTimerText}>
-                    Next free contract refresh in {formatDurationShort(autoRefreshRemainingMs)}
-                  </Text>
-                  {launchableTypes.length === 0 && (
-                    <Text style={styles.expeditionNoLaunchText}>All contracts are currently active. Claim one to launch a new run.</Text>
-                  )}
-                  {launchableTypes.map(type => {
-                    const rarity = state.expeditionContractOffers[type] ?? 'common';
-                    const typeMeta = EXPEDITION_TYPE_META[type];
-                    const rarityMeta = EXPEDITION_RARITY_META[rarity as ExpeditionRarity];
-                    const cfg = {
-                      icon: typeMeta.icon,
-                      name: typeMeta.name,
-                      rarity,
-                      goldCost: rarityMeta.goldCost,
-                      durationMs: rarityMeta.durationMs,
-                      rewardsLabel: rarityMeta.rewardsLabel,
-                    };
-                    const hasGold = state.gold >= cfg.goldCost;
-                    const canStartNow = hasGold;
-
-                    return (
-                      <Pressable
-                        key={type}
-                        style={[styles.expeditionStartCard, !canStartNow && styles.expeditionStartCardDisabled]}
-                        disabled={!canStartNow}
-                        onPress={() => startExpedition(type, cfg.rarity)}
-                      >
-                        <View style={styles.expeditionStartCardLeft}>
-                          <Text style={styles.expeditionStartCardName}>{cfg.icon} {cfg.name}</Text>
-                          <Text style={styles.expeditionStartCardMeta}>{cfg.rarity} • {formatDurationShort(cfg.durationMs)}</Text>
-                          <Text style={styles.expeditionStartCardRewards}>{cfg.rewardsLabel}</Text>
-                        </View>
-                        <View style={styles.expeditionStartCardRight}>
-                          <Text style={[styles.expeditionStartCardCost, !canStartNow && styles.expeditionStartCardCostDisabled]}>
-                            {fmt(cfg.goldCost)} 💰
-                          </Text>
-                          <Text style={[styles.expeditionStartCardStatus, !canStartNow && styles.expeditionStartCardStatusDisabled]}>
-                            {hasGold ? 'Available' : 'Need Gold'}
-                          </Text>
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                      </>
-                    );
-                  })()}
-                </View>
-              </View>
-            )}
-          </View>
-        )}
+        <WarroomTabContent
+          {...({
+            tab,
+            state,
+            stats,
+            campaignChapter,
+            campaignStage,
+            campaignBossStage,
+            isBossImminent,
+            teamPowerIndex,
+            powerTier,
+            nearUnlockAchievements,
+            isBoss,
+            monster,
+            canRebirthNow,
+            dangerLabel,
+            dangerScore,
+            teamSlotCap,
+            canPlayDiceToday,
+            canRunRiftToday,
+            nextTeamSlotUnlock,
+            missionCards,
+            weeklyEvent,
+            hasClaimableRewards,
+            claimableWeeklyMilestones,
+            claimableMissionIds,
+            prestige1Done,
+            prestige5Done,
+            prestige10Done,
+            prestige25Done,
+            prestige50Done,
+            warPanels,
+            toggleWarPanel,
+            onTabChange,
+            setAchievementsSubTab,
+            setRebirthOpen,
+            autoEquipBestHeroes,
+            setDiceRollResult,
+            setDiceIsRolling,
+            setDiceRollModalOpen,
+            openRiftChallenge,
+            unlockTeamSlot,
+            claimAllRewards,
+            craftEquipment,
+          } as any)}
+        />
+
+        <BattleTabContent
+          {...({
+            tab,
+            state,
+            stats,
+            battleSpeed: state.combatTempo,
+            heatPct,
+            maxHeat,
+            canBurst,
+            burstCost,
+            burstChargePct,
+            canRebirthNow,
+            rebirthWavesLeft,
+            currentAct,
+            actProgressPct,
+            isBoss,
+            monster,
+            monsterAffixes,
+            teamSlotCap,
+            getClassConfig,
+            ttkSeconds,
+            dangerScore,
+            dangerLabel,
+            usableInventory,
+            nextBossUnlock,
+            unlockLabel,
+            setCombatTempo,
+            burst,
+            buyPremiumCoolant,
+            useUsableItem,
+            setRebirthOpen,
+          } as any)}
+        />
+        <HeroesTabContent
+          {...({
+            tab,
+            state,
+            stats,
+            heroesSubTab,
+            setHeroesSubTab,
+            forceFreeSummonStep,
+            forceBuildTeamStep,
+            canGachaX10,
+            canGachaOnce,
+            pityRemaining,
+            hasGachaNotification,
+            paidX10,
+            summonTimeline,
+            rarityConfig,
+            expandedHeroes,
+            setExpandedHeroes,
+            activeTeamSet,
+            teamSlotCap,
+            getClassConfig,
+            getHeroPassiveTraitInfo,
+            getHeroActiveArchetypeInfo,
+            calculateShardReward,
+            getRankUpShardCost,
+            getHeroGoldLevelCost,
+            summonHero,
+            summonHeroX10,
+            autoEquipBestHeroes,
+            autoRecycleHeroes,
+            saveTeamLoadout,
+            loadTeamLoadout,
+            toggleEquipHero,
+            rankUpHero,
+            levelUpHeroGold,
+            setRecycleConfirmUid,
+            renderSubTabBar,
+          } as any)}
+        />
+
+        <StatsTabContent
+          {...({
+            tab,
+            state,
+            stats,
+            classConfig,
+            classMasteryLevel,
+            damageEssenceCost,
+            economyEssenceCost,
+            survivalEssenceCost,
+            rebirthDamageCost,
+            rebirthEconomyCost,
+            rebirthSurvivalCost,
+            forceSpendStatStep,
+            classPassive,
+            allocateStat,
+            allocateStatN,
+            allocateStatMax,
+            spendEssenceUpgrade,
+            spendRebirthCore,
+          } as any)}
+        />
+
+        <EquipmentTabContent
+          {...({
+            tab,
+            state,
+            stats,
+            equipmentSubTab,
+            setEquipmentSubTab,
+            compareItemId,
+            setCompareItemId,
+            shardForgeCosts,
+            getEquipmentCraftCost,
+            getEquipmentItem,
+            getUpgradePlan,
+            equipmentRarityConfig,
+            optimizeEquipment,
+            autoDismantleEquipment,
+            craftEquipment,
+            equipItem,
+            upgradeEquipmentRarity,
+            dismantleEquipment,
+            convertShardsToEssence,
+            convertShardsToScrap,
+            renderSubTabBar,
+          } as any)}
+        />
+
+        <AchievementsTabContent
+          {...({
+            tab,
+            state,
+            stats,
+            achievementsSubTab,
+            setAchievementsSubTab,
+            missionCards,
+            claimableWeeklyMilestones,
+            claimableMissionIds,
+            hasClaimableRewards,
+            weeklyEvent,
+            storyEntries,
+            nextStoryEntry,
+            claimWeeklyTrack,
+            claimMission,
+            claimAllRewards,
+            renderSubTabBar,
+          } as any)}
+        />
+
+        <GuildhallTabContent
+          {...({
+            tab,
+            state,
+            stats,
+            guildhallSubTab,
+            setGuildhallSubTab,
+            batchLevelMode,
+            setBatchLevelMode,
+            batchLevelSelected,
+            setBatchLevelSelected,
+            getHeroGoldLevelCost,
+            batchLevelHeroes,
+            upgradeFacility,
+            startExpedition,
+            completeExpedition,
+            refreshExpeditionContracts,
+            renderSubTabBar,
+          } as any)}
+        />
       </ScrollView>
 
       {/* Bottom Navigation */}
@@ -4217,7 +2738,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 // Styles
 // ──────────────────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+export const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: '#060B12',

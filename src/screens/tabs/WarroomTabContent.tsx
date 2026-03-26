@@ -1,0 +1,386 @@
+import React from 'react';
+import { View, Text, Pressable, ScrollView } from 'react-native';
+import { GameState, Stats } from '../../useGameState';
+import { REBIRTH_WAVE_THRESHOLD } from '../../gameConfig';
+import { fmt } from '../../utils';
+import { styles } from '../GameScreen';
+
+export interface WarroomTabContentProps {
+  tab: string;
+  state: GameState;
+  stats: Stats;
+  campaignChapter: number;
+  campaignStage: number;
+  campaignBossStage: number;
+  isBossImminent: boolean;
+  teamPowerIndex: number;
+  powerTier: string;
+  nearUnlockAchievements: any[];
+  isBoss: boolean;
+  monster: any;
+  canRebirthNow: boolean;
+  dangerLabel: string;
+  dangerScore: number;
+  teamSlotCap: number;
+  canPlayDiceToday: boolean;
+  canRunRiftToday: boolean;
+  nextTeamSlotUnlock: any;
+  missionCards: any[];
+  weeklyEvent: any;
+  hasClaimableRewards: boolean;
+  claimableWeeklyMilestones: any[];
+  claimableMissionIds: any[];
+  prestige1Done: boolean;
+  prestige5Done: boolean;
+  prestige10Done: boolean;
+  prestige25Done: boolean;
+  prestige50Done: boolean;
+  warPanels: Record<string, boolean>;
+  toggleWarPanel: (panel: string) => void;
+  onTabChange: (tab: string) => void;
+  setAchievementsSubTab: (tab: string) => void;
+  setRebirthOpen: (open: boolean) => void;
+  autoEquipBestHeroes: () => void;
+  setDiceRollResult: (result: any) => void;
+  setDiceIsRolling: (rolling: boolean) => void;
+  setDiceRollModalOpen: (open: boolean) => void;
+  openRiftChallenge: () => void;
+  unlockTeamSlot: () => void;
+  claimAllRewards: () => void;
+  craftEquipment: (slot: string) => void;
+}
+
+export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
+  tab,
+  state,
+  stats,
+  campaignChapter,
+  campaignStage,
+  campaignBossStage,
+  isBossImminent,
+  teamPowerIndex,
+  powerTier,
+  nearUnlockAchievements,
+  isBoss,
+  monster,
+  canRebirthNow,
+  dangerLabel,
+  dangerScore,
+  teamSlotCap,
+  canPlayDiceToday,
+  canRunRiftToday,
+  nextTeamSlotUnlock,
+  missionCards,
+  weeklyEvent,
+  hasClaimableRewards,
+  claimableWeeklyMilestones,
+  claimableMissionIds,
+  prestige1Done,
+  prestige5Done,
+  prestige10Done,
+  prestige25Done,
+  prestige50Done,
+  warPanels,
+  toggleWarPanel,
+  onTabChange,
+  setAchievementsSubTab,
+  setRebirthOpen,
+  autoEquipBestHeroes,
+  setDiceRollResult,
+  setDiceIsRolling,
+  setDiceRollModalOpen,
+  openRiftChallenge,
+  unlockTeamSlot,
+  claimAllRewards,
+  craftEquipment,
+}) => {
+  return (
+    <>
+      {tab === 'warroom' && (
+        <View style={styles.warRoomTab}>
+          <Text style={styles.sectionTitle}>🛰️ War Room Command</Text>
+          <Text style={styles.warRoomIntro}>One-screen operations hub. Expand panels for details, jump to deep tabs when needed.</Text>
+
+          <View style={styles.campaignRail}>
+            <View style={styles.campaignRailCard}>
+              <Text style={styles.campaignRailLabel}>Campaign</Text>
+              <Text style={styles.campaignRailValue}>Chapter {campaignChapter} • Stage {campaignStage}</Text>
+              <View style={styles.hpBarBg}>
+                <View style={[styles.hpBarFill, { width: `${(campaignStage / campaignBossStage) * 100}%`, backgroundColor: '#5DA8FF' }]} />
+              </View>
+            </View>
+            <View style={styles.campaignRailCard}>
+              <Text style={styles.campaignRailLabel}>Boss Gate</Text>
+              <Text style={styles.campaignRailValue}>Stage {campaignBossStage} • Every 10 Waves</Text>
+              <Text style={styles.campaignRailHint}>{isBossImminent ? 'Pressure Rising' : 'Stabilize & Push'}</Text>
+            </View>
+            <View style={styles.campaignRailCard}>
+              <Text style={styles.campaignRailLabel}>Legion Score</Text>
+              <Text style={styles.campaignRailValue}>{fmt(teamPowerIndex)} ({powerTier})</Text>
+              <Text style={styles.campaignRailHint}>Aim for next tier via gear + mastery</Text>
+            </View>
+          </View>
+
+          <View style={styles.warNearUnlockCard}>
+            <View style={styles.warNearUnlockHeader}>
+              <Text style={styles.warNearUnlockTitle}>🏆 Near Unlocks</Text>
+              <Pressable
+                style={styles.warNearUnlockBtn}
+                onPress={() => {
+                  onTabChange('achievements');
+                  setAchievementsSubTab('achievements');
+                }}
+              >
+                <Text style={styles.warNearUnlockBtnText}>Open Records</Text>
+              </Pressable>
+            </View>
+            {nearUnlockAchievements.length === 0 ? (
+              <Text style={styles.warNearUnlockEmpty}>All achievements unlocked. You have completed the current records board.</Text>
+            ) : (
+              nearUnlockAchievements.map(item => (
+                <View key={item.ach.id} style={styles.warNearUnlockRow}>
+                  <View style={styles.warNearUnlockTop}>
+                    <Text style={styles.warNearUnlockName}>{item.ach.emoji} {item.ach.name}</Text>
+                    <Text style={styles.warNearUnlockPct}>{Math.round(item.ratio * 100)}%</Text>
+                  </View>
+                  <Text style={styles.warNearUnlockDesc}>{item.ach.description}</Text>
+                  {item.progress && (
+                    <Text style={styles.warNearUnlockProgress}>
+                      {item.progress.label}: {fmt(item.progress.value)} / {fmt(item.progress.target)}
+                      {item.remaining != null ? ` • ${fmt(item.remaining)} to go` : ''}
+                    </Text>
+                  )}
+                  <View style={styles.hpBarBg}>
+                    <View style={[styles.hpBarFill, { width: `${Math.max(4, Math.round(item.ratio * 100))}%`, backgroundColor: '#7BD9A8' }]} />
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+
+          <View style={styles.warPanel}>
+            <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('frontline')}>
+              <Text style={styles.warPanelTitle}>⚔️ Frontline</Text>
+              <Text style={styles.warPanelChevron}>{warPanels.frontline ? '−' : '+'}</Text>
+            </Pressable>
+            {warPanels.frontline && (
+              <View style={styles.warPanelBody}>
+                <Text style={styles.warPanelStat}>Wave {state.wave} • {monster.name} {isBoss ? '(Boss)' : ''}</Text>
+                <Text style={styles.warPanelStat}>Team HP: {Math.ceil(state.teamHp)} / {state.teamMaxHp}</Text>
+                <Text style={styles.warPanelStat}>Danger: {dangerLabel} ({dangerScore.toFixed(0)}%)</Text>
+                <View style={styles.warPanelActionRow}>
+                  <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('battle')}>
+                    <Text style={styles.warPanelActionText}>Open Warfront</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.warPanelActionBtn, !canRebirthNow && styles.warPanelActionBtnDisabled]}
+                    disabled={!canRebirthNow}
+                    onPress={() => setRebirthOpen(true)}
+                  >
+                    <Text style={styles.warPanelActionText}>{canRebirthNow ? 'Rebirth' : `Rebirth @ W${REBIRTH_WAVE_THRESHOLD}`}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.warPanel}>
+            <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('roster')}>
+              <Text style={styles.warPanelTitle}>👥 Roster</Text>
+              <Text style={styles.warPanelChevron}>{warPanels.roster ? '−' : '+'}</Text>
+            </Pressable>
+            {warPanels.roster && (
+              <View style={styles.warPanelBody}>
+                <Text style={styles.warPanelStat}>Active Team: {state.activeTeamHeroIds.length}/{teamSlotCap}</Text>
+                <Text style={styles.warPanelStat}>Total Heroes: {state.heroRoster.length}</Text>
+                <Text style={styles.warPanelStat}>Shards: {fmt(state.heroShards)}</Text>
+                <Text style={styles.warPanelStat}>Boss Tears: {state.bossTears} 💧 (summon currency)</Text>
+                <View style={styles.warPanelActionRow}>
+                  <Pressable style={styles.warPanelActionBtn} onPress={autoEquipBestHeroes}>
+                    <Text style={styles.warPanelActionText}>Auto Equip</Text>
+                  </Pressable>
+                  <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('heroes')}>
+                    <Text style={styles.warPanelActionText}>Manage Roster</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.warPanel}>
+            <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('operations')}>
+              <Text style={styles.warPanelTitle}>🎲 Operations</Text>
+              <Text style={styles.warPanelChevron}>{warPanels.operations ? '−' : '+'}</Text>
+            </Pressable>
+            {warPanels.operations && (
+              <View style={styles.warPanelBody}>
+                <Text style={styles.warPanelStat}>Daily Dice: {canPlayDiceToday ? 'Ready' : 'Claimed today'}</Text>
+                <Text style={styles.warPanelStat}>Rift Challenge: {canRunRiftToday ? 'Ready' : 'Cleared today'}{state.lastRiftWavesCleared > 0 ? ` • Last clear ${state.lastRiftWavesCleared}/5` : ''}</Text>
+                {state.lastDiceRollValue != null && (
+                  <Text style={styles.warPanelStat}>Last Dice Roll: {state.lastDiceRollValue}/20</Text>
+                )}
+                <Text style={styles.warPanelStat}>Formation Rule: Max 2 Front, 2 Mid, 2 Back</Text>
+                <Text style={styles.warPanelStat}>Team Slots: {state.activeTeamHeroIds.length}/{teamSlotCap}</Text>
+                {nextTeamSlotUnlock ? (
+                  <Text style={styles.warPanelStat}>
+                    Next Slot {nextTeamSlotUnlock.targetSlots}: Wave {nextTeamSlotUnlock.requiredWave}, {fmt(nextTeamSlotUnlock.goldCost)} gold, {fmt(nextTeamSlotUnlock.shardCost)} shards
+                  </Text>
+                ) : (
+                  <Text style={styles.warPanelStat}>All team slots unlocked.</Text>
+                )}
+                <View style={styles.warPanelActionRow}>
+                  <Pressable
+                    style={[styles.warPanelActionBtn, !canPlayDiceToday && styles.warPanelActionBtnDisabled]}
+                    disabled={!canPlayDiceToday}
+                    onPress={() => {
+                      setDiceRollResult(null);
+                      setDiceIsRolling(false);
+                      setDiceRollModalOpen(true);
+                    }}
+                  >
+                    <View style={{ position: 'relative', alignItems: 'center' }}>
+                      <Text style={styles.warPanelActionText}>Roll Dice (+Diamonds)</Text>
+                      {canPlayDiceToday && <View style={[styles.redDot, { position: 'absolute', top: -2, right: 0 }]} />}
+                    </View>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.warPanelActionBtn, !canRunRiftToday && styles.warPanelActionBtnDisabled]}
+                    disabled={!canRunRiftToday}
+                    onPress={openRiftChallenge}
+                  >
+                    <View style={{ position: 'relative', alignItems: 'center' }}>
+                      <Text style={styles.warPanelActionText}>Run Rift (+Diamonds)</Text>
+                      {canRunRiftToday && <View style={[styles.redDot, { position: 'absolute', top: -2, right: 0 }]} />}
+                    </View>
+                  </Pressable>
+                </View>
+                <View style={styles.warPanelActionRow}>
+                  <Pressable
+                    style={[
+                      styles.warPanelActionBtn,
+                      (!nextTeamSlotUnlock || !nextTeamSlotUnlock.canUnlock) && styles.warPanelActionBtnDisabled,
+                    ]}
+                    disabled={!nextTeamSlotUnlock || !nextTeamSlotUnlock.canUnlock}
+                    onPress={unlockTeamSlot}
+                  >
+                    <Text style={styles.warPanelActionText}>
+                      {nextTeamSlotUnlock ? `Unlock Slot ${nextTeamSlotUnlock.targetSlots}` : 'Slots Maxed'}
+                    </Text>
+                  </Pressable>
+                  <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('heroes')}>
+                    <Text style={styles.warPanelActionText}>Edit Team</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.warPanel}>
+            <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('armory')}>
+              <Text style={styles.warPanelTitle}>🎒 Armory</Text>
+              <Text style={styles.warPanelChevron}>{warPanels.armory ? '−' : '+'}</Text>
+            </Pressable>
+            {warPanels.armory && (
+              <View style={styles.warPanelBody}>
+                <Text style={styles.warPanelStat}>Items: {state.inventoryItemIds.length}</Text>
+                <Text style={styles.warPanelStat}>Scrap: {fmt(state.equipmentScrap)} • Essence: {fmt(state.essence)}</Text>
+                <View style={styles.warPanelActionRow}>
+                  <Pressable style={styles.warPanelActionBtn} onPress={() => craftEquipment('weapon')}>
+                    <Text style={styles.warPanelActionText}>Craft Weapon</Text>
+                  </Pressable>
+                  <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('equipment')}>
+                    <Text style={styles.warPanelActionText}>Open Armory</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.warPanel}>
+            <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('growth')}>
+              <Text style={styles.warPanelTitle}>📈 Growth</Text>
+              <Text style={styles.warPanelChevron}>{warPanels.growth ? '−' : '+'}</Text>
+            </Pressable>
+            {warPanels.growth && (
+              <View style={styles.warPanelBody}>
+                <Text style={styles.warPanelStat}>Level {state.level} • Unspent: {state.unspentStatPoints}</Text>
+                <Text style={styles.warPanelStat}>Achievement Bonus: +{(stats.achievementBonusPercent * 100).toFixed(0)}% to final DPS, gold, and EXP</Text>
+                <Text style={styles.warPanelStat}>Rebirth Cores: {state.rebirthCores}</Text>
+                <View style={styles.warPanelActionRow}>
+                  <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('stats')}>
+                    <Text style={styles.warPanelActionText}>Power Grid</Text>
+                  </Pressable>
+                  <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('achievements')}>
+                    <Text style={styles.warPanelActionText}>Legends</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.warPanel}>
+            <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('objectives')}>
+              <Text style={styles.warPanelTitle}>🎯 Objectives</Text>
+              <Text style={styles.warPanelChevron}>{warPanels.objectives ? '−' : '+'}</Text>
+            </Pressable>
+            {warPanels.objectives && (
+              <View style={styles.warPanelBody}>
+                <Text style={styles.warPanelStat}>Weekly Kills: {state.weeklyKills}</Text>
+                <Text style={styles.warPanelStat}>Missions Ready: {missionCards.filter(m => !m.claimed && m.progress.done).length}</Text>
+                <Text style={styles.warPanelStat}>Current Event: {weeklyEvent.emoji} {weeklyEvent.name}</Text>
+                <View style={styles.warPanelActionRow}>
+                  <Pressable
+                    style={[styles.warPanelActionBtn, !hasClaimableRewards && styles.warPanelActionBtnDisabled]}
+                    disabled={!hasClaimableRewards}
+                    onPress={claimAllRewards}
+                  >
+                    <Text style={styles.warPanelActionText}>Claim All ({claimableWeeklyMilestones.length + claimableMissionIds.length})</Text>
+                  </Pressable>
+                  <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('achievements')}>
+                    <Text style={styles.warPanelActionText}>Open Objectives</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.warPanel}>
+            <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('prestige')}>
+              <Text style={styles.warPanelTitle}>♾️ Prestige Milestones</Text>
+              <Text style={styles.warPanelChevron}>{warPanels.prestige ? '−' : '+'}</Text>
+            </Pressable>
+            {warPanels.prestige && (
+              <View style={styles.warPanelBody}>
+                <Text style={styles.warPanelStat}>Rebirths Completed: {state.prestigeCount ?? 0}</Text>
+                {[
+                  { n: 1, label: '1st Rebirth', bonus: 'Unlock Core Tree', done: prestige1Done },
+                  { n: 5, label: '5th Rebirth', bonus: '+5% final team DPS and team max HP', done: prestige5Done },
+                  { n: 10, label: '10th Rebirth', bonus: 'Legendary Aura visual', done: prestige10Done },
+                  { n: 25, label: '25th Rebirth', bonus: '+15% rebirth core value (meta branch power per level)', done: prestige25Done },
+                  { n: 50, label: '50th Rebirth', bonus: 'Grand Ascendant title', done: prestige50Done },
+                ].map(m => (
+                  <View key={m.n} style={styles.prestigeMilestoneRow}>
+                    <Text style={[styles.prestigeMilestoneCheck, m.done && styles.prestigeMilestoneDone]}>{m.done ? '✅' : '○'}</Text>
+                    <View>
+                      <Text style={styles.prestigeMilestoneLabel}>{m.label}</Text>
+                      <Text style={styles.prestigeMilestoneBonus}>{m.bonus}</Text>
+                    </View>
+                  </View>
+                ))}
+                <View style={styles.warPanelActionRow}>
+                  <Pressable
+                    style={[styles.warPanelActionBtn, !canRebirthNow && styles.warPanelActionBtnDisabled]}
+                    disabled={!canRebirthNow}
+                    onPress={() => setRebirthOpen(true)}
+                  >
+                    <Text style={styles.warPanelActionText}>{canRebirthNow ? 'Rebirth Now' : `Rebirth @ W${REBIRTH_WAVE_THRESHOLD}`}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+    </>
+  );
+};
