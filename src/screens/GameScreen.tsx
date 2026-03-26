@@ -290,6 +290,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [idleChestReward, setIdleChestReward] = useState<{ title: string; detail: string } | null>(null);
   const [storyUnlockToast, setStoryUnlockToast] = useState<{ id: string; title: string; chapter: string } | null>(null);
   const [hoveredTopChipId, setHoveredTopChipId] = useState<'dps' | 'power' | 'gear' | null>(null);
+  const [activeAffixTooltipId, setActiveAffixTooltipId] = useState<string | null>(null);
   const [topChipTooltipAnchor, setTopChipTooltipAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const lastSummonIdRef = useRef<string | null>(null);
@@ -436,6 +437,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   const monster = getMonsterForWave(state.wave);
   const monsterAffixes = getMonsterAffixes(state.wave);
+  const activeAffixTooltip = monsterAffixes.find(affix => affix.id === activeAffixTooltipId) ?? null;
   const affixTotals = monsterAffixes.reduce((acc, affix) => ({
     hpMult: acc.hpMult * affix.enemyHpMultiplier,
     dmgMult: acc.dmgMult * affix.enemyDamageMultiplier,
@@ -795,6 +797,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     const arrowLeft = Math.max(12, Math.min(bubbleWidth - 18, centerX - left - 6));
     return { left, top, width: bubbleWidth, arrowLeft };
   }, [topChipTooltipAnchor, viewportWidth]);
+
+  useEffect(() => {
+    if (!activeAffixTooltipId) return;
+    if (!monsterAffixes.some(affix => affix.id === activeAffixTooltipId)) {
+      setActiveAffixTooltipId(null);
+    }
+  }, [activeAffixTooltipId, monsterAffixes]);
 
   useEffect(() => {
     const unlockedIds = storyEntries.filter(entry => entry.unlocked).map(entry => entry.id);
@@ -5566,9 +5575,39 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 8,
     backgroundColor: '#101728',
   },
+  affixChipActive: {
+    backgroundColor: '#162236',
+    shadowColor: '#8FC8FF',
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
   affixChipText: {
     fontSize: 10,
     fontWeight: '700',
+  },
+  affixTooltipCard: {
+    width: '88%',
+    maxWidth: 460,
+    borderWidth: 1,
+    borderColor: '#355270',
+    backgroundColor: '#0F1A29',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  affixTooltipTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  affixTooltipText: {
+    fontSize: 10,
+    lineHeight: 14,
+    color: '#C4D9EC',
   },
   affixDesc: {
     fontSize: 10,
