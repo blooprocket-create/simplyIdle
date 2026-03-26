@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import { RARITIES, HERO_LEVEL_CAP } from '../../gameConfig';
@@ -76,6 +76,29 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
   setRecycleConfirmUid,
   renderSubTabBar,
 }) => {
+  const rarityRank = useMemo(() => {
+    const rankMap: Record<string, number> = {};
+    RARITIES.forEach((rarity, index) => {
+      rankMap[rarity.id] = index;
+    });
+    return rankMap;
+  }, []);
+
+  const sortedRoster = useMemo(() => {
+    return [...state.heroRoster].sort((a, b) => {
+      const aOnTeam = activeTeamSet.has(a.uid) ? 1 : 0;
+      const bOnTeam = activeTeamSet.has(b.uid) ? 1 : 0;
+      if (aOnTeam !== bOnTeam) return bOnTeam - aOnTeam;
+
+      const aRarity = rarityRank[a.rarity] ?? -1;
+      const bRarity = rarityRank[b.rarity] ?? -1;
+      if (aRarity !== bRarity) return bRarity - aRarity;
+
+      if (a.level !== b.level) return b.level - a.level;
+      return a.name.localeCompare(b.name);
+    });
+  }, [activeTeamSet, rarityRank, state.heroRoster]);
+
   return (
     <>
       {tab === 'heroes' && (
@@ -202,7 +225,8 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
               {state.heroRoster.length === 0 ? (
                 <Text style={styles.emptyMsg}>Summon your first hero!</Text>
               ) : (
-                state.heroRoster.map(hero => {
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {sortedRoster.map(hero => {
                   const inActiveTeam = activeTeamSet.has(hero.uid);
                   const cls = getClassConfig(hero.heroClass);
                   const rarity = rarityConfig(hero.rarity);
@@ -222,7 +246,14 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                         : 'Aegis';
 
                   return (
-                    <View key={hero.uid} style={[styles.heroCard, inActiveTeam && styles.heroCardActive]}>
+                    <View
+                      key={hero.uid}
+                      style={[
+                        styles.heroCard,
+                        inActiveTeam && styles.heroCardActive,
+                        { width: '48%', minWidth: 170, marginBottom: 0 },
+                      ]}
+                    >
                       <View style={[styles.heroCardRarityBar, { backgroundColor: rarity.color }]} />
                       <View style={styles.heroCardBody}>
                         <View style={styles.heroCardTopRow}>
@@ -249,37 +280,6 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                             >
                               <Text style={styles.toggleBtnText}>{inActiveTeam ? '✔ Team' : '+ Add'}</Text>
                             </Pressable>
-                          </View>
-                        </View>
-
-                        {nextRankCost && (
-                          <View style={styles.rankUpSection}>
-                            <Text style={styles.rankUpLabel}>Rank Up Cost: {nextRankCost} ✨</Text>
-                            <Pressable
-                              style={[styles.rankUpBtn, !canRankUp && styles.rankUpBtnDisabled]}
-                              disabled={!canRankUp}
-                              onPress={() => rankUpHero(hero.uid)}
-                            >
-                              <Text style={styles.rankUpBtnText}>{canRankUp ? 'Rank Up' : `Need ${nextRankCost - state.heroShards} more`}</Text>
-                            </Pressable>
-                          </View>
-                        )}
-                        {hero.rank === 10 && <Text style={styles.maxRankMsg}>✓ Max Rank!</Text>}
-
-                        {details && (
-                          <View style={styles.heroStatsRow}>
-                            <View style={styles.heroStatBadge}>
-                              <Text style={styles.heroStatBadgeLabel}>DPS</Text>
-                              <Text style={styles.heroStatBadgeValue}>{details.dps.toFixed(1)}</Text>
-                            </View>
-                            <View style={styles.heroStatBadge}>
-                              <Text style={styles.heroStatBadgeLabel}>HP</Text>
-                              <Text style={styles.heroStatBadgeValue}>{details.hp}</Text>
-                            </View>
-                            <View style={styles.heroStatBadge}>
-                              <Text style={styles.heroStatBadgeLabel}>Boost</Text>
-                              <Text style={styles.heroStatBadgeValue}>+{(hero.teamBoost * 100).toFixed(1)}%</Text>
-                            </View>
                             <Pressable
                               style={styles.expandBtn}
                               onPress={() => {
@@ -288,55 +288,89 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                                 setExpandedHeroes(s);
                               }}
                             >
-                              <Text style={styles.expandBtnText}>{isExpanded ? '▲' : '▼'}</Text>
+                              <Text style={styles.expandBtnText}>{isExpanded ? 'Hide' : 'More'}</Text>
                             </Pressable>
                           </View>
-                        )}
-
-                        <View style={styles.heroIdentityBox}>
-                          <Text style={styles.heroIdentityLine}>Passive: {trait.name}</Text>
-                          <Text style={styles.heroIdentitySub}>{trait.description}</Text>
-                          <Text style={styles.heroIdentityLine}>Active: {activeArchetype.name}</Text>
-                          <Text style={styles.heroIdentitySub}>{activeArchetype.description}</Text>
                         </View>
 
-                        {isExpanded && details && (
-                          <View style={styles.heroExpandedStats}>
-                            {(['STR', 'VIT', 'AGI', 'INT', 'SPR'] as const).map((lbl, i) => {
-                              const val = [details.str, details.vit, details.agi, details.int, details.spr][i];
-                              return (
-                                <View key={lbl} style={styles.heroStatItem}>
-                                  <Text style={styles.heroStatItemLabel}>{lbl}</Text>
-                                  <Text style={styles.heroStatItemValue}>{val}</Text>
-                                </View>
-                              );
-                            })}
-                          </View>
-                        )}
+                        <Text style={styles.heroDetail}>⭐ Rank {hero.rank}/10 • +{(hero.teamBoost * 100).toFixed(1)}% boost</Text>
 
-                        {hero.level < 999 && (() => {
-                          const lvlCost = getHeroGoldLevelCost(hero.level);
-                          const canAfford = state.gold >= lvlCost;
-                          return (
+                        {isExpanded && (
+                          <>
+                            {nextRankCost && (
+                              <View style={styles.rankUpSection}>
+                                <Text style={styles.rankUpLabel}>Rank Up Cost: {nextRankCost} ✨</Text>
+                                <Pressable
+                                  style={[styles.rankUpBtn, !canRankUp && styles.rankUpBtnDisabled]}
+                                  disabled={!canRankUp}
+                                  onPress={() => rankUpHero(hero.uid)}
+                                >
+                                  <Text style={styles.rankUpBtnText}>{canRankUp ? 'Rank Up' : `Need ${nextRankCost - state.heroShards} more`}</Text>
+                                </Pressable>
+                              </View>
+                            )}
+                            {hero.rank === 10 && <Text style={styles.maxRankMsg}>✓ Max Rank!</Text>}
+
+                            {details && (
+                              <View style={styles.heroStatsRow}>
+                                <View style={styles.heroStatBadge}>
+                                  <Text style={styles.heroStatBadgeLabel}>DPS</Text>
+                                  <Text style={styles.heroStatBadgeValue}>{details.dps.toFixed(1)}</Text>
+                                </View>
+                                <View style={styles.heroStatBadge}>
+                                  <Text style={styles.heroStatBadgeLabel}>HP</Text>
+                                  <Text style={styles.heroStatBadgeValue}>{details.hp}</Text>
+                                </View>
+                              </View>
+                            )}
+
+                            <View style={styles.heroIdentityBox}>
+                              <Text style={styles.heroIdentityLine}>Passive: {trait.name}</Text>
+                              <Text style={styles.heroIdentitySub}>{trait.description}</Text>
+                              <Text style={styles.heroIdentityLine}>Active: {activeArchetype.name}</Text>
+                              <Text style={styles.heroIdentitySub}>{activeArchetype.description}</Text>
+                            </View>
+
+                            {details && (
+                              <View style={styles.heroExpandedStats}>
+                                {(['STR', 'VIT', 'AGI', 'INT', 'SPR'] as const).map((lbl, i) => {
+                                  const val = [details.str, details.vit, details.agi, details.int, details.spr][i];
+                                  return (
+                                    <View key={lbl} style={styles.heroStatItem}>
+                                      <Text style={styles.heroStatItemLabel}>{lbl}</Text>
+                                      <Text style={styles.heroStatItemValue}>{val}</Text>
+                                    </View>
+                                  );
+                                })}
+                              </View>
+                            )}
+
+                            {hero.level < 999 && (() => {
+                              const lvlCost = getHeroGoldLevelCost(hero.level);
+                              const canAfford = state.gold >= lvlCost;
+                              return (
+                                <Pressable
+                                  style={[styles.heroLvlUpBtn, !canAfford && styles.heroLvlUpBtnDisabled]}
+                                  disabled={!canAfford}
+                                  onPress={() => levelUpHeroGold(hero.uid)}
+                                >
+                                  <Text style={styles.heroLvlUpBtnText}>⬆ Level Up {fmt(lvlCost)}g</Text>
+                                </Pressable>
+                              );
+                            })()}
                             <Pressable
-                              style={[styles.heroLvlUpBtn, !canAfford && styles.heroLvlUpBtnDisabled]}
-                              disabled={!canAfford}
-                              onPress={() => levelUpHeroGold(hero.uid)}
+                              style={styles.recycleBtn}
+                              onPress={() => setRecycleConfirmUid(hero.uid)}
                             >
-                              <Text style={styles.heroLvlUpBtnText}>⬆ Level Up  {fmt(lvlCost)}g</Text>
+                              <Text style={styles.recycleBtnText}>♻️ Recycle for {shardValue} ✨</Text>
                             </Pressable>
-                          );
-                        })()}
-                        <Pressable
-                          style={styles.recycleBtn}
-                          onPress={() => setRecycleConfirmUid(hero.uid)}
-                        >
-                          <Text style={styles.recycleBtnText}>♻️ Recycle for {shardValue} ✨</Text>
-                        </Pressable>
+                          </>
+                        )}
                       </View>
                     </View>
                   );
-                })
+                })}
+                </View>
               )}
             </>
           )}

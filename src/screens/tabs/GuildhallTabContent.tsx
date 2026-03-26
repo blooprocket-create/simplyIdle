@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { GameState, Stats, EXPEDITION_CONTRACT_REFRESH_MS, EXPEDITION_CONTRACT_REFRESH_GOLD_COST } from '../../useGameState';
-import { HERO_LEVEL_CAP } from '../../gameConfig';
+import { HERO_LEVEL_CAP, RARITIES } from '../../gameConfig';
 import { EXPEDITION_TYPES, EXPEDITION_TYPE_META, EXPEDITION_RARITY_META, formatDurationShort, ExpeditionType, ExpeditionRarity } from '../GameScreen';
 import { fmt } from '../../utils';
 import { styles } from '../GameScreen';
@@ -43,6 +43,33 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
   refreshExpeditionContracts,
   renderSubTabBar,
 }) => {
+  const activeTeamSet = useMemo(() => new Set(state.activeTeamHeroIds), [state.activeTeamHeroIds]);
+
+  const rarityRank = useMemo(() => {
+    const rankMap: Record<string, number> = {};
+    RARITIES.forEach((rarity, index) => {
+      rankMap[rarity.id] = index;
+    });
+    return rankMap;
+  }, []);
+
+  const sortedBatchHeroes = useMemo(() => {
+    return state.heroRoster
+      .filter(hero => hero.level < HERO_LEVEL_CAP)
+      .sort((a, b) => {
+        const aOnTeam = activeTeamSet.has(a.uid) ? 1 : 0;
+        const bOnTeam = activeTeamSet.has(b.uid) ? 1 : 0;
+        if (aOnTeam !== bOnTeam) return bOnTeam - aOnTeam;
+
+        const aRarity = rarityRank[a.rarity] ?? -1;
+        const bRarity = rarityRank[b.rarity] ?? -1;
+        if (aRarity !== bRarity) return bRarity - aRarity;
+
+        if (a.level !== b.level) return b.level - a.level;
+        return a.name.localeCompare(b.name);
+      });
+  }, [activeTeamSet, rarityRank, state.heroRoster]);
+
   return (
     <>
       {tab === 'guildhall' && (
@@ -79,12 +106,15 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
               </View>
 
               <Text style={styles.selectHeroesLabel}>Select Heroes to Level</Text>
-              <ScrollView style={styles.batchHeroList} nestedScrollEnabled>
-                {state.heroRoster.map(hero => {
+              <ScrollView
+                style={styles.batchHeroList}
+                nestedScrollEnabled
+                contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 8 }}
+              >
+                {sortedBatchHeroes.map(hero => {
                   const isSelected = batchLevelSelected.has(hero.uid);
                   const maxLevel = HERO_LEVEL_CAP;
-                  if (hero.level >= maxLevel) return null;
-                  const isOnTeam = state.activeTeamHeroIds.includes(hero.uid);
+                  const isOnTeam = activeTeamSet.has(hero.uid);
 
                   let totalCost = 0;
                   let projectedLevel = hero.level;
@@ -108,7 +138,12 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
                   return (
                     <Pressable
                       key={hero.uid}
-                      style={[styles.batchHeroCard, isSelected && styles.batchHeroCardSelected]}
+                      style={[
+                        styles.batchHeroCard,
+                        { width: '48%', minWidth: 170 },
+                        isSelected && styles.batchHeroCardSelected,
+                        isOnTeam && styles.heroCardActive,
+                      ]}
                       onPress={() => {
                         const updated = new Set(batchLevelSelected);
                         if (updated.has(hero.uid)) {
@@ -125,7 +160,7 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
                       <View style={styles.batchHeroInfo}>
                         <Text style={styles.batchHeroName}>{hero.emoji} {hero.name}</Text>
                         <Text style={styles.batchHeroLevel}>Level {hero.level} → {projectedLevel}</Text>
-                        {isOnTeam && <Text style={styles.batchHeroTeamTag}>🛡️ Active Team</Text>}
+                        <Text style={styles.batchHeroTeamTag}>{isOnTeam ? '🛡️ Active Team' : `⭐ Rank ${hero.rank}/10`}</Text>
                         <Text style={styles.batchHerosCost}>
                           {batchLevelMode === 'max'
                             ? `Affordable now: ${fmt(totalCost)} 💰`
