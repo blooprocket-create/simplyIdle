@@ -2473,6 +2473,7 @@ type Action =
   | { type: 'EQUIP_ITEM'; itemId: string }
   | { type: 'SUMMON_HERO' }
   | { type: 'SUMMON_HERO_X10' }
+  | { type: 'SUMMON_HERO_X10_CINEMATIC' }
   | { type: 'AUTO_EQUIP_BEST_HEROES' }
   | { type: 'SAVE_TEAM_LOADOUT'; slot: number }
   | { type: 'LOAD_TEAM_LOADOUT'; slot: number }
@@ -2824,6 +2825,69 @@ function reducer(state: GameState, action: Action): GameState {
           detail: `${pityHits} pity hit${pityHits > 1 ? 's' : ''} in this x10 summon.`,
         });
       }
+      return nextState;
+    }
+
+    case 'SUMMON_HERO_X10_CINEMATIC': {
+      const totalPulls = 10;
+      const freeUses = Math.min(state.freeSummonCharges, totalPulls);
+      const paidUses = totalPulls - freeUses;
+      if (state.bossTears < paidUses) return state;
+
+      const summoned: HeroUnit[] = [];
+      const historyBatch: SummonHistoryEntry[] = [];
+      let pityCounter = state.gachaPityCounter;
+      let pityHits = 0;
+      for (let i = 0; i < totalPulls; i++) {
+        const template = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
+        const roll = rollRarityWithPity(pityCounter);
+        pityCounter = roll.nextCounter;
+        if (roll.pityTriggered) pityHits++;
+        const rarity = roll.rarity;
+        const rarityMult = rarityConfig(rarity).boostMultiplier;
+        const uid = `${template.id}_${Date.now()}_${i}_${Math.floor(Math.random() * 10000)}`;
+        const summonedHero: HeroUnit = {
+          ...template,
+          uid,
+          rarity,
+          level: 1,
+          rank: 1,
+          teamBoost: Number((template.baseTeamBoost * rarityMult).toFixed(4)),
+        };
+        summoned.push(summonedHero);
+        historyBatch.push({
+          id: `hist_${uid}`,
+          heroName: summonedHero.name,
+          heroEmoji: summonedHero.emoji,
+          rarity: summonedHero.rarity,
+          ts: Date.now(),
+          pityTriggered: roll.pityTriggered,
+        });
+      }
+
+      let nextState = withAchievement(({
+        ...state,
+        bossTears: state.bossTears - paidUses,
+        heroRoster: [...summoned, ...state.heroRoster],
+        summonHistory: [...historyBatch, ...state.summonHistory].slice(0, MAX_SAVE_SUMMON_HISTORY),
+        totalSummons: state.totalSummons + totalPulls,
+        freeSummonCharges: state.freeSummonCharges - freeUses + 1,
+        gachaPityCounter: pityCounter,
+      }));
+      if (pityHits > 0) {
+        nextState = queueReward(nextState, {
+          id: `pity_x10_${Date.now()}`,
+          kind: 'system',
+          title: 'Pity Triggered',
+          detail: `${pityHits} pity hit${pityHits > 1 ? 's' : ''} in this x10 summon.`,
+        });
+      }
+      nextState = queueReward(nextState, {
+        id: `cinematic_bonus_${Date.now()}`,
+        kind: 'system',
+        title: 'Cinematic Bonus',
+        detail: '+1 free summon charge awarded.',
+      });
       return nextState;
     }
 
@@ -4600,6 +4664,7 @@ export function useGameState(saveSlot: string = 'default') {
   const equipItem = useCallback((itemId: string) => dispatch({ type: 'EQUIP_ITEM', itemId }), []);
   const summonHero = useCallback(() => dispatch({ type: 'SUMMON_HERO' }), []);
   const summonHeroX10 = useCallback(() => dispatch({ type: 'SUMMON_HERO_X10' }), []);
+  const summonHeroX10Cinematic = useCallback(() => dispatch({ type: 'SUMMON_HERO_X10_CINEMATIC' }), []);
   const autoEquipBestHeroes = useCallback(() => dispatch({ type: 'AUTO_EQUIP_BEST_HEROES' }), []);
   const saveTeamLoadout = useCallback((slot: number) => dispatch({ type: 'SAVE_TEAM_LOADOUT', slot }), []);
   const loadTeamLoadout = useCallback((slot: number) => dispatch({ type: 'LOAD_TEAM_LOADOUT', slot }), []);
@@ -4779,6 +4844,7 @@ export function useGameState(saveSlot: string = 'default') {
     equipItem,
     summonHero,
     summonHeroX10,
+    summonHeroX10Cinematic,
     autoEquipBestHeroes,
     saveTeamLoadout,
     loadTeamLoadout,

@@ -214,6 +214,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setActiveTeam,
     summonHero,
     summonHeroX10,
+    summonHeroX10Cinematic,
     autoEquipBestHeroes,
     saveTeamLoadout,
     loadTeamLoadout,
@@ -297,6 +298,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [chapterMapOpen, setChapterMapOpen] = useState(false);
   const [compareItemId, setCompareItemId] = useState<string | null>(null);
   const [summonReveal, setSummonReveal] = useState<SummonReveal | null>(null);
+  const [cinematicSummonOpen, setCinematicSummonOpen] = useState(false);
+  const [cinematicSummonPhase, setCinematicSummonPhase] = useState<'charge' | 'warp' | 'reveal'>('charge');
+  const [cinematicSummonResults, setCinematicSummonResults] = useState<SummonReveal[]>([]);
   const [idleChestReady, setIdleChestReady] = useState(false);
   const [idleChestOpen, setIdleChestOpen] = useState(false);
   const [idleChestReward, setIdleChestReward] = useState<{ title: string; detail: string } | null>(null);
@@ -306,6 +310,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [topChipTooltipAnchor, setTopChipTooltipAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const lastSummonIdRef = useRef<string | null>(null);
+  const pendingCinematicSummonRef = useRef(false);
+  const cinematicTimersRef = useRef<number[]>([]);
+  const cinematicPulse = useRef(new Animated.Value(0)).current;
+  const cinematicRevealScale = useRef(new Animated.Value(0.8)).current;
   const topChipRefs = useRef<Record<'dps' | 'power' | 'gear', View | null>>({ dps: null, power: null, gear: null });
   const storyUnlockInitRef = useRef(false);
   const seenStoryUnlockIdsRef = useRef<Set<string>>(new Set());
@@ -854,14 +862,69 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   }, [rewardPopup]);
 
   useEffect(() => {
+    if (!cinematicSummonOpen) {
+      cinematicPulse.stopAnimation();
+      cinematicPulse.setValue(0);
+      return;
+    }
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(cinematicPulse, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(cinematicPulse, {
+          toValue: 0,
+          duration: 700,
+          easing: Easing.inOut(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [cinematicPulse, cinematicSummonOpen]);
+
+  useEffect(() => {
+    if (cinematicSummonPhase !== 'reveal') return;
+    cinematicRevealScale.setValue(0.8);
+    Animated.spring(cinematicRevealScale, {
+      toValue: 1,
+      friction: 7,
+      tension: 90,
+      useNativeDriver: true,
+    }).start();
+  }, [cinematicRevealScale, cinematicSummonPhase]);
+
+  useEffect(() => {
+    return () => {
+      cinematicTimersRef.current.forEach(timer => clearTimeout(timer));
+      cinematicTimersRef.current = [];
+    };
+  }, []);
+
+  useEffect(() => {
     const latest = state.summonHistory[0];
     if (!latest) return;
     if (lastSummonIdRef.current === latest.id) return;
     lastSummonIdRef.current = latest.id;
+    if (pendingCinematicSummonRef.current) {
+      pendingCinematicSummonRef.current = false;
+      const latestTen = state.summonHistory.slice(0, 10).map(entry => ({
+        id: entry.id,
+        heroName: entry.heroName,
+        emoji: entry.heroEmoji,
+        rarity: entry.rarity,
+      }));
+      setCinematicSummonResults(latestTen);
+      setCinematicSummonPhase('reveal');
+      return;
+    }
+    if (cinematicSummonOpen) return;
     setSummonReveal({ id: latest.id, heroName: latest.heroName, emoji: latest.heroEmoji, rarity: latest.rarity });
     const timer = setTimeout(() => setSummonReveal(null), 2000);
     return () => clearTimeout(timer);
-  }, [state.summonHistory]);
+  }, [cinematicSummonOpen, state.summonHistory]);
 
   useEffect(() => {
     if (!rewardPopup && !idleChestOpen) {
@@ -1019,6 +1082,42 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   const canCraftWeapon = state.equipmentScrap >= 130;
 
+  const triggerCinematicSummon = () => {
+    if (!canGachaX10 || cinematicSummonOpen) return;
+    cinematicTimersRef.current.forEach(timer => clearTimeout(timer));
+    cinematicTimersRef.current = [];
+    setCinematicSummonResults([]);
+    setCinematicSummonOpen(true);
+    setCinematicSummonPhase('charge');
+
+    const phaseWarp = setTimeout(() => {
+      setCinematicSummonPhase('warp');
+      pendingCinematicSummonRef.current = true;
+      summonHeroX10Cinematic();
+    }, 850);
+
+    const fallbackReveal = setTimeout(() => {
+      if (!pendingCinematicSummonRef.current) return;
+      pendingCinematicSummonRef.current = false;
+      const latestTen = state.summonHistory.slice(0, 10).map(entry => ({
+        id: entry.id,
+        heroName: entry.heroName,
+        emoji: entry.heroEmoji,
+        rarity: entry.rarity,
+      }));
+      setCinematicSummonResults(latestTen);
+      setCinematicSummonPhase('reveal');
+    }, 2600);
+
+    const autoClose = setTimeout(() => {
+      setCinematicSummonOpen(false);
+      setCinematicSummonResults([]);
+      setCinematicSummonPhase('charge');
+    }, 6800);
+
+    cinematicTimersRef.current.push(phaseWarp as unknown as number, fallbackReveal as unknown as number, autoClose as unknown as number);
+  };
+
   const hasWarRoomNotification = canRebirthNow || (nextTeamSlotUnlock?.canUnlock ?? false);
   const hasEquipmentNotification = Object.values(state.equippedItems).filter(Boolean).length < 3;
   const hasAchievementsNotification = hasClaimableRewards;
@@ -1172,6 +1271,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const prestige10Done = (state.prestigeCount ?? 0) >= 10;
   const prestige25Done = (state.prestigeCount ?? 0) >= 25;
   const prestige50Done = (state.prestigeCount ?? 0) >= 50;
+  const cinematicGlowOpacity = cinematicPulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.22, 0.86],
+  });
+  const cinematicGlowScale = cinematicPulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.08],
+  });
 
   function openCharacterSlot(playerClass: PlayerClass) {
     setDraftName('');
@@ -1318,6 +1425,73 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           </View>
         </View>
       )}
+
+      <Modal
+        transparent
+        visible={cinematicSummonOpen}
+        animationType="fade"
+        onRequestClose={() => setCinematicSummonOpen(false)}
+      >
+        <View style={styles.cinematicSummonOverlay}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.cinematicSummonGlow,
+              {
+                opacity: cinematicGlowOpacity,
+                transform: [{ scale: cinematicGlowScale }],
+              },
+            ]}
+          />
+
+          <Animated.View
+            style={[
+              styles.cinematicSummonCard,
+              cinematicSummonPhase === 'reveal' && { transform: [{ scale: cinematicRevealScale }] },
+            ]}
+          >
+            {cinematicSummonPhase !== 'reveal' ? (
+              <>
+                <Text style={styles.cinematicSummonTitle}>
+                  {cinematicSummonPhase === 'charge' ? 'Charging Warp Gate' : 'Warp Corridor Open'}
+                </Text>
+                <Text style={styles.cinematicSummonPhaseText}>
+                  {cinematicSummonPhase === 'charge'
+                    ? 'Synchronizing stellar signatures for 10 arrivals...'
+                    : 'Pull sequence active. Locking to highest rarity echoes...'}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.cinematicSummonTitle}>Cinematic Recruit Complete</Text>
+                <Text style={styles.cinematicSummonPhaseText}>+1 Free Summon bonus awarded</Text>
+                <View style={styles.cinematicSummonResultsGrid}>
+                  {cinematicSummonResults.map(entry => {
+                    const rarity = rarityConfig(entry.rarity);
+                    return (
+                      <View key={entry.id} style={[styles.cinematicSummonResultCard, { borderColor: rarity.color }]}>
+                        <Text style={styles.cinematicSummonResultEmoji}>{entry.emoji}</Text>
+                        <Text style={styles.cinematicSummonResultName} numberOfLines={1}>{entry.heroName}</Text>
+                        <Text style={[styles.cinematicSummonResultRarity, { color: rarity.color }]}>{rarity.label}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+                <Pressable
+                  style={styles.cinematicSummonCloseBtn}
+                  onPress={() => {
+                    setCinematicSummonOpen(false);
+                    setCinematicSummonResults([]);
+                    setCinematicSummonPhase('charge');
+                  }}
+                >
+                  <Text style={styles.cinematicSummonCloseText}>Continue</Text>
+                </Pressable>
+              </>
+            )}
+          </Animated.View>
+        </View>
+      </Modal>
 
 
       {/* Header */}
@@ -1636,6 +1810,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             getHeroGoldLevelCost,
             summonHero,
             summonHeroX10,
+            summonHeroX10Cinematic: triggerCinematicSummon,
             autoEquipBestHeroes,
             autoRecycleHeroes,
             saveTeamLoadout,

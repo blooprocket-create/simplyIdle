@@ -30,6 +30,7 @@ export interface HeroesTabContentProps {
   getHeroGoldLevelCost: (level: number) => number;
   summonHero: () => void;
   summonHeroX10: () => void;
+  summonHeroX10Cinematic: () => void;
   autoEquipBestHeroes: () => void;
   autoRecycleHeroes: () => void;
   saveTeamLoadout: (slot: number) => void;
@@ -66,6 +67,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
   getHeroGoldLevelCost,
   summonHero,
   summonHeroX10,
+  summonHeroX10Cinematic,
   autoEquipBestHeroes,
   autoRecycleHeroes,
   saveTeamLoadout,
@@ -129,7 +131,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                     !canGachaX10 && styles.featuredSummonBtnDisabled,
                   ]}
                   disabled={!canGachaX10}
-                  onPress={summonHeroX10}
+                  onPress={summonHeroX10Cinematic}
                 >
                   <Text style={styles.featuredSummonBtnText}>Cinematic x10 Summon</Text>
                 </Pressable>
