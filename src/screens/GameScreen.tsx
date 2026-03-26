@@ -519,6 +519,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   const tutorialProgressLabel = `${Math.min(state.tutorialCurrentQuestIndex, TUTORIAL_QUESTS.length)}/${TUTORIAL_QUESTS.length}`;
   const rewardPopup = state.rewardQueue[0] ?? null;
+  const isOfflineRewardPopup = !!rewardPopup && `${rewardPopup.title} ${rewardPopup.detail}`.toLowerCase().includes('offline progress');
   const classCutinTone = useMemo(() => {
     const byClass: Record<PlayerClass, { stripe: string; glow: string; callout: string }> = {
       warrior: { stripe: '#6E7FA8', glow: '#9AB3E6', callout: 'Aegis Impact' },
@@ -840,7 +841,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     const t = `${rewardPopup.title} ${rewardPopup.detail}`.toLowerCase();
     if (t.includes('offline progress')) {
       setIdleChestReward(rewardPopup);
-      setIdleChestReady(true);
+      setIdleChestReady(false);
+      setIdleChestOpen(true);
       return;
     }
   }, [rewardPopup]);
@@ -1500,137 +1502,29 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               />
             </View>
             <Text style={styles.hpText}>{Math.ceil(state.monsterHp)}/{Math.ceil(state.monsterMaxHp)} HP</Text>
-          </View>
-
-          {/* Team Selection */}
-          <View style={styles.teamInfo}>
-            <View style={styles.teamHeader}>
-              <Text style={styles.teamTitle}>⚔️ Active Team (+ You)</Text>
-              <View style={styles.teamHeaderActions}>
-                <Pressable
-                  onPress={() => {
-                    setTempTeam([...state.activeTeamHeroIds]);
-                    setTeamSelectionMode(!teamSelectionMode);
-                    if (activeTeamCollapsed) setActiveTeamCollapsed(false);
-                  }}
-                  style={[styles.editBtn, forceBuildTeamStep && !teamSelectionMode && styles.tutorialPulse]}
-                >
-                  <Text style={styles.editBtnText}>{teamSelectionMode ? 'Cancel' : 'Edit'}</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => {
-                    setActiveTeamCollapsed(prev => {
-                      const next = !prev;
-                      if (next) setTeamSelectionMode(false);
-                      return next;
-                    });
-                  }}
-                  style={styles.teamCollapseBtn}
-                >
-                  <Text style={styles.teamCollapseBtnText}>{activeTeamCollapsed ? 'Expand' : 'Collapse'}</Text>
-                </Pressable>
-              </View>
+            <View style={styles.affixRow}>
+              {monsterAffixes.map(affix => (
+                <View key={affix.id} style={[styles.affixChip, { borderColor: affix.color }]}>
+                  <Text style={[styles.affixChipText, { color: affix.color }]}>{affix.name}</Text>
+                </View>
+              ))}
             </View>
-
-            {activeTeamCollapsed ? (
-              <Text style={styles.teamCollapsedHint}>
-                Active heroes: {state.activeTeamHeroIds.length}/{teamSlotCap} • Synergies: {stats.synergies.length}
+            <Text style={styles.teamSynergyInline}>
+              TTK {ttkSeconds >= 99 ? '99s+' : `${ttkSeconds.toFixed(1)}s`} • Danger {dangerLabel} ({dangerScore.toFixed(0)}%)
+            </Text>
+            <Text style={styles.teamSynergyInline}>
+              Rewards: 💰 {fmt(getMonsterGold(state.wave))} • ✨ {fmt(getMonsterExp(state.wave))} {isBoss ? '• 👹 Boss bonus' : ''}
+            </Text>
+            {stats.synergies.length > 0 && (
+              <Text style={styles.teamSynergyInline}>
+                Synergies: {stats.synergies.map(s => s.name).join(' • ')}
               </Text>
-            ) : teamSelectionMode ? (
-              <View>
-                <Text style={styles.selectMsg}>Select up to {teamSlotCap} heroes ({tempTeam.length}/{teamSlotCap})</Text>
-                <Text style={styles.sectionHelperText}>Formation cap: max 2 Front, 2 Mid, 2 Back.</Text>
-                <ScrollView style={styles.heroSelector}>
-                  {state.heroRoster.map(hero => {
-                    const isSelected = tempTeam.includes(hero.uid);
-                    return (
-                      <Pressable
-                        key={hero.uid}
-                        style={[styles.heroSelectCard, isSelected && styles.heroSelectCardSelected]}
-                        onPress={() => {
-                          setTempTeam(prev => {
-                            if (prev.includes(hero.uid)) {
-                              return prev.filter(id => id !== hero.uid);
-                            }
-                            if (prev.length >= teamSlotCap) return prev;
-
-                            const roleForUid = (uid: string) => {
-                              const rosterHero = state.heroRoster.find(h => h.uid === uid);
-                              if (!rosterHero) return 'mid';
-                              return state.heroFormationByUid[uid]
-                                ?? (rosterHero.heroClass === 'warrior' || rosterHero.heroClass === 'berserker'
-                                  ? 'front'
-                                  : rosterHero.heroClass === 'archer' || rosterHero.heroClass === 'mage'
-                                    ? 'back'
-                                    : 'mid');
-                            };
-                            const role = roleForUid(hero.uid);
-                            const roleCount = prev.reduce((count, uid) => count + (roleForUid(uid) === role ? 1 : 0), 0);
-                            if (roleCount >= 2) return prev;
-                            return [...prev, hero.uid];
-                          });
-                        }}
-                      >
-                        <View style={[styles.selectCheckbox, isSelected && styles.selectCheckboxChecked]} />
-                        <View style={styles.heroSelectInfo}>
-                          <Text style={styles.heroSelectName}>{hero.emoji} {hero.name} Lv{hero.level}</Text>
-                          <Text style={{ color: rarityConfig(hero.rarity).color, fontSize: 12 }}>
-                            {hero.rarity} • {hero.heroClass}
-                          </Text>
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-                <Pressable
-                  style={[styles.confirmBtn, forceBuildTeamStep && styles.tutorialPulse]}
-                  onPress={() => {
-                    setActiveTeam(tempTeam);
-                    setTeamSelectionMode(false);
-                  }}
-                >
-                  <Text style={styles.confirmBtnText}>Confirm Team ({tempTeam.length})</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <View style={styles.activeTeamDisplay}>
-                {state.activeTeamHeroIds.length === 0 ? (
-                  <Text style={styles.noTeamMsg}>No heroes selected. Tap Edit to choose your team.</Text>
-                ) : (
-                  <>
-                    {state.activeTeamHeroIds.map((heroId, idx) => {
-                      const hero = state.heroRoster.find(h => h.uid === heroId);
-                      if (!hero) return null;
-                      const cls = getClassConfig(hero.heroClass);
-                      return (
-                        <View key={heroId} style={styles.activeTeamCard}>
-                          <Text style={styles.slotIdx}>#{idx + 1}</Text>
-                          <View style={styles.activeTeamCardContent}>
-                            <Text style={styles.activeTeamHeroName}>{hero.emoji} {hero.name}</Text>
-                            <Text style={styles.activeTeamHeroClass}>
-                              <Text style={{ color: rarityConfig(hero.rarity).color }}>{hero.rarity}</Text>
-                              {' • '}
-                              {cls.name} Lv{hero.level}
-                            </Text>
-                          </View>
-                          {(() => {
-                            const role = VALID_FORMATION_ROLES_FOR_CLASS[hero.heroClass][0];
-                            const roleName = role === 'front' ? '🛡️ Front' : role === 'mid' ? '⚔️ Mid' : '🏹 Back';
-                            return (
-                              <View style={styles.formationBadge}>
-                                <Text style={styles.formationBadgeText}>{roleName}</Text>
-                              </View>
-                            );
-                          })()}
-                        </View>
-                      );
-                    })}
-                    <Text style={styles.teamSynergyInline}>
-                      Synergies Active: {stats.synergies.length} • Formation: F{stats.formation.front}/M{stats.formation.mid}/B{stats.formation.back}
-                    </Text>
-                  </>
-                )}
-              </View>
+            )}
+            {(stats.damageBuffPct > 0 || stats.damageReductionBuffPct > 0) && (
+              <Text style={styles.buffText}>
+                Buffs: {stats.damageBuffPct > 0 ? `+${Math.round(stats.damageBuffPct * 100)}% DPS ` : ''}
+                {stats.damageReductionBuffPct > 0 ? `• -${Math.round(stats.damageReductionBuffPct * 100)}% incoming` : ''}
+              </Text>
             )}
           </View>
         </>
@@ -1866,23 +1760,23 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
       {storyUnlockToast && (
         <Pressable
-          style={[styles.storyToast, styles.storyToastActive]}
+          style={[styles.rewardToast, styles.rewardToastActive]}
           onPress={() => {
             setStoryUnlockToast(null);
             onTabChange('achievements');
             setAchievementsSubTab('codex');
           }}
         >
-          <Text style={styles.storyToastIcon}>📖</Text>
-          <View style={styles.storyToastContent}>
-            <Text style={styles.storyToastTitle}>New Chronicle Unlocked</Text>
-            <Text style={styles.storyToastDetail}>{storyUnlockToast.chapter} - {storyUnlockToast.title}</Text>
+          <Text style={styles.rewardToastSparkle}>📖</Text>
+          <View>
+            <Text style={styles.rewardToastTitle}>New Chronicle Unlocked</Text>
+            <Text style={styles.rewardToastDetail}>{storyUnlockToast.chapter} - {storyUnlockToast.title}</Text>
           </View>
-          <Text style={styles.storyToastHint}>View</Text>
+          <Text style={styles.rewardToastSparkle}>View</Text>
         </Pressable>
       )}
 
-      {rewardPopup && !idleChestReady && (
+      {rewardPopup && !idleChestReady && !isOfflineRewardPopup && (
         <Pressable style={[styles.rewardToast, styles.rewardToastActive]} onPress={clearRewardPopup}>
           <Text style={styles.rewardToastSparkle}>✨</Text>
           <View>
@@ -1890,23 +1784,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             <Text style={styles.rewardToastDetail}>{rewardPopup.detail}</Text>
           </View>
           <Text style={styles.rewardToastSparkle}>✨</Text>
-        </Pressable>
-      )}
-
-      {idleChestReady && idleChestReward && (
-        <Pressable
-          style={styles.idleChestPopIn}
-          onPress={() => {
-            setIdleChestOpen(true);
-            setIdleChestReady(false);
-          }}
-        >
-          <Text style={styles.idleChestEmoji}>🎁</Text>
-          <View style={styles.idleChestInfo}>
-            <Text style={styles.idleChestTitle}>Idle Rewards Ready</Text>
-            <Text style={styles.idleChestDetail}>Tap to open your return chest</Text>
-          </View>
-          <Text style={styles.idleChestOpenText}>Open</Text>
         </Pressable>
       )}
 

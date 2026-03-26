@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
-import { REBIRTH_WAVE_THRESHOLD, StatKey, EquipmentSlot, getMonsterGold, getMonsterExp } from '../../gameConfig';
+import { REBIRTH_WAVE_THRESHOLD, StatKey, EquipmentSlot, rarityConfig } from '../../gameConfig';
 import { STAT_LABELS } from '../GameScreen';
 import { fmt } from '../../utils';
 import { styles } from '../GameScreen';
@@ -103,26 +103,6 @@ export const BattleTabContent: React.FC<BattleTabContentProps> = ({
                 ]}
               />
             </View>
-            <View style={styles.burstRow}>
-              <View style={styles.burstInfo}>
-                <Text style={styles.burstTitle}>Burst Gauge</Text>
-                <Text style={styles.burstSub}>Charge from kills ({state.burstCharge}/{burstCost}) • bosses grant +3 • spend for amplified strikes</Text>
-              </View>
-              <Pressable
-                style={[styles.burstBtn, !canBurst && styles.burstBtnDisabled]}
-                disabled={!canBurst}
-                onPress={() => {
-                  const hits = 4 * battleSpeed;
-                  burst(hits);
-                }}
-              >
-                <Text style={styles.burstBtnText}>{canBurst ? `Burst x${4 * battleSpeed}` : 'Charging'}</Text>
-              </Pressable>
-            </View>
-            <View style={styles.hpBarBg}>
-              <View style={[styles.hpBarFill, { width: `${burstChargePct}%`, backgroundColor: '#FFB347' }]} />
-            </View>
-            <Text style={styles.burstHint}>{canBurst ? 'Burst ready: cash in now for a wave skip push.' : `${burstCost - state.burstCharge} kills to next burst`}</Text>
             <View style={styles.heatStoreRow}>
               <Pressable
                 style={[styles.heatStoreBtn, state.diamonds < 8 && styles.heatStoreBtnDisabled]}
@@ -155,6 +135,26 @@ export const BattleTabContent: React.FC<BattleTabContentProps> = ({
                 <Text style={styles.heatStoreBtnText}>Use ❄️ ({state.usableItemCounts['coolant_mk2'] ?? 0})</Text>
               </Pressable>
             </View>
+            <View style={styles.burstRow}>
+              <View style={styles.burstInfo}>
+                <Text style={styles.burstTitle}>Burst Gauge</Text>
+                <Text style={styles.burstSub}>Charge from kills ({state.burstCharge}/{burstCost}) • bosses grant +3 • spend for amplified strikes</Text>
+              </View>
+              <Pressable
+                style={[styles.burstBtn, !canBurst && styles.burstBtnDisabled]}
+                disabled={!canBurst}
+                onPress={() => {
+                  const hits = 4 * battleSpeed;
+                  burst(hits);
+                }}
+              >
+                <Text style={styles.burstBtnText}>{canBurst ? `Burst x${4 * battleSpeed}` : 'Charging'}</Text>
+              </Pressable>
+            </View>
+            <View style={styles.hpBarBg}>
+              <View style={[styles.hpBarFill, { width: `${burstChargePct}%`, backgroundColor: '#FFB347' }]} />
+            </View>
+            <Text style={styles.burstHint}>{canBurst ? 'Burst ready: cash in now for a wave skip push.' : `${burstCost - state.burstCharge} kills to next burst`}</Text>
           </View>
 
           <View style={styles.battleSection}>
@@ -191,23 +191,6 @@ export const BattleTabContent: React.FC<BattleTabContentProps> = ({
             </Text>
           </View>
           
-          {/* Enemy Info */}
-          <View style={styles.battleSection}>
-            <Text style={styles.battleSectionTitle}>Enemy {isBoss ? '👹 BOSS' : '🦹'}</Text>
-            <Text style={styles.battleMonsterName}>{monster.name} {isBoss && '(Boss)' }</Text>
-            <Text style={styles.battleMonsterWave}>Wave {state.wave} {isBoss && '- 10x Danger'}</Text>
-            <View style={styles.affixRow}>
-              {monsterAffixes.map(affix => (
-                <View key={affix.id} style={[styles.affixChip, { borderColor: affix.color }]}>
-                  <Text style={[styles.affixChipText, { color: affix.color }]}>{affix.name}</Text>
-                </View>
-              ))}
-            </View>
-            {monsterAffixes.map(affix => (
-              <Text key={`${affix.id}_desc`} style={styles.affixDesc}>{affix.description}</Text>
-            ))}
-          </View>
-
           {/* Team Composition */}
           <View style={styles.battleSection}>
             <Text style={styles.battleSectionTitle}>Your Team ({state.activeTeamHeroIds.length}/{teamSlotCap})</Text>
@@ -219,10 +202,11 @@ export const BattleTabContent: React.FC<BattleTabContentProps> = ({
                 if (!hero) return null;
                 const cls = getClassConfig(hero.heroClass);
                 const detail = stats.heroDetails[hero.uid];
+                const rarityColor = rarityConfig(hero.rarity).color;
                 return (
                   <View key={heroId} style={styles.battleHeroRow}>
                     <Text style={styles.battleHeroSlot}>#{idx + 1}</Text>
-                    <Text style={styles.battleHeroInfo}>
+                    <Text style={[styles.battleHeroInfo, { color: rarityColor }]}>
                       {hero.emoji} {hero.name}
                     </Text>
                     <Text style={styles.battleHeroStats}>
@@ -232,68 +216,6 @@ export const BattleTabContent: React.FC<BattleTabContentProps> = ({
                   </View>
                 );
               })
-            )}
-          </View>
-
-          {/* Combat Stats */}
-          <View style={styles.battleSection}>
-            <Text style={styles.battleSectionTitle}>Combat Stats</Text>
-            <View style={styles.battleStatRow}>
-              <Text style={styles.battleStatLabel}>Team DPS:</Text>
-              <Text style={styles.battleStatValue}>{Math.floor(stats.dps)}</Text>
-            </View>
-            <View style={styles.battleStatRow}>
-              <Text style={styles.battleStatLabel}>Team HP:</Text>
-              <Text style={styles.battleStatValue}>{Math.ceil(state.teamHp)} / {state.teamMaxHp}</Text>
-            </View>
-            <View style={styles.battleStatRow}>
-              <Text style={styles.battleStatLabel}>Enemy HP:</Text>
-              <Text style={styles.battleStatValue}>{Math.ceil(state.monsterHp)} / {state.monsterMaxHp}</Text>
-            </View>
-            {(stats.damageBuffPct > 0 || stats.damageReductionBuffPct > 0) && (
-              <Text style={styles.buffText}>
-                Buffs: {stats.damageBuffPct > 0 ? `+${Math.round(stats.damageBuffPct * 100)}% DPS ` : ''}
-                {stats.damageReductionBuffPct > 0 ? `• -${Math.round(stats.damageReductionBuffPct * 100)}% incoming` : ''}
-              </Text>
-            )}
-          </View>
-
-          <View style={styles.battleSection}>
-            <Text style={styles.battleSectionTitle}>Forecast</Text>
-            <View style={styles.battleStatRow}>
-              <Text style={styles.battleStatLabel}>Expected TTK:</Text>
-              <Text style={styles.battleStatValue}>{ttkSeconds >= 99 ? '99s+' : `${ttkSeconds.toFixed(1)}s`}</Text>
-            </View>
-            <View style={styles.battleStatRow}>
-              <Text style={styles.battleStatLabel}>Danger:</Text>
-              <Text style={[styles.battleStatValue, dangerScore >= 80 ? styles.dangerCritical : dangerScore >= 55 ? styles.dangerHigh : styles.dangerLow]}>
-                {dangerLabel} ({dangerScore.toFixed(0)}%)
-              </Text>
-            </View>
-            <View style={styles.hpBarBg}>
-              <View
-                style={[
-                  styles.hpBarFill,
-                  {
-                    width: `${dangerScore}%`,
-                    backgroundColor: dangerScore >= 80 ? '#FF5B8A' : dangerScore >= 55 ? '#FFB347' : '#6DDB7B',
-                  },
-                ]}
-              />
-            </View>
-          </View>
-
-          {/* Wave Rewards */}
-          <View style={styles.battleSection}>
-            <Text style={styles.battleSectionTitle}>Wave Rewards</Text>
-            <Text style={styles.battleRewardLabel}>
-              💰 {fmt(getMonsterGold(state.wave))} gold
-            </Text>
-            <Text style={styles.battleRewardLabel}>
-             ✨ {fmt(getMonsterExp(state.wave))} EXP
-            </Text>
-            {isBoss && (
-              <Text style={styles.battleBossReward}>👹 Bonus drops on boss defeat!</Text>
             )}
           </View>
 

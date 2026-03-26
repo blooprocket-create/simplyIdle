@@ -90,10 +90,14 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
                   let projectedLevel = hero.level;
 
                   if (batchLevelMode === 'max') {
+                    let remainingGold = state.gold;
                     for (let lvl = hero.level; lvl < maxLevel; lvl++) {
-                      totalCost += getHeroGoldLevelCost(lvl);
+                      const levelCost = getHeroGoldLevelCost(lvl);
+                      if (remainingGold < levelCost) break;
+                      totalCost += levelCost;
+                      remainingGold -= levelCost;
+                      projectedLevel = lvl + 1;
                     }
-                    projectedLevel = maxLevel;
                   } else {
                     for (let lvl = hero.level; lvl < Math.min(hero.level + batchLevelMode, maxLevel); lvl++) {
                       totalCost += getHeroGoldLevelCost(lvl);
@@ -122,7 +126,11 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
                         <Text style={styles.batchHeroName}>{hero.emoji} {hero.name}</Text>
                         <Text style={styles.batchHeroLevel}>Level {hero.level} → {projectedLevel}</Text>
                         {isOnTeam && <Text style={styles.batchHeroTeamTag}>🛡️ Active Team</Text>}
-                        <Text style={styles.batchHerosCost}>Cost: {fmt(totalCost)} 💰</Text>
+                        <Text style={styles.batchHerosCost}>
+                          {batchLevelMode === 'max'
+                            ? `Affordable now: ${fmt(totalCost)} 💰`
+                            : `Cost: ${fmt(totalCost)} 💰`}
+                        </Text>
                       </View>
                     </Pressable>
                   );
