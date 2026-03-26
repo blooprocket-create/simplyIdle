@@ -4764,7 +4764,6 @@ export const styles = StyleSheet.create({
   batchHeroHeaderMobile: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 10,
   },
   batchHeroHeaderLeftMobile: {
@@ -4795,6 +4794,11 @@ export const styles = StyleSheet.create({
     backgroundColor: '#162739',
     paddingHorizontal: 10,
     paddingVertical: 5,
+    alignSelf: 'flex-start',
+  },
+  batchHeroProjectedRowMobile: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
   },
   batchHeroProjectedPillText: {
     fontSize: 10,

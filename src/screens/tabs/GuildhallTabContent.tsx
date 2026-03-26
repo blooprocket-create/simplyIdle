@@ -154,7 +154,7 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
                       style={[
                         styles.batchHeroCard,
                         isPhoneWidth && styles.batchHeroCardMobile,
-                        { width: batchCardWidth, alignItems: isPhoneWidth ? 'stretch' : 'center' },
+                        { width: isSingleColumnBatch ? '100%' : batchCardWidth, alignItems: isPhoneWidth ? 'stretch' : 'center' },
                         isSelected && styles.batchHeroCardSelected,
                         isOnTeam && styles.heroCardActive,
                       ]}
@@ -182,8 +182,11 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
                                 </Text>
                               </View>
                             </View>
+                          </View>
+
+                          <View style={styles.batchHeroProjectedRowMobile}>
                             <View style={styles.batchHeroProjectedPill}>
-                              <Text style={styles.batchHeroProjectedPillText}>+{projectedLevel - hero.level}</Text>
+                              <Text style={styles.batchHeroProjectedPillText}>+{projectedLevel - hero.level} levels</Text>
                             </View>
                           </View>
 
