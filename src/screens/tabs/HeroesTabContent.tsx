@@ -79,6 +79,8 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
   renderSubTabBar,
 }) => {
   const { width: viewportWidth } = useWindowDimensions();
+  const isPhoneWidth = viewportWidth < 700;
+  const isSingleColumnRoster = viewportWidth < 520;
   const isNarrow = viewportWidth < 390;
   const isUltraNarrow = viewportWidth < 330;
 
@@ -105,11 +107,11 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
     });
   }, [activeTeamSet, rarityRank, state.heroRoster]);
 
-  const rosterColumns = isUltraNarrow ? 1 : viewportWidth >= 980 ? 4 : viewportWidth >= 700 ? 3 : 2;
-  const rosterGap = isNarrow ? 6 : 8;
-  const rosterHorizontalPadding = isNarrow ? 36 : 44;
+  const rosterColumns = isSingleColumnRoster ? 1 : viewportWidth >= 1180 ? 4 : viewportWidth >= 860 ? 3 : 2;
+  const rosterGap = isPhoneWidth ? 10 : 8;
+  const rosterHorizontalPadding = isPhoneWidth ? 28 : 44;
   const rosterCardWidth = Math.max(
-    isUltraNarrow ? 220 : 130,
+    isSingleColumnRoster ? viewportWidth - rosterHorizontalPadding : isUltraNarrow ? 220 : 180,
     Math.floor((viewportWidth - rosterHorizontalPadding - rosterGap * (rosterColumns - 1)) / rosterColumns),
   );
 
@@ -207,9 +209,9 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
 
           {heroesSubTab === 'roster' && (
             <>
-              <View style={styles.heroRosterHeader}>
+              <View style={[styles.heroRosterHeader, isPhoneWidth && styles.heroRosterHeaderStacked]}>
                 <Text style={styles.sectionTitle}>👥 Roster Command</Text>
-                <View style={[styles.heroRosterActions, isNarrow && { width: '100%', justifyContent: 'space-between' }] }>
+                <View style={[styles.heroRosterActions, isPhoneWidth && styles.heroRosterActionsStacked]}>
                   <Pressable style={styles.autoEquipBtn} onPress={autoEquipBestHeroes}>
                     <Text style={styles.autoEquipBtnText}>⚡ Auto Equip</Text>
                   </Pressable>
@@ -221,9 +223,9 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
               <Text style={styles.rosterCount}>
                 {state.heroRoster.length} heroes • {state.activeTeamHeroIds.length}/{teamSlotCap} in active team
               </Text>
-              <View style={[styles.loadoutRow, isNarrow && { flexWrap: 'wrap' }]}>
+              <View style={[styles.loadoutRow, isPhoneWidth && styles.loadoutRowMobile]}>
                 {[0, 1, 2].map(slot => (
-                  <View key={slot} style={[styles.loadoutCell, isNarrow && { minWidth: '31%' }]}>
+                  <View key={slot} style={[styles.loadoutCell, isPhoneWidth && styles.loadoutCellMobile]}>
                     <Text style={styles.loadoutLabel}>L{slot + 1}</Text>
                     <View style={styles.loadoutBtnsWrap}>
                       <Pressable style={styles.loadoutSaveBtn} onPress={() => saveTeamLoadout(slot)}>
@@ -239,7 +241,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
               {state.heroRoster.length === 0 ? (
                 <Text style={styles.emptyMsg}>Summon your first hero!</Text>
               ) : (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: rosterGap }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: rosterGap, alignItems: 'stretch' }}>
                 {sortedRoster.map(hero => {
                   const inActiveTeam = activeTeamSet.has(hero.uid);
                   const cls = getClassConfig(hero.heroClass);
@@ -264,19 +266,19 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                       key={hero.uid}
                       style={[
                         styles.heroCard,
-                        isNarrow && styles.heroCardMobile,
+                        isPhoneWidth && styles.heroCardMobile,
                         inActiveTeam && styles.heroCardActive,
-                        isNarrow && inActiveTeam && styles.heroCardMobileActive,
+                        isPhoneWidth && inActiveTeam && styles.heroCardMobileActive,
                         { width: rosterCardWidth, marginBottom: 0 },
                       ]}
                     >
                       <View style={[styles.heroCardRarityBar, { backgroundColor: rarity.color }]} />
-                      <View style={[styles.heroCardBody, isNarrow && { paddingHorizontal: 8, paddingVertical: 8 }]}> 
-                        {isNarrow ? (
+                      <View style={[styles.heroCardBody, isPhoneWidth && styles.heroCardBodyMobile]}> 
+                        {isPhoneWidth ? (
                           <>
                             <View style={styles.heroCardHeaderMobile}>
                               <View style={[styles.heroPortraitFrame, styles.heroPortraitFrameMobile, { borderColor: rarity.color }]}>
-                                <Text style={styles.heroEmoji}>{hero.emoji}</Text>
+                                <Text style={[styles.heroEmoji, styles.heroEmojiMobile]}>{hero.emoji}</Text>
                               </View>
                               <View style={styles.heroCardInfoMobile}>
                                 <View style={styles.heroNameRowMobile}>
@@ -289,19 +291,31 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                                   <Text style={{ color: rarity.color }}>{hero.rarity}</Text>
                                   {' • '}{cls.name}
                                 </Text>
-                                <View style={styles.heroChipRowMobile}>
-                                  <View style={[styles.heroChipMobile, styles.heroChipMobileFaction]}>
-                                    <Text style={styles.heroChipTextMobile}>{faction}</Text>
-                                  </View>
-                                  <View style={[styles.heroChipMobile, styles.heroChipMobileRank]}>
-                                    <Text style={styles.heroChipTextMobile}>Rank {hero.rank}</Text>
-                                  </View>
-                                </View>
+                                <Text style={styles.heroSubMetaMobile} numberOfLines={1}>{activeArchetype.name} doctrine</Text>
                               </View>
                             </View>
 
-                            <View style={styles.heroBoostPillMobile}>
-                              <Text style={styles.heroBoostPillTextMobile}>+{(hero.teamBoost * 100).toFixed(1)}% team boost</Text>
+                            <View style={styles.heroChipRowMobile}>
+                              <View style={[styles.heroChipMobile, styles.heroChipMobileFaction]}>
+                                <Text style={styles.heroChipTextMobile}>{faction}</Text>
+                              </View>
+                              <View style={[styles.heroChipMobile, styles.heroChipMobileRank]}>
+                                <Text style={styles.heroChipTextMobile}>Rank {hero.rank}</Text>
+                              </View>
+                              <View style={[styles.heroChipMobile, styles.heroChipMobileArchetype]}>
+                                <Text style={styles.heroChipTextMobile}>{activeArchetype.name}</Text>
+                              </View>
+                            </View>
+
+                            <View style={styles.heroUtilityRowMobile}>
+                              <View style={styles.heroBoostPillMobile}>
+                                <Text style={styles.heroBoostPillTextMobile}>+{(hero.teamBoost * 100).toFixed(1)}% team boost</Text>
+                              </View>
+                              {inActiveTeam && (
+                                <View style={styles.heroTeamPillMobile}>
+                                  <Text style={styles.heroTeamPillTextMobile}>Active Team</Text>
+                                </View>
+                              )}
                             </View>
 
                             <View style={styles.heroActionRowMobile}>

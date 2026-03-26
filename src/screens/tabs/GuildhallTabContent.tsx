@@ -44,6 +44,8 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
   renderSubTabBar,
 }) => {
   const { width: viewportWidth } = useWindowDimensions();
+  const isPhoneWidth = viewportWidth < 700;
+  const isSingleColumnBatch = viewportWidth < 520;
   const isNarrow = viewportWidth < 390;
   const isUltraNarrow = viewportWidth < 330;
   const activeTeamSet = useMemo(() => new Set(state.activeTeamHeroIds), [state.activeTeamHeroIds]);
@@ -73,11 +75,11 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
       });
   }, [activeTeamSet, rarityRank, state.heroRoster]);
 
-  const batchColumns = isUltraNarrow ? 1 : viewportWidth >= 980 ? 4 : viewportWidth >= 700 ? 3 : 2;
-  const batchGap = isNarrow ? 6 : 8;
-  const batchHorizontalPadding = isNarrow ? 36 : 44;
+  const batchColumns = isSingleColumnBatch ? 1 : viewportWidth >= 1180 ? 4 : viewportWidth >= 860 ? 3 : 2;
+  const batchGap = isPhoneWidth ? 10 : 8;
+  const batchHorizontalPadding = isPhoneWidth ? 28 : 44;
   const batchCardWidth = Math.max(
-    isUltraNarrow ? 220 : 130,
+    isSingleColumnBatch ? viewportWidth - batchHorizontalPadding : isUltraNarrow ? 220 : 180,
     Math.floor((viewportWidth - batchHorizontalPadding - batchGap * (batchColumns - 1)) / batchColumns),
   );
 
@@ -151,7 +153,8 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
                       key={hero.uid}
                       style={[
                         styles.batchHeroCard,
-                        { width: batchCardWidth, alignItems: isNarrow ? 'flex-start' : 'center', paddingVertical: isNarrow ? 8 : 10, paddingHorizontal: isNarrow ? 8 : 10 },
+                        isPhoneWidth && styles.batchHeroCardMobile,
+                        { width: batchCardWidth, alignItems: isPhoneWidth ? 'stretch' : 'center' },
                         isSelected && styles.batchHeroCardSelected,
                         isOnTeam && styles.heroCardActive,
                       ]}
@@ -165,25 +168,62 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
                         setBatchLevelSelected(updated);
                       }}
                     >
-                      <View style={[styles.batchHeroCheckbox, isNarrow && { marginTop: 2 }]}>
-                        {isSelected && <View style={styles.batchHeroCheckboxInner} />}
-                      </View>
-                      <View style={[styles.batchHeroInfo, isNarrow && { gap: 3, minWidth: 0 }]}> 
-                        <Text style={[styles.batchHeroName, isNarrow && { fontSize: 12 }]} numberOfLines={1}>{hero.emoji} {hero.name}</Text>
-                        <Text style={[styles.batchHeroLevel, isNarrow && { fontSize: 11 }]} numberOfLines={1}>
-                          {isNarrow ? `Lv ${hero.level} -> ${projectedLevel}` : `Level ${hero.level} → ${projectedLevel}`}
-                        </Text>
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-                          <Text style={[styles.batchHeroTeamTag, isNarrow && { fontSize: 10 }]} numberOfLines={1}>
-                            {isOnTeam ? '🛡️ Active Team' : `⭐ Rank ${hero.rank}/10`}
-                          </Text>
-                        </View>
-                        <Text style={[styles.batchHerosCost, isNarrow && { fontSize: 10 }]} numberOfLines={1}>
-                          {batchLevelMode === 'max'
-                            ? `Affordable now: ${fmt(totalCost)} 💰`
-                            : `Cost: ${fmt(totalCost)} 💰`}
-                        </Text>
-                      </View>
+                      {isPhoneWidth ? (
+                        <>
+                          <View style={styles.batchHeroHeaderMobile}>
+                            <View style={styles.batchHeroHeaderLeftMobile}>
+                              <View style={styles.batchHeroCheckbox}>
+                                {isSelected && <View style={styles.batchHeroCheckboxInner} />}
+                              </View>
+                              <View style={styles.batchHeroInfoMobile}>
+                                <Text style={styles.batchHeroNameMobile} numberOfLines={1}>{hero.emoji} {hero.name}</Text>
+                                <Text style={styles.batchHeroLevelMobile} numberOfLines={1}>
+                                  Level {hero.level} → {projectedLevel}
+                                </Text>
+                              </View>
+                            </View>
+                            <View style={styles.batchHeroProjectedPill}>
+                              <Text style={styles.batchHeroProjectedPillText}>+{projectedLevel - hero.level}</Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.batchHeroTagRowMobile}>
+                            <View style={[styles.batchHeroMetaPillMobile, isOnTeam ? styles.batchHeroMetaPillTeamMobile : styles.batchHeroMetaPillRankMobile]}>
+                              <Text style={styles.batchHeroMetaPillTextMobile}>{isOnTeam ? 'Active Team' : `Rank ${hero.rank}/10`}</Text>
+                            </View>
+                            <View style={styles.batchHeroMetaPillMobile}>
+                              <Text style={styles.batchHeroMetaPillTextMobile}>{hero.rarity}</Text>
+                            </View>
+                            <View style={[styles.batchHeroMetaPillMobile, styles.batchHeroMetaPillCostMobile]}>
+                              <Text style={[styles.batchHeroMetaPillTextMobile, styles.batchHeroMetaPillTextCostMobile]}>
+                                {batchLevelMode === 'max' ? `Now ${fmt(totalCost)} 💰` : `${fmt(totalCost)} 💰`}
+                              </Text>
+                            </View>
+                          </View>
+                        </>
+                      ) : (
+                        <>
+                          <View style={[styles.batchHeroCheckbox, isNarrow && { marginTop: 2 }]}>
+                            {isSelected && <View style={styles.batchHeroCheckboxInner} />}
+                          </View>
+                          <View style={[styles.batchHeroInfo, isNarrow && { gap: 3, minWidth: 0 }]}> 
+                            <Text style={[styles.batchHeroName, isNarrow && { fontSize: 12 }]} numberOfLines={1}>{hero.emoji} {hero.name}</Text>
+                            <Text style={[styles.batchHeroLevel, isNarrow && { fontSize: 11 }]} numberOfLines={1}>
+                              {isNarrow ? `Lv ${hero.level} -> ${projectedLevel}` : `Level ${hero.level} → ${projectedLevel}`}
+                            </Text>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                              <Text style={[styles.batchHeroTeamTag, isNarrow && { fontSize: 10 }]} numberOfLines={1}>
+                                {isOnTeam ? '🛡️ Active Team' : `⭐ Rank ${hero.rank}/10`}
+                              </Text>
+                            </View>
+                            <Text style={[styles.batchHerosCost, isNarrow && { fontSize: 10 }]} numberOfLines={1}>
+                              {batchLevelMode === 'max'
+                                ? `Affordable now: ${fmt(totalCost)} 💰`
+                                : `Cost: ${fmt(totalCost)} 💰`}
+                            </Text>
+                          </View>
+                        </>
+                      )}
                     </Pressable>
                   );
                 })}

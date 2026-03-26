@@ -1910,10 +1910,19 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  heroRosterHeaderStacked: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
   heroRosterActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  heroRosterActionsStacked: {
+    width: '100%',
+    gap: 8,
   },
   autoEquipBtn: {
     backgroundColor: '#2A2A4A',
@@ -2118,6 +2127,9 @@ export const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 8,
   },
+  loadoutRowMobile: {
+    flexWrap: 'wrap',
+  },
   loadoutCell: {
     flex: 1,
     backgroundColor: '#151d30',
@@ -2125,6 +2137,9 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2c3a5b',
     padding: 6,
+  },
+  loadoutCellMobile: {
+    minWidth: '31%',
   },
   loadoutLabel: {
     fontSize: 10,
@@ -2174,9 +2189,9 @@ export const styles = StyleSheet.create({
     backgroundColor: '#1a2a20',
   },
   heroCardMobile: {
-    borderRadius: 12,
-    borderColor: '#31486B',
-    backgroundColor: '#121C28',
+    borderRadius: 18,
+    borderColor: '#35587D',
+    backgroundColor: '#101A27',
     shadowColor: '#09111D',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.34,
@@ -2185,7 +2200,7 @@ export const styles = StyleSheet.create({
   },
   heroCardMobileActive: {
     borderColor: '#69D59A',
-    backgroundColor: '#16281F',
+    backgroundColor: '#14241D',
     shadowColor: '#1E5D3D',
     shadowOpacity: 0.28,
   },
@@ -2197,6 +2212,11 @@ export const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     paddingHorizontal: 10,
+  },
+  heroCardBodyMobile: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 10,
   },
   heroCardTopRow: {
     flexDirection: 'row',
@@ -2210,7 +2230,7 @@ export const styles = StyleSheet.create({
   heroCardHeaderMobile: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   heroPortraitFrame: {
     width: 38,
@@ -2222,15 +2242,18 @@ export const styles = StyleSheet.create({
     backgroundColor: '#0D1523',
   },
   heroPortraitFrameMobile: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: '#0B1522',
     shadowColor: '#4FA8FF',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.2,
     shadowRadius: 10,
     elevation: 3,
+  },
+  heroEmojiMobile: {
+    fontSize: 27,
   },
   heroCardInfoMobile: {
     flex: 1,
@@ -2244,7 +2267,7 @@ export const styles = StyleSheet.create({
   },
   heroNameMobile: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '800',
     color: '#F4F8FF',
     marginBottom: 0,
@@ -2263,15 +2286,19 @@ export const styles = StyleSheet.create({
     color: '#FFCA6B',
   },
   heroMetaMobile: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#AEBED7',
+    marginTop: 4,
+  },
+  heroSubMetaMobile: {
+    fontSize: 11,
+    color: '#7FA5C7',
     marginTop: 3,
   },
   heroChipRowMobile: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 6,
+    gap: 7,
   },
   heroChipMobile: {
     borderRadius: 999,
@@ -2287,14 +2314,23 @@ export const styles = StyleSheet.create({
     backgroundColor: '#34234B',
     borderColor: '#64478B',
   },
+  heroChipMobileArchetype: {
+    backgroundColor: '#1A3341',
+    borderColor: '#3F738A',
+  },
   heroChipTextMobile: {
     fontSize: 10,
     fontWeight: '800',
     color: '#EDF5FF',
     letterSpacing: 0.2,
   },
+  heroUtilityRowMobile: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
   heroBoostPillMobile: {
-    marginTop: 10,
     alignSelf: 'flex-start',
     borderRadius: 999,
     borderWidth: 1,
@@ -2308,27 +2344,42 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#87E6C9',
   },
+  heroTeamPillMobile: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#4E8E68',
+    backgroundColor: '#173123',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  heroTeamPillTextMobile: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#A8F1BD',
+  },
   heroActionRowMobile: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 10,
   },
   toggleBtnMobile: {
     flex: 1,
     alignItems: 'center',
-    borderRadius: 9,
-    paddingVertical: 9,
+    justifyContent: 'center',
+    minHeight: 44,
+    borderRadius: 12,
+    paddingVertical: 10,
     backgroundColor: '#395586',
   },
   toggleBtnMobileActive: {
     backgroundColor: '#63D783',
   },
   expandBtnMobile: {
-    minWidth: 78,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 9,
-    paddingVertical: 9,
+    minHeight: 44,
+    borderRadius: 12,
+    paddingVertical: 10,
     backgroundColor: '#222E46',
     borderWidth: 1,
     borderColor: '#3B4E75',
@@ -4679,6 +4730,14 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 10,
     gap: 10,
   },
+  batchHeroCardMobile: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    gap: 10,
+  },
   batchHeroCardSelected: {
     borderColor: '#6DDB7B',
     backgroundColor: 'rgba(109, 219, 123, 0.08)',
@@ -4701,6 +4760,79 @@ export const styles = StyleSheet.create({
   batchHeroInfo: {
     flex: 1,
     gap: 2,
+  },
+  batchHeroHeaderMobile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  batchHeroHeaderLeftMobile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    minWidth: 0,
+  },
+  batchHeroInfoMobile: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+  },
+  batchHeroNameMobile: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#E5F2FF',
+  },
+  batchHeroLevelMobile: {
+    fontSize: 11,
+    color: '#95B7D8',
+  },
+  batchHeroProjectedPill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#516F92',
+    backgroundColor: '#162739',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  batchHeroProjectedPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#CDE6FF',
+  },
+  batchHeroTagRowMobile: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+  },
+  batchHeroMetaPillMobile: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#415B78',
+    backgroundColor: '#162536',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  batchHeroMetaPillTeamMobile: {
+    borderColor: '#548A66',
+    backgroundColor: '#173123',
+  },
+  batchHeroMetaPillRankMobile: {
+    borderColor: '#5F4E8A',
+    backgroundColor: '#241E38',
+  },
+  batchHeroMetaPillCostMobile: {
+    borderColor: '#8F7531',
+    backgroundColor: '#312812',
+  },
+  batchHeroMetaPillTextMobile: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#E3F2FF',
+  },
+  batchHeroMetaPillTextCostMobile: {
+    color: '#FFD36B',
   },
   batchHeroName: {
     fontSize: 12,
