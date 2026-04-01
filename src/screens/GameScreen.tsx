@@ -17,13 +17,12 @@ import {
   AppState,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ENABLE_SIMULATED_DOLLAR_PURCHASES, EXPEDITION_CONTRACT_REFRESH_GOLD_COST, EXPEDITION_CONTRACT_REFRESH_MS, FACILITY_MAX_LEVEL, MINI_OPS_COOLDOWN_MS, getCharacterSaveSlot, getDpsBreakdown, getEquipmentCraftCost, getFacilityUpgradeCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState, VALID_FORMATION_ROLES_FOR_CLASS } from '../useGameState';
+import { ENABLE_SIMULATED_DOLLAR_PURCHASES, FACILITY_MAX_LEVEL, MINI_OPS_COOLDOWN_MS, getCharacterSaveSlot, getDpsBreakdown, getEquipmentCraftCost, getFacilityUpgradeCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState } from '../useGameState';
 import { trackEvent } from '../telemetry';
 import {
   ACHIEVEMENTS,
   CLASSES,
   PlayerClass,
-  StatKey,
   EquipmentSlot,
   RARITIES,
   ACTIVE_TEAM_SIZE,
@@ -49,7 +48,6 @@ import {
   getRankUpShardCost,
   getUsableItem,
   Rarity,
-  HERO_LEVEL_CAP,
 } from '../gameConfig';
 import { fmt } from '../utils';
 import AchievementToast from '../components/AchievementToast';
@@ -107,16 +105,6 @@ export const STAT_LABELS = {
   intelligence: 'INT',
   spirit: 'SPR',
 } as const;
-
-const TAB_META: Record<Tab, { icon: string; label: string; mood: string }> = {
-  warroom: { icon: '🛰️', label: 'War Room', mood: 'All Systems' },
-  battle: { icon: '⚔️', label: 'Warfront', mood: 'Push Waves' },
-  heroes: { icon: '👥', label: 'Roster', mood: 'Squad Ops' },
-  stats: { icon: '📊', label: 'Growth', mood: 'Power Grid' },
-  equipment: { icon: '🎒', label: 'Armory', mood: 'Forge Gear' },
-  achievements: { icon: '🏆', label: 'Legends', mood: 'Milestones' },
-  operations: { icon: '🏰', label: 'Operations', mood: 'Infrastructure' },
-};
 
 export const ACH_BONUS_PER_UNLOCK_PCT = 3;
 export const ACH_BONUS_CAP_PCT = 75;
@@ -214,8 +202,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     state,
     stats,
     createCharacter,
-    attack,
-    setActiveTeam,
     summonHero,
     summonHeroX10,
     summonHeroX10Cinematic,
@@ -227,7 +213,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setAutoRecycleMaxRarity,
     setAutoRecycleEnabled,
     toggleEquipHero,
-    setHeroFormation,
     playDiceRoll,
     playReconSweep,
     playLockpickCache,
@@ -292,9 +277,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [rebirthOpen, setRebirthOpen] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [draftClass, setDraftClass] = useState<PlayerClass>('warrior');
-  const [teamSelectionMode, setTeamSelectionMode] = useState(false);
-  const [activeTeamCollapsed, setActiveTeamCollapsed] = useState(false);
-  const [tempTeam, setTempTeam] = useState<string[]>(state.activeTeamHeroIds);
   const [expandedHeroes, setExpandedHeroes] = useState<Set<string>>(new Set());
   const [recycleConfirmUid, setRecycleConfirmUid] = useState<string | null>(null);
   const [smartCoolantConfirmOpen, setSmartCoolantConfirmOpen] = useState(false);
@@ -385,7 +367,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [riftWavePredictions, setRiftWavePredictions] = useState<number[]>([]);
 
   // Timer tick for expedition countdown display
-  const [timerTick, setTimerTick] = useState(0);
+  const [, setTimerTick] = useState(0);
 
   // Handle app state changes: track time when app goes to background
   // and apply offline progression when it returns to foreground
@@ -538,7 +520,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   );
 
   // Boss Tears is the real summon currency; gold cost line kept for reference in tooltips
-  const paidSingles = state.freeSummonCharges > 0 ? 0 : 1;
   const canGachaOnce = state.freeSummonCharges > 0 || state.bossTears >= 1;
   const paidX10 = Math.max(0, 10 - state.freeSummonCharges);
   const canGachaX10 = state.freeSummonCharges >= 10 || state.bossTears >= paidX10;
@@ -587,16 +568,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   const rewardPopup = state.rewardQueue[0] ?? null;
   const isOfflineRewardPopup = !!rewardPopup && `${rewardPopup.title} ${rewardPopup.detail}`.toLowerCase().includes('offline progress');
-  const classCutinTone = useMemo(() => {
-    const byClass: Record<PlayerClass, { stripe: string; glow: string; callout: string }> = {
-      warrior: { stripe: '#6E7FA8', glow: '#9AB3E6', callout: 'Aegis Impact' },
-      berserker: { stripe: '#A0472A', glow: '#E77A50', callout: 'Rage Breaker' },
-      archer: { stripe: '#3C8C63', glow: '#7FD7A6', callout: 'Skyline Volley' },
-      mage: { stripe: '#5B4AA6', glow: '#A993F0', callout: 'Astral Collapse' },
-      monk: { stripe: '#B19135', glow: '#EACE77', callout: 'Zen Tempest' },
-    };
-    return byClass[state.playerClass ?? 'warrior'];
-  }, [state.playerClass]);
   const rebirthWaveRequirement = getRebirthWaveRequirement(state.prestigeCount);
   const canRebirthNow = state.highestWaveReached >= rebirthWaveRequirement;
   const teamSlotCap = Math.max(4, Math.min(ACTIVE_TEAM_SIZE, state.teamSlotsUnlocked ?? 4));
@@ -618,7 +589,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     : 0;
   const canClaimMiniBounty = !!state.miniBounty && activeMiniBountyProgress >= state.miniBounty.targetValue;
   const canRunRiftToday = state.lastRiftRunDay !== currentDay;
-  const rebirthProgressPct = Math.max(0, Math.min(1, state.highestWaveReached / rebirthWaveRequirement)) * 100;
   const rebirthWavesLeft = Math.max(0, rebirthWaveRequirement - state.highestWaveReached);
   const expeditionClaimableCount = state.expeditionQueue.filter(exp => (Date.now() - exp.startTime) >= exp.durationMs).length;
   const expeditionActiveTypes = new Set(state.expeditionQueue.map(exp => exp.type));
@@ -705,20 +675,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const damageEssenceCost = getEssenceCost('damage');
   const economyEssenceCost = getEssenceCost('economy');
   const survivalEssenceCost = getEssenceCost('survival');
-  const tabSignals: Record<Tab, string> = {
-    warroom: canRebirthNow ? 'READY' : 'LIVE',
-    battle: `W${state.wave}`,
-    heroes: `${state.heroRoster.length}`,
-    stats: state.unspentStatPoints > 0 ? `+${state.unspentStatPoints}` : 'OK',
-    equipment: `${state.inventoryItemIds.length}`,
-    achievements: `${state.achievements.size}/${ACHIEVEMENTS.length}`,
-    operations: operationsNotificationCount > 0 ? `${operationsNotificationCount}` : 'OK',
-  };
   const isNativeApp = Platform.OS !== 'web';
   const isCompactPhone = viewportWidth < 430;
   const isShortPhone = viewportHeight < 780;
-  const compactCommandTabWidth = viewportWidth < 390 ? 106 : viewportWidth < 520 ? 118 : 126;
-  const useCompactCommandTabs = isCompactPhone || viewportWidth <= 560;
   const compactSubTabMinWidth = viewportWidth < 390 ? 92 : 108;
   const claimableWeeklyMilestones = WEEKLY_TRACK_MILESTONES.filter(ms => state.weeklyKills >= ms && !state.weeklyTrackClaimed.includes(ms));
   const claimableMissionIds = missionCards.filter(m => !m.claimed && m.progress.done).map(m => m.mission.id);
@@ -801,19 +760,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     state.wave,
   ]);
   const expPct = Math.floor((state.exp / Math.max(1, stats.expNeeded)) * 100);
-  const topStatChips = [
-    { id: 'gold', label: 'Gold 💰', value: fmt(state.gold) },
-    { id: 'diamonds', label: 'Diamonds 💎', value: `${state.diamonds}` },
-    { id: 'tears', label: 'Tears 💧', value: `${state.bossTears}` },
-    { id: 'shards', label: 'Shards 💠', value: fmt(state.heroShards) },
-    { id: 'essence', label: 'Essence ✨', value: fmt(state.essence) },
-    { id: 'dps', label: 'DPS', value: fmt(stats.dps) },
-    { id: 'power', label: 'Power', value: fmt(teamPowerIndex) },
-    { id: 'gear', label: 'Gear', value: fmt(gearScore) },
-    { id: 'exp', label: 'EXP', value: `${expPct}%` },
-    { id: 'streak', label: 'Streak', value: `${state.dailyLoginStreak}` },
-    { id: 'peakwave', label: 'Peak Wave', value: `${state.highestWaveReached}` },
-  ];
   const topChipTooltip = useMemo(() => {
     function multLine(label: string, mult: number): string {
       const deltaPct = (mult - 1) * 100;
@@ -871,7 +817,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
     return null;
   }, [hoveredTopChipId, dpsBreakdown, powerFromDps, powerFromHp, powerFromDefense, powerFromGear, stats.dps, state.teamMaxHp, stats.teamDefense, gearScore, teamPowerIndex, gearScoreRows]);
-  const isTopChipWithTooltip = (id: string): id is 'dps' | 'power' | 'gear' => id === 'dps' || id === 'power' || id === 'gear';
   const updateTopChipAnchor = (id: 'dps' | 'power' | 'gear') => {
     const ref = topChipRefs.current[id];
     if (!ref || typeof ref.measureInWindow !== 'function') return;
@@ -880,13 +825,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         setTopChipTooltipAnchor({ x, y, width, height });
       }
     });
-  };
-  const showTopChipTooltip = (id: 'dps' | 'power' | 'gear') => {
-    setHoveredTopChipId(id);
-    requestAnimationFrame(() => updateTopChipAnchor(id));
-  };
-  const hideTopChipTooltip = (id: 'dps' | 'power' | 'gear') => {
-    setHoveredTopChipId(current => (current === id ? null : current));
   };
   useEffect(() => {
     if (!hoveredTopChipId) return;
@@ -1349,7 +1287,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setAutoRecycleMaxRarity(next.id);
   };
 
-  const canCraftWeapon = state.equipmentScrap >= 130;
 
   const triggerCinematicSummon = () => {
     if (!canGachaX10 || cinematicSummonOpen) return;
@@ -1553,7 +1490,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const maxHeat = getMaxHeatForLevel(state.level);
   const heatPct = Math.min(100, Math.max(0, (state.combatHeat / maxHeat) * 100));
   const canBurst = state.burstCharge >= burstCost;
-  const battleSpeed = state.combatTempo;
   const prestige1Done = (state.prestigeCount ?? 0) >= 1;
   const prestige5Done = (state.prestigeCount ?? 0) >= 5;
   const prestige10Done = (state.prestigeCount ?? 0) >= 10;

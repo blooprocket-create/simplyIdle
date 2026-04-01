@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, FlatList } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { theme } from '../../theme/colors';
 import MobileCard from '../../components/MobileCard';
 import SectionHeader from '../../components/SectionHeader';
 import MobileScrollContainer from '../../components/MobileScrollContainer';
-import { fmt } from '../../utils';
 
 interface Hero {
   uid: string;

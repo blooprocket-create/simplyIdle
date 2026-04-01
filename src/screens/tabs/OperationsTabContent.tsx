@@ -38,7 +38,7 @@ export interface OperationsTabContentProps {
 export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
   tab,
   state,
-  stats,
+  stats: _stats,
   operationsSubTab,
   setOperationsSubTab,
   canPlayDiceToday,

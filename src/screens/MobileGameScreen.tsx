@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { View, StyleSheet } from 'react-native';
 import { theme } from '../theme/colors';
 import MobileNavigation, { MobileTab } from '../components/MobileNavigation';
 import MobileHeader from '../components/MobileHeader';
@@ -8,8 +7,7 @@ import WarfrontTab from './tabs/WarfrontTab';
 import RosterTab from './tabs/RosterTab';
 import EngineTab from './tabs/EngineTab';
 import ProgressTab from './tabs/ProgressTab';
-import { useGameState, getCharacterSaveSlot, getSaveStorageKey } from '../useGameState';
-import { CLASSES } from '../gameConfig';
+import { useGameState, getCharacterSaveSlot } from '../useGameState';
 
 interface MobileGameScreenProps {
   accountName: string;
@@ -18,10 +16,10 @@ interface MobileGameScreenProps {
 
 export default function MobileGameScreen({
   accountName,
-  onLogout,
+  onLogout: _onLogout,
 }: MobileGameScreenProps) {
   const [currentTab, setCurrentTab] = useState<MobileTab>('warfront');
-  const [selectedCharacterClass, setSelectedCharacterClass] = useState<string | null>(null);
+  const [selectedCharacterClass] = useState<string | null>(null);
 
   // Load game state
   const gameState = useGameState(

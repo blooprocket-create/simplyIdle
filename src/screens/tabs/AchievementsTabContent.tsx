@@ -1,9 +1,8 @@
 import React from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import { ACHIEVEMENTS, WEEKLY_TRACK_MILESTONES } from '../../gameConfig';
 import { ACH_BONUS_PER_UNLOCK_PCT, ACH_BONUS_CAP_PCT } from '../GameScreen';
-import { fmt } from '../../utils';
 import { styles } from '../GameScreen';
 
 export interface AchievementsTabContentProps {

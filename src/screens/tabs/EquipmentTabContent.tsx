@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import { EquipmentSlot } from '../../gameConfig';
 import { fmt } from '../../utils';
@@ -32,7 +32,7 @@ export interface EquipmentTabContentProps {
 export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
   tab,
   state,
-  stats,
+  stats: _stats,
   equipmentSubTab,
   setEquipmentSubTab,
   compareItemId,
