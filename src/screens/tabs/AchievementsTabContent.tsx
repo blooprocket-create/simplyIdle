@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, Pressable, Image } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
-import { ACHIEVEMENTS, HERO_POOL, WEEKLY_TRACK_MILESTONES, getHeroBackstory } from '../../gameConfig';
+import { ACHIEVEMENTS, HERO_POOL, WEEKLY_TRACK_MILESTONES, getHeroBackstory, getHeroUniqueWeaponName } from '../../gameConfig';
 import { getHeroPortraitSource } from '../../heroPortraits';
 import { ACH_BONUS_PER_UNLOCK_PCT, ACH_BONUS_CAP_PCT } from '../GameScreen';
 import { styles } from '../GameScreen';
@@ -22,6 +22,7 @@ export interface AchievementsTabContentProps {
   claimWeeklyTrack: (ms: number) => void;
   claimMission: (missionId: string) => void;
   claimCodexHeroVip: (heroId: string) => void;
+  claimCodexUniqueVip: (heroId: string) => void;
   claimAllRewards: () => void;
   renderSubTabBar: (tabs: any[]) => React.ReactNode;
 }
@@ -42,11 +43,27 @@ export const AchievementsTabContent: React.FC<AchievementsTabContentProps> = ({
   claimWeeklyTrack,
   claimMission,
   claimCodexHeroVip,
+  claimCodexUniqueVip,
   claimAllRewards,
   renderSubTabBar,
 }) => {
   const unlockedHeroIds = useMemo(() => new Set(state.heroRoster.map(hero => hero.id)), [state.heroRoster]);
   const codexHeroes = useMemo(() => HERO_POOL.filter(hero => unlockedHeroIds.has(hero.id)), [unlockedHeroIds]);
+  const codexUniqueEntries = useMemo(() => {
+    const entries = HERO_POOL
+      .map(hero => {
+        const uniqueProgress = state.heroUniqueGearByHeroId[hero.id];
+        const uniqueRank = uniqueProgress?.rank ?? 0;
+        if (uniqueRank <= 0) return null;
+        return { hero, uniqueRank };
+      })
+      .filter((entry): entry is { hero: typeof HERO_POOL[number]; uniqueRank: number } => !!entry)
+      .sort((a, b) => {
+        if (a.uniqueRank !== b.uniqueRank) return b.uniqueRank - a.uniqueRank;
+        return a.hero.name.localeCompare(b.hero.name);
+      });
+    return entries;
+  }, [state.heroUniqueGearByHeroId]);
   const renderCodexHeroIcon = (heroId: string, emoji: string) => {
     const portraitSource = getHeroPortraitSource(heroId);
     if (portraitSource) {
@@ -253,6 +270,38 @@ export const AchievementsTabContent: React.FC<AchievementsTabContentProps> = ({
                             {claimed ? '✅' : '📜'} {hero.name}
                           </Text>
                           <Text style={styles.codexDesc}>{getHeroBackstory(hero.id)}</Text>
+                          <Text style={styles.codexReward}>{claimed ? 'VIP claimed (+10)' : 'Tap icon: +10 VIP points'}</Text>
+                        </View>
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+
+              <View style={styles.collectionCard}>
+                <Text style={styles.collectionCardTitle}>🗡️ Unique Gear Codex</Text>
+                <Text style={styles.collectionStat}>Discovered uniques: {codexUniqueEntries.length}/{HERO_POOL.length}</Text>
+                <Text style={styles.collectionHint}>Tap a discovered unique icon to claim +10 VIP points once.</Text>
+                {codexUniqueEntries.length === 0 ? (
+                  <Text style={styles.collectionStat}>Find unique weapon drops to archive them here.</Text>
+                ) : (
+                  codexUniqueEntries.map(({ hero, uniqueRank }) => {
+                    const claimed = state.codexVipClaimedUniqueIds.includes(hero.id);
+                    return (
+                      <View key={`unique_${hero.id}`} style={[styles.codexEntry, claimed && styles.codexEntryDone]}>
+                        <Pressable
+                          style={[styles.toggleBtn, styles.codexHeroIconBtn, claimed && { opacity: 0.55 }]}
+                          disabled={claimed}
+                          onPress={() => claimCodexUniqueVip(hero.id)}
+                        >
+                          {renderCodexHeroIcon(hero.id, hero.emoji)}
+                          {!claimed && <View style={styles.codexClaimDot} />}
+                        </Pressable>
+                        <View style={styles.codexEntryLeft}>
+                          <Text style={[styles.codexTitle, claimed && styles.codexTitleDone]}>
+                            {claimed ? '✅' : '🗡️'} {getHeroUniqueWeaponName(hero.id)}
+                          </Text>
+                          <Text style={styles.codexDesc}>{hero.name} • Rank {uniqueRank}/10</Text>
                           <Text style={styles.codexReward}>{claimed ? 'VIP claimed (+10)' : 'Tap icon: +10 VIP points'}</Text>
                         </View>
                       </View>

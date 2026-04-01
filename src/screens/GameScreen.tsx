@@ -277,6 +277,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     claimWeeklyTrack,
     claimMission,
     claimCodexHeroVip,
+    claimCodexUniqueVip,
     markHintSeen,
     clearAchievement,
     clearRewardPopup,
@@ -2329,6 +2330,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             claimWeeklyTrack,
             claimMission,
             claimCodexHeroVip,
+            claimCodexUniqueVip,
             claimAllRewards,
             renderSubTabBar,
           } as any)}
