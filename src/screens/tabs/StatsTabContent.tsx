@@ -144,7 +144,7 @@ export const StatsTabContent: React.FC<StatsTabContentProps> = ({
                 disabled={state.essence < damageEssenceCost}
                 onPress={() => spendEssenceUpgrade('damage')}
               >
-                <Text style={styles.metaUpgradeBtnText}>{damageEssenceCost} 🜂</Text>
+                <Text style={styles.metaUpgradeBtnText}>{damageEssenceCost} ✨</Text>
               </Pressable>
             </View>
 
@@ -158,7 +158,7 @@ export const StatsTabContent: React.FC<StatsTabContentProps> = ({
                 disabled={state.essence < economyEssenceCost}
                 onPress={() => spendEssenceUpgrade('economy')}
               >
-                <Text style={styles.metaUpgradeBtnText}>{economyEssenceCost} 🜂</Text>
+                <Text style={styles.metaUpgradeBtnText}>{economyEssenceCost} ✨</Text>
               </Pressable>
             </View>
 
@@ -172,7 +172,7 @@ export const StatsTabContent: React.FC<StatsTabContentProps> = ({
                 disabled={state.essence < survivalEssenceCost}
                 onPress={() => spendEssenceUpgrade('survival')}
               >
-                <Text style={styles.metaUpgradeBtnText}>{survivalEssenceCost} 🜂</Text>
+                <Text style={styles.metaUpgradeBtnText}>{survivalEssenceCost} ✨</Text>
               </Pressable>
             </View>
 

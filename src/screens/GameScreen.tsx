@@ -178,11 +178,11 @@ export const EXPEDITION_TYPE_META: Record<ExpeditionType, { icon: string; name: 
   abyss: { icon: '🌑', name: 'Abyss Dive' },
 };
 export const EXPEDITION_RARITY_META: Record<ExpeditionRarity, { goldCost: number; durationMs: number; rewardsLabel: string }> = {
-  common: { goldCost: 25_000, durationMs: 5 * 60 * 1000, rewardsLabel: '+35💎 +150✨' },
-  rare: { goldCost: 75_000, durationMs: 20 * 60 * 1000, rewardsLabel: '+75💎 +320✨ +1⚡' },
-  epic: { goldCost: 220_000, durationMs: 90 * 60 * 1000, rewardsLabel: '+140💎 +700✨ +1⚡' },
-  legendary: { goldCost: 500_000, durationMs: 4 * 60 * 60 * 1000, rewardsLabel: '+240💎 +1300✨ +2⚡' },
-  godly: { goldCost: 1_000_000, durationMs: 8 * 60 * 60 * 1000, rewardsLabel: '+400💎 +2400✨ +4⚡' },
+  common: { goldCost: 25_000, durationMs: 5 * 60 * 1000, rewardsLabel: '+35💎 +150💠' },
+  rare: { goldCost: 75_000, durationMs: 20 * 60 * 1000, rewardsLabel: '+75💎 +320💠 +1✨' },
+  epic: { goldCost: 220_000, durationMs: 90 * 60 * 1000, rewardsLabel: '+140💎 +700💠 +1✨' },
+  legendary: { goldCost: 500_000, durationMs: 4 * 60 * 60 * 1000, rewardsLabel: '+240💎 +1300💠 +2✨' },
+  godly: { goldCost: 1_000_000, durationMs: 8 * 60 * 60 * 1000, rewardsLabel: '+400💎 +2400💠 +4✨' },
 };
 
 export function formatDurationShort(ms: number): string {
@@ -805,8 +805,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     { id: 'gold', label: 'Gold 💰', value: fmt(state.gold) },
     { id: 'diamonds', label: 'Diamonds 💎', value: `${state.diamonds}` },
     { id: 'tears', label: 'Tears 💧', value: `${state.bossTears}` },
-    { id: 'shards', label: 'Shards ✨', value: fmt(state.heroShards) },
-    { id: 'essence', label: 'Essence ⚡', value: fmt(state.essence) },
+    { id: 'shards', label: 'Shards 💠', value: fmt(state.heroShards) },
+    { id: 'essence', label: 'Essence ✨', value: fmt(state.essence) },
     { id: 'dps', label: 'DPS', value: fmt(stats.dps) },
     { id: 'power', label: 'Power', value: fmt(teamPowerIndex) },
     { id: 'gear', label: 'Gear', value: fmt(gearScore) },

@@ -1124,10 +1124,10 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'gear_mythic', name: 'Mythic Artisan', description: 'Own Mythic-rarity equipment.', emoji: '✨', condition: s => s.essence >= 50 },
   
   // Shard and essence
-  { id: 'shards_1000', name: 'Shard Banker', description: 'Hold 1,000 hero shards at once.', emoji: '💎', condition: s => s.heroShards >= 1000 },
-  { id: 'shards_10k', name: 'Crystalline Hoard', description: 'Hold 10,000 hero shards at once.', emoji: '🔷', condition: s => s.heroShards >= 10000 },
-  { id: 'essence_25', name: 'Essence Channel', description: 'Own 25 essence.', emoji: '🜂', condition: s => s.essence >= 25 },
-  { id: 'essence_100', name: 'Eternal Conduit', description: 'Own 100 essence.', emoji: '⚡', condition: s => s.essence >= 100 },
+  { id: 'shards_1000', name: 'Shard Banker', description: 'Hold 1,000 hero shards at once.', emoji: '💠', condition: s => s.heroShards >= 1000 },
+  { id: 'shards_10k', name: 'Crystalline Hoard', description: 'Hold 10,000 hero shards at once.', emoji: '💠', condition: s => s.heroShards >= 10000 },
+  { id: 'essence_25', name: 'Essence Channel', description: 'Own 25 essence.', emoji: '✨', condition: s => s.essence >= 25 },
+  { id: 'essence_100', name: 'Eternal Conduit', description: 'Own 100 essence.', emoji: '✨', condition: s => s.essence >= 100 },
   
   // Progression unlocks
   { id: 'unlocks_3', name: 'Relic Keeper', description: 'Unlock 3 permanent features.', emoji: '🔓', condition: s => s.unlockedCount >= 3 },

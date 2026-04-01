@@ -145,7 +145,7 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
                       >
                         <Text style={styles.upgradeGearBtnText}>
                           {upgradePlan.targetRarity
-                            ? `Upgrade → ${upgradePlan.targetRarity.toUpperCase()} (${upgradePlan.scrapCost}🔩 ${upgradePlan.essenceCost}🜂 ${fmt(upgradePlan.goldCost)}g)`
+                            ? `Upgrade → ${upgradePlan.targetRarity.toUpperCase()} (${upgradePlan.scrapCost}🔩 ${upgradePlan.essenceCost}✨ ${fmt(upgradePlan.goldCost)}💰)`
                             : 'Upgrade Unavailable'}
                         </Text>
                       </Pressable>
@@ -196,14 +196,14 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
                     disabled={state.heroShards < shardForgeCosts.essenceCost}
                     onPress={convertShardsToEssence}
                   >
-                    <Text style={styles.shardForgeBtnText}>Essence • {shardForgeCosts.essenceCost} ✨</Text>
+                    <Text style={styles.shardForgeBtnText}>Essence • {shardForgeCosts.essenceCost} 💠</Text>
                   </Pressable>
                   <Pressable
                     style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.scrapCost && styles.shardForgeBtnDisabled]}
                     disabled={state.heroShards < shardForgeCosts.scrapCost}
                     onPress={convertShardsToScrap}
                   >
-                    <Text style={styles.shardForgeBtnText}>Scrap • {shardForgeCosts.scrapCost} ✨</Text>
+                    <Text style={styles.shardForgeBtnText}>Scrap • {shardForgeCosts.scrapCost} 💠</Text>
                   </Pressable>
                 </View>
               </View>

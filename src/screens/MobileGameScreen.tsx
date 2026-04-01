@@ -105,13 +105,13 @@ export default function MobileGameScreen({
     },
     {
       id: 'shards',
-      icon: '✨',
+      icon: '💠',
       label: 'Shards',
       value: `${Math.floor(state.heroShards || 0)}`,
     },
     {
       id: 'essence',
-      icon: '⚡',
+      icon: '✨',
       label: 'Essence',
       value: `${Math.floor(state.essence || 0)}`,
     },

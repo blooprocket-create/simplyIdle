@@ -530,8 +530,8 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                               >
                                 <Text style={styles.rankUpBtnText}>
                                   {canHeroRebirth
-                                    ? `Hero Rebirth (${heroRebirthShardCost}✨ + ${heroRebirthEssenceCost}⚡, +${heroRebirthPlan.statGainPct}% stats)`
-                                    : `Need ${Math.max(0, heroRebirthShardCost - state.heroShards)}✨ / ${Math.max(0, heroRebirthEssenceCost - state.essence)}⚡`}
+                                    ? `Hero Rebirth (${heroRebirthShardCost}💠 + ${heroRebirthEssenceCost}✨, +${heroRebirthPlan.statGainPct}% stats)`
+                                    : `Need ${Math.max(0, heroRebirthShardCost - state.heroShards)}💠 / ${Math.max(0, heroRebirthEssenceCost - state.essence)}✨`}
                                 </Text>
                               </Pressable>
                             )}
