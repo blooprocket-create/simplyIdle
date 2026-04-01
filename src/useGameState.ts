@@ -19,7 +19,6 @@ import {
   HeroActiveSkillArchetypeId,
   HERO_POOL,
   ACTIVE_TEAM_SIZE,
-  HERO_LEVEL_EXP_FORMULA,
   HERO_LEVEL_CAP,
   WeeklyEventConfig,
   MissionBoardGoal,
@@ -58,7 +57,7 @@ import {
   unlockLabel,
 } from './gameConfig';
 import { buildingCost, bulkCost } from './utils';
-import { trackEvent } from './telemetry';
+import { debugLog, trackEvent, trackGameplayAction } from './telemetry';
 
 const SAVE_KEY = 'idlerpg_save_v3';
 const TICK_MS = 100;
@@ -134,12 +133,34 @@ const VALID_RARITIES = new Set<Rarity>(['common', 'uncommon', 'rare', 'epic', 'l
 const VALID_AUTO_RECYCLE_RARITIES = new Set<Rarity>(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'godly']);
 const VALID_PERMANENT_UNLOCKS = new Set<PermanentUnlockId>(['class_passive', 'advanced_consumables', 'mythic_equipment']);
 const VALID_HERO_FORMATION_ROLES = new Set<HeroFormationRole>(['front', 'mid', 'back']);
-const VALID_PARTY_IDS = new Set<PartyId>(PARTY.map(party => party.id));
 const VALID_SKILL_IDS = new Set(SKILLS.map(skill => skill.id));
 const VALID_ACHIEVEMENT_IDS = new Set(ACHIEVEMENTS.map(achievement => achievement.id));
 const VALID_MISSION_IDS = new Set(MISSION_BOARD_GOALS.map(mission => mission.id));
 const VALID_WEEKLY_TRACK_MILESTONES = new Set(WEEKLY_TRACK_MILESTONES);
 const VALID_DOLLAR_SHOP_OFFER_IDS = new Set<DollarShopOfferId>(['usd_499', 'usd_1999', 'usd_4999', 'usd_9999']);
+const ACTION_TELEMETRY_SAMPLE: Partial<Record<Action['type'], number>> = {
+  CREATE_CHARACTER: 0,
+  SUMMON_HERO: 1500,
+  SUMMON_HERO_X10: 1500,
+  SUMMON_HERO_X10_CINEMATIC: 1500,
+  REBIRTH: 0,
+  PLAY_DICE_ROLL: 0,
+  PLAY_RECON_SWEEP: 0,
+  PLAY_LOCKPICK_CACHE: 0,
+  PLAY_TARGET_PRACTICE: 0,
+  START_MINI_BOUNTY_DRAFT: 0,
+  CLAIM_MINI_BOUNTY_DRAFT: 0,
+  RUN_RIFT_DUNGEON: 0,
+  START_EXPEDITION: 1000,
+  COMPLETE_EXPEDITION: 1000,
+  UPGRADE_FACILITY: 1000,
+  SPEND_ESSENCE_UPGRADE: 1000,
+  SPEND_REBIRTH_CORE: 1000,
+  BUY_GOLD_SHOP_ITEM: 1000,
+  BUY_DIAMOND_SHOP_ITEM: 1000,
+  SIMULATE_DOLLAR_PURCHASE: 1000,
+  APPLY_OFFLINE_PROGRESS: 0,
+};
 
 export function getCharacterSaveSlot(accountName: string, playerClass: PlayerClass): string {
   return `${accountName}_${playerClass}`;
@@ -786,7 +807,7 @@ function defaultFormationForClass(playerClass: PlayerClass): HeroFormationRole {
   return VALID_FORMATION_ROLES_FOR_CLASS[playerClass][0];
 }
 
-function getFormationRoleForHero(state: GameState, hero: HeroUnit): HeroFormationRole {
+function getFormationRoleForHero(hero: HeroUnit): HeroFormationRole {
   return VALID_FORMATION_ROLES_FOR_CLASS[hero.heroClass][0];
 }
 
@@ -854,7 +875,7 @@ function getFormationMultipliers(state: GameState): {
 
   for (const hero of state.heroRoster) {
     if (!active.has(hero.uid)) continue;
-    const role = getFormationRoleForHero(state, hero);
+    const role = getFormationRoleForHero(hero);
     
     // Cap each role at MAX_FORMATION_ROLE_HEROES
     if (role === 'front') {
@@ -1216,7 +1237,7 @@ function tickHeroActives(state: GameState, elapsedMs: number): GameState {
     cooldowns[hero.uid] = Math.max(0, (cooldowns[hero.uid] ?? 0) - elapsedMs);
     if (cooldowns[hero.uid] > 0) continue;
 
-    const role = getFormationRoleForHero(nextState, hero);
+    const role = getFormationRoleForHero(hero);
     const roleTriggerMult = role === 'back' ? 1.22 : role === 'mid' ? 1.05 : 0.92;
     const triggerChance = Math.min(0.16, 0.015 + hero.level * 0.00012) * roleTriggerMult * (elapsedMs / 1000);
     if (Math.random() > triggerChance) continue;
@@ -4956,7 +4977,7 @@ function serialize(state: GameState): SaveData {
 
 export function useGameState(saveSlot: string = 'default') {
   const saveKey = getSaveStorageKey(saveSlot);
-  const [state, dispatch] = useReducer(reducer, DEFAULT_STATE);
+  const [state, rawDispatch] = useReducer(reducer, DEFAULT_STATE);
   const [hydrated, setHydrated] = useState(false);
   const lastTickRef = useRef(Date.now());
   const lastSaveRef = useRef(Date.now());
@@ -4967,10 +4988,43 @@ export function useGameState(saveSlot: string = 'default') {
   const prevSummonsRef = useRef(0);
   const prevHighestWaveRef = useRef(1);
   const prevPrestigeRef = useRef(0);
+  const actionDispatchCountsRef = useRef<Partial<Record<Action['type'], number>>>({});
   stateRef.current = state;
+
+  const dispatch = useCallback((action: Action) => {
+    rawDispatch(action);
+
+    if (action.type === 'TICK') return;
+    const nextCount = (actionDispatchCountsRef.current[action.type] ?? 0) + 1;
+    actionDispatchCountsRef.current[action.type] = nextCount;
+
+    debugLog('dispatch', `Action ${action.type}`, {
+      saveSlot,
+      count: nextCount,
+      wave: stateRef.current.wave,
+      level: stateRef.current.level,
+      prestige: stateRef.current.prestigeCount,
+    });
+
+    const throttleMs = ACTION_TELEMETRY_SAMPLE[action.type];
+    if (throttleMs !== undefined) {
+      void trackGameplayAction(
+        `action_${action.type.toLowerCase()}`,
+        {
+          saveSlot,
+          wave: stateRef.current.wave,
+          level: stateRef.current.level,
+          prestigeCount: stateRef.current.prestigeCount,
+          totalKills: stateRef.current.totalKills,
+        },
+        throttleMs,
+      );
+    }
+  }, [saveSlot]);
 
   useEffect(() => {
     setHydrated(false);
+    debugLog('save', 'Loading save slot', { saveSlot, saveKey });
     dispatch({ type: 'LOAD', payload: {} });
     sessionStartedRef.current = false;
     sessionStartedAtRef.current = 0;
@@ -4983,15 +5037,25 @@ export function useGameState(saveSlot: string = 'default') {
 
     AsyncStorage.getItem(saveKey)
       .then(raw => {
-        if (!raw) return;
+        if (!raw) {
+          debugLog('save', 'No existing save found; using defaults', { saveSlot });
+          return;
+        }
         try {
           const data: SaveData = JSON.parse(raw);
+          debugLog('save', 'Save loaded successfully', {
+            saveSlot,
+            wave: data.wave,
+            level: data.level,
+            highestWave: data.highestWaveReached,
+          });
           dispatch({ type: 'LOAD', payload: data });
           const elapsed = Date.now() - (data.lastActiveAt ?? Date.now());
           dispatch({ type: 'APPLY_OFFLINE_PROGRESS', elapsedMs: elapsed });
           dispatch({ type: 'APPLY_DAILY_LOGIN', nowMs: Date.now() });
           dispatch({ type: 'APPLY_WEEKLY_ROLLOVER', nowMs: Date.now() });
         } catch {
+          debugLog('save', 'Save payload was corrupted; falling back to defaults', { saveSlot });
           // Ignore corrupted save and continue fresh.
         }
       })

@@ -6,6 +6,8 @@ const TELEMETRY_CAP = 800;
 const VEXO_API_KEY = 'f974be1c-5121-4b5c-82f9-799a07387574';
 
 let vexoInitialized = false;
+const DEBUG_LOGS_ENABLED = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
+const gameplayThrottleMsByEvent = new Map<string, number>();
 
 export interface TelemetryEvent {
   name: string;
@@ -66,4 +68,30 @@ export async function clearTelemetryEvents(): Promise<void> {
   } catch {
     // No-op.
   }
+}
+
+export function debugLog(scope: string, message: string, payload?: Record<string, unknown>): void {
+  if (!DEBUG_LOGS_ENABLED) return;
+  const ts = new Date().toISOString();
+  if (payload) {
+    // eslint-disable-next-line no-console
+    console.log(`[SimplyIdle][${ts}][${scope}] ${message}`, payload);
+  } else {
+    // eslint-disable-next-line no-console
+    console.log(`[SimplyIdle][${ts}][${scope}] ${message}`);
+  }
+}
+
+export async function trackGameplayAction(
+  eventName: string,
+  payload?: Record<string, string | number | boolean | null>,
+  throttleMs = 0,
+): Promise<void> {
+  const now = Date.now();
+  if (throttleMs > 0) {
+    const lastTs = gameplayThrottleMsByEvent.get(eventName) ?? 0;
+    if (now - lastTs < throttleMs) return;
+    gameplayThrottleMsByEvent.set(eventName, now);
+  }
+  await trackEvent(eventName, payload);
 }

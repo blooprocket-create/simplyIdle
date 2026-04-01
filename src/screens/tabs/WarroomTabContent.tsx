@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import { fmt } from '../../utils';
 import { styles } from '../GameScreen';

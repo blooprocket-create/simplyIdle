@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../theme/colors';
 import MobileCard from '../../components/MobileCard';
 import SectionHeader from '../../components/SectionHeader';
@@ -34,7 +33,6 @@ interface WarfrontTabProps {
 }
 
 export default function WarfrontTab(props: WarfrontTabProps) {
-  const { width: viewportWidth } = useWindowDimensions();
   const teamHpPct = Math.max(0, Math.min(1, props.teamHp / Math.max(1, props.teamMaxHp))) * 100;
   const monsterHpPct = Math.max(0, Math.min(1, props.monsterHp / Math.max(1, props.monsterMaxHp))) * 100;
 
