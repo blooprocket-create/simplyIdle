@@ -1,10 +1,6 @@
 import { useMemo } from 'react';
 import { getEquipmentItem } from '../gameConfig';
 
-interface EquippedItem {
-  id: string | null;
-}
-
 interface GameState {
   equippedItems: Record<string, string | null>;
   equipmentInventory: Record<string, Equipment>;

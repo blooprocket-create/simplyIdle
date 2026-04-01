@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Pressable, Text, Platform } from 'react-native';
-import { THEME, SPACING, RADIUS, Z_INDEX } from '../theme';
+import { THEME, RADIUS, Z_INDEX } from '../theme';
 
 export type BottomTabType = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations';
 

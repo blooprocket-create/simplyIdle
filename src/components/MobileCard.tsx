@@ -30,7 +30,6 @@ interface MobileCardProps {
   }>;
   footer?: string;
   style?: ViewStyle;
-  expanded?: boolean;
 }
 
 export default function MobileCard({
@@ -41,7 +40,6 @@ export default function MobileCard({
   actions,
   footer,
   style,
-  expanded,
 }: MobileCardProps) {
   const allActions = actions || (action ? [action] : []);
 

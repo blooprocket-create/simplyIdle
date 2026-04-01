@@ -17,8 +17,6 @@ interface CurrentAct {
   bossWave: number;
 }
 
-const REBIRTH_WAVE_THRESHOLD = 20; // adjust based on your gameConfig
-
 export function useGameGuidance(
   canRebirthNow: boolean,
   state: GameState,
