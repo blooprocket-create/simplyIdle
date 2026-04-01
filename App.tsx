@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import GameScreen from './src/screens/GameScreen';
 import AuthScreen, { AUTH_STORAGE_KEYS, getValidStoredSession } from './src/screens/AuthScreen';
-import { identifyTelemetryDevice, initTelemetry } from './src/telemetry';
+import { debugLog, identifyTelemetryDevice, initTelemetry, trackEvent } from './src/telemetry';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -12,6 +12,10 @@ export default function App() {
 
   useEffect(() => {
     initTelemetry();
+    void trackEvent('app_boot', {
+      platform: Platform.OS,
+      source: 'App.tsx',
+    });
   }, []);
 
   useEffect(() => {
@@ -43,6 +47,15 @@ export default function App() {
       .then(name => setAccountName(name))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    debugLog('app', 'Session resolution complete', { hasAccount: !!accountName });
+    void trackEvent('auth_session_resolved', {
+      hasAccount: !!accountName,
+      platform: Platform.OS,
+    });
+  }, [loading, accountName]);
 
   useEffect(() => {
     void identifyTelemetryDevice(accountName);
