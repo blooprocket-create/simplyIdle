@@ -349,6 +349,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [reconGameOpen, setReconGameOpen] = useState(false);
   const [reconChoices, setReconChoices] = useState<ReconSweepOutcome[]>([]);
   const [reconPickedIndex, setReconPickedIndex] = useState<number | null>(null);
+  const [reconRevealInProgress, setReconRevealInProgress] = useState(false);
+  const [reconRevealComplete, setReconRevealComplete] = useState(false);
+  const reconFlipAnims = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+  ]).current;
+  const reconSelectedScale = useRef(new Animated.Value(1)).current;
 
   const [lockpickGameOpen, setLockpickGameOpen] = useState(false);
   const [lockpickTargetCode, setLockpickTargetCode] = useState<number>(0);
@@ -1058,6 +1066,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setReconGameOpen(false);
     setReconChoices([]);
     setReconPickedIndex(null);
+    setReconRevealInProgress(false);
+    setReconRevealComplete(false);
+    reconFlipAnims.forEach(anim => anim.setValue(0));
+    reconSelectedScale.setValue(1);
   };
 
   const openReconSweepGame = () => {
@@ -1069,7 +1081,47 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       .sort(() => Math.random() - 0.5);
     setReconChoices(sampled);
     setReconPickedIndex(null);
+    setReconRevealInProgress(false);
+    setReconRevealComplete(false);
+    reconFlipAnims.forEach(anim => anim.setValue(0));
+    reconSelectedScale.setValue(1);
     setReconGameOpen(true);
+  };
+
+  const revealReconChoice = (pickIndex: number) => {
+    if (reconRevealInProgress || reconRevealComplete) return;
+    setReconRevealInProgress(true);
+    setReconPickedIndex(pickIndex);
+
+    const otherIndices = [0, 1, 2].filter(index => index !== pickIndex && index < reconChoices.length);
+    const sequences: Animated.CompositeAnimation[] = [
+      Animated.timing(reconFlipAnims[pickIndex], {
+        toValue: 1,
+        duration: 320,
+        useNativeDriver: true,
+      }),
+    ];
+    otherIndices.forEach(index => {
+      sequences.push(
+        Animated.timing(reconFlipAnims[index], {
+          toValue: 1,
+          duration: 260,
+          useNativeDriver: true,
+        }),
+      );
+    });
+
+    Animated.sequence(sequences).start(() => {
+      Animated.spring(reconSelectedScale, {
+        toValue: 1.1,
+        friction: 6,
+        tension: 90,
+        useNativeDriver: true,
+      }).start(() => {
+        setReconRevealInProgress(false);
+        setReconRevealComplete(true);
+      });
+    });
   };
 
   const claimReconSweepGame = () => {
@@ -3032,11 +3084,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         <View style={styles.modalOverlay}>
           <View style={styles.miniGameModalContent}>
             <Text style={styles.diceRollTitle}>🛰️ Recon Sweep</Text>
-            <Text style={styles.miniGameHint}>Pick one intel node. Rewards are based on what you reveal.</Text>
+            <Text style={styles.miniGameHint}>Pick one intel card. It flips first, then the remaining intel is revealed.</Text>
             <View style={styles.reconChoiceGrid}>
               {reconChoices.map((choice, index) => {
                 const picked = reconPickedIndex === index;
-                const revealed = reconPickedIndex != null;
                 const label =
                   choice === 'intel_gold'
                     ? 'Supply Route'
@@ -3045,23 +3096,40 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       : choice === 'intel_buff'
                         ? 'Telemetry Feed'
                         : 'Enemy Ambush';
+                const rotateY = reconFlipAnims[index].interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0deg', '180deg'],
+                });
+                const scale = picked ? reconSelectedScale : 1;
                 return (
                   <Pressable
                     key={`${choice}_${index}`}
-                    style={[
-                      styles.reconChoiceCard,
-                      picked && styles.reconChoiceCardPicked,
-                      revealed && choice === 'ambush' && styles.reconChoiceCardDanger,
-                    ]}
-                    disabled={reconPickedIndex != null}
-                    onPress={() => setReconPickedIndex(index)}
+                    style={styles.reconChoiceCardTapTarget}
+                    disabled={reconRevealInProgress || reconRevealComplete}
+                    onPress={() => revealReconChoice(index)}
                   >
-                    <Text style={styles.reconChoiceLabel}>{revealed ? label : `Node ${index + 1}`}</Text>
+                    <Animated.View
+                      style={[
+                        styles.reconChoiceCard,
+                        picked && styles.reconChoiceCardPicked,
+                        choice === 'ambush' && reconRevealComplete && styles.reconChoiceCardDanger,
+                        {
+                          transform: [{ perspective: 1000 }, { rotateY }, { scale }],
+                        },
+                      ]}
+                    >
+                      <View style={styles.reconCardFaceFront}>
+                        <Text style={styles.reconChoiceLabel}>{`Node ${index + 1}`}</Text>
+                      </View>
+                      <View style={styles.reconCardFaceBack}>
+                        <Text style={styles.reconChoiceLabel}>{label}</Text>
+                      </View>
+                    </Animated.View>
                   </Pressable>
                 );
               })}
             </View>
-            {reconPickedIndex == null ? (
+            {!reconRevealComplete ? (
               <Pressable style={styles.modalBtn} onPress={resetReconGame}>
                 <Text style={styles.modalBtnText}>Cancel</Text>
               </Pressable>
