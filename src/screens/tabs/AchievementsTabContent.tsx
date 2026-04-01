@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, Image } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import { ACHIEVEMENTS, HERO_POOL, WEEKLY_TRACK_MILESTONES, getHeroBackstory } from '../../gameConfig';
+import { getHeroPortraitSource } from '../../heroPortraits';
 import { ACH_BONUS_PER_UNLOCK_PCT, ACH_BONUS_CAP_PCT } from '../GameScreen';
 import { styles } from '../GameScreen';
 
@@ -46,6 +47,13 @@ export const AchievementsTabContent: React.FC<AchievementsTabContentProps> = ({
 }) => {
   const unlockedHeroIds = useMemo(() => new Set(state.heroRoster.map(hero => hero.id)), [state.heroRoster]);
   const codexHeroes = useMemo(() => HERO_POOL.filter(hero => unlockedHeroIds.has(hero.id)), [unlockedHeroIds]);
+  const renderCodexHeroIcon = (heroId: string, emoji: string) => {
+    const portraitSource = getHeroPortraitSource(heroId);
+    if (portraitSource) {
+      return <Image source={portraitSource} style={styles.codexHeroPortrait} resizeMode="cover" />;
+    }
+    return <Text style={styles.toggleBtnText}>{emoji}</Text>;
+  };
 
   return (
     <>
@@ -237,7 +245,7 @@ export const AchievementsTabContent: React.FC<AchievementsTabContentProps> = ({
                           disabled={claimed}
                           onPress={() => claimCodexHeroVip(hero.id)}
                         >
-                          <Text style={styles.toggleBtnText}>{hero.emoji}</Text>
+                          {renderCodexHeroIcon(hero.id, hero.emoji)}
                         </Pressable>
                         <View style={styles.codexEntryLeft}>
                           <Text style={[styles.codexTitle, claimed && styles.codexTitleDone]}>

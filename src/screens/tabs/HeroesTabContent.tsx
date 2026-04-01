@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
-import { View, Text, Pressable, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Text, Pressable, ScrollView, useWindowDimensions, Image } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import { RARITIES, HERO_LEVEL_CAP, getHeroBackstory, getHeroRebirthPlan, getHeroUniqueEffectFamilyLabel, getHeroUniqueSkillDescription, getHeroUniqueWeaponName } from '../../gameConfig';
+import { getHeroPortraitSource } from '../../heroPortraits';
 import { fmt } from '../../utils';
 import { styles } from '../GameScreen';
 
@@ -109,6 +110,21 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
   setRecycleConfirmUid,
   renderSubTabBar,
 }) => {
+  const renderHeroPortrait = (heroId: string, emoji: string, isMobile: boolean) => {
+    const portraitSource = getHeroPortraitSource(heroId);
+    if (portraitSource) {
+      return (
+        <Image
+          source={portraitSource}
+          style={[styles.heroPortraitImage, isMobile && styles.heroPortraitImageMobile]}
+          resizeMode="cover"
+        />
+      );
+    }
+
+    return <Text style={[styles.heroEmoji, isMobile && styles.heroEmojiMobile]}>{emoji}</Text>;
+  };
+
   const { width: viewportWidth } = useWindowDimensions();
   const isPhoneWidth = viewportWidth < 700;
   const isSingleColumnRoster = viewportWidth < 520;
@@ -383,7 +399,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                           <>
                             <View style={styles.heroCardHeaderMobile}>
                               <View style={[styles.heroPortraitFrame, styles.heroPortraitFrameMobile, { borderColor: rarity.color }]}>
-                                <Text style={[styles.heroEmoji, styles.heroEmojiMobile]}>{hero.emoji}</Text>
+                                {renderHeroPortrait(hero.id, hero.emoji, true)}
                               </View>
                               <View style={styles.heroCardInfoMobile}>
                                 <View style={styles.heroNameRowMobile}>
@@ -446,7 +462,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                           <>
                             <View style={styles.heroCardTopRow}>
                               <View style={[styles.heroPortraitFrame, { borderColor: rarity.color }]}>
-                                <Text style={styles.heroEmoji}>{hero.emoji}</Text>
+                                {renderHeroPortrait(hero.id, hero.emoji, false)}
                               </View>
                               <View style={styles.heroCardInfo}>
                                 <Text style={styles.heroName} numberOfLines={1}>{hero.name}</Text>

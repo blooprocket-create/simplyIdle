@@ -2344,6 +2344,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#0D1523',
+    overflow: 'hidden',
   },
   heroPortraitFrameMobile: {
     width: 58,
@@ -2358,6 +2359,14 @@ export const styles = StyleSheet.create({
   },
   heroEmojiMobile: {
     fontSize: 27,
+  },
+  heroPortraitImage: {
+    width: '100%',
+    height: '100%',
+  },
+  heroPortraitImageMobile: {
+    width: '100%',
+    height: '100%',
   },
   heroCardInfoMobile: {
     flex: 1,
@@ -4563,6 +4572,11 @@ export const styles = StyleSheet.create({
   },
   codexEntryLeft: {
     flex: 1,
+  },
+  codexHeroPortrait: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
   codexTitle: {
     fontSize: 12,
