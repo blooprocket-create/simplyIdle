@@ -82,6 +82,26 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
     isSingleColumnBatch ? viewportWidth - batchHorizontalPadding : isUltraNarrow ? 220 : 180,
     Math.floor((viewportWidth - batchHorizontalPadding - batchGap * (batchColumns - 1)) / batchColumns),
   );
+  const expeditionClaimableCount = state.expeditionQueue.filter(exp => (Date.now() - exp.startTime) >= exp.durationMs).length;
+  const expeditionActiveTypes = new Set(state.expeditionQueue.map(exp => exp.type as ExpeditionType));
+  const expeditionLaunchableAffordableCount = EXPEDITION_TYPES.filter(type => {
+    if (expeditionActiveTypes.has(type)) return false;
+    const rarity = state.expeditionContractOffers[type] ?? 'common';
+    const cost = EXPEDITION_RARITY_META[rarity as ExpeditionRarity]?.goldCost ?? Number.MAX_SAFE_INTEGER;
+    return state.gold >= cost;
+  }).length;
+  const facilityUpgradeCosts: Record<'training' | 'treasury' | 'forge' | 'tactics', number[]> = {
+    training: [5000, 12000, 30000, 75000, 150000, 300000],
+    treasury: [4000, 10000, 25000, 60000, 120000, 250000],
+    forge: [6000, 15000, 40000, 90000, 180000, 350000],
+    tactics: [5000, 12000, 30000, 75000, 150000, 300000],
+  };
+  const facilitiesUpgradeableCount = (['training', 'treasury', 'forge', 'tactics'] as const).filter(facility => {
+    const level = state.guildhallFacilities[facility].level;
+    if (level >= 5) return false;
+    const nextCost = facilityUpgradeCosts[facility][level] ?? Number.MAX_SAFE_INTEGER;
+    return state.gold >= nextCost;
+  }).length;
 
   return (
     <>
@@ -93,6 +113,12 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
             label: st === 'batch' ? 'Batch Level' : st === 'facilities' ? 'Facilities' : 'Expeditions',
             active: guildhallSubTab === st,
             onPress: () => setGuildhallSubTab(st),
+            notificationCount:
+              st === 'facilities'
+                ? facilitiesUpgradeableCount
+                : st === 'expeditions'
+                  ? expeditionClaimableCount + expeditionLaunchableAffordableCount
+                  : 0,
           })))}
 
           {/* BATCH LEVELING TAB */}

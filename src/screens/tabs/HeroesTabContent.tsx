@@ -126,6 +126,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
             label: st === 'summon' ? 'Summon Bay' : 'Roster',
             active: heroesSubTab === st,
             onPress: () => setHeroesSubTab(st),
+            notificationCount: st === 'summon' && hasGachaNotification ? 1 : 0,
           })))}
 
           {heroesSubTab === 'summon' && (

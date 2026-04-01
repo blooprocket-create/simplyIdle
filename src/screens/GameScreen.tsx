@@ -548,8 +548,25 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const rebirthWavesLeft = Math.max(0, rebirthWaveRequirement - state.highestWaveReached);
   const expeditionClaimableCount = state.expeditionQueue.filter(exp => (Date.now() - exp.startTime) >= exp.durationMs).length;
   const expeditionActiveTypes = new Set(state.expeditionQueue.map(exp => exp.type));
-  const expeditionLaunchableCount = EXPEDITION_TYPES.filter(type => !expeditionActiveTypes.has(type)).length;
-  const guildhallNotificationCount = expeditionClaimableCount + expeditionLaunchableCount;
+  const expeditionLaunchableAffordableCount = EXPEDITION_TYPES.filter(type => {
+    if (expeditionActiveTypes.has(type)) return false;
+    const rarity = state.expeditionContractOffers[type] ?? 'common';
+    const cost = EXPEDITION_RARITY_META[rarity]?.goldCost ?? Number.MAX_SAFE_INTEGER;
+    return state.gold >= cost;
+  }).length;
+  const facilityUpgradeCosts: Record<'training' | 'treasury' | 'forge' | 'tactics', number[]> = {
+    training: [5000, 12000, 30000, 75000, 150000, 300000],
+    treasury: [4000, 10000, 25000, 60000, 120000, 250000],
+    forge: [6000, 15000, 40000, 90000, 180000, 350000],
+    tactics: [5000, 12000, 30000, 75000, 150000, 300000],
+  };
+  const facilitiesUpgradeableCount = (['training', 'treasury', 'forge', 'tactics'] as const).filter(facility => {
+    const level = state.guildhallFacilities[facility].level;
+    if (level >= 5) return false;
+    const nextCost = facilityUpgradeCosts[facility][level] ?? Number.MAX_SAFE_INTEGER;
+    return state.gold >= nextCost;
+  }).length;
+  const guildhallNotificationCount = expeditionClaimableCount + expeditionLaunchableAffordableCount + facilitiesUpgradeableCount;
   const guidanceList = useMemo(() => {
     const recs: Array<{ title: string; detail: string; tab: Tab }> = [];
     if (canRebirthNow) {
@@ -1148,6 +1165,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     active: boolean;
     onPress: () => void;
     disabled?: boolean;
+    notificationCount?: number;
   }>) => {
     const buttons = items.map(item => (
       <Pressable
@@ -1162,6 +1180,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         onPress={item.onPress}
         disabled={item.disabled}
       >
+        {!!item.notificationCount && <View style={styles.subTabRedDot} />}
         <Text style={[styles.subTabBtnText, item.active && styles.subTabBtnTextActive]}>{item.label}</Text>
       </Pressable>
     ));

@@ -1271,12 +1271,22 @@ export const styles = StyleSheet.create({
     paddingRight: 12,
   },
   subTabBtn: {
+    position: 'relative',
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#3a5471',
     backgroundColor: '#16283B',
     paddingVertical: 6,
     paddingHorizontal: 10,
+  },
+  subTabRedDot: {
+    position: 'absolute',
+    top: 4,
+    right: 5,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#ff3b30',
   },
   subTabBtnCompact: {
     minHeight: 38,

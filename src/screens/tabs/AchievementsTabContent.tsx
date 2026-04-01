@@ -52,6 +52,11 @@ export const AchievementsTabContent: React.FC<AchievementsTabContentProps> = ({
             label: st === 'overview' ? 'Overview' : st === 'weekly' ? 'Weekly' : st === 'missions' ? 'Missions' : st === 'achievements' ? 'Records' : st === 'collection' ? 'Collection' : 'Codex',
             active: achievementsSubTab === st,
             onPress: () => setAchievementsSubTab(st),
+            notificationCount: st === 'weekly'
+              ? claimableWeeklyMilestones.length
+              : st === 'missions'
+                ? claimableMissionIds.length
+                : 0,
           })))}
 
           {(achievementsSubTab === 'overview' || achievementsSubTab === 'weekly' || achievementsSubTab === 'missions') && (
