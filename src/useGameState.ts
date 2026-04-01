@@ -1845,32 +1845,28 @@ function sanitizeStatAllocation(raw: unknown, level: number, savedUnspent?: unkn
   const record = isRecord(raw) ? raw : {};
   const levelBudget = Math.max(0, (level - 1) * STAT_POINTS_PER_LEVEL);
   const legacyUnspent = clampInt(savedUnspent, 0, SAFE_INTEGER_CAP, 0);
-  const budget = levelBudget + legacyUnspent;
   const requested: StatBlock = {
-    strength: clampInt(record.strength, 0, budget, 0),
-    vitality: clampInt(record.vitality, 0, budget, 0),
-    agility: clampInt(record.agility, 0, budget, 0),
-    intelligence: clampInt(record.intelligence, 0, budget, 0),
-    spirit: clampInt(record.spirit, 0, budget, 0),
+    strength: clampInt(record.strength, 0, SAFE_INTEGER_CAP, 0),
+    vitality: clampInt(record.vitality, 0, SAFE_INTEGER_CAP, 0),
+    agility: clampInt(record.agility, 0, SAFE_INTEGER_CAP, 0),
+    intelligence: clampInt(record.intelligence, 0, SAFE_INTEGER_CAP, 0),
+    spirit: clampInt(record.spirit, 0, SAFE_INTEGER_CAP, 0),
   };
 
-  let remaining = budget;
-  const statsAlloc: StatBlock = {
-    strength: 0,
-    vitality: 0,
-    agility: 0,
-    intelligence: 0,
-    spirit: 0,
-  };
+  const spentTotal = requested.strength
+    + requested.vitality
+    + requested.agility
+    + requested.intelligence
+    + requested.spirit;
 
-  for (const key of ['strength', 'vitality', 'agility', 'intelligence', 'spirit'] as StatKey[]) {
-    const next = Math.min(requested[key], remaining);
-    statsAlloc[key] = next;
-    remaining -= next;
-  }
+  // Preserve saved allocations exactly to avoid losing invested stats on schema/balance migrations.
+  // If a legacy save exceeds the current level-derived budget, keep the invested distribution and
+  // only clamp unspent points to a non-negative value.
+  const effectiveBudget = Math.max(levelBudget + legacyUnspent, spentTotal + legacyUnspent);
+  const remaining = Math.max(0, effectiveBudget - spentTotal);
 
   return {
-    statsAlloc,
+    statsAlloc: requested,
     unspentStatPoints: remaining,
   };
 }
