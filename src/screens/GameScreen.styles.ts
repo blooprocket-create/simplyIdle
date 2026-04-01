@@ -1665,10 +1665,18 @@ export const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
   },
+  useItemBtnSecondary: {
+    backgroundColor: '#3D4A6A',
+  },
+  usableActionsCol: {
+    gap: 6,
+    alignItems: 'stretch',
+  },
   useItemBtnText: {
     fontSize: 11,
     color: '#C7FFD2',
     fontWeight: '700',
+    textAlign: 'center',
   },
   autoPotionRow: {
     flexDirection: 'row',

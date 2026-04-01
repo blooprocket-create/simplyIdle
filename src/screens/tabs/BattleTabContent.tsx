@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { Alert, Platform, View, Text, Pressable, ScrollView } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import { rarityConfig } from '../../gameConfig';
 import { styles } from '../GameScreen';
@@ -20,7 +20,7 @@ export interface BattleTabContentProps {
   setCombatTempo: (tempo: number) => void;
   burst: (hits: number) => void;
   buyPremiumCoolant: (itemId: string, amount?: number) => void;
-  useUsableItem: (itemId: string) => void;
+  useUsableItem: (itemId: string, amount?: number | 'all') => void;
 }
 
 export const BattleTabContent: React.FC<BattleTabContentProps> = ({
@@ -41,6 +41,32 @@ export const BattleTabContent: React.FC<BattleTabContentProps> = ({
   buyPremiumCoolant,
   useUsableItem,
 }) => {
+  const confirmUseAll = (item: any, count: number) => {
+    if (count <= 0) return;
+
+    const needsWarning = item.effect === 'heal_team_percent' || item.effect === 'reduce_heat_flat';
+    if (!needsWarning) {
+      useUsableItem(item.id, 'all');
+      return;
+    }
+
+    const warningText = item.effect === 'heal_team_percent'
+      ? `Use all ${count} ${item.name} now? This can over-heal and waste value.`
+      : `Use all ${count} ${item.name} now? This can over-cool and waste premium resources.`;
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm(warningText)) {
+        useUsableItem(item.id, 'all');
+      }
+      return;
+    }
+
+    Alert.alert('Confirm Use All', warningText, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Use All', style: 'destructive', onPress: () => useUsableItem(item.id, 'all') },
+    ]);
+  };
+
   return (
     <>
       {tab === 'battle' && (
@@ -187,9 +213,14 @@ export const BattleTabContent: React.FC<BattleTabContentProps> = ({
                       <Text style={styles.usableName}>{item.emoji} {item.name} x{count}</Text>
                       <Text style={styles.usableDesc}>{item.description}</Text>
                     </View>
-                    <Pressable style={styles.useItemBtn} onPress={() => useUsableItem(item.id)}>
-                      <Text style={styles.useItemBtnText}>Use</Text>
-                    </Pressable>
+                    <View style={styles.usableActionsCol}>
+                      <Pressable style={styles.useItemBtn} onPress={() => useUsableItem(item.id)}>
+                        <Text style={styles.useItemBtnText}>Use</Text>
+                      </Pressable>
+                      <Pressable style={[styles.useItemBtn, styles.useItemBtnSecondary]} onPress={() => confirmUseAll(item, count)}>
+                        <Text style={styles.useItemBtnText}>Use All</Text>
+                      </Pressable>
+                    </View>
                   </View>
                 );
               })
