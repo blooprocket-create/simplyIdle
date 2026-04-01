@@ -752,6 +752,30 @@ function maybeGrantHeroUniqueGear(state: GameState, hero: HeroUnit, chance: numb
   return grantHeroUniqueGear(state, hero);
 }
 
+function isPreferredUniqueBearer(candidate: HeroUnit, current: HeroUnit): boolean {
+  const rarityDiff = rarityRank(candidate.rarity) - rarityRank(current.rarity);
+  if (rarityDiff !== 0) return rarityDiff > 0;
+  if (candidate.level !== current.level) return candidate.level > current.level;
+  if (candidate.rank !== current.rank) return candidate.rank > current.rank;
+  if (candidate.teamBoost !== current.teamBoost) return candidate.teamBoost > current.teamBoost;
+  return candidate.uid.localeCompare(current.uid) < 0;
+}
+
+function getUniqueWeaponBearerUid(state: GameState, heroTemplateId: string): string | null {
+  const progress = state.heroUniqueGearByHeroId[heroTemplateId];
+  if (!progress || progress.rank <= 0 || !progress.equipped) return null;
+
+  let best: HeroUnit | null = null;
+  for (const hero of state.heroRoster) {
+    if (hero.id !== heroTemplateId) continue;
+    if (!best || isPreferredUniqueBearer(hero, best)) {
+      best = hero;
+    }
+  }
+
+  return best?.uid ?? null;
+}
+
 function getActiveUniqueSkillMultipliers(state: GameState): {
   dpsMult: number;
   goldMult: number;
@@ -764,13 +788,13 @@ function getActiveUniqueSkillMultipliers(state: GameState): {
   let expMult = 1;
   let incomingDmgMult = 1;
 
-  for (const hero of state.heroRoster) {
-    if (!active.has(hero.uid)) continue;
-    const progress = state.heroUniqueGearByHeroId[hero.id];
+  for (const [heroTemplateId, progress] of Object.entries(state.heroUniqueGearByHeroId)) {
     if (!progress?.equipped) continue;
     const rank = progress.rank ?? 0;
     if (rank <= 0) continue;
-    const modifiers = getHeroUniqueCombatModifiers(hero.id, clampUniqueRank(rank));
+    const bearerUid = getUniqueWeaponBearerUid(state, heroTemplateId);
+    if (!bearerUid || !active.has(bearerUid)) continue;
+    const modifiers = getHeroUniqueCombatModifiers(heroTemplateId, clampUniqueRank(rank));
 
     dpsMult *= modifiers.dpsMult;
     goldMult *= modifiers.goldMult;
@@ -786,9 +810,8 @@ function getActiveUniqueSkillMultipliers(state: GameState): {
   };
 }
 
-function hasEquippedUniqueWeapon(state: GameState, heroTemplateId: string): boolean {
-  const progress = state.heroUniqueGearByHeroId[heroTemplateId];
-  return !!progress && progress.rank > 0 && progress.equipped;
+function hasEquippedUniqueWeaponOnHero(state: GameState, hero: Pick<HeroUnit, 'id' | 'uid'>): boolean {
+  return getUniqueWeaponBearerUid(state, hero.id) === hero.uid;
 }
 
 function migrateLegacyEquipmentIds(
@@ -1193,7 +1216,7 @@ function maybeAutoRecycleBackground(state: GameState): GameState {
   const activeTeam = new Set(state.activeTeamHeroIds);
   const maxRank = rarityRank(state.autoRecycleMaxRarity);
   const toRecycle = state.heroRoster.filter(
-    h => !activeTeam.has(h.uid) && rarityRank(h.rarity) <= maxRank && !hasEquippedUniqueWeapon(state, h.id),
+    h => !activeTeam.has(h.uid) && rarityRank(h.rarity) <= maxRank && !hasEquippedUniqueWeaponOnHero(state, h),
   );
   if (toRecycle.length === 0) return state;
 
@@ -3908,7 +3931,7 @@ function reducer(state: GameState, action: Action): GameState {
     case 'RECYCLE_HERO': {
       const hero = state.heroRoster.find(h => h.uid === action.uid);
       if (!hero) return state;
-      if (hasEquippedUniqueWeapon(state, hero.id)) return state;
+      if (hasEquippedUniqueWeaponOnHero(state, hero)) return state;
       
       // Calculate shard reward and remove hero from roster
       const weekly = getCurrentWeeklyEvent(state);
@@ -3939,7 +3962,7 @@ function reducer(state: GameState, action: Action): GameState {
       const activeTeam = new Set(state.activeTeamHeroIds);
       const maxRank = rarityRank(state.autoRecycleMaxRarity);
       const toRecycle = state.heroRoster.filter(
-        h => !activeTeam.has(h.uid) && rarityRank(h.rarity) <= maxRank && !hasEquippedUniqueWeapon(state, h.id),
+        h => !activeTeam.has(h.uid) && rarityRank(h.rarity) <= maxRank && !hasEquippedUniqueWeaponOnHero(state, h),
       );
       if (toRecycle.length === 0) return state;
 

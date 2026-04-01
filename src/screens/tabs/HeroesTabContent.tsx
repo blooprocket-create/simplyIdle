@@ -172,6 +172,27 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
       });
   }, [activeTeamSet, rarityRank, state.heroRoster]);
 
+  const uniqueBearerByHeroId = useMemo(() => {
+    const bearerByHeroId: Record<string, string> = {};
+
+    for (const [heroId, progress] of Object.entries(state.heroUniqueGearByHeroId)) {
+      if (!progress || progress.rank <= 0 || !progress.equipped) continue;
+      const copies = state.heroRoster.filter(hero => hero.id === heroId);
+      if (copies.length === 0) continue;
+      const best = copies.sort((a, b) => {
+        const rarityDiff = (rarityRank[b.rarity] ?? 0) - (rarityRank[a.rarity] ?? 0);
+        if (rarityDiff !== 0) return rarityDiff;
+        if (b.level !== a.level) return b.level - a.level;
+        if (b.rank !== a.rank) return b.rank - a.rank;
+        if (b.teamBoost !== a.teamBoost) return b.teamBoost - a.teamBoost;
+        return a.uid.localeCompare(b.uid);
+      })[0];
+      bearerByHeroId[heroId] = best.uid;
+    }
+
+    return bearerByHeroId;
+  }, [rarityRank, state.heroRoster, state.heroUniqueGearByHeroId]);
+
   const rosterColumns = isSingleColumnRoster ? 1 : viewportWidth >= 1180 ? 4 : viewportWidth >= 860 ? 3 : 2;
   const rosterGap = isPhoneWidth ? 10 : 8;
   const rosterHorizontalPadding = isPhoneWidth ? 28 : 44;
@@ -366,6 +387,8 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                   const uniqueProgress = state.heroUniqueGearByHeroId[hero.id];
                   const uniqueRank = uniqueProgress?.rank ?? 0;
                   const uniqueEquipped = !!uniqueProgress?.equipped;
+                  const uniqueBearerUid = uniqueBearerByHeroId[hero.id] ?? null;
+                  const isUniqueBearer = uniqueEquipped && uniqueBearerUid === hero.uid;
                   const uniqueWeaponName = getHeroUniqueWeaponName(hero.id);
                   const uniqueDoctrine = getHeroUniqueEffectFamilyLabel(hero.id);
                   const uniqueSkill = uniqueRank > 0
@@ -555,6 +578,10 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                               </Pressable>
                             )}
 
+                            {uniqueEquipped && uniqueRank > 0 && !isUniqueBearer && (
+                              <Text style={styles.heroDetail}>Assigned to higher-rarity copy</Text>
+                            )}
+
                             {details && (
                               <View style={styles.heroExpandedStats}>
                                 {(['STR', 'VIT', 'AGI', 'INT', 'SPR'] as const).map((lbl, i) => {
@@ -596,11 +623,11 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                               </Pressable>
                             )}
                             <Pressable
-                              style={[styles.recycleBtn, uniqueEquipped && styles.rankUpBtnDisabled]}
-                              disabled={uniqueEquipped}
+                              style={[styles.recycleBtn, isUniqueBearer && styles.rankUpBtnDisabled]}
+                              disabled={isUniqueBearer}
                               onPress={() => setRecycleConfirmUid(hero.uid)}
                             >
-                              <Text style={styles.recycleBtnText}>{uniqueEquipped ? '🔒 Unique Weapon Equipped - Cannot Recycle' : `♻️ Recycle for ${shardValue} 💠`}</Text>
+                              <Text style={styles.recycleBtnText}>{isUniqueBearer ? '🔒 Unique Weapon Equipped - Cannot Recycle' : `♻️ Recycle for ${shardValue} 💠`}</Text>
                             </Pressable>
                           </>
                         )}
