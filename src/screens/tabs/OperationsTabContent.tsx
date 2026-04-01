@@ -63,6 +63,68 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
     const nextCost = facilityUpgradeCosts[facility][level] ?? Number.MAX_SAFE_INTEGER;
     return state.gold >= nextCost;
   }).length;
+  const dungeonLanes = [
+    {
+      id: 'rift',
+      title: 'Rift Breach',
+      icon: '🕳️',
+      rewardFocus: 'Diamonds + shards burst run',
+      unlockText: 'Always available',
+      unlocked: true,
+      actionable: canRunRiftToday,
+      status: canRunRiftToday ? 'Ready' : 'Cleared today',
+      onPress: openRiftChallenge,
+      ctaText: 'Run Rift',
+    },
+    {
+      id: 'gold',
+      title: 'Treasury Raid',
+      icon: '💰',
+      rewardFocus: 'Gold-focused dungeon lane',
+      unlockText: 'Unlock at highest wave 80',
+      unlocked: state.highestWaveReached >= 80,
+      actionable: false,
+      status: state.highestWaveReached >= 80 ? 'Coming soon' : `Locked (${state.highestWaveReached}/80)`,
+      onPress: undefined,
+      ctaText: 'Coming Soon',
+    },
+    {
+      id: 'exp',
+      title: 'Archive Siege',
+      icon: '📘',
+      rewardFocus: 'EXP-focused dungeon lane',
+      unlockText: 'Unlock at highest wave 120',
+      unlocked: state.highestWaveReached >= 120,
+      actionable: false,
+      status: state.highestWaveReached >= 120 ? 'Coming soon' : `Locked (${state.highestWaveReached}/120)`,
+      onPress: undefined,
+      ctaText: 'Coming Soon',
+    },
+    {
+      id: 'diamond',
+      title: 'Crystal Vault',
+      icon: '💎',
+      rewardFocus: 'Diamond-focused dungeon lane',
+      unlockText: 'Unlock at highest wave 180',
+      unlocked: state.highestWaveReached >= 180,
+      actionable: false,
+      status: state.highestWaveReached >= 180 ? 'Coming soon' : `Locked (${state.highestWaveReached}/180)`,
+      onPress: undefined,
+      ctaText: 'Coming Soon',
+    },
+    {
+      id: 'tears',
+      title: 'Abyss Condenser',
+      icon: '💧',
+      rewardFocus: 'Boss Tear-focused dungeon lane',
+      unlockText: 'Unlock at highest wave 240',
+      unlocked: state.highestWaveReached >= 240,
+      actionable: false,
+      status: state.highestWaveReached >= 240 ? 'Coming soon' : `Locked (${state.highestWaveReached}/240)`,
+      onPress: undefined,
+      ctaText: 'Coming Soon',
+    },
+  ] as const;
 
   return (
     <>
@@ -115,25 +177,27 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
             <View style={styles.expeditionsSection}>
               <Text style={styles.expeditionsTitle}>🕳️ Dungeon Ops</Text>
               <Text style={styles.expeditionsDesc}>Dedicated dungeon lane for focused resource runs.</Text>
-              <View style={styles.facilityCard}>
-                <Text style={styles.facilityName}>Rift (legacy mode)</Text>
-                <Text style={styles.facilityBonusText}>Status: {canRunRiftToday ? 'Ready' : 'Cleared today'}</Text>
-                {state.lastRiftWavesCleared > 0 && (
-                  <Text style={styles.facilityNextBonus}>Last clear: {state.lastRiftWavesCleared}/5 waves</Text>
-                )}
-                <Pressable
-                  style={[styles.warPanelActionBtn, !canRunRiftToday && styles.warPanelActionBtnDisabled]}
-                  disabled={!canRunRiftToday}
-                  onPress={openRiftChallenge}
-                >
-                  <Text style={styles.warPanelActionText}>Run Rift</Text>
-                </Pressable>
-              </View>
-              <View style={styles.facilityCard}>
-                <Text style={styles.facilityName}>Future Dungeon Lanes</Text>
-                <Text style={styles.facilityNextBonus}>Planned tracks: Gold Ops, EXP Ops, Diamond Ops, Tear Ops, and more.</Text>
-                <Text style={styles.facilityNextBonus}>This sub-tab is now the home for all dungeon systems.</Text>
-              </View>
+              {dungeonLanes.map(lane => (
+                <View key={lane.id} style={styles.facilityCard}>
+                  <Text style={styles.facilityName}>{lane.icon} {lane.title}</Text>
+                  <Text style={styles.facilityBonusText}>{lane.rewardFocus}</Text>
+                  <Text style={styles.facilityNextBonus}>{lane.unlockText}</Text>
+                  <Text style={styles.facilityBonusText}>Status: {lane.status}</Text>
+                  {lane.id === 'rift' && state.lastRiftWavesCleared > 0 && (
+                    <Text style={styles.facilityNextBonus}>Last clear: {state.lastRiftWavesCleared}/5 waves</Text>
+                  )}
+                  <Pressable
+                    style={[
+                      styles.warPanelActionBtn,
+                      (!lane.actionable || !lane.unlocked) && styles.warPanelActionBtnDisabled,
+                    ]}
+                    disabled={!lane.actionable || !lane.unlocked}
+                    onPress={lane.onPress}
+                  >
+                    <Text style={styles.warPanelActionText}>{lane.ctaText}</Text>
+                  </Pressable>
+                </View>
+              ))}
             </View>
           )}
 
