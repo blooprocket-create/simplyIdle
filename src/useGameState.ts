@@ -3884,7 +3884,7 @@ function reducer(state: GameState, action: Action): GameState {
       if (state.lastLockpickDay != null && (nowMs - state.lastLockpickDay) < MINI_OPS_COOLDOWN_MS) return state;
 
       const success = typeof action.forcedSuccess === 'boolean' ? action.forcedSuccess : Math.random() < 0.46;
-      const diamondGain = success ? Math.max(15, Math.floor(8 + state.highestWaveReached * 0.35)) : 0;
+      const diamondGain = success ? Math.max(30, Math.floor(16 + state.highestWaveReached * 0.6)) : 0;
       const goldConsolation = success ? 0 : Math.max(4000, Math.floor(getMonsterGold(state.wave) * 20));
 
       return queueReward({
