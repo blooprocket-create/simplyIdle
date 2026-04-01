@@ -247,6 +247,24 @@ export const styles = StyleSheet.create({
     color: '#D4DCF2',
     lineHeight: 18,
   },
+  characterSlotActions: {
+    marginTop: 8,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  characterSlotDeleteBtn: {
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: '#8F3A46',
+    backgroundColor: '#3A1D25',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  characterSlotDeleteBtnText: {
+    fontSize: 11,
+    color: '#FFD9DE',
+    fontWeight: '700',
+  },
   characterBackBtn: {
     alignSelf: 'flex-start',
     marginBottom: 16,

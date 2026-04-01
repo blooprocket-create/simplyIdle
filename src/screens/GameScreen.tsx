@@ -10,6 +10,7 @@ import {
   TextInput,
   Modal,
   Linking,
+  Alert,
   Animated,
   Easing,
   useWindowDimensions,
@@ -1329,6 +1330,47 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setSelectedCharacterClass(playerClass);
   }
 
+  async function deleteCharacterSlot(playerClass: PlayerClass) {
+    const saveKey = getSaveStorageKey(getCharacterSaveSlot(accountName, playerClass));
+    await AsyncStorage.removeItem(saveKey);
+
+    const lastSlotKey = getLastCharacterSlotKey(accountName);
+    const lastSelected = await AsyncStorage.getItem(lastSlotKey);
+    if (lastSelected === playerClass) {
+      await AsyncStorage.removeItem(lastSlotKey);
+    }
+
+    setSlotSummaries(prev => prev.map(slot => (
+      slot.classId === playerClass
+        ? {
+          ...slot,
+          occupied: false,
+          playerName: null,
+          level: 1,
+          highestWaveReached: 1,
+        }
+        : slot
+    )));
+  }
+
+  function confirmDeleteCharacterSlot(playerClass: PlayerClass) {
+    const cls = CLASSES.find(entry => entry.id === playerClass) ?? CLASSES[0];
+    Alert.alert(
+      `Delete ${cls.name} Character?`,
+      'This permanently removes that slot save. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void deleteCharacterSlot(playerClass);
+          },
+        },
+      ],
+    );
+  }
+
   function returnToCharacterSelect() {
     setSettingsOpen(false);
     setDraftName('');
@@ -1376,6 +1418,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       ? `${slot.playerName} • Lv ${slot.level} • Peak Wave ${slot.highestWaveReached}`
                       : `Create a ${cls.name.toLowerCase()} in this slot.`}
                   </Text>
+                  {slot.occupied && (
+                    <View style={styles.characterSlotActions}>
+                      <Pressable
+                        style={styles.characterSlotDeleteBtn}
+                        onPress={(event) => {
+                          event.stopPropagation();
+                          confirmDeleteCharacterSlot(slot.classId);
+                        }}
+                      >
+                        <Text style={styles.characterSlotDeleteBtnText}>Delete Character</Text>
+                      </Pressable>
+                    </View>
+                  )}
                 </Pressable>
               );
             })}
