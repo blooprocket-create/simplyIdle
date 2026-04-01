@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ENABLE_SIMULATED_DOLLAR_PURCHASES, FACILITY_MAX_LEVEL, MINI_OPS_COOLDOWN_MS, getCharacterSaveSlot, getDpsBreakdown, getEquipmentCraftCost, getFacilityUpgradeCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState } from '../useGameState';
-import { trackEvent } from '../telemetry';
+import { debugLog, trackEvent, trackGameplayAction } from '../telemetry';
 import {
   ACHIEVEMENTS,
   CLASSES,
@@ -970,8 +970,28 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   }, [rewardPopup, idleChestOpen]);
 
   const onTabChange = (nextTab: Tab) => {
+    debugLog('ui', 'Tab changed', { from: tab, to: nextTab, wave: state.wave });
+    void trackGameplayAction('ui_tab_changed', { from: tab, to: nextTab, wave: state.wave }, 500);
     setTab(nextTab);
   };
+
+  useEffect(() => {
+    if (!eventsOpen) return;
+    debugLog('ui', 'Events panel opened', { wave: state.wave, seasonPoints: state.seasonPoints });
+    void trackGameplayAction('ui_events_opened', { wave: state.wave, seasonPoints: state.seasonPoints }, 1000);
+  }, [eventsOpen, state.wave, state.seasonPoints]);
+
+  useEffect(() => {
+    if (!shopOpen) return;
+    debugLog('ui', 'Shop opened', { shopTab, diamonds: state.diamonds, gold: state.gold });
+    void trackGameplayAction('ui_shop_opened', { shopTab, diamonds: state.diamonds, gold: state.gold }, 1000);
+  }, [shopOpen, shopTab, state.diamonds, state.gold]);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    debugLog('ui', 'Settings opened', { wave: state.wave, level: state.level });
+    void trackGameplayAction('ui_settings_opened', { wave: state.wave, level: state.level }, 1000);
+  }, [settingsOpen, state.wave, state.level]);
 
   const getDiceOutcome = (roll: number) => {
     // Exact same formula as reducer for consistency
