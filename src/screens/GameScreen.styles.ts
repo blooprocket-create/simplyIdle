@@ -4676,8 +4676,8 @@ export const styles = StyleSheet.create({
     color: '#000',
   },
 
-  // Guild Hall Tab
-  guildhallTab: {
+  // Operations Tab
+  operationsTab: {
     padding: 12,
     gap: 16,
   },

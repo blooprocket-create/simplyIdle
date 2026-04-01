@@ -61,15 +61,15 @@ import {
   StatsTabContent,
   EquipmentTabContent,
   AchievementsTabContent,
-  GuildhallTabContent,
+  OperationsTabContent,
 } from './tabs';
 import { styles } from './GameScreen.styles';
 
-export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'guildhall';
+export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations';
 type HeroesSubTab = 'summon' | 'roster' | 'batch';
 type EquipmentSubTab = 'inventory' | 'craft' | 'forge';
 type AchievementsSubTab = 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex';
-type GuildhallSubTab = 'facilities' | 'expeditions';
+type OperationsSubTab = 'facilities' | 'expeditions';
 type ShopTab = 'diamond' | 'gold' | 'dollar';
 export type ExpeditionType = 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss';
 export type ExpeditionRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
@@ -111,7 +111,7 @@ const TAB_META: Record<Tab, { icon: string; label: string; mood: string }> = {
   stats: { icon: '📊', label: 'Growth', mood: 'Power Grid' },
   equipment: { icon: '🎒', label: 'Armory', mood: 'Forge Gear' },
   achievements: { icon: '🏆', label: 'Legends', mood: 'Milestones' },
-  guildhall: { icon: '🏰', label: 'Operations', mood: 'Infrastructure' },
+  operations: { icon: '🏰', label: 'Operations', mood: 'Infrastructure' },
 };
 
 export const ACH_BONUS_PER_UNLOCK_PCT = 3;
@@ -294,7 +294,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [heroesSubTab, setHeroesSubTab] = useState<HeroesSubTab>('summon');
   const [equipmentSubTab, setEquipmentSubTab] = useState<EquipmentSubTab>('inventory');
   const [achievementsSubTab, setAchievementsSubTab] = useState<AchievementsSubTab>('overview');
-  const [guildhallSubTab, setGuildhallSubTab] = useState<GuildhallSubTab>('facilities');
+  const [operationsSubTab, setOperationsSubTab] = useState<OperationsSubTab>('facilities');
   const [eventsOpen, setEventsOpen] = useState(false);
   const [chapterMapOpen, setChapterMapOpen] = useState(false);
   const [compareItemId, setCompareItemId] = useState<string | null>(null);
@@ -554,6 +554,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     const cost = EXPEDITION_RARITY_META[rarity]?.goldCost ?? Number.MAX_SAFE_INTEGER;
     return state.gold >= cost;
   }).length;
+  const operationsFacilities = state.guildhallFacilities;
   const facilityUpgradeCosts: Record<'training' | 'treasury' | 'forge' | 'tactics', number[]> = {
     training: [5000, 12000, 30000, 75000, 150000, 300000],
     treasury: [4000, 10000, 25000, 60000, 120000, 250000],
@@ -561,12 +562,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     tactics: [5000, 12000, 30000, 75000, 150000, 300000],
   };
   const facilitiesUpgradeableCount = (['training', 'treasury', 'forge', 'tactics'] as const).filter(facility => {
-    const level = state.guildhallFacilities[facility].level;
+    const level = operationsFacilities[facility].level;
     if (level >= 5) return false;
     const nextCost = facilityUpgradeCosts[facility][level] ?? Number.MAX_SAFE_INTEGER;
     return state.gold >= nextCost;
   }).length;
-  const guildhallNotificationCount = expeditionClaimableCount + expeditionLaunchableAffordableCount + facilitiesUpgradeableCount;
+  const operationsNotificationCount = expeditionClaimableCount + expeditionLaunchableAffordableCount + facilitiesUpgradeableCount;
   const guidanceList = useMemo(() => {
     const recs: Array<{ title: string; detail: string; tab: Tab }> = [];
     if (canRebirthNow) {
@@ -636,7 +637,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     stats: state.unspentStatPoints > 0 ? `+${state.unspentStatPoints}` : 'OK',
     equipment: `${state.inventoryItemIds.length}`,
     achievements: `${state.achievements.size}/${ACHIEVEMENTS.length}`,
-    guildhall: guildhallNotificationCount > 0 ? `${guildhallNotificationCount}` : 'OK',
+    operations: operationsNotificationCount > 0 ? `${operationsNotificationCount}` : 'OK',
   };
   const isNativeApp = Platform.OS !== 'web';
   const isCompactPhone = viewportWidth < 430;
@@ -1208,7 +1209,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       stats: hasStatsNotification ? 1 : 0,
       achievements: hasAchievementsNotification ? 1 : 0,
       equipment: hasEquipmentNotification ? 1 : 0,
-      guildhall: guildhallNotificationCount,
+      operations: operationsNotificationCount,
     };
 
     return (
@@ -1275,13 +1276,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   // Manage expedition queue timer display (ticks every second to update countdown display)
   useEffect(() => {
-    const watchingExpeditionsTab = tab === 'guildhall' && guildhallSubTab === 'expeditions';
+    const watchingExpeditionsTab = tab === 'operations' && operationsSubTab === 'expeditions';
     if (state.expeditionQueue.length === 0 && !watchingExpeditionsTab) return;
     const timer = setInterval(() => {
       setTimerTick(prev => prev + 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, [state.expeditionQueue, tab, guildhallSubTab]);
+  }, [state.expeditionQueue, tab, operationsSubTab]);
 
 
   const isBossImminent = state.wave % 10 >= 8;
@@ -1924,14 +1925,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           } as any)}
         />
 
-        <GuildhallTabContent
+        <OperationsTabContent
           {...({
             tab,
             state,
             stats,
-            guildhallSubTab,
-            setGuildhallSubTab,
-            getHeroGoldLevelCost,
+            operationsSubTab,
+            setOperationsSubTab,
             upgradeFacility,
             startExpedition,
             completeExpedition,

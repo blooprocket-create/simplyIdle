@@ -19,5 +19,5 @@ export type { EquipmentTabContentProps } from './EquipmentTabContent';
 export { AchievementsTabContent } from './AchievementsTabContent';
 export type { AchievementsTabContentProps } from './AchievementsTabContent';
 
-export { GuildhallTabContent } from './GuildhallTabContent';
-export type { GuildhallTabContentProps } from './GuildhallTabContent';
+export { OperationsTabContent } from './OperationsTabContent';
+export type { OperationsTabContentProps } from './OperationsTabContent';
