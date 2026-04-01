@@ -2662,6 +2662,22 @@ export const styles = StyleSheet.create({
     color: '#777',
     fontWeight: '700',
   },
+  statTotalRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+    marginTop: 2,
+  },
+  statTotalLabel: {
+    fontSize: 11,
+    color: '#92A3C4',
+    fontWeight: '700',
+  },
+  statTotalValue: {
+    fontSize: 13,
+    color: '#F0F6FF',
+    fontWeight: '800',
+  },
   statValue: {
     fontSize: 14,
     fontWeight: '700',

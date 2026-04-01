@@ -57,13 +57,18 @@ export const StatsTabContent: React.FC<StatsTabContentProps> = ({
           <View style={styles.statsGrid}>
             {(Object.keys(STAT_LABELS) as Array<keyof typeof STAT_LABELS>).map(stat => {
               const gearBonus = stats.equipmentBonus[stat];
-              const val = stats.combined[stat] - gearBonus;
+              const total = stats.combined[stat];
+              const val = total - gearBonus;
               const desc = classConfig.statDescriptions[stat as StatKey];
               return (
                 <View key={stat} style={styles.statRow}>
                   <View style={styles.statRowTop}>
                     <View style={styles.statLabel}>
                       <Text style={styles.statAbr}>{STAT_LABELS[stat]}</Text>
+                      <View style={styles.statTotalRow}>
+                        <Text style={styles.statTotalLabel}>Total</Text>
+                        <Text style={styles.statTotalValue}>{total}</Text>
+                      </View>
                       <View style={styles.statValueRow}>
                         <Text style={styles.statValue}>{val}</Text>
                         {gearBonus > 0 && <Text style={styles.statGearValue}>(+{gearBonus} gear)</Text>}
