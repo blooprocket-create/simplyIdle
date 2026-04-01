@@ -81,9 +81,11 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
     return Array.from(bestOwnedByHeroId.values())
       .map(hero => {
         const progress = state.heroUniqueGearByHeroId[hero.id];
+        const copyCount = state.heroRoster.filter(copy => copy.id === hero.id).length;
         return {
           hero,
           progress,
+          copyCount,
           uniqueRank: progress?.rank ?? 0,
           uniqueEquipped: !!progress?.equipped,
         };
@@ -160,13 +162,14 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
               {uniqueArmoryEntries.length === 0 ? (
                 <Text style={styles.emptyMsg}>Summon heroes to start building the armory. Owned heroes appear here even before their unique weapon is forged.</Text>
               ) : (
-                uniqueArmoryEntries.map(({ hero, uniqueRank, uniqueEquipped }) => {
+                uniqueArmoryEntries.map(({ hero, copyCount, uniqueRank, uniqueEquipped }) => {
                     const uniqueWeaponName = getHeroUniqueWeaponName(hero.id);
                     const uniqueDoctrine = getHeroUniqueEffectFamilyLabel(hero.id);
                     const isLocked = uniqueRank <= 0;
                     const uniqueSkillText = isLocked
                       ? `Locked • ${uniqueWeaponName} has not been forged yet.`
                       : getHeroUniqueSkillDescription(hero.id, uniqueRank);
+                    const bearerLabel = `${hero.name} • ${hero.rarity.toUpperCase()} • Lv ${hero.level} • Rank ${hero.rank}`;
                     return (
                       <View key={hero.id} style={[styles.uniqueArmoryCard, uniqueEquipped && styles.uniqueArmoryCardEquipped, isLocked && styles.uniqueArmoryCardLocked]}>
                         <View style={styles.uniqueArmoryCardTop}>
@@ -181,6 +184,14 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
                           </View>
                         </View>
                         <Text style={[styles.uniqueArmorySkill, isLocked && styles.uniqueArmoryLockText]}>{uniqueSkillText}</Text>
+                        {!isLocked && (
+                          <Text style={styles.uniqueArmoryRule}>
+                            {uniqueEquipped ? `Equipped by: ${bearerLabel}` : `Stored for bearer: ${bearerLabel}`}
+                          </Text>
+                        )}
+                        {copyCount > 1 && (
+                          <Text style={styles.uniqueArmoryRule}>Duplicate copies owned: {copyCount}. Highest-priority copy is selected automatically.</Text>
+                        )}
                         <Text style={styles.uniqueArmoryLore}>{getHeroBackstory(hero.id)}</Text>
                         <Text style={styles.uniqueArmoryRule}>Only {hero.name} can wield this weapon.</Text>
                         {!isLocked && (
