@@ -274,13 +274,18 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                     <Text style={styles.heroSlotUnlockMeta}>
                       Next slot {nextTeamSlotUnlock.targetSlots}: Wave {nextTeamSlotUnlock.requiredWave} • {fmt(nextTeamSlotUnlock.goldCost)} gold • {fmt(nextTeamSlotUnlock.shardCost)} shards
                     </Text>
+                    <Text style={styles.heroSlotUnlockMeta}>
+                      Wave: {nextTeamSlotUnlock.waveMet ? 'OK' : `${state.highestWaveReached}/${nextTeamSlotUnlock.requiredWave}`} •
+                      Gold: {nextTeamSlotUnlock.goldMet ? 'OK' : `${fmt(state.gold)}/${fmt(nextTeamSlotUnlock.goldCost)}`} •
+                      Shards: {nextTeamSlotUnlock.shardMet ? 'OK' : `${fmt(state.heroShards)}/${fmt(nextTeamSlotUnlock.shardCost)}`}
+                    </Text>
                     <Pressable
                       style={[styles.heroSlotUnlockBtn, !nextTeamSlotUnlock.canUnlock && styles.heroSlotUnlockBtnDisabled]}
                       disabled={!nextTeamSlotUnlock.canUnlock}
                       onPress={unlockTeamSlot}
                     >
                       <Text style={styles.heroSlotUnlockBtnText}>
-                        {nextTeamSlotUnlock.canUnlock ? `Unlock Slot ${nextTeamSlotUnlock.targetSlots}` : 'Requirements not met'}
+                        {nextTeamSlotUnlock.canUnlock ? `Unlock Slot ${nextTeamSlotUnlock.targetSlots}` : 'Need More Resources'}
                       </Text>
                     </Pressable>
                   </>

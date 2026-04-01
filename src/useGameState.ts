@@ -5266,6 +5266,9 @@ export function useGameState(saveSlot: string = 'default') {
       requiredWave: req.requiredWave,
       goldCost: req.goldCost,
       shardCost: req.shardCost,
+      waveMet: state.highestWaveReached >= req.requiredWave,
+      goldMet: state.gold >= req.goldCost,
+      shardMet: state.heroShards >= req.shardCost,
       canUnlock: state.highestWaveReached >= req.requiredWave && state.gold >= req.goldCost && state.heroShards >= req.shardCost,
     };
   }, [state]);
