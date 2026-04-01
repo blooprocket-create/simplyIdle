@@ -3142,6 +3142,33 @@ function reducer(state: GameState, action: Action): GameState {
         });
       }
 
+      if (item.effect === 'gain_vip_points_flat') {
+        const gain = item.value * requestedUses;
+        const nextPoints = nextState.vipPoints + gain;
+        const nextLevel = getVipLevelFromPoints(nextPoints);
+        const leveledUp = nextLevel > nextState.vipLevel;
+
+        nextState = queueReward({
+          ...nextState,
+          vipPoints: nextPoints,
+          vipLevel: nextLevel,
+        }, {
+          id: `use_${item.id}_${Date.now()}`,
+          kind: 'system',
+          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
+          detail: `+${gain} VIP points`,
+        });
+
+        if (leveledUp) {
+          nextState = queueReward(nextState, {
+            id: `vip_item_level_${nextLevel}_${Date.now()}`,
+            kind: 'system',
+            title: `VIP Level Up: ${nextLevel}`,
+            detail: `Bonuses now: +${Math.round((getVipDamageMultiplier({ ...nextState, vipLevel: nextLevel }) - 1) * 100)}% DPS, +${Math.round((getVipGoldMultiplier({ ...nextState, vipLevel: nextLevel }) - 1) * 100)}% gold, +${Math.round((getVipExpMultiplier({ ...nextState, vipLevel: nextLevel }) - 1) * 100)}% EXP`,
+          });
+        }
+      }
+
       return withAchievement((nextState));
     }
 

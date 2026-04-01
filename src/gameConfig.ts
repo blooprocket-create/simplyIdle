@@ -437,7 +437,7 @@ export function getStarterEquipmentForClass(playerClass: PlayerClass): string[] 
     .filter((id): id is string => !!id);
 }
 
-export type UsableItemEffect = 'heal_team_percent' | 'gain_gold_flat' | 'gain_exp_flat' | 'gain_shards_flat' | 'reduce_heat_flat';
+export type UsableItemEffect = 'heal_team_percent' | 'gain_gold_flat' | 'gain_exp_flat' | 'gain_shards_flat' | 'reduce_heat_flat' | 'gain_vip_points_flat';
 export type UsableItemType = 'basic' | 'advanced';
 
 export interface UsableItem {
@@ -491,6 +491,16 @@ export const USABLE_ITEMS: UsableItem[] = [
     effect: 'gain_shards_flat',
     value: 60,
     dropWeight: 7,
+  },
+  {
+    id: 'vip_token',
+    name: 'Sovereign VIP Writ',
+    emoji: '👑',
+    description: 'Instantly grants 100 VIP points.',
+    itemType: 'basic',
+    effect: 'gain_vip_points_flat',
+    value: 100,
+    dropWeight: 3,
   },
   {
     id: 'grand_potion',

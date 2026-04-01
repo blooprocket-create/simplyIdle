@@ -4,6 +4,7 @@ import { THEME, TYPOGRAPHY, SPACING, Z_INDEX, RADIUS } from '../theme';
 
 interface GameHeaderProps {
   playerName: string;
+  playerVipStatus: string;
   playerClass: string;
   gold: number;
   diamonds: number;
@@ -16,6 +17,7 @@ interface GameHeaderProps {
 
 export default function GameHeader({
   playerName,
+  playerVipStatus,
   playerClass,
   gold,
   diamonds,
@@ -40,9 +42,14 @@ export default function GameHeader({
 
       {/* Left: Player Identity */}
       <View style={styles.left}>
-        <Text style={styles.playerName} numberOfLines={1}>
-          {playerName}
-        </Text>
+        <View style={styles.playerIdentityRow}>
+          <Text style={styles.playerName} numberOfLines={1}>
+            {playerName}
+          </Text>
+          <Text style={styles.playerVipStatus} numberOfLines={1}>
+            {playerVipStatus}
+          </Text>
+        </View>
         <Text style={styles.playerClass}>{playerClass}</Text>
       </View>
 
@@ -118,18 +125,30 @@ const styles = StyleSheet.create({
   },
 
   left: {
-    flex: 0.2,
-    minWidth: 50,
+    flex: 0.32,
+    minWidth: 94,
+  },
+  playerIdentityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   playerName: {
     ...TYPOGRAPHY.section,
     color: THEME.text.primary,
-    marginBottom: 2,
+    flexShrink: 1,
+  },
+  playerVipStatus: {
+    fontSize: 9,
+    color: '#FFE07A',
+    fontWeight: '700',
+    flexShrink: 1,
   },
   playerClass: {
     fontSize: 9,
     color: THEME.text.tertiary,
     fontWeight: '600',
+    marginTop: 2,
   },
 
   center: {

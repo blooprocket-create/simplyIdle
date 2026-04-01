@@ -1541,6 +1541,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       {/* Header */}
       <GameHeader
         playerName={state.playerName}
+        playerVipStatus={vipLevel >= 10 ? `VIP ${vipLevel} (MAX)` : `VIP ${vipLevel} (${fmt(vipPoints)}/${fmt(vipNextThreshold)})`}
         playerClass={`${stats.className} • Lv ${state.level}`}
         gold={state.gold}
         diamonds={state.diamonds}
