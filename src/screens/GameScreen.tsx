@@ -186,6 +186,7 @@ interface CharacterSlotSummary {
   playerName: string | null;
   level: number;
   highestWaveReached: number;
+  vipLevel: number;
   occupied: boolean;
 }
 
@@ -193,8 +194,21 @@ function getLastCharacterSlotKey(accountName: string): string {
   return `idlerpg_last_character_slot_v1_${accountName}`;
 }
 
+function getVipLevelFromPoints(points: number): number {
+  let level = 0;
+  for (let i = 0; i < VIP_LEVEL_THRESHOLDS.length; i += 1) {
+    if (points >= VIP_LEVEL_THRESHOLDS[i]) {
+      level = i;
+    } else {
+      break;
+    }
+  }
+  return Math.max(0, Math.min(10, level));
+}
+
 export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [selectedCharacterClass, setSelectedCharacterClass] = useState<PlayerClass | null>(null);
+  const [lastUsedCharacterClass, setLastUsedCharacterClass] = useState<PlayerClass | null>(null);
   const [slotSummaries, setSlotSummaries] = useState<CharacterSlotSummary[]>([]);
   const [slotListLoading, setSlotListLoading] = useState(true);
   const {
@@ -407,6 +421,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             playerName: null,
             level: 1,
             highestWaveReached: 1,
+            vipLevel: 0,
             occupied: false,
           } satisfies CharacterSlotSummary;
         }
@@ -417,10 +432,18 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             level?: number;
             highestWaveReached?: number;
             wave?: number;
+            vipLevel?: number;
+            vipPoints?: number;
             characterCreated?: boolean;
           };
           const playerName = typeof parsed.playerName === 'string' ? parsed.playerName.trim().slice(0, 24) : '';
           const occupied = !!playerName && parsed.characterCreated === true;
+          const parsedVipPoints = typeof parsed.vipPoints === 'number' && Number.isFinite(parsed.vipPoints)
+            ? Math.max(0, Math.floor(parsed.vipPoints))
+            : 0;
+          const parsedVipLevel = typeof parsed.vipLevel === 'number' && Number.isFinite(parsed.vipLevel)
+            ? Math.max(0, Math.min(10, Math.floor(parsed.vipLevel)))
+            : getVipLevelFromPoints(parsedVipPoints);
           return {
             classId: cls.id,
             playerName: occupied ? playerName : null,
@@ -430,6 +453,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               : typeof parsed.wave === 'number' && Number.isFinite(parsed.wave)
                 ? Math.max(1, Math.floor(parsed.wave))
                 : 1,
+            vipLevel: occupied ? parsedVipLevel : 0,
             occupied,
           } satisfies CharacterSlotSummary;
         } catch {
@@ -438,6 +462,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             playerName: null,
             level: 1,
             highestWaveReached: 1,
+            vipLevel: 0,
             occupied: false,
           } satisfies CharacterSlotSummary;
         }
@@ -448,10 +473,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
       const occupiedClasses = summaries.filter(slot => slot.occupied).map(slot => slot.classId);
       const lastSelected = await AsyncStorage.getItem(getLastCharacterSlotKey(accountName));
+      const normalizedLastSelected = lastSelected && CLASSES.some(cls => cls.id === lastSelected)
+        ? lastSelected as PlayerClass
+        : null;
+      setLastUsedCharacterClass(normalizedLastSelected);
       if (cancelled) return;
 
-      if (lastSelected && occupiedClasses.includes(lastSelected as PlayerClass)) {
-        setSelectedCharacterClass(lastSelected as PlayerClass);
+      if (normalizedLastSelected && occupiedClasses.includes(normalizedLastSelected)) {
+        setSelectedCharacterClass(normalizedLastSelected);
       } else if (occupiedClasses.length === 1) {
         setSelectedCharacterClass(occupiedClasses[0]);
       } else {
@@ -469,6 +498,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   useEffect(() => {
     if (!selectedCharacterClass) return;
+    setLastUsedCharacterClass(selectedCharacterClass);
     void AsyncStorage.setItem(getLastCharacterSlotKey(accountName), selectedCharacterClass);
   }, [accountName, selectedCharacterClass]);
 
@@ -481,9 +511,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         playerName: state.playerName,
         level: state.level,
         highestWaveReached: state.highestWaveReached,
+          vipLevel: Math.max(0, Math.min(10, state.vipLevel ?? 0)),
       }
       : slot));
-  }, [hydrated, selectedCharacterClass, state.characterCreated, state.highestWaveReached, state.level, state.playerName]);
+        }, [hydrated, selectedCharacterClass, state.characterCreated, state.highestWaveReached, state.level, state.playerName, state.vipLevel]);
 
   useEffect(() => {
     if (!selectedCharacterClass) return;
@@ -1546,6 +1577,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     const lastSelected = await AsyncStorage.getItem(lastSlotKey);
     if (lastSelected === playerClass) {
       await AsyncStorage.removeItem(lastSlotKey);
+      setLastUsedCharacterClass(null);
     }
 
     setSlotSummaries(prev => prev.map(slot => (
@@ -1556,6 +1588,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           playerName: null,
           level: 1,
           highestWaveReached: 1,
+          vipLevel: 0,
         }
         : slot
     )));
@@ -1618,6 +1651,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           <View style={styles.characterSlotList}>
             {slotSummaries.map(slot => {
               const cls = CLASSES.find(entry => entry.id === slot.classId) ?? CLASSES[0];
+              const isLastUsed = slot.classId === lastUsedCharacterClass && slot.occupied;
               return (
                 <View
                   key={slot.classId}
@@ -1626,14 +1660,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Pressable onPress={() => openCharacterSlot(slot.classId)}>
                     <View style={styles.characterSlotHeader}>
                       <Text style={styles.characterSlotTitle}>{cls.emoji} {cls.name}</Text>
-                      <Text style={[styles.characterSlotBadge, slot.occupied ? styles.characterSlotBadgeFilled : styles.characterSlotBadgeEmpty]}>
-                        {slot.occupied ? 'EXISTING' : 'EMPTY'}
-                      </Text>
+                      <View style={styles.characterSlotBadges}>
+                        <Text style={[styles.characterSlotBadge, slot.occupied ? styles.characterSlotBadgeFilled : styles.characterSlotBadgeEmpty]}>
+                          {slot.occupied ? 'EXISTING' : 'EMPTY'}
+                        </Text>
+                        {isLastUsed && (
+                          <Text style={[styles.characterSlotBadge, styles.characterSlotBadgeLastUsed]}>LAST USED</Text>
+                        )}
+                      </View>
                     </View>
                     <Text style={styles.characterSlotFantasy}>{cls.fantasy}</Text>
                     <Text style={styles.characterSlotBody}>
                       {slot.occupied
-                        ? `${slot.playerName} • Lv ${slot.level} • Peak Wave ${slot.highestWaveReached}`
+                        ? `${slot.playerName} • Lv ${slot.level} • VIP ${slot.vipLevel} • Peak Wave ${slot.highestWaveReached}`
                         : `Create a ${cls.name.toLowerCase()} in this slot.`}
                     </Text>
                   </Pressable>

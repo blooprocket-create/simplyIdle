@@ -217,6 +217,11 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  characterSlotBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   characterSlotTitle: {
     fontSize: 16,
     fontWeight: '700',
@@ -237,6 +242,10 @@ export const styles = StyleSheet.create({
   characterSlotBadgeEmpty: {
     color: '#D2D8E8',
     backgroundColor: '#2B3447',
+  },
+  characterSlotBadgeLastUsed: {
+    color: '#1C1300',
+    backgroundColor: '#F3CF6B',
   },
   characterSlotFantasy: {
     fontSize: 12,
