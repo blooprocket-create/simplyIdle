@@ -125,6 +125,7 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
       ctaText: 'Coming Soon',
     },
   ] as const;
+  const dungeonOpsReadyCount = dungeonLanes.filter(lane => lane.unlocked && lane.actionable).length;
 
   return (
     <>
@@ -140,7 +141,7 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
               st === 'miniops'
                 ? (canPlayDiceToday ? 1 : 0)
                 : st === 'dungeonops'
-                  ? (canRunRiftToday ? 1 : 0)
+                  ? dungeonOpsReadyCount
                   : st === 'facilities'
                     ? facilitiesUpgradeableCount
                     : expeditionClaimableCount + expeditionLaunchableAffordableCount,
@@ -179,7 +180,10 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
               <Text style={styles.expeditionsDesc}>Dedicated dungeon lane for focused resource runs.</Text>
               {dungeonLanes.map(lane => (
                 <View key={lane.id} style={styles.facilityCard}>
-                  <Text style={styles.facilityName}>{lane.icon} {lane.title}</Text>
+                  <View style={{ position: 'relative', alignSelf: 'flex-start', paddingRight: 12 }}>
+                    <Text style={styles.facilityName}>{lane.icon} {lane.title}</Text>
+                    {lane.unlocked && lane.actionable && <View style={[styles.redDot, { top: 2, right: 0 }]} />}
+                  </View>
                   <Text style={styles.facilityBonusText}>{lane.rewardFocus}</Text>
                   <Text style={styles.facilityNextBonus}>{lane.unlockText}</Text>
                   <Text style={styles.facilityBonusText}>Status: {lane.status}</Text>
