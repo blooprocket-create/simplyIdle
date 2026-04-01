@@ -50,6 +50,8 @@ import {
   rollEquipmentRarityByTier,
   rollRarity,
   rarityConfig,
+  getHighestAvailableSummonRarity,
+  getSummonRarityPool,
   getRankUpShardCost,
   getRankStatMultiplier,
   calculateShardReward,
@@ -129,8 +131,8 @@ export function getMaxHeatForLevel(level: number): number {
 }
 
 const VALID_PLAYER_CLASSES = new Set<PlayerClass>(['warrior', 'berserker', 'archer', 'mage', 'monk']);
-const VALID_RARITIES = new Set<Rarity>(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'godly']);
-const VALID_AUTO_RECYCLE_RARITIES = new Set<Rarity>(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'godly']);
+const VALID_RARITIES = new Set<Rarity>(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'godly', 'transcendent']);
+const VALID_AUTO_RECYCLE_RARITIES = new Set<Rarity>(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'godly', 'transcendent']);
 const VALID_PERMANENT_UNLOCKS = new Set<PermanentUnlockId>(['class_passive', 'advanced_consumables', 'mythic_equipment']);
 const VALID_HERO_FORMATION_ROLES = new Set<HeroFormationRole>(['front', 'mid', 'back']);
 const VALID_SKILL_IDS = new Set(SKILLS.map(skill => skill.id));
@@ -997,7 +999,12 @@ function rarityRank(rarity: Rarity): number {
     legendary: 4,
     mythic: 5,
     godly: 6,
+    transcendent: 7,
   }[rarity] ?? 0;
+}
+
+function isPostgameSummonUnlocked(state: Pick<GameState, 'highestWaveReached'>): boolean {
+  return state.highestWaveReached >= 51;
 }
 
 function queueReward(state: GameState, reward: RewardPopup): GameState {
@@ -1125,12 +1132,13 @@ function maybeAutoRecycleBackground(state: GameState): GameState {
 function maybeAutoSummonTick(state: GameState): GameState {
   if (!state.autoSummonEnabled) return state;
   if (state.autoSummonCooldownMs > 0) return state;
+  const postgameUnlocked = isPostgameSummonUnlocked(state);
   const trySingle = (): GameState | null => {
     const canUseFree = state.freeSummonCharges > 0;
     if (!canUseFree && state.bossTears < 1) return null;
 
     const template = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
-    const roll = rollRarityWithPity(state.gachaPityCounter);
+    const roll = rollRarityWithPity(state.gachaPityCounter, postgameUnlocked);
     const rarity = roll.rarity;
     const rarityMult = rarityConfig(rarity).boostMultiplier;
     const uid = `${template.id}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
@@ -1175,7 +1183,7 @@ function maybeAutoSummonTick(state: GameState): GameState {
     let pityCounter = state.gachaPityCounter;
     for (let i = 0; i < totalPulls; i++) {
       const template = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
-      const roll = rollRarityWithPity(pityCounter);
+      const roll = rollRarityWithPity(pityCounter, postgameUnlocked);
       pityCounter = roll.nextCounter;
       const rarity = roll.rarity;
       const rarityMult = rarityConfig(rarity).boostMultiplier;
@@ -1559,6 +1567,9 @@ function getEquipmentUpgradePlan(state: GameState, itemId: string): {
     const rarity = EQUIP_RARITY_ORDER[i];
     if (rarity === 'mythic' && !hasUnlock(state, 'mythic_equipment')) {
       return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, goldCost: 0, reason: 'Mythic tier locked' };
+    }
+    if (rarity === 'transcendent' && !isPostgameSummonUnlocked(state)) {
+      return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, goldCost: 0, reason: 'Transcendent tier locked' };
     }
     const pool = EQUIPMENT_CATALOG.filter(candidate =>
       candidate.slot === item.slot
@@ -2272,15 +2283,17 @@ function addUsableItemCount(counts: Record<string, number>, itemId: string, amou
   return next;
 }
 
-function rollRarityWithPity(counter: number): { rarity: Rarity; nextCounter: number; pityTriggered: boolean } {
+function rollRarityWithPity(counter: number, postgameUnlocked: boolean): { rarity: Rarity; nextCounter: number; pityTriggered: boolean } {
   const pityTriggered = counter + 1 >= PITY_THRESHOLD;
   if (pityTriggered) {
     const r = Math.random();
-    const rarity: Rarity = r < 0.75 ? 'legendary' : r < 0.95 ? 'mythic' : 'godly';
+    const rarity: Rarity = postgameUnlocked
+      ? (r < 0.7 ? 'legendary' : r < 0.92 ? 'mythic' : r < 0.99 ? 'godly' : 'transcendent')
+      : (r < 0.75 ? 'legendary' : r < 0.95 ? 'mythic' : 'godly');
     return { rarity, nextCounter: 0, pityTriggered: true };
   }
 
-  const rarity = rollRarity(Math.random());
+  const rarity = rollRarity(Math.random(), getSummonRarityPool(postgameUnlocked));
   const nextCounter = rarityRank(rarity) >= rarityRank('legendary') ? 0 : counter + 1;
   return { rarity, nextCounter, pityTriggered: false };
 }
@@ -2463,9 +2476,10 @@ function killMonster(state: GameState): GameState {
 
   // Chance to drop class-compatible equipment on kill.
   const mythicUnlocked = hasUnlock(newState, 'mythic_equipment');
+  const transcendentUnlocked = isPostgameSummonUnlocked(newState);
   const dropChance = Math.min(0.4, 0.10 + state.wave * 0.003 + (isBoss ? 0.12 : 0));
   if (newState.playerClass && Math.random() <= dropChance) {
-    const droppedRarity = rollEquipmentRarityByTier(Math.random(), mythicUnlocked);
+    const droppedRarity = rollEquipmentRarityByTier(Math.random(), mythicUnlocked, transcendentUnlocked);
     const pool = EQUIPMENT_CATALOG.filter(item =>
       item.allowedClasses.includes(newState.playerClass as PlayerClass) &&
       item.rarity === droppedRarity,
@@ -2650,7 +2664,7 @@ type Action =
   | { type: 'EQUIP_ITEM'; itemId: string }
   | { type: 'SUMMON_HERO' }
   | { type: 'SUMMON_HERO_X10' }
-  | { type: 'SUMMON_HERO_X10_CINEMATIC' }
+  | { type: 'SUMMON_HERO_X10_CINEMATIC'; featuredHeroId?: string }
   | { type: 'AUTO_EQUIP_BEST_HEROES' }
   | { type: 'SAVE_TEAM_LOADOUT'; slot: number }
   | { type: 'LOAD_TEAM_LOADOUT'; slot: number }
@@ -2910,9 +2924,10 @@ function reducer(state: GameState, action: Action): GameState {
     case 'SUMMON_HERO': {
       const canUseFree = state.freeSummonCharges > 0;
       if (!canUseFree && state.bossTears < 1) return state;
+      const postgameUnlocked = isPostgameSummonUnlocked(state);
 
       const template = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
-      const roll = rollRarityWithPity(state.gachaPityCounter);
+      const roll = rollRarityWithPity(state.gachaPityCounter, postgameUnlocked);
       const rarity = roll.rarity;
       const rarityMult = rarityConfig(rarity).boostMultiplier;
       const uid = `${template.id}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
@@ -2959,6 +2974,7 @@ function reducer(state: GameState, action: Action): GameState {
       const freeUses = Math.min(state.freeSummonCharges, totalPulls);
       const paidUses = totalPulls - freeUses;
       if (state.bossTears < paidUses) return state;
+      const postgameUnlocked = isPostgameSummonUnlocked(state);
 
       const summoned: HeroUnit[] = [];
       const historyBatch: SummonHistoryEntry[] = [];
@@ -2966,7 +2982,7 @@ function reducer(state: GameState, action: Action): GameState {
       let pityHits = 0;
       for (let i = 0; i < totalPulls; i++) {
         const template = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
-        const roll = rollRarityWithPity(pityCounter);
+        const roll = rollRarityWithPity(pityCounter, postgameUnlocked);
         pityCounter = roll.nextCounter;
         if (roll.pityTriggered) pityHits++;
         const rarity = roll.rarity;
@@ -3016,17 +3032,25 @@ function reducer(state: GameState, action: Action): GameState {
       const freeUses = Math.min(state.freeSummonCharges, totalPulls);
       const paidUses = totalPulls - freeUses;
       if (state.bossTears < paidUses) return state;
+      const postgameUnlocked = isPostgameSummonUnlocked(state);
+      const highestRarity = getHighestAvailableSummonRarity(postgameUnlocked);
+      const featuredTemplate = action.featuredHeroId
+        ? HERO_POOL.find(hero => hero.id === action.featuredHeroId) ?? null
+        : null;
 
       const summoned: HeroUnit[] = [];
       const historyBatch: SummonHistoryEntry[] = [];
       let pityCounter = state.gachaPityCounter;
       let pityHits = 0;
       for (let i = 0; i < totalPulls; i++) {
-        const template = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
-        const roll = rollRarityWithPity(pityCounter);
+        const roll = rollRarityWithPity(pityCounter, postgameUnlocked);
         pityCounter = roll.nextCounter;
         if (roll.pityTriggered) pityHits++;
         const rarity = roll.rarity;
+        const shouldFeature = !!featuredTemplate && rarity === highestRarity && Math.random() < 0.65;
+        const template = shouldFeature
+          ? featuredTemplate
+          : HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
         const rarityMult = rarityConfig(rarity).boostMultiplier;
         const uid = `${template.id}_${Date.now()}_${i}_${Math.floor(Math.random() * 10000)}`;
         const summonedHero: HeroUnit = {
@@ -5184,7 +5208,7 @@ export function useGameState(saveSlot: string = 'default') {
   const equipItem = useCallback((itemId: string) => dispatch({ type: 'EQUIP_ITEM', itemId }), []);
   const summonHero = useCallback(() => dispatch({ type: 'SUMMON_HERO' }), []);
   const summonHeroX10 = useCallback(() => dispatch({ type: 'SUMMON_HERO_X10' }), []);
-  const summonHeroX10Cinematic = useCallback(() => dispatch({ type: 'SUMMON_HERO_X10_CINEMATIC' }), []);
+  const summonHeroX10Cinematic = useCallback((featuredHeroId?: string) => dispatch({ type: 'SUMMON_HERO_X10_CINEMATIC', featuredHeroId }), []);
   const autoEquipBestHeroes = useCallback(() => dispatch({ type: 'AUTO_EQUIP_BEST_HEROES' }), []);
   const saveTeamLoadout = useCallback((slot: number) => dispatch({ type: 'SAVE_TEAM_LOADOUT', slot }), []);
   const loadTeamLoadout = useCallback((slot: number) => dispatch({ type: 'LOAD_TEAM_LOADOUT', slot }), []);

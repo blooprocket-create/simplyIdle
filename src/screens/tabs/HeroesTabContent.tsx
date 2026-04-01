@@ -5,6 +5,17 @@ import { RARITIES, HERO_LEVEL_CAP, getHeroRebirthPlan } from '../../gameConfig';
 import { fmt } from '../../utils';
 import { styles } from '../GameScreen';
 
+interface FeaturedSummonBannerView {
+  id: string;
+  title: string;
+  description: string;
+  featuredHeroId: string;
+  artEmoji: string;
+  featuredHeroName: string;
+  featuredHeroEmoji: string;
+  highestRarity: string;
+}
+
 export interface HeroesTabContentProps {
   tab: string;
   state: GameState;
@@ -36,6 +47,7 @@ export interface HeroesTabContentProps {
   summonHero: () => void;
   summonHeroX10: () => void;
   summonHeroX10Cinematic: () => void;
+  featuredSummonBanner: FeaturedSummonBannerView;
   autoEquipBestHeroes: () => void;
   autoRecycleHeroes: () => void;
   saveTeamLoadout: (slot: number) => void;
@@ -81,6 +93,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
   summonHero,
   summonHeroX10,
   summonHeroX10Cinematic,
+  featuredSummonBanner,
   autoEquipBestHeroes,
   autoRecycleHeroes,
   saveTeamLoadout,
@@ -174,8 +187,11 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
             <View style={styles.gachaSection}>
               <Text style={styles.sectionTitle}>✨ Gacha Summon</Text>
               <View style={styles.featuredSummonCard}>
-                <Text style={styles.featuredSummonTitle}>🌌 Featured Banner: Astral Vanguard</Text>
-                <Text style={styles.featuredSummonDesc}>Higher odds for EPIC+ drops during this rotation. Mythic trigger creates full-screen flash.</Text>
+                <Text style={styles.featuredSummonTitle}>{featuredSummonBanner.artEmoji} Featured Banner: {featuredSummonBanner.title}</Text>
+                <Text style={styles.featuredSummonDesc}>{featuredSummonBanner.description}</Text>
+                <Text style={styles.featuredSummonDesc}>
+                  Focus Hero: {featuredSummonBanner.featuredHeroEmoji} {featuredSummonBanner.featuredHeroName} • Boosted at {featuredSummonBanner.highestRarity.toUpperCase()} rarity on cinematic pulls.
+                </Text>
                 <View style={styles.featuredSummonMeterRow}>
                   <Text style={styles.featuredSummonMeterLabel}>Legendary Pity</Text>
                   <Text style={styles.featuredSummonMeterValue}>{state.gachaPityCounter}/30</Text>

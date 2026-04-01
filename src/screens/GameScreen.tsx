@@ -37,6 +37,9 @@ import {
   getMonsterExp,
   getMonsterDamage,
   rarityConfig,
+  getDailyFeaturedSummonBanner,
+  getHeroTemplateById,
+  getHighestAvailableSummonRarity,
   getClassConfig,
   getClassPassive,
   getHeroPassiveTraitInfo,
@@ -1345,6 +1348,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setAutoRecycleMaxRarity(next.id);
   };
 
+  const featuredSummonBanner = useMemo(() => {
+    const banner = getDailyFeaturedSummonBanner();
+    const featuredHero = getHeroTemplateById(banner.featuredHeroId);
+    const postgameUnlocked = state.highestWaveReached >= 51;
+    const highestRarity = getHighestAvailableSummonRarity(postgameUnlocked);
+    return {
+      ...banner,
+      featuredHeroName: featuredHero?.name ?? 'Unknown Hero',
+      featuredHeroEmoji: featuredHero?.emoji ?? '⭐',
+      highestRarity,
+    };
+  }, [state.highestWaveReached]);
+
 
   const triggerCinematicSummon = () => {
     if (!canGachaX10 || cinematicSummonOpen) return;
@@ -1357,7 +1373,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     const phaseWarp = setTimeout(() => {
       setCinematicSummonPhase('warp');
       pendingCinematicSummonRef.current = true;
-      summonHeroX10Cinematic();
+      summonHeroX10Cinematic(featuredSummonBanner.featuredHeroId);
     }, 850);
 
     const fallbackReveal = setTimeout(() => {
@@ -1817,6 +1833,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     ? 'Synchronizing stellar signatures for 10 arrivals...'
                     : 'Pull sequence active. Locking to highest rarity echoes...'}
                 </Text>
+                <Text style={styles.cinematicSummonPhaseText}>
+                  {featuredSummonBanner.artEmoji} {featuredSummonBanner.title} • Featured: {featuredSummonBanner.featuredHeroEmoji} {featuredSummonBanner.featuredHeroName}
+                </Text>
+                <Text style={styles.cinematicSummonPhaseText}>
+                  Focus protocol: elevated odds for featured hero at {featuredSummonBanner.highestRarity.toUpperCase()} rarity.
+                </Text>
               </>
             ) : (
               <>
@@ -2188,6 +2210,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             summonHero,
             summonHeroX10,
             summonHeroX10Cinematic: triggerCinematicSummon,
+            featuredSummonBanner,
             autoEquipBestHeroes,
             autoRecycleHeroes,
             saveTeamLoadout,

@@ -369,6 +369,21 @@ export const EQUIPMENT_CATALOG: EquipmentItem[] = [
   { id: 'x_archer_galecrest', name: 'Galecrest Brooch', emoji: '🍃', slot: 'accessory', rarity: 'legendary', allowedClasses: ['archer'], description: 'Keeps rhythm between movement and release.', bonus: { agility: 6, spirit: 2 } },
   { id: 'x_mage_starseal', name: 'Starseal Prism', emoji: '🔷', slot: 'accessory', rarity: 'epic', allowedClasses: ['mage'], description: 'Condenses unstable mana into clean bursts.', bonus: { intelligence: 4, spirit: 2 } },
   { id: 'x_monk_tidebead', name: 'Tidebead Charm', emoji: '🌊', slot: 'accessory', rarity: 'rare', allowedClasses: ['monk'], description: 'Stabilizes cadence under pressure.', bonus: { spirit: 3, vitality: 1 } },
+  { id: 'tw_warrior_oblivion', name: 'Oblivion Crownblade', emoji: '🗡️', slot: 'weapon', rarity: 'transcendent', allowedClasses: ['warrior'], description: 'Dynastic steel tempered in collapsing stars.', bonus: { strength: 14, vitality: 7 } },
+  { id: 'tw_berserker_abyss', name: 'Abyssbreaker', emoji: '🪓', slot: 'weapon', rarity: 'transcendent', allowedClasses: ['berserker'], description: 'A tidal executioner axe forged under blood moons.', bonus: { strength: 15, agility: 6 } },
+  { id: 'tw_archer_solstice', name: 'Solstice Railbow', emoji: '🏹', slot: 'weapon', rarity: 'transcendent', allowedClasses: ['archer'], description: 'Launches stellar lances through fortress walls.', bonus: { agility: 14, spirit: 6 } },
+  { id: 'tw_mage_axiom', name: 'Axiom Core Staff', emoji: '🔮', slot: 'weapon', rarity: 'transcendent', allowedClasses: ['mage'], description: 'Writes new laws for arcane warfare.', bonus: { intelligence: 16, spirit: 8 } },
+  { id: 'tw_monk_resonance', name: 'Resonance Edge', emoji: '🗡️', slot: 'weapon', rarity: 'transcendent', allowedClasses: ['monk'], description: 'Every strike echoes across parallel arenas.', bonus: { spirit: 14, agility: 7 } },
+  { id: 'ta_warrior_imperium', name: 'Imperium Bulwark', emoji: '🛡️', slot: 'armor', rarity: 'transcendent', allowedClasses: ['warrior'], description: 'Throneguard plate from the final empire.', bonus: { vitality: 15, spirit: 7 } },
+  { id: 'ta_berserker_howl', name: 'Howlplate Mantle', emoji: '🧱', slot: 'armor', rarity: 'transcendent', allowedClasses: ['berserker'], description: 'Hides stitched from apex void predators.', bonus: { vitality: 14, strength: 7 } },
+  { id: 'ta_archer_aether', name: 'Aetherveil Cloak', emoji: '🕶️', slot: 'armor', rarity: 'transcendent', allowedClasses: ['archer'], description: 'Bends crosswinds into phantom cover.', bonus: { agility: 13, vitality: 6 } },
+  { id: 'ta_mage_singularity', name: 'Singularity Robes', emoji: '🌌', slot: 'armor', rarity: 'transcendent', allowedClasses: ['mage'], description: 'Orbiting runes trap enemy momentum.', bonus: { intelligence: 15, spirit: 8 } },
+  { id: 'ta_monk_equilibrium', name: 'Equilibrium Vestments', emoji: '🌙', slot: 'armor', rarity: 'transcendent', allowedClasses: ['monk'], description: 'Flows between stillness and annihilation.', bonus: { spirit: 13, vitality: 7 } },
+  { id: 'tx_warrior_crown', name: 'Crownfall Sigil', emoji: '💠', slot: 'accessory', rarity: 'transcendent', allowedClasses: ['warrior'], description: 'Marks command over ruined dynasties.', bonus: { vitality: 9, strength: 7 } },
+  { id: 'tx_berserker_heart', name: 'Heartfire Core', emoji: '🔥', slot: 'accessory', rarity: 'transcendent', allowedClasses: ['berserker'], description: 'Converts battle pain into pure force.', bonus: { strength: 10, agility: 6 } },
+  { id: 'tx_archer_horizon', name: 'Horizon Lens', emoji: '🔭', slot: 'accessory', rarity: 'transcendent', allowedClasses: ['archer'], description: 'Calculates kill vectors before release.', bonus: { agility: 10, spirit: 5 } },
+  { id: 'tx_mage_paradox', name: 'Paradox Prism', emoji: '🌀', slot: 'accessory', rarity: 'transcendent', allowedClasses: ['mage'], description: 'Fractures cast limits into infinite loops.', bonus: { intelligence: 10, spirit: 7 } },
+  { id: 'tx_monk_cycle', name: 'Cycle Knot', emoji: '♾️', slot: 'accessory', rarity: 'transcendent', allowedClasses: ['monk'], description: 'Aligns breath with the eternal return.', bonus: { spirit: 10, vitality: 6 } },
 ];
 
 export function getEquipmentItem(id: string): EquipmentItem | undefined {
@@ -389,10 +404,12 @@ export function rollEquipmentRarity(random: number): EquipmentRarity {
   return 'common';
 }
 
-export function rollEquipmentRarityByTier(random: number, mythicUnlocked: boolean): EquipmentRarity {
-  const pool = mythicUnlocked
-    ? EQUIPMENT_RARITIES
-    : EQUIPMENT_RARITIES.filter(r => r.id !== 'mythic');
+export function rollEquipmentRarityByTier(random: number, mythicUnlocked: boolean, transcendentUnlocked = false): EquipmentRarity {
+  const pool = EQUIPMENT_RARITIES.filter(r => {
+    if (!mythicUnlocked && (r.id === 'mythic' || r.id === 'transcendent')) return false;
+    if (!transcendentUnlocked && r.id === 'transcendent') return false;
+    return true;
+  });
   const totalWeight = pool.reduce((sum, r) => sum + r.dropWeight, 0);
   let cursor = random * totalWeight;
   for (const r of pool) {
@@ -559,7 +576,7 @@ export function rollUsableItem(random: number, advancedUnlocked: boolean): Usabl
   return pool[0];
 }
 
-export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic' | 'godly';
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic' | 'godly' | 'transcendent';
 
 export interface RarityConfig {
   id: Rarity;
@@ -570,14 +587,53 @@ export interface RarityConfig {
 }
 
 export const RARITIES: RarityConfig[] = [
-  { id: 'common', label: 'Common', color: '#B8B8B8', chance: 0.5, boostMultiplier: 1.0 },
+  { id: 'common', label: 'Common', color: '#B8B8B8', chance: 0.499, boostMultiplier: 1.0 },
   { id: 'uncommon', label: 'Uncommon', color: '#6DDB7B', chance: 0.25, boostMultiplier: 1.15 },
   { id: 'rare', label: 'Rare', color: '#5DA8FF', chance: 0.13, boostMultiplier: 1.35 },
   { id: 'epic', label: 'Epic', color: '#B66BFF', chance: 0.07, boostMultiplier: 1.6 },
   { id: 'legendary', label: 'Legendary', color: '#FFB347', chance: 0.03, boostMultiplier: 1.95 },
   { id: 'mythic', label: 'Mythic', color: '#FF5B8A', chance: 0.015, boostMultiplier: 2.35 },
   { id: 'godly', label: 'Godly', color: '#FFE76A', chance: 0.005, boostMultiplier: 3.0 },
+  { id: 'transcendent', label: 'Transcendent', color: '#00D4FF', chance: 0.001, boostMultiplier: 3.55 },
 ];
+
+export interface FeaturedSummonBanner {
+  id: string;
+  title: string;
+  description: string;
+  featuredHeroId: string;
+  artEmoji: string;
+}
+
+export const FEATURED_SUMMON_BANNERS: FeaturedSummonBanner[] = [
+  { id: 'astral-vanguard', title: 'Astral Vanguard', description: 'Void command mobilized for precision warfront strikes.', featuredHeroId: 'h64', artEmoji: '🌌' },
+  { id: 'worldrend-ascendant', title: 'Worldrend Ascendant', description: 'Frontline cataclysm specialists break siege lines.', featuredHeroId: 'h61', artEmoji: '🗻' },
+  { id: 'abyssal-tide', title: 'Abyssal Tide', description: 'Berserker leviathans surge through fractured gates.', featuredHeroId: 'h62', artEmoji: '🌊' },
+  { id: 'sunflame-flight', title: 'Sunflame Flight', description: 'Skyborn marksmen dominate extreme-range execution.', featuredHeroId: 'h63', artEmoji: '🦅' },
+  { id: 'eternal-cycle', title: 'Eternal Cycle', description: 'Monastic avatars reset fate with impossible tempo.', featuredHeroId: 'h65', artEmoji: '♾️' },
+  { id: 'time-hegemony', title: 'Time Hegemony', description: 'Chrono-casters lock timelines around elite targets.', featuredHeroId: 'h57', artEmoji: '⏰' },
+  { id: 'imperial-fall', title: 'Imperial Fall', description: 'Crown-era warlords reclaim ruined dynastic thrones.', featuredHeroId: 'h52', artEmoji: '👑' },
+];
+
+export function getDailyFeaturedSummonBanner(nowMs = Date.now()): FeaturedSummonBanner {
+  const dayIndex = Math.floor(nowMs / 86_400_000);
+  const idx = ((dayIndex % FEATURED_SUMMON_BANNERS.length) + FEATURED_SUMMON_BANNERS.length) % FEATURED_SUMMON_BANNERS.length;
+  return FEATURED_SUMMON_BANNERS[idx];
+}
+
+export function getHeroTemplateById(heroId: string): HeroTemplate | undefined {
+  return HERO_POOL.find(hero => hero.id === heroId);
+}
+
+export function getSummonRarityPool(postgameUnlocked: boolean): RarityConfig[] {
+  return postgameUnlocked
+    ? RARITIES
+    : RARITIES.filter(r => r.id !== 'transcendent');
+}
+
+export function getHighestAvailableSummonRarity(postgameUnlocked: boolean): Rarity {
+  return postgameUnlocked ? 'transcendent' : 'godly';
+}
 
 export interface HeroTemplate {
   id: string;
@@ -680,6 +736,7 @@ const RARITY_RANK_COST_MULT: Record<Rarity, number> = {
   legendary: 3.7,
   mythic: 5.3,
   godly: 7.8,
+  transcendent: 11.4,
 };
 
 const RARITY_RANK_POWER_MULT: Record<Rarity, number> = {
@@ -690,6 +747,7 @@ const RARITY_RANK_POWER_MULT: Record<Rarity, number> = {
   legendary: 1.48,
   mythic: 1.72,
   godly: 2.05,
+  transcendent: 2.45,
 };
 
 export function getRankConfig(rank: number): RankConfig | null {
@@ -722,6 +780,7 @@ export function calculateShardReward(rarity: Rarity, level: number): number {
     legendary: 250,
     mythic: 600,
     godly: 1500,
+    transcendent: 3200,
   }[rarity] ?? 5;
   
   const levelMultiplier = 1 + (Math.max(1, level - 1) * 0.15);
@@ -854,13 +913,13 @@ export const GACHA_SUMMON_COST = 500;
 export const HERO_LEVEL_EXP_FORMULA = (level: number) => Math.floor(50 * Math.pow(1.18, level - 1));
 export const HERO_LEVEL_CAP = 999;
 
-export function rollRarity(random: number): Rarity {
+export function rollRarity(random: number, pool: RarityConfig[] = RARITIES): Rarity {
   let acc = 0;
-  for (const r of RARITIES) {
+  for (const r of pool) {
     acc += r.chance;
     if (random <= acc) return r.id;
   }
-  return 'common';
+  return pool[0]?.id ?? 'common';
 }
 
 export function rarityConfig(rarity: Rarity): RarityConfig {
