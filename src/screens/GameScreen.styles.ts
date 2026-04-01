@@ -3640,11 +3640,13 @@ export const styles = StyleSheet.create({
   bottomSheetBox: {
     width: '100%',
     maxWidth: 900,
-    maxHeight: '70%',
+    height: '100%',
+    maxHeight: '100%',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
+    paddingTop: Platform.OS === 'ios' ? 18 : 10,
     paddingBottom: Platform.OS === 'ios' ? 18 : 12,
   },
   modalBox: {
@@ -3711,7 +3713,6 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2E425A',
     width: '88%',
-    maxHeight: '80%',
     padding: 14,
   },
   settingsHeaderRow: {
@@ -3732,7 +3733,7 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
   },
   settingsScroll: {
-    maxHeight: 520,
+    flex: 1,
   },
   settingsCard: {
     borderRadius: 8,
@@ -3902,7 +3903,6 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2E425A',
     width: '88%',
-    maxHeight: '80%',
     padding: 14,
   },
   eventsHeaderRow: {
@@ -3917,7 +3917,7 @@ export const styles = StyleSheet.create({
     color: '#FFF',
   },
   eventsScroll: {
-    maxHeight: 520,
+    flex: 1,
   },
   eventsScrollContent: {
     paddingBottom: 6,
