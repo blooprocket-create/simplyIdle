@@ -4,10 +4,15 @@ import { View, Text, StyleSheet, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import GameScreen from './src/screens/GameScreen';
 import AuthScreen, { AUTH_STORAGE_KEYS, getValidStoredSession } from './src/screens/AuthScreen';
+import { identifyTelemetryDevice, initTelemetry } from './src/telemetry';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [accountName, setAccountName] = useState<string | null>(null);
+
+  useEffect(() => {
+    initTelemetry();
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
@@ -38,6 +43,10 @@ export default function App() {
       .then(name => setAccountName(name))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    void identifyTelemetryDevice(accountName);
+  }, [accountName]);
 
   if (loading) {
     return (
