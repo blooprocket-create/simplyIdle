@@ -3559,8 +3559,10 @@ function reducer(state: GameState, action: Action): GameState {
       const elapsed = Math.max(0, Math.min(action.elapsedMs, OFFLINE_PROGRESS_CAP_MS));
       if (elapsed < 5000) return { ...state, lastActiveAt: Date.now() };
 
-      const MAX_OFFLINE_KILLS = Math.min(3200, Math.max(1200, 900 + Math.floor(state.highestWaveReached * 1.5)));
-      const MAX_OFFLINE_WAVES = Math.min(260, Math.max(90, 60 + Math.floor(Math.sqrt(Math.max(1, state.wave)) * 10)));
+        // Scale kills and waves based on wave progress to simulate active gameplay
+        // At wave 100: ~2000 kills, ~150 waves; at wave 300: ~5000 kills, ~400 waves
+        const MAX_OFFLINE_KILLS = Math.min(12000, Math.max(2000, 1500 + Math.floor(state.highestWaveReached * 3)));
+        const MAX_OFFLINE_WAVES = Math.min(500, Math.max(100, 80 + Math.floor(state.highestWaveReached * 0.8)));
       const MIN_KILL_MS = 140;
       let remainingMs = elapsed;
       let working = state;
@@ -3667,25 +3669,18 @@ function reducer(state: GameState, action: Action): GameState {
       const preservedActiveTeam = normalizeTeamSelectionByRules(state, state.activeTeamHeroIds);
       const rebirthState = {
         ...state,
-        gold: 0,
         exp: 0,
         level: 1,
-        // Preserve allocated stat distribution through rebirth.
+          // Preserve gold, stat distribution, and learned skills through rebirth.
         unspentStatPoints: state.unspentStatPoints,
         statsAlloc: state.statsAlloc,
         wave: 1,
         monsterHp: getMonsterMaxHp(1),
         monsterMaxHp: getMonsterMaxHp(1),
         party: initialParty(),
-        skills: new Set<string>(),
         activeTeamHeroIds: preservedActiveTeam,
         prestigeCount: state.prestigeCount + 1,
         newAchievement: null,
-        damageBuffPct: 0,
-        damageBuffMs: 0,
-        damageReductionBuffPct: 0,
-        damageReductionBuffMs: 0,
-        heroActiveCdMs: {},
         lastActiveAt: Date.now(),
         seasonPoints: state.seasonPoints + 250,
         bestSeasonPoints: Math.max(state.bestSeasonPoints, state.seasonPoints + 250),
