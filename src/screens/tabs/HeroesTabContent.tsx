@@ -170,6 +170,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
   );
   const hasBatchNotification = sortedBatchHeroes.some(hero => state.gold >= getHeroGoldLevelCost(hero.level));
   const hasUnlockableTeamSlot = !!nextTeamSlotUnlock?.canUnlock;
+  const uniqueOwnedCount = Object.keys(state.heroUniqueGearByHeroId).length;
 
   return (
     <>
@@ -192,6 +193,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                 <Text style={styles.featuredSummonDesc}>
                   Focus Hero: {featuredSummonBanner.featuredHeroEmoji} {featuredSummonBanner.featuredHeroName} • Boosted at {featuredSummonBanner.highestRarity.toUpperCase()} rarity on cinematic pulls.
                 </Text>
+                <Text style={styles.featuredSummonDesc}>Hero Unique Relics owned: {uniqueOwnedCount}/{new Set(state.heroRoster.map(hero => hero.id)).size || 0}</Text>
                 <View style={styles.featuredSummonMeterRow}>
                   <Text style={styles.featuredSummonMeterLabel}>Legendary Pity</Text>
                   <Text style={styles.featuredSummonMeterValue}>{state.gachaPityCounter}/30</Text>
@@ -343,6 +345,16 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                   const canHeroRebirth = hero.rank >= 10 && hero.level >= HERO_LEVEL_CAP && state.heroShards >= heroRebirthShardCost && state.essence >= heroRebirthEssenceCost;
                   const trait = getHeroPassiveTraitInfo(hero.passiveTrait);
                   const activeArchetype = getHeroActiveArchetypeInfo(hero.activeSkillArchetype);
+                  const uniqueRank = state.heroUniqueGearByHeroId[hero.id]?.rank ?? 0;
+                  const uniqueSkill = uniqueRank > 0
+                    ? hero.heroClass === 'warrior' || hero.heroClass === 'berserker'
+                      ? `Battle Aegis R${uniqueRank}: +${12 + uniqueRank * 4}% DPS, ${8 + uniqueRank * 2}% DR while active`
+                      : hero.heroClass === 'archer'
+                        ? `Deadeye Volley R${uniqueRank}: +${14 + uniqueRank * 4}% DPS, +${5 + uniqueRank * 2}% gold while active`
+                        : hero.heroClass === 'mage'
+                          ? `Astral Conduit R${uniqueRank}: +${13 + uniqueRank * 4}% DPS, +${7 + uniqueRank * 2}% EXP while active`
+                          : `Sanctified Flow R${uniqueRank}: +${11 + uniqueRank * 4}% DPS, ${10 + uniqueRank * 2}% DR while active`
+                    : 'No unique relic yet';
                   const faction = hero.heroClass === 'warrior' || hero.heroClass === 'berserker'
                     ? 'Vanguard'
                     : hero.heroClass === 'archer'
@@ -509,6 +521,8 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                               <Text style={styles.heroIdentitySub}>{trait.description}</Text>
                               <Text style={styles.heroIdentityLine}>Active: {activeArchetype.name}</Text>
                               <Text style={styles.heroIdentitySub}>{activeArchetype.description}</Text>
+                              <Text style={styles.heroIdentityLine}>Unique Relic: {uniqueRank > 0 ? `Rank ${uniqueRank}/10` : 'Locked'}</Text>
+                              <Text style={styles.heroIdentitySub}>{uniqueSkill}</Text>
                             </View>
 
                             {details && (

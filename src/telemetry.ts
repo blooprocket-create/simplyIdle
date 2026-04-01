@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { customEvent, identifyDevice, vexo } from 'vexo-analytics';
 
 const TELEMETRY_KEY = 'simplyidle_telemetry_v1';
@@ -90,14 +91,25 @@ export async function clearTelemetryEvents(): Promise<void> {
 
 export function getTelemetryDebugInfo(): {
   vexoInitialized: boolean;
+  telemetryBootstrapSent: boolean;
   localKey: string;
   localCap: number;
 } {
   return {
     vexoInitialized,
+    telemetryBootstrapSent,
     localKey: TELEMETRY_KEY,
     localCap: TELEMETRY_CAP,
   };
+}
+
+export async function trackTelemetryHeartbeat(source: string): Promise<void> {
+  await trackEvent('telemetry_heartbeat', {
+    source,
+    platform: Platform.OS,
+    vexoInitialized,
+    telemetryBootstrapSent,
+  });
 }
 
 export function debugLog(scope: string, message: string, payload?: Record<string, unknown>): void {

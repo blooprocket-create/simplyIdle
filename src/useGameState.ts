@@ -134,6 +134,7 @@ const VALID_PLAYER_CLASSES = new Set<PlayerClass>(['warrior', 'berserker', 'arch
 const VALID_RARITIES = new Set<Rarity>(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'godly', 'transcendent']);
 const VALID_AUTO_RECYCLE_RARITIES = new Set<Rarity>(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'godly', 'transcendent']);
 const VALID_PERMANENT_UNLOCKS = new Set<PermanentUnlockId>(['class_passive', 'advanced_consumables', 'mythic_equipment']);
+const VALID_HERO_TEMPLATE_IDS = new Set(HERO_POOL.map(hero => hero.id));
 const VALID_HERO_FORMATION_ROLES = new Set<HeroFormationRole>(['front', 'mid', 'back']);
 const VALID_SKILL_IDS = new Set(SKILLS.map(skill => skill.id));
 const VALID_ACHIEVEMENT_IDS = new Set(ACHIEVEMENTS.map(achievement => achievement.id));
@@ -309,6 +310,7 @@ export interface GameState {
   teamLoadouts: string[][];
   teamSlotsUnlocked: number;
   heroFormationByUid: Record<string, HeroFormationRole>;
+  heroUniqueGearByHeroId: Record<string, HeroUniqueGearProgress>;
   lastDiceRollDay: number | null;
   lastRiftRunDay: number | null;
   lastDiceRollValue: number | null;
@@ -407,7 +409,11 @@ const blankStats: StatBlock = {
   spirit: 0,
 };
 
-type EquipmentSource = 'starter' | 'drop' | 'craft' | 'crate' | 'upgrade' | 'legacy';
+type EquipmentSource = 'starter' | 'drop' | 'craft' | 'crate' | 'upgrade' | 'legacy' | 'hero_unique';
+
+export interface HeroUniqueGearProgress {
+  rank: number;
+}
 
 export interface EquipmentInstance {
   id: string;
@@ -469,6 +475,7 @@ const DEFAULT_STATE: GameState = {
   teamLoadouts: [[], [], []],
   teamSlotsUnlocked: 4,
   heroFormationByUid: {},
+  heroUniqueGearByHeroId: {},
   lastDiceRollDay: null,
   lastRiftRunDay: null,
   lastDiceRollValue: null,
@@ -695,8 +702,135 @@ function getEquipmentScrapGain(item: EquipmentInstance | EquipmentItem): number 
     crate: 0.58,
     upgrade: 0.5,
     legacy: 0.9,
+    hero_unique: 0.05,
   };
   return Math.max(1, Math.floor(baseValue * sourceMultiplier[item.source]));
+}
+
+function clampUniqueRank(rank: number): number {
+  return Math.max(1, Math.min(10, Math.floor(rank)));
+}
+
+function getHeroUniqueSkillDescription(heroClass: PlayerClass, rank: number): string {
+  const safeRank = clampUniqueRank(rank);
+  if (heroClass === 'warrior' || heroClass === 'berserker') {
+    return `Battle Aegis: +${12 + safeRank * 4}% team DPS and ${8 + safeRank * 2}% damage reduction while active.`;
+  }
+  if (heroClass === 'archer') {
+    return `Deadeye Volley: +${14 + safeRank * 4}% team DPS and +${5 + safeRank * 2}% gold while active.`;
+  }
+  if (heroClass === 'mage') {
+    return `Astral Conduit: +${13 + safeRank * 4}% team DPS and +${7 + safeRank * 2}% EXP while active.`;
+  }
+  return `Sanctified Flow: +${11 + safeRank * 4}% team DPS and ${10 + safeRank * 2}% damage reduction while active.`;
+}
+
+function buildHeroUniqueEquipment(hero: HeroUnit, rank: number): EquipmentInstance {
+  const safeRank = clampUniqueRank(rank);
+  const baseValue = 36 + safeRank * 18;
+  const classStats: Record<PlayerClass, Partial<StatBlock>> = {
+    warrior: { strength: baseValue + 28, vitality: baseValue + 20, spirit: Math.floor(baseValue * 0.45) },
+    berserker: { strength: baseValue + 20, vitality: baseValue + 28, agility: Math.floor(baseValue * 0.35) },
+    archer: { agility: baseValue + 30, strength: Math.floor(baseValue * 0.55), vitality: Math.floor(baseValue * 0.5) },
+    mage: { intelligence: baseValue + 30, spirit: baseValue + 18, vitality: Math.floor(baseValue * 0.45) },
+    monk: { spirit: baseValue + 24, vitality: baseValue + 18, intelligence: Math.floor(baseValue * 0.55) },
+  };
+  const classBonus = classStats[hero.heroClass] ?? {};
+  const uniqueId = `hero_unique_${hero.id}`;
+  return {
+    id: uniqueId,
+    baseItemId: uniqueId,
+    name: `${hero.name}'s Oath Relic`,
+    emoji: '💠',
+    slot: 'accessory',
+    rarity: 'transcendent',
+    allowedClasses: [hero.heroClass],
+    description: `Unique relic bound to ${hero.name}. ${getHeroUniqueSkillDescription(hero.heroClass, safeRank)}`,
+    bonus: {
+      strength: classBonus.strength ?? 0,
+      vitality: classBonus.vitality ?? 0,
+      agility: classBonus.agility ?? 0,
+      intelligence: classBonus.intelligence ?? 0,
+      spirit: classBonus.spirit ?? 0,
+    },
+    itemLevel: 1 + safeRank * 10,
+    source: 'hero_unique',
+  };
+}
+
+function grantHeroUniqueGear(state: GameState, hero: HeroUnit): GameState {
+  const current = state.heroUniqueGearByHeroId[hero.id]?.rank ?? 0;
+  const nextRank = clampUniqueRank(Math.max(1, current + 1));
+  if (current >= 10) return state;
+
+  const uniqueItem = buildHeroUniqueEquipment(hero, nextRank);
+  const alreadyOwned = current > 0;
+  const nextUnique = {
+    ...state.heroUniqueGearByHeroId,
+    [hero.id]: { rank: nextRank },
+  };
+  const nextInventoryIds = state.inventoryItemIds.includes(uniqueItem.id)
+    ? state.inventoryItemIds
+    : [...state.inventoryItemIds, uniqueItem.id];
+
+  const rewarded = queueReward({
+    ...state,
+    heroUniqueGearByHeroId: nextUnique,
+    inventoryItemIds: nextInventoryIds,
+    equipmentInventory: {
+      ...state.equipmentInventory,
+      [uniqueItem.id]: uniqueItem,
+    },
+  }, {
+    id: `hero_unique_${hero.id}_${Date.now()}`,
+    kind: 'item',
+    title: alreadyOwned ? `Unique Relic Rank Up: ${hero.name}` : `Unique Relic Acquired: ${hero.name}`,
+    detail: `${uniqueItem.emoji} ${uniqueItem.name} • Rank ${nextRank}/10`,
+  });
+  return queueCombatLog(rewarded, `${hero.name}'s relic is now Rank ${nextRank}`);
+}
+
+function maybeGrantHeroUniqueGear(state: GameState, hero: HeroUnit, chance: number): GameState {
+  if (Math.random() > chance) return state;
+  return grantHeroUniqueGear(state, hero);
+}
+
+function getActiveUniqueSkillMultipliers(state: GameState): {
+  dpsMult: number;
+  goldMult: number;
+  expMult: number;
+  incomingDmgMult: number;
+} {
+  const active = new Set(state.activeTeamHeroIds);
+  let dpsMult = 1;
+  let goldMult = 1;
+  let expMult = 1;
+  let incomingDmgMult = 1;
+
+  for (const hero of state.heroRoster) {
+    if (!active.has(hero.uid)) continue;
+    const rank = state.heroUniqueGearByHeroId[hero.id]?.rank ?? 0;
+    if (rank <= 0) continue;
+    const safeRank = clampUniqueRank(rank);
+
+    dpsMult *= 1 + 0.12 + safeRank * 0.04;
+    if (hero.heroClass === 'archer') {
+      goldMult *= 1 + 0.03 + safeRank * 0.015;
+    }
+    if (hero.heroClass === 'mage') {
+      expMult *= 1 + 0.04 + safeRank * 0.015;
+    }
+    if (hero.heroClass === 'warrior' || hero.heroClass === 'berserker' || hero.heroClass === 'monk') {
+      incomingDmgMult *= Math.max(0.55, 1 - (0.06 + safeRank * 0.015));
+    }
+  }
+
+  return {
+    dpsMult: Math.min(40, dpsMult),
+    goldMult: Math.min(6, goldMult),
+    expMult: Math.min(6, expMult),
+    incomingDmgMult: Math.max(0.3, incomingDmgMult),
+  };
 }
 
 function migrateLegacyEquipmentIds(
@@ -1003,8 +1137,8 @@ function rarityRank(rarity: Rarity): number {
   }[rarity] ?? 0;
 }
 
-function isPostgameSummonUnlocked(state: Pick<GameState, 'highestWaveReached'>): boolean {
-  return state.highestWaveReached >= 51;
+function isPostgameSummonUnlocked(state: Pick<GameState, 'highestWaveReached' | 'prestigeCount'>): boolean {
+  return state.highestWaveReached >= 150 && state.prestigeCount >= 1;
 }
 
 function queueReward(state: GameState, reward: RewardPopup): GameState {
@@ -1042,11 +1176,13 @@ function getHeroPassiveMultipliers(state: GameState): {
     if (trait === 'bulwark_instinct') incomingDmgMult *= 0.98;
   }
 
+  const uniqueSkills = getActiveUniqueSkillMultipliers(state);
+
   return {
-    dpsMult: Math.min(1.4, dpsMult),
-    goldMult: Math.min(1.6, goldMult),
-    expMult: Math.min(1.45, expMult),
-    incomingDmgMult: Math.max(0.72, incomingDmgMult),
+    dpsMult: Math.min(12, dpsMult * uniqueSkills.dpsMult),
+    goldMult: Math.min(4, goldMult * uniqueSkills.goldMult),
+    expMult: Math.min(4, expMult * uniqueSkills.expMult),
+    incomingDmgMult: Math.max(0.35, incomingDmgMult * uniqueSkills.incomingDmgMult),
   };
 }
 
@@ -1168,6 +1304,7 @@ function maybeAutoSummonTick(state: GameState): GameState {
       gachaPityCounter: roll.nextCounter,
       autoSummonCooldownMs: 1200,
     }));
+    nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.05);
     nextState = queueCombatLog(nextState, `Auto Summon: ${hero.emoji} ${hero.name} (${hero.rarity})`);
     return nextState;
   };
@@ -1217,6 +1354,9 @@ function maybeAutoSummonTick(state: GameState): GameState {
       gachaPityCounter: pityCounter,
       autoSummonCooldownMs: 1800,
     }));
+    for (const hero of summoned) {
+      nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.06);
+    }
     nextState = queueCombatLog(nextState, `Auto Summon x10 completed`);
     return nextState;
   };
@@ -1362,6 +1502,7 @@ export function getDpsBreakdown(state: GameState): {
     synergy: number;
     mastery: number;
     vipDamage: number;
+    uniqueRelics: number;
     temporaryBuff: number;
   };
   totalMultiplier: number;
@@ -1407,6 +1548,7 @@ export function getDpsBreakdown(state: GameState): {
   const masteryDpsMult = 1 + Math.min(0.4, masteryLevel * 0.01);
   const vipDamageMult = getVipDamageMultiplier(state);
   const tacticsPowerMult = getTacticsPowerMultiplier(state);
+  const uniqueSkillMult = getActiveUniqueSkillMultipliers(state).dpsMult;
   const multipliers = {
     rebirthLegacy: rebirthMult,
     achievementLegacy: getAchievementBonusMultiplier(state),
@@ -1419,6 +1561,7 @@ export function getDpsBreakdown(state: GameState): {
     synergy: synergy.dpsMult,
     mastery: masteryDpsMult,
     vipDamage: vipDamageMult,
+    uniqueRelics: uniqueSkillMult,
     temporaryBuff: activeBuffMult,
   };
   const totalMultiplier = multipliers.rebirthLegacy
@@ -1432,6 +1575,7 @@ export function getDpsBreakdown(state: GameState): {
     * multipliers.synergy
     * multipliers.mastery
     * multipliers.vipDamage
+    * multipliers.uniqueRelics
     * multipliers.temporaryBuff;
   const finalDps = Math.max(1, (playerDps + heroDps) * totalMultiplier);
   return {
@@ -1814,7 +1958,7 @@ function sanitizeEquipmentInventoryRecord(raw: unknown, fallbackLevel: number): 
     const rarity = typeof entry.rarity === 'string' && EQUIP_RARITY_ORDER.includes(entry.rarity as EquipmentRarity)
       ? entry.rarity as EquipmentRarity
       : baseItem.rarity;
-    const source = typeof entry.source === 'string' && ['starter', 'drop', 'craft', 'crate', 'upgrade', 'legacy'].includes(entry.source)
+    const source = typeof entry.source === 'string' && ['starter', 'drop', 'craft', 'crate', 'upgrade', 'legacy', 'hero_unique'].includes(entry.source)
       ? entry.source as EquipmentSource
       : 'legacy';
     inventory[instanceId] = {
@@ -1909,6 +2053,17 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
       if (validRoles.includes(role as HeroFormationRole)) {
         heroFormationByUid[uid] = role as HeroFormationRole;
       }
+    }
+  }
+
+  const heroUniqueGearByHeroId: Record<string, HeroUniqueGearProgress> = {};
+  if (isRecord(payload.heroUniqueGearByHeroId)) {
+    for (const [heroId, raw] of Object.entries(payload.heroUniqueGearByHeroId)) {
+      if (!VALID_HERO_TEMPLATE_IDS.has(heroId)) continue;
+      const rank = isRecord(raw)
+        ? clampInt(raw.rank, 1, 10, 1)
+        : clampInt(raw, 1, 10, 1);
+      heroUniqueGearByHeroId[heroId] = { rank };
     }
   }
 
@@ -2107,6 +2262,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     teamLoadouts,
     teamSlotsUnlocked,
     heroFormationByUid,
+    heroUniqueGearByHeroId,
     lastDiceRollDay: sanitizeMiniOpsCooldownTimestamp(payload.lastDiceRollDay, now),
     lastRiftRunDay: payload.lastRiftRunDay == null ? null : clampInt(payload.lastRiftRunDay, 0, currentDay, currentDay),
     lastDiceRollValue: payload.lastDiceRollValue == null ? null : clampInt(payload.lastDiceRollValue, 1, 20, 1),
@@ -2958,6 +3114,7 @@ function reducer(state: GameState, action: Action): GameState {
         freeSummonCharges: canUseFree ? state.freeSummonCharges - 1 : state.freeSummonCharges,
         gachaPityCounter: roll.nextCounter,
       }));
+      nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.06);
       if (roll.pityTriggered) {
         nextState = queueReward(nextState, {
           id: `pity_single_${Date.now()}`,
@@ -3016,6 +3173,9 @@ function reducer(state: GameState, action: Action): GameState {
         freeSummonCharges: state.freeSummonCharges - freeUses,
         gachaPityCounter: pityCounter,
       }));
+      for (const hero of summoned) {
+        nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.08);
+      }
       if (pityHits > 0) {
         nextState = queueReward(nextState, {
           id: `pity_x10_${Date.now()}`,
@@ -3081,6 +3241,9 @@ function reducer(state: GameState, action: Action): GameState {
         freeSummonCharges: state.freeSummonCharges - freeUses + 1,
         gachaPityCounter: pityCounter,
       }));
+      for (const hero of summoned) {
+        nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.12);
+      }
       if (pityHits > 0) {
         nextState = queueReward(nextState, {
           id: `pity_x10_${Date.now()}`,
@@ -3347,6 +3510,7 @@ function reducer(state: GameState, action: Action): GameState {
       if (Object.values(state.equippedItems).includes(action.itemId)) return state;
       const item = getEquipmentEntry(state, action.itemId);
       if (!item) return state;
+      if ('source' in item && item.source === 'hero_unique') return state;
       const gain = getEquipmentScrapGain(item);
       const nextEquipmentInventory = { ...state.equipmentInventory };
       delete nextEquipmentInventory[action.itemId];
@@ -3370,7 +3534,9 @@ function reducer(state: GameState, action: Action): GameState {
       const candidates = state.inventoryItemIds
         .filter(itemId => !equippedIds.has(itemId))
         .map(itemId => ({ itemId, item: getEquipmentEntry(state, itemId) }))
-        .filter((entry): entry is { itemId: string; item: EquipmentInstance | EquipmentItem } => !!entry.item);
+        .filter((entry): entry is { itemId: string; item: EquipmentInstance | EquipmentItem } => (
+          !!entry.item && (!('source' in entry.item) || entry.item.source !== 'hero_unique')
+        ));
       if (candidates.length === 0) return state;
 
       const dismantleIds = new Set(candidates.map(entry => entry.itemId));
@@ -4692,6 +4858,7 @@ function reducer(state: GameState, action: Action): GameState {
         teamLoadouts: p.teamLoadouts,
         teamSlotsUnlocked: p.teamSlotsUnlocked,
         heroFormationByUid: p.heroFormationByUid,
+        heroUniqueGearByHeroId: p.heroUniqueGearByHeroId ?? {},
         lastDiceRollDay: p.lastDiceRollDay,
         lastRiftRunDay: p.lastRiftRunDay,
         lastDiceRollValue: p.lastDiceRollValue,
@@ -4817,6 +4984,7 @@ interface SaveData {
   teamLoadouts: string[][];
   teamSlotsUnlocked?: number;
   heroFormationByUid: Record<string, HeroFormationRole>;
+  heroUniqueGearByHeroId: Record<string, HeroUniqueGearProgress>;
   lastDiceRollDay?: number | null;
   lastRiftRunDay?: number | null;
   lastDiceRollValue?: number | null;
@@ -4936,6 +5104,7 @@ function serialize(state: GameState): SaveData {
     teamLoadouts: state.teamLoadouts,
     teamSlotsUnlocked: state.teamSlotsUnlocked,
     heroFormationByUid: state.heroFormationByUid,
+    heroUniqueGearByHeroId: state.heroUniqueGearByHeroId,
     lastDiceRollDay: state.lastDiceRollDay,
     lastRiftRunDay: state.lastRiftRunDay,
     lastDiceRollValue: state.lastDiceRollValue,

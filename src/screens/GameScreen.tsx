@@ -815,6 +815,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           multLine('Hero passives', dpsBreakdown.multipliers.heroPassives),
           multLine('Formation + synergy', dpsBreakdown.multipliers.formation * dpsBreakdown.multipliers.synergy),
           multLine('VIP protocol', dpsBreakdown.multipliers.vipDamage),
+          multLine('Unique relic skills', dpsBreakdown.multipliers.uniqueRelics),
           multLine('Mastery + temporary buff', dpsBreakdown.multipliers.mastery * dpsBreakdown.multipliers.temporaryBuff),
         ],
       };

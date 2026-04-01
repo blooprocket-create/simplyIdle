@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import GameScreen from './src/screens/GameScreen';
 import AuthScreen, { AUTH_STORAGE_KEYS, getValidStoredSession } from './src/screens/AuthScreen';
-import { debugLog, identifyTelemetryDevice, initTelemetry, trackEvent } from './src/telemetry';
+import { debugLog, identifyTelemetryDevice, initTelemetry, trackEvent, trackTelemetryHeartbeat } from './src/telemetry';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -16,6 +16,7 @@ export default function App() {
       platform: Platform.OS,
       source: 'App.tsx',
     });
+    void trackTelemetryHeartbeat('app_boot');
   }, []);
 
   useEffect(() => {
@@ -55,6 +56,7 @@ export default function App() {
       hasAccount: !!accountName,
       platform: Platform.OS,
     });
+    void trackTelemetryHeartbeat('auth_session_resolved');
   }, [loading, accountName]);
 
   useEffect(() => {
