@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, Text, StatusBar } from 'react-native';
+import { View, StyleSheet, Pressable, Text, StatusBar, useWindowDimensions } from 'react-native';
 import { THEME, TYPOGRAPHY, SPACING, Z_INDEX, RADIUS } from '../theme';
 
 interface GameHeaderProps {
@@ -30,6 +30,8 @@ export default function GameHeader({
   onActionPress,
 }: GameHeaderProps) {
   const [showStatTip, setShowStatTip] = useState(false);
+  const { width } = useWindowDimensions();
+  const twoRowResources = width <= 980;
 
  const formatNumber = (num: number): string => {
     if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
@@ -57,26 +59,57 @@ export default function GameHeader({
 
       {/* Center: Core Resources */}
       <View style={styles.center}>
-        <Pressable style={styles.resourceChip} onPress={() => {}}>
-          <Text style={styles.resourceIcon}>💰</Text>
-          <Text style={styles.resourceValue}>{formatNumber(gold)}</Text>
-        </Pressable>
-        <Pressable style={styles.resourceChip} onPress={() => {}}>
-          <Text style={styles.resourceIcon}>💎</Text>
-          <Text style={styles.resourceValue}>{formatNumber(diamonds)}</Text>
-        </Pressable>
-        <Pressable style={styles.resourceChip} onPress={() => {}}>
-          <Text style={styles.resourceIcon}>💧</Text>
-          <Text style={styles.resourceValue}>{formatNumber(bossTearsOrdered)}</Text>
-        </Pressable>
-        <Pressable style={styles.resourceChip} onPress={() => {}}>
-          <Text style={styles.resourceIcon}>💠</Text>
-          <Text style={styles.resourceValue}>{formatNumber(heroShards)}</Text>
-        </Pressable>
-        <Pressable style={styles.resourceChip} onPress={() => {}}>
-          <Text style={styles.resourceIcon}>✨</Text>
-          <Text style={styles.resourceValue}>{formatNumber(essence)}</Text>
-        </Pressable>
+        {twoRowResources ? (
+          <>
+            <View style={styles.resourceRow}>
+              <Pressable style={styles.resourceChip} onPress={() => {}}>
+                <Text style={styles.resourceIcon}>💰</Text>
+                <Text style={styles.resourceValue}>{formatNumber(gold)}</Text>
+              </Pressable>
+              <Pressable style={styles.resourceChip} onPress={() => {}}>
+                <Text style={styles.resourceIcon}>💎</Text>
+                <Text style={styles.resourceValue}>{formatNumber(diamonds)}</Text>
+              </Pressable>
+              <Pressable style={styles.resourceChip} onPress={() => {}}>
+                <Text style={styles.resourceIcon}>💧</Text>
+                <Text style={styles.resourceValue}>{formatNumber(bossTearsOrdered)}</Text>
+              </Pressable>
+            </View>
+            <View style={styles.resourceRow}>
+              <Pressable style={styles.resourceChip} onPress={() => {}}>
+                <Text style={styles.resourceIcon}>💠</Text>
+                <Text style={styles.resourceValue}>{formatNumber(heroShards)}</Text>
+              </Pressable>
+              <Pressable style={styles.resourceChip} onPress={() => {}}>
+                <Text style={styles.resourceIcon}>✨</Text>
+                <Text style={styles.resourceValue}>{formatNumber(essence)}</Text>
+              </Pressable>
+            </View>
+          </>
+        ) : (
+          <>
+            <Pressable style={styles.resourceChip} onPress={() => {}}>
+              <Text style={styles.resourceIcon}>💰</Text>
+              <Text style={styles.resourceValue}>{formatNumber(gold)}</Text>
+            </Pressable>
+            <Pressable style={styles.resourceChip} onPress={() => {}}>
+              <Text style={styles.resourceIcon}>💎</Text>
+              <Text style={styles.resourceValue}>{formatNumber(diamonds)}</Text>
+            </Pressable>
+            <Pressable style={styles.resourceChip} onPress={() => {}}>
+              <Text style={styles.resourceIcon}>💧</Text>
+              <Text style={styles.resourceValue}>{formatNumber(bossTearsOrdered)}</Text>
+            </Pressable>
+            <Pressable style={styles.resourceChip} onPress={() => {}}>
+              <Text style={styles.resourceIcon}>💠</Text>
+              <Text style={styles.resourceValue}>{formatNumber(heroShards)}</Text>
+            </Pressable>
+            <Pressable style={styles.resourceChip} onPress={() => {}}>
+              <Text style={styles.resourceIcon}>✨</Text>
+              <Text style={styles.resourceValue}>{formatNumber(essence)}</Text>
+            </Pressable>
+          </>
+        )}
       </View>
 
       {/* Right: Key Stats + Actions */}
@@ -159,6 +192,9 @@ const styles = StyleSheet.create({
 
   center: {
     flex: 0.5,
+    gap: SPACING.xs,
+  },
+  resourceRow: {
     flexDirection: 'row',
     gap: SPACING.xs,
   },
