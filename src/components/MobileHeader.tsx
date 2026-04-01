@@ -1,7 +1,6 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { theme } from '../theme/colors';
-import { fmt } from '../utils';
 
 interface HeaderChip {
   id: string;
@@ -40,15 +39,33 @@ export default function MobileHeader({ primary, secondary, onSettingsPress, onSh
         ))}
       </View>
 
-      {/* Secondary row - scrollable resource chips */}
+      {/* Secondary resources split across 2 rows */}
       {secondary && secondary.length > 0 && (
-        <View style={styles.secondaryRow}>
-          {secondary.map(chip => (
-            <View key={chip.id} style={styles.resourceChip}>
-              <Text style={styles.resourceChipIcon}>{chip.icon}</Text>
-              <Text style={styles.resourceChipValue}>{chip.value}</Text>
+        <View style={styles.secondaryRows}>
+          <View style={styles.secondaryRow}>
+            {secondary.slice(0, 3).map(chip => (
+              <View key={chip.id} style={styles.resourceChip}>
+                <Text style={styles.resourceChipIcon}>{chip.icon}</Text>
+                <View>
+                  <Text style={styles.resourceChipValue}>{chip.value}</Text>
+                  <Text style={styles.resourceChipLabel}>{chip.label}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+          {secondary.length > 3 && (
+            <View style={styles.secondaryRow}>
+              {secondary.slice(3).map(chip => (
+                <View key={chip.id} style={styles.resourceChip}>
+                  <Text style={styles.resourceChipIcon}>{chip.icon}</Text>
+                  <View>
+                    <Text style={styles.resourceChipValue}>{chip.value}</Text>
+                    <Text style={styles.resourceChipLabel}>{chip.label}</Text>
+                  </View>
+                </View>
+              ))}
             </View>
-          ))}
+          )}
         </View>
       )}
 
@@ -56,7 +73,7 @@ export default function MobileHeader({ primary, secondary, onSettingsPress, onSh
       <View style={styles.actions}>
         {onShopPress && (
           <Pressable style={styles.actionBtn} onPress={onShopPress}>
-            <Text style={styles.actionIcon}>🛍️</Text>
+            <Text style={styles.actionIcon}>🛒</Text>
           </Pressable>
         )}
         {onSettingsPress && (
@@ -112,12 +129,15 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 2,
   },
+  secondaryRows: {
+    gap: theme.spacing.xs,
+  },
   secondaryRow: {
     flexDirection: 'row',
     gap: theme.spacing.sm,
-    overflow: 'hidden',
   },
   resourceChip: {
+    flex: 1,
     backgroundColor: theme.bg.card,
     borderRadius: 6,
     paddingHorizontal: theme.spacing.md,
@@ -135,6 +155,11 @@ const styles = StyleSheet.create({
     color: theme.text.primary,
     fontSize: 11,
     fontWeight: '600',
+  },
+  resourceChipLabel: {
+    color: theme.text.tertiary,
+    fontSize: 9,
+    marginTop: 1,
   },
   actions: {
     position: 'absolute',
