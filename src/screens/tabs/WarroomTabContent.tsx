@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
-import { REBIRTH_WAVE_THRESHOLD } from '../../gameConfig';
 import { fmt } from '../../utils';
 import { styles } from '../GameScreen';
 
@@ -19,6 +18,7 @@ export interface WarroomTabContentProps {
   isBoss: boolean;
   monster: any;
   canRebirthNow: boolean;
+  rebirthWaveRequirement: number;
   rebirthWavesLeft: number;
   currentAct: any;
   actProgressPct: number;
@@ -69,6 +69,7 @@ export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
   isBoss,
   monster,
   canRebirthNow,
+  rebirthWaveRequirement,
   rebirthWavesLeft,
   currentAct,
   actProgressPct,
@@ -198,7 +199,7 @@ export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
                     disabled={!canRebirthNow}
                     onPress={() => setRebirthOpen(true)}
                   >
-                    <Text style={styles.warPanelActionText}>{canRebirthNow ? 'Rebirth' : `Rebirth @ W${REBIRTH_WAVE_THRESHOLD}`}</Text>
+                    <Text style={styles.warPanelActionText}>{canRebirthNow ? 'Rebirth' : `Rebirth @ W${rebirthWaveRequirement}`}</Text>
                   </Pressable>
                 </View>
               </View>
@@ -376,7 +377,7 @@ export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
                 <Text style={styles.warPanelStat}>
                   {canRebirthNow
                     ? 'Rebirth is ready. Reset now for permanent cores and stronger scaling.'
-                    : `Rebirth unlocks at Wave ${REBIRTH_WAVE_THRESHOLD}. ${rebirthWavesLeft} waves remaining.`}
+                    : `Rebirth unlocks at Wave ${rebirthWaveRequirement}. ${rebirthWavesLeft} waves remaining.`}
                 </Text>
                 {[
                   { n: 1, label: '1st Rebirth', bonus: 'Unlock Core Tree', done: prestige1Done },
@@ -399,7 +400,7 @@ export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
                     disabled={!canRebirthNow}
                     onPress={() => setRebirthOpen(true)}
                   >
-                    <Text style={styles.warPanelActionText}>{canRebirthNow ? 'Rebirth Now' : `Rebirth @ W${REBIRTH_WAVE_THRESHOLD}`}</Text>
+                    <Text style={styles.warPanelActionText}>{canRebirthNow ? 'Rebirth Now' : `Rebirth @ W${rebirthWaveRequirement}`}</Text>
                   </Pressable>
                 </View>
               </View>

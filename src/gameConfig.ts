@@ -1245,6 +1245,11 @@ export const COST_SCALE = 1.15;
 export const REBIRTH_BONUS = 1.5;
 export const REBIRTH_WAVE_THRESHOLD = 100;
 
+export function getRebirthWaveRequirement(prestigeCount: number): number {
+  const clampedPrestige = Math.max(0, Math.floor(prestigeCount));
+  return Math.max(1, Math.ceil(REBIRTH_WAVE_THRESHOLD * Math.pow(1.12, clampedPrestige)));
+}
+
 // ── Weekly Events / Mission Board ──────────────────────────────────────────
 
 export interface WeeklyEventConfig {

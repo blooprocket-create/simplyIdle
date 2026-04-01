@@ -1,17 +1,19 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
-import { REBIRTH_WAVE_THRESHOLD, REBIRTH_BONUS } from '../gameConfig.ts';
+import { REBIRTH_BONUS } from '../gameConfig.ts';
 
 interface Props {
   visible: boolean;
   wave: number;
+  highestWave: number;
+  requiredWave: number;
   prestigeCount: number; // rebirth count
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-export default function RebirthModal({ visible, wave, prestigeCount, onConfirm, onCancel }: Props) {
-  const canRebirth = wave >= REBIRTH_WAVE_THRESHOLD;
+export default function RebirthModal({ visible, wave, highestWave, requiredWave, prestigeCount, onConfirm, onCancel }: Props) {
+  const canRebirth = highestWave >= requiredWave;
   const nextBonus = Math.pow(REBIRTH_BONUS, prestigeCount + 1).toFixed(2);
 
   return (
@@ -26,8 +28,12 @@ export default function RebirthModal({ visible, wave, prestigeCount, onConfirm, 
             <Text style={styles.statVal}>{wave}</Text>
           </View>
           <View style={styles.stat}>
+            <Text style={styles.statLabel}>Highest Wave</Text>
+            <Text style={styles.statVal}>{highestWave}</Text>
+          </View>
+          <View style={styles.stat}>
             <Text style={styles.statLabel}>Required</Text>
-            <Text style={styles.statVal}>Wave {REBIRTH_WAVE_THRESHOLD}</Text>
+            <Text style={styles.statVal}>Wave {requiredWave}</Text>
           </View>
           <View style={styles.stat}>
             <Text style={styles.statLabel}>New Power Bonus</Text>
@@ -36,7 +42,7 @@ export default function RebirthModal({ visible, wave, prestigeCount, onConfirm, 
 
           {!canRebirth && (
             <Text style={styles.warning}>
-              Reach wave {REBIRTH_WAVE_THRESHOLD} first!  ({REBIRTH_WAVE_THRESHOLD - wave} to go)
+              Reach peak wave {requiredWave} first! ({requiredWave - highestWave} to go)
             </Text>
           )}
 

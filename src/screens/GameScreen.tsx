@@ -25,7 +25,7 @@ import {
   EquipmentSlot,
   RARITIES,
   ACTIVE_TEAM_SIZE,
-  REBIRTH_WAVE_THRESHOLD,
+  getRebirthWaveRequirement,
   equipmentRarityConfig,
   getMonsterForWave,
   getActForWave,
@@ -233,6 +233,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     equipItem,
     recycleHero,
     rankUpHero,
+    rebirthHero,
     levelUpHeroGold,
     convertShardsToEssence,
     convertShardsToScrap,
@@ -536,18 +537,23 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     };
     return byClass[state.playerClass ?? 'warrior'];
   }, [state.playerClass]);
-  const canRebirthNow = state.wave >= REBIRTH_WAVE_THRESHOLD;
+  const rebirthWaveRequirement = getRebirthWaveRequirement(state.prestigeCount);
+  const canRebirthNow = state.highestWaveReached >= rebirthWaveRequirement;
   const teamSlotCap = Math.max(4, Math.min(ACTIVE_TEAM_SIZE, state.teamSlotsUnlocked ?? 4));
   const nextTeamSlotUnlock = getNextTeamSlotUnlock();
   const currentDay = Math.floor(Date.now() / 86_400_000);
   const canPlayDiceToday = state.lastDiceRollDay !== currentDay;
   const canRunRiftToday = state.lastRiftRunDay !== currentDay;
-  const rebirthProgressPct = Math.max(0, Math.min(1, state.wave / REBIRTH_WAVE_THRESHOLD)) * 100;
-  const rebirthWavesLeft = Math.max(0, REBIRTH_WAVE_THRESHOLD - state.wave);
+  const rebirthProgressPct = Math.max(0, Math.min(1, state.highestWaveReached / rebirthWaveRequirement)) * 100;
+  const rebirthWavesLeft = Math.max(0, rebirthWaveRequirement - state.highestWaveReached);
+  const expeditionClaimableCount = state.expeditionQueue.filter(exp => (Date.now() - exp.startTime) >= exp.durationMs).length;
+  const expeditionActiveTypes = new Set(state.expeditionQueue.map(exp => exp.type));
+  const expeditionLaunchableCount = EXPEDITION_TYPES.filter(type => !expeditionActiveTypes.has(type)).length;
+  const guildhallNotificationCount = expeditionClaimableCount + expeditionLaunchableCount;
   const guidanceList = useMemo(() => {
     const recs: Array<{ title: string; detail: string; tab: Tab }> = [];
     if (canRebirthNow) {
-      recs.push({ title: 'Rebirth Ready', detail: 'Reset now for permanent cores and stronger scaling.', tab: 'battle' });
+      recs.push({ title: 'Rebirth Ready', detail: 'Open War Room and trigger rebirth for permanent cores.', tab: 'warroom' });
     }
     if (state.activeTeamHeroIds.length < teamSlotCap) {
       recs.push({ title: 'Build Full Team', detail: `Equip ${teamSlotCap} heroes to stabilize damage and survival.`, tab: 'heroes' });
@@ -613,7 +619,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     stats: state.unspentStatPoints > 0 ? `+${state.unspentStatPoints}` : 'OK',
     equipment: `${state.inventoryItemIds.length}`,
     achievements: `${state.achievements.size}/${ACHIEVEMENTS.length}`,
-    guildhall: `${state.expeditionQueue.length}`,
+    guildhall: guildhallNotificationCount > 0 ? `${guildhallNotificationCount}` : 'OK',
   };
   const isNativeApp = Platform.OS !== 'web';
   const isCompactPhone = viewportWidth < 430;
@@ -1183,7 +1189,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       stats: hasStatsNotification ? 1 : 0,
       achievements: hasAchievementsNotification ? 1 : 0,
       equipment: hasEquipmentNotification ? 1 : 0,
-      guildhall: state.expeditionQueue.length > 0 ? 1 : 0,
+      guildhall: guildhallNotificationCount,
     };
 
     return (
@@ -1727,6 +1733,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             isBoss,
             monster,
             canRebirthNow,
+            rebirthWaveRequirement,
             rebirthWavesLeft,
             currentAct,
             actProgressPct,
@@ -1817,6 +1824,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             loadTeamLoadout,
             toggleEquipHero,
             rankUpHero,
+            rebirthHero,
             levelUpHeroGold,
             setRecycleConfirmUid,
             renderSubTabBar,
@@ -2762,6 +2770,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       <RebirthModal
         visible={rebirthOpen}
         wave={state.wave}
+        highestWave={state.highestWaveReached}
+        requiredWave={rebirthWaveRequirement}
         prestigeCount={state.prestigeCount}
         onConfirm={rebirth}
         onCancel={() => setRebirthOpen(false)}

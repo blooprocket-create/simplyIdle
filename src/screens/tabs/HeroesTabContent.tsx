@@ -37,6 +37,7 @@ export interface HeroesTabContentProps {
   loadTeamLoadout: (slot: number) => void;
   toggleEquipHero: (heroId: string) => void;
   rankUpHero: (heroId: string) => void;
+  rebirthHero: (heroId: string) => void;
   levelUpHeroGold: (heroId: string) => void;
   setRecycleConfirmUid: (uid: string) => void;
   renderSubTabBar: (tabs: any[]) => React.ReactNode;
@@ -74,6 +75,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
   loadTeamLoadout,
   toggleEquipHero,
   rankUpHero,
+  rebirthHero,
   levelUpHeroGold,
   setRecycleConfirmUid,
   renderSubTabBar,
@@ -249,8 +251,11 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                   const details = stats.heroDetails[hero.uid];
                   const isExpanded = expandedHeroes.has(hero.uid);
                   const shardValue = calculateShardReward(hero.rarity, hero.level);
+                  const heroRebirthShardCost = Math.max(250, Math.floor(shardValue * 2));
+                  const heroRebirthEssenceCost = 1;
                   const nextRankCost = hero.rank < 10 ? getRankUpShardCost(hero.rarity, hero.rank + 1) : null;
                   const canRankUp = !!nextRankCost && state.heroShards >= nextRankCost;
+                  const canHeroRebirth = hero.rank >= 10 && hero.level >= HERO_LEVEL_CAP && state.heroShards >= heroRebirthShardCost && state.essence >= heroRebirthEssenceCost;
                   const trait = getHeroPassiveTraitInfo(hero.passiveTrait);
                   const activeArchetype = getHeroActiveArchetypeInfo(hero.activeSkillArchetype);
                   const faction = hero.heroClass === 'warrior' || hero.heroClass === 'berserker'
@@ -445,6 +450,19 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                                 </Pressable>
                               );
                             })()}
+                            {hero.rank >= 10 && hero.level >= HERO_LEVEL_CAP && (
+                              <Pressable
+                                style={[styles.rankUpBtn, !canHeroRebirth && styles.rankUpBtnDisabled]}
+                                disabled={!canHeroRebirth}
+                                onPress={() => rebirthHero(hero.uid)}
+                              >
+                                <Text style={styles.rankUpBtnText}>
+                                  {canHeroRebirth
+                                    ? `Hero Rebirth (${heroRebirthShardCost}✨ + ${heroRebirthEssenceCost}⚡)`
+                                    : `Need ${Math.max(0, heroRebirthShardCost - state.heroShards)}✨ / ${Math.max(0, heroRebirthEssenceCost - state.essence)}⚡`}
+                                </Text>
+                              </Pressable>
+                            )}
                             <Pressable
                               style={styles.recycleBtn}
                               onPress={() => setRecycleConfirmUid(hero.uid)}

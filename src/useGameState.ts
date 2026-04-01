@@ -7,6 +7,7 @@ import {
   COST_SCALE,
   REBIRTH_BONUS,
   REBIRTH_WAVE_THRESHOLD,
+  getRebirthWaveRequirement,
   PartyId,
   PlayerClass,
   StatKey,
@@ -1587,12 +1588,14 @@ function sanitizeIntList(value: unknown, maxItems: number): number[] {
   return sanitized;
 }
 
-function sanitizeStatAllocation(raw: unknown, level: number): {
+function sanitizeStatAllocation(raw: unknown, level: number, savedUnspent?: unknown): {
   statsAlloc: StatBlock;
   unspentStatPoints: number;
 } {
   const record = isRecord(raw) ? raw : {};
-  const budget = Math.max(0, (level - 1) * STAT_POINTS_PER_LEVEL);
+  const levelBudget = Math.max(0, (level - 1) * STAT_POINTS_PER_LEVEL);
+  const legacyUnspent = clampInt(savedUnspent, 0, SAFE_INTEGER_CAP, 0);
+  const budget = levelBudget + legacyUnspent;
   const requested: StatBlock = {
     strength: clampInt(record.strength, 0, budget, 0),
     vitality: clampInt(record.vitality, 0, budget, 0),
@@ -1635,6 +1638,8 @@ function sanitizeLoadedHero(raw: unknown, index: number): HeroUnit | null {
   const rank = clampInt(raw.rank, 1, 10, 1);
   const uid = clampString(raw.uid, `${template.id}_${index}`, 64) || `${template.id}_${index}`;
   const rarityMult = rarityConfig(rarity).boostMultiplier;
+  const baseBoost = Number((template.baseTeamBoost * rarityMult).toFixed(4));
+  const teamBoost = clampFloat(raw.teamBoost, baseBoost, 10, baseBoost);
 
   return normalizeHero({
     ...template,
@@ -1642,7 +1647,7 @@ function sanitizeLoadedHero(raw: unknown, index: number): HeroUnit | null {
     rarity,
     level,
     rank,
-    teamBoost: Number((template.baseTeamBoost * rarityMult).toFixed(4)),
+    teamBoost: Number(teamBoost.toFixed(4)),
   });
 }
 
@@ -1702,7 +1707,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     wave,
     clampInt(payload.highestWaveReached ?? payload.highestLevelReached, 1, MAX_SAVE_WAVE, 1),
   );
-  const { statsAlloc, unspentStatPoints } = sanitizeStatAllocation(payload.statsAlloc, level);
+  const { statsAlloc, unspentStatPoints } = sanitizeStatAllocation(payload.statsAlloc, level, payload.unspentStatPoints);
   const maxMonsterHp = getMonsterMaxHp(wave);
   const monsterHp = clampFloat(payload.monsterHp, 0, maxMonsterHp, maxMonsterHp);
   const teamMaxHp = Math.max(100, clampInt(payload.teamHp, 1, SAFE_INTEGER_CAP, 100));
@@ -2495,6 +2500,7 @@ type Action =
   | { type: 'SET_AUTO_SUMMON_MODE'; mode: 'single' | 'x10' }
   | { type: 'SET_AUTO_BURST_ENABLED'; enabled: boolean }
   | { type: 'SET_COMBAT_TEMPO'; tempo: CombatTempo }
+  | { type: 'REBIRTH_HERO'; uid: string }
   | { type: 'SET_AUTO_TEMPO_ENABLED'; enabled: boolean }
   | { type: 'SET_AUTO_TEMPO_TARGET'; target: AutoTempoTarget }
   | { type: 'SET_AUTO_SUMMON_RESERVE_GOLD'; reserveGold: number }
@@ -2502,8 +2508,8 @@ type Action =
   | { type: 'BUY_DIAMOND_SHOP_ITEM'; offerId: DiamondShopOfferId }
   | { type: 'SIMULATE_DOLLAR_PURCHASE'; offerId: DollarShopOfferId }
   | { type: 'CLAIM_VIP_REWARD'; level: number }
-  | { type: 'BUY_PREMIUM_COOLANT'; itemId: 'coolant_mk1' | 'coolant_mk2' }
-  | { type: 'USE_USABLE_ITEM'; itemId: string }
+  | { type: 'BUY_PREMIUM_COOLANT'; itemId: 'coolant_mk1' | 'coolant_mk2'; amount?: number }
+  | { type: 'USE_USABLE_ITEM'; itemId: string; amount?: number | 'all' }
   | { type: 'AUTO_DISMANTLE_EQUIPMENT' }
   | { type: 'DISMANTLE_EQUIPMENT'; itemId: string }
   | { type: 'CRAFT_EQUIPMENT'; slot: EquipmentSlot }
@@ -3018,29 +3024,35 @@ function reducer(state: GameState, action: Action): GameState {
       const qty = state.usableItemCounts[action.itemId] ?? 0;
       if (qty <= 0) return state;
 
+      const requestedUses = action.amount === 'all'
+        ? qty
+        : clampInt(action.amount, 1, qty, 1);
+      if (requestedUses <= 0) return state;
+
       const item = getUsableItem(action.itemId);
       if (!item) return state;
 
       let nextState: GameState = {
         ...state,
-        usableItemCounts: addUsableItemCount(state.usableItemCounts, action.itemId, -1),
+        usableItemCounts: addUsableItemCount(state.usableItemCounts, action.itemId, -requestedUses),
       };
+      const useSuffix = requestedUses > 1 ? ` x${requestedUses}` : '';
 
       if (item.effect === 'heal_team_percent') {
-        const healed = Math.ceil(nextState.teamMaxHp * item.value);
+        const healed = Math.ceil(nextState.teamMaxHp * item.value) * requestedUses;
         nextState = queueReward({
           ...nextState,
           teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + healed),
         }, {
           id: `use_${item.id}_${Date.now()}`,
           kind: 'item',
-          title: `Used ${item.emoji} ${item.name}`,
+          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
           detail: `Restored ${healed} team HP`,
         });
       }
 
       if (item.effect === 'gain_gold_flat') {
-        const gain = Math.ceil(item.value * Math.pow(REBIRTH_BONUS, nextState.prestigeCount) * getVipGoldMultiplier(nextState));
+        const gain = Math.ceil(item.value * Math.pow(REBIRTH_BONUS, nextState.prestigeCount) * getVipGoldMultiplier(nextState)) * requestedUses;
         nextState = queueReward({
           ...nextState,
           gold: nextState.gold + gain,
@@ -3048,13 +3060,13 @@ function reducer(state: GameState, action: Action): GameState {
         }, {
           id: `use_${item.id}_${Date.now()}`,
           kind: 'gold',
-          title: `Used ${item.emoji} ${item.name}`,
+          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
           detail: `+${gain} gold`,
         });
       }
 
       if (item.effect === 'gain_exp_flat') {
-        const gain = Math.ceil(item.value * getAchievementBonusMultiplier(nextState) * getVipExpMultiplier(nextState));
+        const gain = Math.ceil(item.value * getAchievementBonusMultiplier(nextState) * getVipExpMultiplier(nextState)) * requestedUses;
         const lvl = processLevelUp(nextState.exp + gain, nextState.level);
         nextState = queueReward({
           ...nextState,
@@ -3065,34 +3077,34 @@ function reducer(state: GameState, action: Action): GameState {
         }, {
           id: `use_${item.id}_${Date.now()}`,
           kind: 'item',
-          title: `Used ${item.emoji} ${item.name}`,
+          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
           detail: `+${gain} EXP`,
         });
       }
 
       if (item.effect === 'gain_shards_flat') {
         const weekly = getCurrentWeeklyEvent(nextState);
-        const gain = Math.ceil(item.value * (1 + nextState.prestigeCount * 0.04) * weekly.shardMultiplier);
+        const gain = Math.ceil(item.value * (1 + nextState.prestigeCount * 0.04) * weekly.shardMultiplier) * requestedUses;
         nextState = queueReward({
           ...nextState,
           heroShards: nextState.heroShards + gain,
         }, {
           id: `use_${item.id}_${Date.now()}`,
           kind: 'shard',
-          title: `Used ${item.emoji} ${item.name}`,
+          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
           detail: `+${gain} shards`,
         });
       }
 
       if (item.effect === 'reduce_heat_flat') {
-        const reduced = Math.max(0, nextState.combatHeat - item.value);
+        const reduced = Math.max(0, nextState.combatHeat - item.value * requestedUses);
         nextState = queueReward({
           ...nextState,
           combatHeat: reduced,
         }, {
           id: `use_${item.id}_${Date.now()}`,
           kind: 'system',
-          title: `Used ${item.emoji} ${item.name}`,
+          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
           detail: `Heat ${Math.ceil(nextState.combatHeat)} -> ${Math.ceil(reduced)}`,
         });
       }
@@ -3362,7 +3374,7 @@ function reducer(state: GameState, action: Action): GameState {
       if (elapsed < 5000) return { ...state, lastActiveAt: Date.now() };
 
       const MAX_OFFLINE_KILLS = 4000;
-      const MIN_KILL_MS = 35;
+      const MIN_KILL_MS = 120;
       let remainingMs = elapsed;
       let working = state;
       const startWave = state.wave;
@@ -3399,6 +3411,7 @@ function reducer(state: GameState, action: Action): GameState {
       const wavesGained = Math.max(0, working.wave - startWave);
       const goldGain = Math.max(0, working.gold - startGold);
       const expGain = Math.max(0, working.totalExp - startExp);
+      const reachedKillCap = killsGained >= MAX_OFFLINE_KILLS;
       working = {
         ...working,
         rewardQueue: baseRewardQueue,
@@ -3412,7 +3425,7 @@ function reducer(state: GameState, action: Action): GameState {
         id: `offline_${Date.now()}`,
         kind: 'system',
         title: 'Offline Progress',
-        detail: `+${killsGained} kills • +${wavesGained} waves • +${goldGain} gold • +${expGain} EXP`,
+        detail: `+${killsGained} kills • +${wavesGained} waves • +${goldGain} gold • +${expGain} EXP • now Wave ${working.wave}${reachedKillCap ? ' (simulation cap reached)' : ''}`,
       });
       return withAchievement((next));
     }
@@ -3452,14 +3465,17 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'REBIRTH': {
-      if (state.wave < REBIRTH_WAVE_THRESHOLD) return state;
-      const gainedCores = Math.max(1, Math.floor((state.wave - REBIRTH_WAVE_THRESHOLD) / 25) + 1);
+      const rebirthRequirement = getRebirthWaveRequirement(state.prestigeCount);
+      if (state.highestWaveReached < rebirthRequirement) return state;
+      const gainedCores = Math.max(1, Math.floor((state.highestWaveReached - rebirthRequirement) / 25) + 1);
+      const refundedStats = state.statsAlloc.strength + state.statsAlloc.vitality + state.statsAlloc.agility + state.statsAlloc.intelligence + state.statsAlloc.spirit;
       return queueReward({
         ...state,
         gold: 0,
         exp: 0,
         level: 1,
-        unspentStatPoints: state.unspentStatPoints,
+        unspentStatPoints: state.unspentStatPoints + refundedStats,
+        statsAlloc: blankStats,
         wave: 1,
         monsterHp: getMonsterMaxHp(1),
         monsterMaxHp: getMonsterMaxHp(1),
@@ -3483,7 +3499,7 @@ function reducer(state: GameState, action: Action): GameState {
         id: `rebirth_cores_${Date.now()}`,
         kind: 'system',
         title: 'Rebirth Complete',
-        detail: `+${gainedCores} rebirth cores • shockwave triggered`,
+        detail: `+${gainedCores} rebirth cores • requirement was Wave ${rebirthRequirement}`,
       });
     }
 
@@ -3881,6 +3897,34 @@ function reducer(state: GameState, action: Action): GameState {
       };
     }
 
+    case 'REBIRTH_HERO': {
+      const hero = state.heroRoster.find(h => h.uid === action.uid);
+      if (!hero || hero.rank < 10 || hero.level < HERO_LEVEL_CAP) return state;
+
+      const shardCost = Math.max(250, Math.floor(calculateShardReward(hero.rarity, hero.level) * 2));
+      const essenceCost = 1;
+      if (state.heroShards < shardCost || state.essence < essenceCost) return state;
+
+      const updatedHero = normalizeHero({
+        ...hero,
+        level: 1,
+        rank: 1,
+        teamBoost: Number((hero.teamBoost * 1.15).toFixed(4)),
+      });
+
+      return queueReward({
+        ...state,
+        heroShards: state.heroShards - shardCost,
+        essence: state.essence - essenceCost,
+        heroRoster: state.heroRoster.map(h => h.uid === action.uid ? updatedHero : h),
+      }, {
+        id: `hero_rebirth_${hero.uid}_${Date.now()}`,
+        kind: 'system',
+        title: `${hero.name} Reborn`,
+        detail: `-${shardCost} shards, -${essenceCost} essence • team boost now +${(updatedHero.teamBoost * 100).toFixed(1)}%`,
+      });
+    }
+
     case 'CONVERT_SHARDS_TO_ESSENCE': {
       const cost = getShardToEssenceCost(state);
       if (state.heroShards < cost) return state;
@@ -4160,19 +4204,21 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'BUY_PREMIUM_COOLANT': {
-      const cost = PREMIUM_COOLANT_COSTS[action.itemId];
+      const unitCost = PREMIUM_COOLANT_COSTS[action.itemId];
+      const amount = clampInt(action.amount, 1, 99, 1);
+      const cost = unitCost * amount;
       if (state.diamonds < cost) return state;
       const item = getUsableItem(action.itemId);
       if (!item) return state;
       return queueReward({
         ...state,
         diamonds: state.diamonds - cost,
-        usableItemCounts: addUsableItemCount(state.usableItemCounts, action.itemId, 1),
+        usableItemCounts: addUsableItemCount(state.usableItemCounts, action.itemId, amount),
       }, {
         id: `buy_${action.itemId}_${Date.now()}`,
         kind: 'system',
         title: `Purchased ${item.emoji} ${item.name}`,
-        detail: `-${cost} diamonds`,
+        detail: `-${cost} diamonds • +${amount}`,
       });
     }
 
@@ -4703,7 +4749,7 @@ export function useGameState(saveSlot: string = 'default') {
   const spendRebirthCore = useCallback((path: 'damage' | 'economy' | 'survival') => {
     dispatch({ type: 'SPEND_REBIRTH_CORE', path });
   }, []);
-  const useUsableItem = useCallback((itemId: string) => dispatch({ type: 'USE_USABLE_ITEM', itemId }), []);
+  const useUsableItem = useCallback((itemId: string, amount: number | 'all' = 1) => dispatch({ type: 'USE_USABLE_ITEM', itemId, amount }), []);
   const dismantleEquipment = useCallback((itemId: string) => dispatch({ type: 'DISMANTLE_EQUIPMENT', itemId }), []);
   const craftEquipment = useCallback((slot: EquipmentSlot) => dispatch({ type: 'CRAFT_EQUIPMENT', slot }), []);
   const upgradeEquipmentRarity = useCallback((itemId: string) => dispatch({ type: 'UPGRADE_EQUIPMENT_RARITY', itemId }), []);
@@ -4714,6 +4760,7 @@ export function useGameState(saveSlot: string = 'default') {
   const setAutoSummonMode = useCallback((mode: 'single' | 'x10') => dispatch({ type: 'SET_AUTO_SUMMON_MODE', mode }), []);
   const setAutoBurstEnabled = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_BURST_ENABLED', enabled }), []);
   const setCombatTempo = useCallback((tempo: CombatTempo) => dispatch({ type: 'SET_COMBAT_TEMPO', tempo }), []);
+  const rebirthHero = useCallback((uid: string) => dispatch({ type: 'REBIRTH_HERO', uid }), []);
   const setAutoTempoEnabled = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_TEMPO_ENABLED', enabled }), []);
   const setAutoTempoTarget = useCallback((target: AutoTempoTarget) => dispatch({ type: 'SET_AUTO_TEMPO_TARGET', target }), []);
   const setAutoSummonReserveGold = useCallback((reserveGold: number) => {
@@ -4723,8 +4770,8 @@ export function useGameState(saveSlot: string = 'default') {
   const buyDiamondShopItem = useCallback((offerId: DiamondShopOfferId) => dispatch({ type: 'BUY_DIAMOND_SHOP_ITEM', offerId }), []);
   const simulateDollarPurchase = useCallback((offerId: DollarShopOfferId) => dispatch({ type: 'SIMULATE_DOLLAR_PURCHASE', offerId }), []);
   const claimVipReward = useCallback((level: number) => dispatch({ type: 'CLAIM_VIP_REWARD', level }), []);
-  const buyPremiumCoolant = useCallback((itemId: 'coolant_mk1' | 'coolant_mk2') => {
-    dispatch({ type: 'BUY_PREMIUM_COOLANT', itemId });
+  const buyPremiumCoolant = useCallback((itemId: 'coolant_mk1' | 'coolant_mk2', amount: number = 1) => {
+    dispatch({ type: 'BUY_PREMIUM_COOLANT', itemId, amount });
   }, []);
   const autoDismantleEquipment = useCallback(() => dispatch({ type: 'AUTO_DISMANTLE_EQUIPMENT' }), []);
   const spendEssenceUpgrade = useCallback((path: 'damage' | 'economy' | 'survival') => {
@@ -4879,6 +4926,7 @@ export function useGameState(saveSlot: string = 'default') {
     setAutoSummonMode,
     setAutoBurstEnabled,
     setCombatTempo,
+    rebirthHero,
     setAutoTempoEnabled,
     setAutoTempoTarget,
     setAutoSummonReserveGold,

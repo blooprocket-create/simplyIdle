@@ -19,7 +19,7 @@ export interface BattleTabContentProps {
   usableInventory: any[];
   setCombatTempo: (tempo: number) => void;
   burst: (hits: number) => void;
-  buyPremiumCoolant: (itemId: string) => void;
+  buyPremiumCoolant: (itemId: string, amount?: number) => void;
   useUsableItem: (itemId: string) => void;
 }
 
@@ -89,6 +89,22 @@ export const BattleTabContent: React.FC<BattleTabContentProps> = ({
                 onPress={() => buyPremiumCoolant('coolant_mk2')}
               >
                 <Text style={styles.heatStoreBtnText}>Buy ❄️ x1 (18💎)</Text>
+              </Pressable>
+            </View>
+            <View style={styles.heatStoreRow}>
+              <Pressable
+                style={[styles.heatUseBtn, state.diamonds < 40 && styles.heatStoreBtnDisabled]}
+                disabled={state.diamonds < 40}
+                onPress={() => buyPremiumCoolant('coolant_mk1', 5)}
+              >
+                <Text style={styles.heatStoreBtnText}>Buy 🧊 x5 (40💎)</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.heatUseBtn, state.diamonds < 90 && styles.heatStoreBtnDisabled]}
+                disabled={state.diamonds < 90}
+                onPress={() => buyPremiumCoolant('coolant_mk2', 5)}
+              >
+                <Text style={styles.heatStoreBtnText}>Buy ❄️ x5 (90💎)</Text>
               </Pressable>
             </View>
             <View style={styles.heatStoreRow}>
