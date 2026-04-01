@@ -759,7 +759,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     state.totalSummons,
     state.wave,
   ]);
-  const expPct = Math.floor((state.exp / Math.max(1, stats.expNeeded)) * 100);
   const topChipTooltip = useMemo(() => {
     function multLine(label: string, mult: number): string {
       const deltaPct = (mult - 1) * 100;
