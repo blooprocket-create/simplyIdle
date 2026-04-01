@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
-import { ACHIEVEMENTS, WEEKLY_TRACK_MILESTONES } from '../../gameConfig';
+import { ACHIEVEMENTS, HERO_POOL, WEEKLY_TRACK_MILESTONES, getHeroBackstory } from '../../gameConfig';
 import { ACH_BONUS_PER_UNLOCK_PCT, ACH_BONUS_CAP_PCT } from '../GameScreen';
 import { styles } from '../GameScreen';
 
@@ -20,6 +20,7 @@ export interface AchievementsTabContentProps {
   nextStoryEntry: any;
   claimWeeklyTrack: (ms: number) => void;
   claimMission: (missionId: string) => void;
+  claimCodexHeroVip: (heroId: string) => void;
   claimAllRewards: () => void;
   renderSubTabBar: (tabs: any[]) => React.ReactNode;
 }
@@ -39,9 +40,13 @@ export const AchievementsTabContent: React.FC<AchievementsTabContentProps> = ({
   nextStoryEntry,
   claimWeeklyTrack,
   claimMission,
+  claimCodexHeroVip,
   claimAllRewards,
   renderSubTabBar,
 }) => {
+  const unlockedHeroIds = useMemo(() => new Set(state.heroRoster.map(hero => hero.id)), [state.heroRoster]);
+  const codexHeroes = useMemo(() => HERO_POOL.filter(hero => unlockedHeroIds.has(hero.id)), [unlockedHeroIds]);
+
   return (
     <>
       {tab === 'achievements' && (
@@ -215,6 +220,38 @@ export const AchievementsTabContent: React.FC<AchievementsTabContentProps> = ({
             <View>
               <Text style={styles.sectionTitle}>📖 Legacy Codex</Text>
               <Text style={styles.sectionHelperText}>Long-term milestones that define your legend. Each grants a permanent title.</Text>
+
+              <View style={styles.collectionCard}>
+                <Text style={styles.collectionCardTitle}>👥 Hero Codex</Text>
+                <Text style={styles.collectionStat}>Discovered heroes: {codexHeroes.length}/{HERO_POOL.length}</Text>
+                <Text style={styles.collectionHint}>Tap a discovered hero icon to claim +10 VIP points once.</Text>
+                {codexHeroes.length === 0 ? (
+                  <Text style={styles.collectionStat}>Summon heroes to unlock their backstories.</Text>
+                ) : (
+                  codexHeroes.map(hero => {
+                    const claimed = state.codexVipClaimedHeroIds.includes(hero.id);
+                    return (
+                      <View key={hero.id} style={[styles.codexEntry, claimed && styles.codexEntryDone]}>
+                        <Pressable
+                          style={[styles.toggleBtn, claimed && { opacity: 0.55 }]}
+                          disabled={claimed}
+                          onPress={() => claimCodexHeroVip(hero.id)}
+                        >
+                          <Text style={styles.toggleBtnText}>{hero.emoji}</Text>
+                        </Pressable>
+                        <View style={styles.codexEntryLeft}>
+                          <Text style={[styles.codexTitle, claimed && styles.codexTitleDone]}>
+                            {claimed ? '✅' : '📜'} {hero.name}
+                          </Text>
+                          <Text style={styles.codexDesc}>{getHeroBackstory(hero.id)}</Text>
+                          <Text style={styles.codexReward}>{claimed ? 'VIP claimed (+10)' : 'Tap icon: +10 VIP points'}</Text>
+                        </View>
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+
               <View style={styles.storyCardWrap}>
                 <Text style={styles.storyCardTitle}>🧭 War Chronicle</Text>
                 <Text style={styles.storyCardSubtitle}>

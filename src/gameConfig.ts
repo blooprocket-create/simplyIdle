@@ -625,6 +625,61 @@ export function getHeroTemplateById(heroId: string): HeroTemplate | undefined {
   return HERO_POOL.find(hero => hero.id === heroId);
 }
 
+function hashTextSeed(input: string): number {
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) - hash) + input.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+export function getHeroBackstory(heroId: string): string {
+  const hero = getHeroTemplateById(heroId);
+  if (!hero) return 'A nameless wanderer whose legend has yet to be written.';
+
+  const classOrigins: Record<PlayerClass, string[]> = {
+    warrior: [
+      'once commanded the shattered wall-guard of Crownfall',
+      'was forged in the siege pits beneath the Glass Citadel',
+      'carried an oathblade through the ash storms of the frontier',
+    ],
+    berserker: [
+      'survived the blood rites of the Howling Deep',
+      'earned renown by breaking leviathan chains bare-handed',
+      'walked out of a doomed warband as its only heartbeat',
+    ],
+    archer: [
+      'learned wind-reading on the cliffs above Verdant Ruin',
+      'served as a ghost scout between collapsing kingdoms',
+      'made their name by ending wars before horns were blown',
+    ],
+    mage: [
+      'decoded forbidden sigils from a fractured star archive',
+      'studied at a moonlit academy erased from imperial maps',
+      'bound raw riftfire into disciplined battlecraft',
+    ],
+    monk: [
+      'trained in a hidden temple built around a silent crater',
+      'mastered breath forms while empires rose and fell',
+      'kept the old cycle teachings when every order fractured',
+    ],
+  };
+
+  const motives = [
+    'Now they fight to keep the next age from repeating the last.',
+    'They march so no dynasty can chain fate again.',
+    'Each battle is a vow to break the engines of endless war.',
+    'Their campaign is a reckoning written in steel and starlight.',
+    'They seek the final throne before the void can claim it.',
+  ];
+
+  const seed = hashTextSeed(`${hero.id}:${hero.name}`);
+  const origin = classOrigins[hero.heroClass][seed % classOrigins[hero.heroClass].length];
+  const motive = motives[seed % motives.length];
+  return `${hero.name} ${origin}. ${motive}`;
+}
+
 export function getSummonRarityPool(postgameUnlocked: boolean): RarityConfig[] {
   return postgameUnlocked
     ? RARITIES

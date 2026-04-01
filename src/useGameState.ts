@@ -358,6 +358,7 @@ export interface GameState {
   weeklyKills: number;
   weeklyTrackClaimed: number[];
   claimedMissionIds: string[];
+  codexVipClaimedHeroIds: string[];
   seenHintIds: string[];
   permanentUnlocks: PermanentUnlockId[];
   metaDamageLevel: number;
@@ -520,6 +521,7 @@ const DEFAULT_STATE: GameState = {
   weeklyKills: 0,
   weeklyTrackClaimed: [],
   claimedMissionIds: [],
+  codexVipClaimedHeroIds: [],
   seenHintIds: [],
   permanentUnlocks: [],
   metaDamageLevel: 0,
@@ -2306,6 +2308,8 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
       .filter(value => VALID_WEEKLY_TRACK_MILESTONES.has(value)),
     claimedMissionIds: sanitizeStringList(payload.claimedMissionIds, VALID_MISSION_IDS.size)
       .filter(id => VALID_MISSION_IDS.has(id)),
+    codexVipClaimedHeroIds: sanitizeStringList(payload.codexVipClaimedHeroIds, VALID_HERO_TEMPLATE_IDS.size)
+      .filter(id => VALID_HERO_TEMPLATE_IDS.has(id)),
     seenHintIds: sanitizeStringList(payload.seenHintIds, MAX_SAVE_LOG_ENTRIES),
     permanentUnlocks: sanitizeStringList(payload.permanentUnlocks, VALID_PERMANENT_UNLOCKS.size)
       .filter((id): id is PermanentUnlockId => VALID_PERMANENT_UNLOCKS.has(id as PermanentUnlockId)),
@@ -2868,6 +2872,7 @@ type Action =
   | { type: 'APPLY_WEEKLY_ROLLOVER'; nowMs: number }
   | { type: 'CLAIM_WEEKLY_TRACK'; milestone: number }
   | { type: 'CLAIM_MISSION'; missionId: string }
+  | { type: 'CLAIM_CODEX_HERO_VIP'; heroId: string }
   | { type: 'MARK_HINT_SEEN'; hintId: string }
   | { type: 'APPLY_OFFLINE_PROGRESS'; elapsedMs: number }
   | { type: 'APPLY_DAILY_LOGIN'; nowMs: number }
@@ -4790,6 +4795,40 @@ function reducer(state: GameState, action: Action): GameState {
       });
     }
 
+    case 'CLAIM_CODEX_HERO_VIP': {
+      if (!VALID_HERO_TEMPLATE_IDS.has(action.heroId)) return state;
+      if (state.codexVipClaimedHeroIds.includes(action.heroId)) return state;
+      const owned = state.heroRoster.some(hero => hero.id === action.heroId);
+      if (!owned) return state;
+
+      const pointsGain = 10;
+      const nextPoints = state.vipPoints + pointsGain;
+      const nextLevel = getVipLevelFromPoints(nextPoints);
+      const leveledUp = nextLevel > state.vipLevel;
+
+      let nextState = queueReward({
+        ...state,
+        codexVipClaimedHeroIds: [...state.codexVipClaimedHeroIds, action.heroId],
+        vipPoints: nextPoints,
+        vipLevel: nextLevel,
+      }, {
+        id: `codex_vip_${action.heroId}_${Date.now()}`,
+        kind: 'system',
+        title: 'Codex Insight Reward',
+        detail: `+${pointsGain} VIP points for recording hero lore`,
+      });
+
+      if (leveledUp) {
+        nextState = queueReward(nextState, {
+          id: `vip_codex_level_${nextLevel}_${Date.now()}`,
+          kind: 'system',
+          title: `VIP Level Up: ${nextLevel}`,
+          detail: `Bonuses now: +${Math.round((getVipDamageMultiplier({ ...state, vipLevel: nextLevel }) - 1) * 100)}% DPS, +${Math.round((getVipGoldMultiplier({ ...state, vipLevel: nextLevel }) - 1) * 100)}% gold, +${Math.round((getVipExpMultiplier({ ...state, vipLevel: nextLevel }) - 1) * 100)}% EXP`,
+        });
+      }
+      return nextState;
+    }
+
     case 'BUY_PREMIUM_COOLANT': {
       const unitCost = PREMIUM_COOLANT_COSTS[action.itemId];
       const amount = clampInt(action.amount, 1, 99, 1);
@@ -4893,6 +4932,7 @@ function reducer(state: GameState, action: Action): GameState {
         weeklyKills: p.weeklyKills,
         weeklyTrackClaimed: p.weeklyTrackClaimed,
         claimedMissionIds: p.claimedMissionIds,
+        codexVipClaimedHeroIds: p.codexVipClaimedHeroIds,
         seenHintIds: p.seenHintIds,
         permanentUnlocks: p.permanentUnlocks,
         metaDamageLevel: p.metaDamageLevel,
@@ -5022,6 +5062,7 @@ interface SaveData {
   weeklyKills: number;
   weeklyTrackClaimed: number[];
   claimedMissionIds: string[];
+  codexVipClaimedHeroIds?: string[];
   seenHintIds: string[];
   permanentUnlocks: PermanentUnlockId[];
   metaDamageLevel: number;
@@ -5130,6 +5171,7 @@ function serialize(state: GameState): SaveData {
     weeklyKills: state.weeklyKills,
     weeklyTrackClaimed: state.weeklyTrackClaimed,
     claimedMissionIds: state.claimedMissionIds,
+    codexVipClaimedHeroIds: state.codexVipClaimedHeroIds,
     seenHintIds: state.seenHintIds,
     permanentUnlocks: state.permanentUnlocks,
     metaDamageLevel: state.metaDamageLevel,
@@ -5273,7 +5315,7 @@ export function useGameState(saveSlot: string = 'default') {
 
   useEffect(() => {
     if (!hydrated || !state.characterCreated) return;
-    const fingerprint = `${state.weeklyTrackClaimed.join(',')}|${state.claimedMissionIds.join(',')}|${state.vipRewardClaimedLevels.join(',')}|${state.dollarFirstPurchaseClaimedOfferIds.join(',')}`;
+    const fingerprint = `${state.weeklyTrackClaimed.join(',')}|${state.claimedMissionIds.join(',')}|${state.codexVipClaimedHeroIds.join(',')}|${state.vipRewardClaimedLevels.join(',')}|${state.dollarFirstPurchaseClaimedOfferIds.join(',')}`;
     if (fingerprint === claimFingerprintRef.current) return;
     claimFingerprintRef.current = fingerprint;
     lastSaveRef.current = Date.now();
@@ -5283,6 +5325,7 @@ export function useGameState(saveSlot: string = 'default') {
     state.characterCreated,
     state.weeklyTrackClaimed,
     state.claimedMissionIds,
+    state.codexVipClaimedHeroIds,
     state.vipRewardClaimedLevels,
     state.dollarFirstPurchaseClaimedOfferIds,
     saveKey,
@@ -5465,6 +5508,9 @@ export function useGameState(saveSlot: string = 'default') {
   const claimMission = useCallback((missionId: string) => {
     dispatch({ type: 'CLAIM_MISSION', missionId });
   }, []);
+  const claimCodexHeroVip = useCallback((heroId: string) => {
+    dispatch({ type: 'CLAIM_CODEX_HERO_VIP', heroId });
+  }, []);
   const markHintSeen = useCallback((hintId: string) => {
     dispatch({ type: 'MARK_HINT_SEEN', hintId });
   }, []);
@@ -5633,6 +5679,7 @@ export function useGameState(saveSlot: string = 'default') {
     spendEssenceUpgrade,
     claimWeeklyTrack,
     claimMission,
+    claimCodexHeroVip,
     markHintSeen,
     rebirth,
     clearAchievement,
