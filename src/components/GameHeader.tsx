@@ -58,7 +58,7 @@ export default function GameHeader({
       </View>
 
       {/* Center: Core Resources */}
-      <View style={styles.center}>
+      <View style={[styles.center, !twoRowResources && styles.centerSingleRow]}>
         {twoRowResources ? (
           <>
             <View style={styles.resourceRow}>
@@ -193,6 +193,10 @@ const styles = StyleSheet.create({
   center: {
     flex: 0.5,
     gap: SPACING.xs,
+  },
+  centerSingleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   resourceRow: {
     flexDirection: 'row',
