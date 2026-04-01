@@ -1167,8 +1167,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       return;
     }
 
-    const directionHint = guess < lockpickTargetCode ? 'higher' : 'lower';
-    setLockpickHintText(`Access denied. Try a ${directionHint} code. Attempts left: ${3 - nextAttempts}.`);
+    const guessD1 = Math.floor(guess / 10);
+    const guessD2 = guess % 10;
+    const targetD1 = Math.floor(lockpickTargetCode / 10);
+    const targetD2 = lockpickTargetCode % 10;
+    const d1Hint = guessD1 < targetD1 ? 'higher' : guessD1 > targetD1 ? 'lower' : 'correct';
+    const d2Hint = guessD2 < targetD2 ? 'higher' : guessD2 > targetD2 ? 'lower' : 'correct';
+    setLockpickHintText(`Access denied. 1st digit: ${d1Hint}. 2nd digit: ${d2Hint}. Attempts left: ${3 - nextAttempts}.`);
   };
 
   const claimLockpickCacheGame = () => {
@@ -3211,7 +3216,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             </Text>
 
             {targetPracticeScore == null ? (
-              <Pressable style={styles.warPanelActionBtn} onPress={stopTargetPractice}>
+              <Pressable style={[styles.warPanelActionBtn, { alignSelf: 'center' }]} onPress={stopTargetPractice}>
                 <Text style={styles.warPanelActionText}>Stop Shot</Text>
               </Pressable>
             ) : (
