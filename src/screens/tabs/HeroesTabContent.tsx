@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, useWindowDimensions, Image } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
-import { RARITIES, HERO_LEVEL_CAP, getHeroBackstory, getHeroRebirthPlan, getHeroUniqueEffectFamilyLabel, getHeroUniqueSkillDescription, getHeroUniqueWeaponName } from '../../gameConfig';
+import { RARITIES, HERO_LEVEL_CAP, HERO_POOL, getHeroBackstory, getHeroRebirthPlan, getHeroUniqueEffectFamilyLabel, getHeroUniqueSkillDescription, getHeroUniqueWeaponName } from '../../gameConfig';
 import { getHeroPortraitSource } from '../../heroPortraits';
 import { fmt } from '../../utils';
 import { styles } from '../GameScreen';
@@ -209,7 +209,10 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
   );
   const hasBatchNotification = sortedBatchHeroes.some(hero => state.gold >= getHeroGoldLevelCost(hero.level));
   const hasUnlockableTeamSlot = !!nextTeamSlotUnlock?.canUnlock;
-  const uniqueOwnedCount = Object.keys(state.heroUniqueGearByHeroId).length;
+  const uniqueOwnedCount = useMemo(
+    () => HERO_POOL.reduce((count, hero) => count + ((state.heroUniqueGearByHeroId[hero.id]?.rank ?? 0) > 0 ? 1 : 0), 0),
+    [state.heroUniqueGearByHeroId],
+  );
 
   return (
     <>
@@ -232,7 +235,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                 <Text style={styles.featuredSummonDesc}>
                   Focus Hero: {featuredSummonBanner.featuredHeroEmoji} {featuredSummonBanner.featuredHeroName} • Boosted at {featuredSummonBanner.highestRarity.toUpperCase()} rarity on cinematic pulls.
                 </Text>
-                <Text style={styles.featuredSummonDesc}>Hero Unique Relics owned: {uniqueOwnedCount}/{new Set(state.heroRoster.map(hero => hero.id)).size || 0}</Text>
+                <Text style={styles.featuredSummonDesc}>Hero Unique Relics owned: {uniqueOwnedCount}/{HERO_POOL.length}</Text>
                 <View style={styles.featuredSummonMeterRow}>
                   <Text style={styles.featuredSummonMeterLabel}>Legendary Pity</Text>
                   <Text style={styles.featuredSummonMeterValue}>{state.gachaPityCounter}/30</Text>
