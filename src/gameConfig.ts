@@ -693,10 +693,218 @@ const HERO_BACKSTORIES: Record<string, string> = {
   h65: 'Dharma Eternal Cycle guards the Last Wheel archive, preserving combat wisdom across rebirth eras.',
 };
 
+type LegacyHeroUniqueEffectFamily = 'frontline' | 'ranger' | 'arcane' | 'monk';
+type HeroUniqueEffectFamily =
+  | 'bastion'
+  | 'convoy'
+  | 'onslaught'
+  | 'phalanx'
+  | 'command'
+  | 'cataclysm'
+  | 'judgment'
+  | 'ambush'
+  | 'execution'
+  | 'oracle'
+  | 'sanctuary'
+  | 'harvest'
+  | 'spellfire'
+  | 'chronicle';
+
+interface HeroUniqueCombatModifiers {
+  dpsMult: number;
+  goldMult: number;
+  expMult: number;
+  incomingDmgMult: number;
+}
+
+interface HeroUniqueWeaponProfile {
+  weaponName: string;
+  skillName: string;
+  skillFlavor: string;
+  effectFamily?: HeroUniqueEffectFamily | LegacyHeroUniqueEffectFamily;
+}
+
+const HERO_UNIQUE_WEAPONS: Record<string, HeroUniqueWeaponProfile> = {
+  h1: { weaponName: 'Blackgate Oathwall', skillName: 'Last Stand of Blackgate', skillFlavor: 'Turns a broken line into an unbreakable defense.' },
+  h2: { weaponName: 'Crownfall Convoy Shield', skillName: 'Refuge Keeper', skillFlavor: 'Marches protection forward with every rescued soul.' },
+  h3: { weaponName: 'Exile\'s Redress', skillName: 'Ashen Return', skillFlavor: 'Punishes any clan that mistakes mercy for weakness.' },
+  h4: { weaponName: 'Siegehide Mantleaxe', skillName: 'Beastwall Charge', skillFlavor: 'Drives forward behind the weight of hunted war beasts.' },
+  h5: { weaponName: 'Gale-Sleeper Longbow', skillName: 'Stormdraft Split', skillFlavor: 'Reads wind shear before the arrow ever leaves the string.' },
+  h6: { weaponName: 'Tyrant\'s Last Verdict', skillName: 'Reversed Sentence', skillFlavor: 'Executes oppressors with the same precision once used on prisoners.' },
+  h7: { weaponName: 'Bridge of White Silence', skillName: 'Frostspan Miracle', skillFlavor: 'Freezes catastrophe into a path for allies to cross.' },
+  h8: { weaponName: 'Brandless Censer', skillName: 'Rebel Pyre', skillFlavor: 'Turns forbidden fire against the rulers who ordered it.' },
+  h9: { weaponName: 'Granary Wardstaff', skillName: 'Seven-Day Hold', skillFlavor: 'Finds endurance in hunger, rubble, and bare hands.' },
+  h10: { weaponName: 'Dawnscript Veils', skillName: 'Sutra at First Light', skillFlavor: 'Unfolds lost healing doctrine through sacred movement.' },
+  h11: { weaponName: 'Village-Name Plate', skillName: 'Hearthwall Ledger', skillFlavor: 'Carries every protected settlement into the next defense.' },
+  h12: { weaponName: 'Pitscar Reaver', skillName: 'Red Pit Breakout', skillFlavor: 'Turns trial scars into momentum that cannot be chained.' },
+  h13: { weaponName: 'Occupier\'s Blind', skillName: 'Whisper Route', skillFlavor: 'Shoots along the hidden paths only a courier survivor remembers.' },
+  h14: { weaponName: 'Prism Command Lattice', skillName: 'Observatory Overwatch', skillFlavor: 'Converts star math into battlefield certainty.' },
+  h15: { weaponName: 'Sunstep Warfan', skillName: 'Processional Breaker', skillFlavor: 'Refines ceremonial grace into a marching combat rhythm.' },
+  h16: { weaponName: 'Ashwater Testhammer', skillName: 'Live-Drill Temper', skillFlavor: 'Hits with the certainty of steel proven under real fire.' },
+  h17: { weaponName: 'Night-Raid Standard', skillName: 'Third Banner Rising', skillFlavor: 'Raises morale the instant a fallen line is reclaimed.' },
+  h18: { weaponName: 'Hornblood Cleaver', skillName: 'Camp-Horn Reading', skillFlavor: 'Breaks enemy tempo by hearing command patterns before they crest.' },
+  h19: { weaponName: 'Chainfield Sever', skillName: 'Corridor of Hooks', skillFlavor: 'Turns enemy restraint into a killing lane.' },
+  h20: { weaponName: 'Cliffline Talonbow', skillName: 'Far-Sight Execution', skillFlavor: 'Punishes commanders who believe distance is safety.' },
+  h21: { weaponName: 'Lunar Trident Bow', skillName: 'Three Arrows to Midnight', skillFlavor: 'Aligns impossible shots to the cold math of moonlight.' },
+  h22: { weaponName: 'Scarwell Focus', skillName: 'Riftfused Channel', skillFlavor: 'Makes void damage flow through wounds that never fully closed.' , effectFamily: 'arcane' },
+  h23: { weaponName: 'Beaconrend Lantern', skillName: 'Lantern Burst', skillFlavor: 'Condenses siege-signal fire into disciplined devastation.', effectFamily: 'arcane' },
+  h24: { weaponName: 'Treatybreaker Hands', skillName: 'Stillwater Verdict', skillFlavor: 'Delivers the judgment diplomacy could not secure.', effectFamily: 'monk' },
+  h25: { weaponName: 'Thunderbreath Tonfa', skillName: 'Silent Storm Form', skillFlavor: 'Lets motion speak where hearing no longer can.', effectFamily: 'monk' },
+  h26: { weaponName: 'Emberwatch Greatblade', skillName: 'Rankfire Command', skillFlavor: 'Burns brighter when held beside common soldiers.' },
+  h27: { weaponName: 'Convoy-Breaker Rig', skillName: 'Ashrender Ambush', skillFlavor: 'Turns scavenged ruin into perfect demolition timing.' },
+  h28: { weaponName: 'Starplot Recurve', skillName: 'Cartographer\'s Answer', skillFlavor: 'Fires where the chart says the future will stand.' , effectFamily: 'ranger' },
+  h29: { weaponName: 'Soul-Lamp Reliquary', skillName: 'Palefire Ward', skillFlavor: 'Binds mourning rites into protection for the living.', effectFamily: 'arcane' },
+  h30: { weaponName: 'Floodstep Reedstaff', skillName: 'Hollowreed Current', skillFlavor: 'Flows through unstable terrain without ever surrendering balance.', effectFamily: 'monk' },
+  h31: { weaponName: 'Baron\'s End Pickblade', skillName: 'Ironpeak Uprising', skillFlavor: 'Turns labor tools into the start of revolt.' },
+  h32: { weaponName: 'Kinshield Pactblade', skillName: 'Orphan Phalanx', skillFlavor: 'Fights as though every ally were sworn family.' },
+  h33: { weaponName: 'Five-Province Jawmaul', skillName: 'Pit Defector\'s Rush', skillFlavor: 'Carries arena brutality into wars that finally matter.' },
+  h34: { weaponName: 'Quarrysigil Fists', skillName: 'Seismic Recall', skillFlavor: 'Calls old stone-markings back as living shockwaves.' },
+  h35: { weaponName: 'Caravan Halo Bow', skillName: 'Silversprint', skillFlavor: 'Keeps perfect aim even at full mounted speed.', effectFamily: 'ranger' },
+  h36: { weaponName: 'Relaybrand Repeater', skillName: 'Rotating Pressure', skillFlavor: 'Maintains relentless ranged tempo through disciplined cycling.', effectFamily: 'ranger' },
+  h37: { weaponName: 'Eclipse Catechism', skillName: 'Duskborn Veil', skillFlavor: 'Turns ritual shadow into surgical spell cover.', effectFamily: 'arcane' },
+  h38: { weaponName: 'Dawnthief Corvid Seal', skillName: 'Nightwhisper Rewrite', skillFlavor: 'Steals the enemy\'s next command before it is spoken.', effectFamily: 'arcane' },
+  h39: { weaponName: 'Winterwall Sunstaff', skillName: 'Dawn Masonry', skillFlavor: 'Builds a defense and becomes its first guardian.', effectFamily: 'monk' },
+  h40: { weaponName: 'Quarantine Veilblades', skillName: 'No Retreat Convoy', skillFlavor: 'Cuts a safe road where plague and fear say to turn back.', effectFamily: 'monk' },
+  h41: { weaponName: 'Memory-Anvil Greatsword', skillName: 'Fallen Chorus', skillFlavor: 'Strikes with the will of comrades preserved inside the steel.' },
+  h42: { weaponName: 'Republic Dawn', skillName: 'House Without Throne', skillFlavor: 'Fights for a future that outlives noble bloodlines.' },
+  h43: { weaponName: 'Ruinbreak Fangblade', skillName: 'Fortress Null', skillFlavor: 'Leaves command structures gutted and leaderless.' },
+  h44: { weaponName: 'Sanctumrend Idol-Axe', skillName: 'Prophetbreaker Pyre', skillFlavor: 'Burns fear doctrine down and feeds on the collapse.' },
+  h45: { weaponName: 'Vacuumstring Bow', skillName: 'Skybridge Deadfall', skillFlavor: 'Shoots through empty air where hesitation means death.', effectFamily: 'ranger' },
+  h46: { weaponName: 'Warden\'s Red Ledger', skillName: 'Dossier Collapse', skillFlavor: 'Turns old hunting records into a chain of command-kills.', effectFamily: 'ranger' },
+  h47: { weaponName: 'Prismheart Canopy', skillName: 'Tempo Veil', skillFlavor: 'Layers protective light exactly against the enemy\'s rhythm.', effectFamily: 'arcane' },
+  h48: { weaponName: 'Cryo-Crown Scepter', skillName: 'Glacier Fault', skillFlavor: 'Breaks an advance by teaching the ground to freeze and split.', effectFamily: 'arcane' },
+  h49: { weaponName: 'Lightfury Shockstaff', skillName: 'Solar Breach Step', skillFlavor: 'Combines radiant breath and impact footwork into one opening.', effectFamily: 'monk' },
+  h50: { weaponName: 'Soulreturn Mantra', skillName: 'Veteran\'s Recall', skillFlavor: 'Pulls the broken back into the fight with renewed shape.', effectFamily: 'monk' },
+  h51: { weaponName: 'Eclipse-Scale Halberd', skillName: 'Extinction Protocol', skillFlavor: 'Advances with the doctrine of wars meant to erase civilizations.' },
+  h52: { weaponName: 'Office of the Fallen Wing', skillName: 'Infinite Descent', skillFlavor: 'Trades celestial stature for absolute commitment to mortal lines.' },
+  h53: { weaponName: 'Abyss Ringbreaker', skillName: 'Citadel Arena', skillFlavor: 'Treats every fortress as another circle to conquer.' },
+  h54: { weaponName: 'Shadowcourt Headsman', skillName: 'Syndicate Reversal', skillFlavor: 'Redirects an empire of secrets into targeted regime collapse.' },
+  h55: { weaponName: 'First-Impact Railbow', skillName: 'Stratos Verdict', skillFlavor: 'Ends the battle before the enemy registers the opening exchange.', effectFamily: 'ranger' },
+  h56: { weaponName: 'Cultneedle Widowbow', skillName: 'One-Night Collapse', skillFlavor: 'Brings years of infiltration down in a single coordinated kill.', effectFamily: 'ranger' },
+  h57: { weaponName: 'Branchkeeper Chronometer', skillName: 'Civilian Line', skillFlavor: 'Selects the future where the innocent remain standing.', effectFamily: 'arcane' },
+  h58: { weaponName: 'Furnaceheart Scepter', skillName: 'Panic to Flame', skillFlavor: 'Refines battlefield terror into controlled annihilation.', effectFamily: 'arcane' },
+  h59: { weaponName: 'Stellarch Wheelstaff', skillName: 'Cloister Command', skillFlavor: 'Turns disciplined enlightenment into multi-front battle control.', effectFamily: 'monk' },
+  h60: { weaponName: 'Riftseal Sovereign Rings', skillName: 'Age-End Closure', skillFlavor: 'Closes breaches with the force of a final imperial decree.', effectFamily: 'monk' },
+  h61: { weaponName: 'Orbital Furnace Pike', skillName: 'Godplate Sundering', skillFlavor: 'Breaks divine armor the way siege furnaces break ore.' },
+  h62: { weaponName: 'Trenchwake Guillotine', skillName: 'Tidal Citadel Crush', skillFlavor: 'Hits like an abyssal surge rolling over fortress walls.' },
+  h63: { weaponName: 'Downfall Sunwing', skillName: 'Skyfire Reprisal', skillFlavor: 'Returns from certain death as an airborne execution order.', effectFamily: 'ranger' },
+  h64: { weaponName: 'Theaterframe Axiom', skillName: 'Impossible Geometry', skillFlavor: 'Rearranges the field until victory becomes structurally inevitable.', effectFamily: 'arcane' },
+  h65: { weaponName: 'Last Wheel Naginata', skillName: 'Archive of Returns', skillFlavor: 'Carries preserved wisdom from one rebirth age into the next.', effectFamily: 'monk' },
+};
+
+const HERO_UNIQUE_EFFECTS: Record<HeroUniqueEffectFamily, {
+  label: string;
+  dpsBasePct: number;
+  dpsPerRankPct: number;
+  goldBasePct?: number;
+  goldPerRankPct?: number;
+  expBasePct?: number;
+  expPerRankPct?: number;
+  mitigationBasePct?: number;
+  mitigationPerRankPct?: number;
+}> = {
+  bastion: { label: 'Bastion Doctrine', dpsBasePct: 10, dpsPerRankPct: 3.2, mitigationBasePct: 9, mitigationPerRankPct: 1.8 },
+  convoy: { label: 'Convoy Doctrine', dpsBasePct: 8, dpsPerRankPct: 2.8, goldBasePct: 9, goldPerRankPct: 1.8, mitigationBasePct: 4, mitigationPerRankPct: 1.0 },
+  onslaught: { label: 'Onslaught Doctrine', dpsBasePct: 15, dpsPerRankPct: 4.4, mitigationBasePct: 5, mitigationPerRankPct: 1.0 },
+  phalanx: { label: 'Phalanx Doctrine', dpsBasePct: 9, dpsPerRankPct: 3.0, mitigationBasePct: 11, mitigationPerRankPct: 1.8 },
+  command: { label: 'Command Doctrine', dpsBasePct: 11, dpsPerRankPct: 3.3, goldBasePct: 6, goldPerRankPct: 1.5 },
+  cataclysm: { label: 'Cataclysm Doctrine', dpsBasePct: 17, dpsPerRankPct: 4.8, expBasePct: 3, expPerRankPct: 1.0 },
+  judgment: { label: 'Judgment Doctrine', dpsBasePct: 14, dpsPerRankPct: 4.0, mitigationBasePct: 3, mitigationPerRankPct: 0.8 },
+  ambush: { label: 'Ambush Doctrine', dpsBasePct: 12, dpsPerRankPct: 3.5, goldBasePct: 8, goldPerRankPct: 1.8 },
+  execution: { label: 'Execution Doctrine', dpsBasePct: 16, dpsPerRankPct: 4.6, goldBasePct: 3, goldPerRankPct: 1.0 },
+  oracle: { label: 'Oracle Doctrine', dpsBasePct: 11, dpsPerRankPct: 3.4, expBasePct: 10, expPerRankPct: 2.0 },
+  sanctuary: { label: 'Sanctuary Doctrine', dpsBasePct: 8, dpsPerRankPct: 2.8, expBasePct: 6, expPerRankPct: 1.5, mitigationBasePct: 10, mitigationPerRankPct: 1.6 },
+  harvest: { label: 'Harvest Doctrine', dpsBasePct: 7, dpsPerRankPct: 2.6, goldBasePct: 11, goldPerRankPct: 2.2, expBasePct: 4, expPerRankPct: 1.0 },
+  spellfire: { label: 'Spellfire Doctrine', dpsBasePct: 13, dpsPerRankPct: 3.8, expBasePct: 5, expPerRankPct: 1.2 },
+  chronicle: { label: 'Chronicle Doctrine', dpsBasePct: 9, dpsPerRankPct: 3.0, expBasePct: 11, expPerRankPct: 2.2, mitigationBasePct: 6, mitigationPerRankPct: 1.1 },
+};
+
+function isModernHeroUniqueEffectFamily(value: HeroUniqueWeaponProfile['effectFamily']): value is HeroUniqueEffectFamily {
+  if (!value) return false;
+  return value in HERO_UNIQUE_EFFECTS;
+}
+
+function getHeroUniqueEffectFamily(heroId: string): HeroUniqueEffectFamily {
+  const profile = HERO_UNIQUE_WEAPONS[heroId];
+  if (isModernHeroUniqueEffectFamily(profile?.effectFamily)) return profile.effectFamily;
+  const hero = getHeroTemplateById(heroId);
+  if (!hero) return 'bastion';
+
+  if (hero.activeSkillArchetype === 'frontline_ward' && hero.passiveTrait === 'bulwark_instinct') return 'bastion';
+  if (hero.activeSkillArchetype === 'frontline_ward' && hero.passiveTrait === 'fortune_hunter') return 'convoy';
+  if (hero.activeSkillArchetype === 'frontline_ward' && hero.passiveTrait === 'warpath_instinct') return 'onslaught';
+  if (hero.activeSkillArchetype === 'frontline_ward' && hero.passiveTrait === 'sage_instinct') return 'chronicle';
+  if (hero.activeSkillArchetype === 'battle_chant' && hero.passiveTrait === 'bulwark_instinct') return 'phalanx';
+  if (hero.activeSkillArchetype === 'battle_chant' && hero.passiveTrait === 'fortune_hunter') return 'command';
+  if (hero.activeSkillArchetype === 'battle_chant' && hero.passiveTrait === 'warpath_instinct') return 'cataclysm';
+  if (hero.activeSkillArchetype === 'battle_chant' && hero.passiveTrait === 'sage_instinct') return 'chronicle';
+  if (hero.activeSkillArchetype === 'burst_volley' && hero.passiveTrait === 'bulwark_instinct') return 'judgment';
+  if (hero.activeSkillArchetype === 'burst_volley' && hero.passiveTrait === 'fortune_hunter') return 'ambush';
+  if (hero.activeSkillArchetype === 'burst_volley' && hero.passiveTrait === 'warpath_instinct') return 'execution';
+  if (hero.activeSkillArchetype === 'burst_volley' && hero.passiveTrait === 'sage_instinct') return 'oracle';
+  if (hero.activeSkillArchetype === 'mending_pulse' && hero.passiveTrait === 'bulwark_instinct') return 'sanctuary';
+  if (hero.activeSkillArchetype === 'mending_pulse' && hero.passiveTrait === 'fortune_hunter') return 'harvest';
+  if (hero.activeSkillArchetype === 'mending_pulse' && hero.passiveTrait === 'warpath_instinct') return 'spellfire';
+  return 'chronicle';
+}
+
+function clampHeroUniqueRank(rank: number): number {
+  return Math.max(1, Math.min(10, Math.floor(rank)));
+}
+
 export function getHeroBackstory(heroId: string): string {
   const hero = getHeroTemplateById(heroId);
   if (!hero) return 'A nameless wanderer whose legend has yet to be written.';
   return HERO_BACKSTORIES[heroId] ?? `${hero.name} carries an untold legend from the frontier wars.`;
+}
+
+export function getHeroUniqueWeaponName(heroId: string): string {
+  const hero = getHeroTemplateById(heroId);
+  if (!hero) return 'Unwritten Relic';
+  return HERO_UNIQUE_WEAPONS[heroId]?.weaponName ?? `${hero.name}'s Signature Relic`;
+}
+
+export function getHeroUniqueEffectFamilyLabel(heroId: string): string {
+  return HERO_UNIQUE_EFFECTS[getHeroUniqueEffectFamily(heroId)].label;
+}
+
+export function getHeroUniqueCombatModifiers(heroId: string, rank: number): HeroUniqueCombatModifiers {
+  const safeRank = clampHeroUniqueRank(rank);
+  const effect = HERO_UNIQUE_EFFECTS[getHeroUniqueEffectFamily(heroId)];
+  const dpsBonusPct = effect.dpsBasePct + effect.dpsPerRankPct * safeRank;
+  const goldBonusPct = (effect.goldBasePct ?? 0) + (effect.goldPerRankPct ?? 0) * safeRank;
+  const expBonusPct = (effect.expBasePct ?? 0) + (effect.expPerRankPct ?? 0) * safeRank;
+  const mitigationPct = (effect.mitigationBasePct ?? 0) + (effect.mitigationPerRankPct ?? 0) * safeRank;
+
+  return {
+    dpsMult: 1 + dpsBonusPct / 100,
+    goldMult: 1 + goldBonusPct / 100,
+    expMult: 1 + expBonusPct / 100,
+    incomingDmgMult: Math.max(0.5, 1 - mitigationPct / 100),
+  };
+}
+
+export function getHeroUniqueSkillDescription(heroId: string, rank: number): string {
+  const hero = getHeroTemplateById(heroId);
+  const profile = HERO_UNIQUE_WEAPONS[heroId];
+  const safeRank = clampHeroUniqueRank(rank);
+  const skillName = profile?.skillName ?? `${hero?.name ?? 'Unknown'}'s Relic Art`;
+  const skillFlavor = profile?.skillFlavor ?? 'Unleashes a signature legend-bound technique.';
+  const effectLabel = getHeroUniqueEffectFamilyLabel(heroId);
+  const modifiers = getHeroUniqueCombatModifiers(heroId, safeRank);
+  const bonusParts = [`+${Math.round((modifiers.dpsMult - 1) * 100)}% team DPS`];
+
+  if (modifiers.goldMult > 1) {
+    bonusParts.push(`+${Math.round((modifiers.goldMult - 1) * 100)}% gold gain`);
+  }
+  if (modifiers.expMult > 1) {
+    bonusParts.push(`+${Math.round((modifiers.expMult - 1) * 100)}% EXP gain`);
+  }
+  if (modifiers.incomingDmgMult < 1) {
+    bonusParts.push(`${Math.round((1 - modifiers.incomingDmgMult) * 100)}% damage reduction`);
+  }
+
+  return `${skillName} • ${effectLabel}: ${skillFlavor} While active, grants ${bonusParts.join(', ')}.`;
 }
 
 export function getSummonRarityPool(postgameUnlocked: boolean): RarityConfig[] {

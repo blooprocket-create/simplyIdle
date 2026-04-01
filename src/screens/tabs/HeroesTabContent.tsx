@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, useWindowDimensions } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
-import { RARITIES, HERO_LEVEL_CAP, getHeroRebirthPlan } from '../../gameConfig';
+import { RARITIES, HERO_LEVEL_CAP, getHeroBackstory, getHeroRebirthPlan, getHeroUniqueEffectFamilyLabel, getHeroUniqueSkillDescription, getHeroUniqueWeaponName } from '../../gameConfig';
 import { fmt } from '../../utils';
 import { styles } from '../GameScreen';
 
@@ -53,6 +53,7 @@ export interface HeroesTabContentProps {
   saveTeamLoadout: (slot: number) => void;
   loadTeamLoadout: (slot: number) => void;
   toggleEquipHero: (heroId: string) => void;
+  toggleHeroUniqueWeapon: (heroId: string) => void;
   rankUpHero: (heroId: string) => void;
   rebirthHero: (heroId: string) => void;
   levelUpHeroGold: (heroId: string) => void;
@@ -99,6 +100,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
   saveTeamLoadout,
   loadTeamLoadout,
   toggleEquipHero,
+  toggleHeroUniqueWeapon,
   rankUpHero,
   rebirthHero,
   levelUpHeroGold,
@@ -345,16 +347,14 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                   const canHeroRebirth = hero.rank >= 10 && hero.level >= HERO_LEVEL_CAP && state.heroShards >= heroRebirthShardCost && state.essence >= heroRebirthEssenceCost;
                   const trait = getHeroPassiveTraitInfo(hero.passiveTrait);
                   const activeArchetype = getHeroActiveArchetypeInfo(hero.activeSkillArchetype);
-                  const uniqueRank = state.heroUniqueGearByHeroId[hero.id]?.rank ?? 0;
+                  const uniqueProgress = state.heroUniqueGearByHeroId[hero.id];
+                  const uniqueRank = uniqueProgress?.rank ?? 0;
+                  const uniqueEquipped = !!uniqueProgress?.equipped;
+                  const uniqueWeaponName = getHeroUniqueWeaponName(hero.id);
+                  const uniqueDoctrine = getHeroUniqueEffectFamilyLabel(hero.id);
                   const uniqueSkill = uniqueRank > 0
-                    ? hero.heroClass === 'warrior' || hero.heroClass === 'berserker'
-                      ? `Battle Aegis R${uniqueRank}: +${12 + uniqueRank * 4}% DPS, ${8 + uniqueRank * 2}% DR while active`
-                      : hero.heroClass === 'archer'
-                        ? `Deadeye Volley R${uniqueRank}: +${14 + uniqueRank * 4}% DPS, +${5 + uniqueRank * 2}% gold while active`
-                        : hero.heroClass === 'mage'
-                          ? `Astral Conduit R${uniqueRank}: +${13 + uniqueRank * 4}% DPS, +${7 + uniqueRank * 2}% EXP while active`
-                          : `Sanctified Flow R${uniqueRank}: +${11 + uniqueRank * 4}% DPS, ${10 + uniqueRank * 2}% DR while active`
-                    : 'No unique relic yet';
+                    ? getHeroUniqueSkillDescription(hero.id, uniqueRank)
+                    : `Locked • ${uniqueWeaponName} has not been forged yet.`;
                   const faction = hero.heroClass === 'warrior' || hero.heroClass === 'berserker'
                     ? 'Vanguard'
                     : hero.heroClass === 'archer'
@@ -362,6 +362,9 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                       : hero.heroClass === 'mage'
                         ? 'Arcanum'
                         : 'Aegis';
+                  const uniqueWeaponLore = uniqueRank > 0
+                    ? `Forged for ${hero.name}: ${getHeroBackstory(hero.id)}`
+                    : `Unforged concept: ${getHeroBackstory(hero.id)}`;
 
                   return (
                     <View
@@ -521,9 +524,20 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                               <Text style={styles.heroIdentitySub}>{trait.description}</Text>
                               <Text style={styles.heroIdentityLine}>Active: {activeArchetype.name}</Text>
                               <Text style={styles.heroIdentitySub}>{activeArchetype.description}</Text>
-                              <Text style={styles.heroIdentityLine}>Unique Relic: {uniqueRank > 0 ? `Rank ${uniqueRank}/10` : 'Locked'}</Text>
+                              <Text style={styles.heroIdentityLine}>Unique Weapon: {uniqueRank > 0 ? `${uniqueWeaponName} (Rank ${uniqueRank}/10)` : 'Locked'}</Text>
+                              <Text style={styles.heroIdentitySub}>Doctrine: {uniqueDoctrine}</Text>
                               <Text style={styles.heroIdentitySub}>{uniqueSkill}</Text>
+                              <Text style={styles.heroIdentitySub}>{uniqueWeaponLore}</Text>
                             </View>
+
+                            {uniqueRank > 0 && (
+                              <Pressable
+                                style={styles.rankUpBtn}
+                                onPress={() => toggleHeroUniqueWeapon(hero.id)}
+                              >
+                                <Text style={styles.rankUpBtnText}>{uniqueEquipped ? 'Unequip Unique Weapon' : 'Equip Unique Weapon'}</Text>
+                              </Pressable>
+                            )}
 
                             {details && (
                               <View style={styles.heroExpandedStats}>
@@ -566,10 +580,11 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                               </Pressable>
                             )}
                             <Pressable
-                              style={styles.recycleBtn}
+                              style={[styles.recycleBtn, uniqueEquipped && styles.rankUpBtnDisabled]}
+                              disabled={uniqueEquipped}
                               onPress={() => setRecycleConfirmUid(hero.uid)}
                             >
-                              <Text style={styles.recycleBtnText}>♻️ Recycle for {shardValue} 💠</Text>
+                              <Text style={styles.recycleBtnText}>{uniqueEquipped ? '🔒 Unique Weapon Equipped - Cannot Recycle' : `♻️ Recycle for ${shardValue} 💠`}</Text>
                             </Pressable>
                           </>
                         )}

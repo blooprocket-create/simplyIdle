@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
-import { EquipmentSlot } from '../../gameConfig';
+import { EquipmentSlot, getHeroBackstory, getHeroUniqueEffectFamilyLabel, getHeroUniqueSkillDescription, getHeroUniqueWeaponName, RARITIES } from '../../gameConfig';
 import { fmt } from '../../utils';
 import { styles } from '../GameScreen';
 
@@ -22,6 +22,7 @@ export interface EquipmentTabContentProps {
   autoDismantleEquipment: () => void;
   craftEquipment: (slot: EquipmentSlot) => void;
   equipItem: (itemId: string) => void;
+  toggleHeroUniqueWeapon: (heroId: string) => void;
   upgradeEquipmentRarity: (itemId: string) => void;
   dismantleEquipment: (itemId: string) => void;
   convertShardsToEssence: () => void;
@@ -46,12 +47,59 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
   autoDismantleEquipment,
   craftEquipment,
   equipItem,
+  toggleHeroUniqueWeapon,
   upgradeEquipmentRarity,
   dismantleEquipment,
   convertShardsToEssence,
   convertShardsToScrap,
   renderSubTabBar,
 }) => {
+  const rarityRank = useMemo(() => {
+    const rankMap: Record<string, number> = {};
+    RARITIES.forEach((rarity, index) => {
+      rankMap[rarity.id] = index;
+    });
+    return rankMap;
+  }, []);
+
+  const uniqueArmoryEntries = useMemo(() => {
+    const bestOwnedByHeroId = new Map<string, GameState['heroRoster'][number]>();
+
+    for (const hero of state.heroRoster) {
+      const existing = bestOwnedByHeroId.get(hero.id);
+      if (!existing) {
+        bestOwnedByHeroId.set(hero.id, hero);
+        continue;
+      }
+
+      const rarityDiff = (rarityRank[hero.rarity] ?? 0) - (rarityRank[existing.rarity] ?? 0);
+      if (rarityDiff > 0 || (rarityDiff === 0 && hero.level > existing.level)) {
+        bestOwnedByHeroId.set(hero.id, hero);
+      }
+    }
+
+    return Array.from(bestOwnedByHeroId.values())
+      .map(hero => {
+        const progress = state.heroUniqueGearByHeroId[hero.id];
+        return {
+          hero,
+          progress,
+          uniqueRank: progress?.rank ?? 0,
+          uniqueEquipped: !!progress?.equipped,
+        };
+      })
+      .sort((a, b) => {
+        if (a.uniqueRank !== b.uniqueRank) return b.uniqueRank - a.uniqueRank;
+        if (a.uniqueEquipped !== b.uniqueEquipped) return Number(b.uniqueEquipped) - Number(a.uniqueEquipped);
+        const rarityDiff = (rarityRank[b.hero.rarity] ?? 0) - (rarityRank[a.hero.rarity] ?? 0);
+        if (rarityDiff !== 0) return rarityDiff;
+        return b.hero.level - a.hero.level;
+      });
+  }, [rarityRank, state.heroRoster, state.heroUniqueGearByHeroId]);
+
+  const forgedUniqueCount = uniqueArmoryEntries.filter(entry => entry.uniqueRank > 0).length;
+  const equippedUniqueCount = uniqueArmoryEntries.filter(entry => entry.uniqueEquipped && entry.uniqueRank > 0).length;
+
   return (
     <>
       {tab === 'equipment' && (
@@ -59,9 +107,9 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
           <View style={styles.equipHeaderRow}>
             <Text style={styles.sectionTitle}>🎒 Equipment Inventory</Text>
           </View>
-          {renderSubTabBar((['inventory', 'craft', 'forge'] as const).map(st => ({
+          {renderSubTabBar((['inventory', 'armory', 'craft', 'forge'] as const).map(st => ({
             id: st,
-            label: st === 'inventory' ? 'Inventory' : st === 'craft' ? 'Crafting' : 'Forge',
+            label: st === 'inventory' ? 'Inventory' : st === 'armory' ? 'Armory' : st === 'craft' ? 'Crafting' : 'Forge',
             active: equipmentSubTab === st,
             onPress: () => setEquipmentSubTab(st),
           })))}
@@ -69,6 +117,7 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
             Total: {state.inventoryItemIds.length} items • Shards: <Text style={{ color: '#FFB347' }}>{state.heroShards}</Text>
           </Text>
           <Text style={styles.scrapLabel}>🔩 Scrap: {fmt(state.equipmentScrap)}</Text>
+          <Text style={styles.uniqueArmorySummary}>🗃️ Unique Armory: {forgedUniqueCount} forged • {equippedUniqueCount} equipped • Stored separately from normal drops</Text>
           <Text style={styles.mythicTierLabel}>
             Mythic Tier: {state.permanentUnlocks.includes('mythic_equipment') ? 'Unlocked' : 'Locked (Defeat Act 3 Boss)'}
           </Text>
@@ -101,6 +150,49 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
                 );
               })}
             </View>
+          )}
+          {equipmentSubTab === 'armory' && (
+            <>
+              <View style={styles.uniqueArmoryHeaderCard}>
+                <Text style={styles.uniqueArmoryTitle}>Hero Unique Armory</Text>
+                <Text style={styles.uniqueArmoryHelper}>Each unique weapon is hero-bound, lore-linked, and cannot enter the normal dismantle loop.</Text>
+              </View>
+              {uniqueArmoryEntries.length === 0 ? (
+                <Text style={styles.emptyMsg}>Summon heroes to start building the armory. Owned heroes appear here even before their unique weapon is forged.</Text>
+              ) : (
+                uniqueArmoryEntries.map(({ hero, uniqueRank, uniqueEquipped }) => {
+                    const uniqueWeaponName = getHeroUniqueWeaponName(hero.id);
+                    const uniqueDoctrine = getHeroUniqueEffectFamilyLabel(hero.id);
+                    const isLocked = uniqueRank <= 0;
+                    const uniqueSkillText = isLocked
+                      ? `Locked • ${uniqueWeaponName} has not been forged yet.`
+                      : getHeroUniqueSkillDescription(hero.id, uniqueRank);
+                    return (
+                      <View key={hero.id} style={[styles.uniqueArmoryCard, uniqueEquipped && styles.uniqueArmoryCardEquipped, isLocked && styles.uniqueArmoryCardLocked]}>
+                        <View style={styles.uniqueArmoryCardTop}>
+                          <View style={styles.uniqueArmoryIdentityBlock}>
+                            <Text style={styles.uniqueArmoryHeroName}>{hero.emoji} {hero.name}</Text>
+                            <Text style={styles.uniqueArmoryWeaponName}>{uniqueWeaponName}</Text>
+                            <Text style={styles.uniqueArmoryMeta}>{hero.heroClass.toUpperCase()} • {hero.rarity.toUpperCase()} • {uniqueDoctrine}</Text>
+                            <Text style={styles.uniqueArmoryMeta}>{isLocked ? 'UNFORGED' : `Rank ${uniqueRank}/10`}</Text>
+                          </View>
+                          <View style={[styles.uniqueArmoryStatePill, isLocked ? styles.uniqueArmoryStatePillLocked : uniqueEquipped ? styles.uniqueArmoryStatePillEquipped : styles.uniqueArmoryStatePillStored]}>
+                            <Text style={styles.uniqueArmoryStateText}>{isLocked ? 'LOCKED' : uniqueEquipped ? 'EQUIPPED' : 'STORED'}</Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.uniqueArmorySkill, isLocked && styles.uniqueArmoryLockText]}>{uniqueSkillText}</Text>
+                        <Text style={styles.uniqueArmoryLore}>{getHeroBackstory(hero.id)}</Text>
+                        <Text style={styles.uniqueArmoryRule}>Only {hero.name} can wield this weapon.</Text>
+                        {!isLocked && (
+                          <Pressable style={styles.uniqueArmoryToggleBtn} onPress={() => toggleHeroUniqueWeapon(hero.id)}>
+                            <Text style={styles.uniqueArmoryToggleBtnText}>{uniqueEquipped ? 'Unequip Unique Weapon' : 'Equip Unique Weapon'}</Text>
+                          </Pressable>
+                        )}
+                      </View>
+                    );
+                  })
+              )}
+            </>
           )}
           {equipmentSubTab === 'inventory' && state.inventoryItemIds.length === 0 ? (
             <Text style={styles.emptyMsg}>No equipment yet! Kill monsters to find better gear.</Text>

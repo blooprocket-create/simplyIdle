@@ -56,6 +56,10 @@ import {
   getRankStatMultiplier,
   calculateShardReward,
   getHeroRebirthPlan,
+  getHeroBackstory,
+  getHeroUniqueCombatModifiers,
+  getHeroUniqueSkillDescription,
+  getHeroUniqueWeaponName,
   unlockLabel,
 } from './gameConfig';
 import { buildingCost, bulkCost } from './utils';
@@ -414,6 +418,7 @@ type EquipmentSource = 'starter' | 'drop' | 'craft' | 'crate' | 'upgrade' | 'leg
 
 export interface HeroUniqueGearProgress {
   rank: number;
+  equipped: boolean;
 }
 
 export interface EquipmentInstance {
@@ -713,83 +718,31 @@ function clampUniqueRank(rank: number): number {
   return Math.max(1, Math.min(10, Math.floor(rank)));
 }
 
-function getHeroUniqueSkillDescription(heroClass: PlayerClass, rank: number): string {
-  const safeRank = clampUniqueRank(rank);
-  if (heroClass === 'warrior' || heroClass === 'berserker') {
-    return `Battle Aegis: +${12 + safeRank * 4}% team DPS and ${8 + safeRank * 2}% damage reduction while active.`;
-  }
-  if (heroClass === 'archer') {
-    return `Deadeye Volley: +${14 + safeRank * 4}% team DPS and +${5 + safeRank * 2}% gold while active.`;
-  }
-  if (heroClass === 'mage') {
-    return `Astral Conduit: +${13 + safeRank * 4}% team DPS and +${7 + safeRank * 2}% EXP while active.`;
-  }
-  return `Sanctified Flow: +${11 + safeRank * 4}% team DPS and ${10 + safeRank * 2}% damage reduction while active.`;
-}
-
-function buildHeroUniqueEquipment(hero: HeroUnit, rank: number): EquipmentInstance {
-  const safeRank = clampUniqueRank(rank);
-  const baseValue = 36 + safeRank * 18;
-  const classStats: Record<PlayerClass, Partial<StatBlock>> = {
-    warrior: { strength: baseValue + 28, vitality: baseValue + 20, spirit: Math.floor(baseValue * 0.45) },
-    berserker: { strength: baseValue + 20, vitality: baseValue + 28, agility: Math.floor(baseValue * 0.35) },
-    archer: { agility: baseValue + 30, strength: Math.floor(baseValue * 0.55), vitality: Math.floor(baseValue * 0.5) },
-    mage: { intelligence: baseValue + 30, spirit: baseValue + 18, vitality: Math.floor(baseValue * 0.45) },
-    monk: { spirit: baseValue + 24, vitality: baseValue + 18, intelligence: Math.floor(baseValue * 0.55) },
-  };
-  const classBonus = classStats[hero.heroClass] ?? {};
-  const uniqueId = `hero_unique_${hero.id}`;
-  return {
-    id: uniqueId,
-    baseItemId: uniqueId,
-    name: `${hero.name}'s Oath Relic`,
-    emoji: '💠',
-    slot: 'accessory',
-    rarity: 'transcendent',
-    allowedClasses: [hero.heroClass],
-    description: `Unique relic bound to ${hero.name}. ${getHeroUniqueSkillDescription(hero.heroClass, safeRank)}`,
-    bonus: {
-      strength: classBonus.strength ?? 0,
-      vitality: classBonus.vitality ?? 0,
-      agility: classBonus.agility ?? 0,
-      intelligence: classBonus.intelligence ?? 0,
-      spirit: classBonus.spirit ?? 0,
-    },
-    itemLevel: 1 + safeRank * 10,
-    source: 'hero_unique',
-  };
-}
-
 function grantHeroUniqueGear(state: GameState, hero: HeroUnit): GameState {
-  const current = state.heroUniqueGearByHeroId[hero.id]?.rank ?? 0;
+  const progress = state.heroUniqueGearByHeroId[hero.id];
+  const current = progress?.rank ?? 0;
   const nextRank = clampUniqueRank(Math.max(1, current + 1));
   if (current >= 10) return state;
 
-  const uniqueItem = buildHeroUniqueEquipment(hero, nextRank);
   const alreadyOwned = current > 0;
   const nextUnique = {
     ...state.heroUniqueGearByHeroId,
-    [hero.id]: { rank: nextRank },
+    [hero.id]: { rank: nextRank, equipped: progress?.equipped ?? true },
   };
-  const nextInventoryIds = state.inventoryItemIds.includes(uniqueItem.id)
-    ? state.inventoryItemIds
-    : [...state.inventoryItemIds, uniqueItem.id];
+  const storySnippet = getHeroBackstory(hero.id);
+  const uniqueWeaponName = getHeroUniqueWeaponName(hero.id);
+  const uniqueSkill = getHeroUniqueSkillDescription(hero.id, nextRank);
 
   const rewarded = queueReward({
     ...state,
     heroUniqueGearByHeroId: nextUnique,
-    inventoryItemIds: nextInventoryIds,
-    equipmentInventory: {
-      ...state.equipmentInventory,
-      [uniqueItem.id]: uniqueItem,
-    },
   }, {
     id: `hero_unique_${hero.id}_${Date.now()}`,
     kind: 'item',
-    title: alreadyOwned ? `Unique Relic Rank Up: ${hero.name}` : `Unique Relic Acquired: ${hero.name}`,
-    detail: `${uniqueItem.emoji} ${uniqueItem.name} • Rank ${nextRank}/10`,
+    title: alreadyOwned ? `Unique Weapon Rank Up: ${hero.name}` : `Unique Weapon Forged: ${hero.name}`,
+    detail: `${uniqueWeaponName} • Rank ${nextRank}/10 • ${uniqueSkill} ${storySnippet}`,
   });
-  return queueCombatLog(rewarded, `${hero.name}'s relic is now Rank ${nextRank}`);
+  return queueCombatLog(rewarded, `${hero.name}'s unique weapon is now Rank ${nextRank}`);
 }
 
 function maybeGrantHeroUniqueGear(state: GameState, hero: HeroUnit, chance: number): GameState {
@@ -811,20 +764,16 @@ function getActiveUniqueSkillMultipliers(state: GameState): {
 
   for (const hero of state.heroRoster) {
     if (!active.has(hero.uid)) continue;
-    const rank = state.heroUniqueGearByHeroId[hero.id]?.rank ?? 0;
+    const progress = state.heroUniqueGearByHeroId[hero.id];
+    if (!progress?.equipped) continue;
+    const rank = progress.rank ?? 0;
     if (rank <= 0) continue;
-    const safeRank = clampUniqueRank(rank);
+    const modifiers = getHeroUniqueCombatModifiers(hero.id, clampUniqueRank(rank));
 
-    dpsMult *= 1 + 0.12 + safeRank * 0.04;
-    if (hero.heroClass === 'archer') {
-      goldMult *= 1 + 0.03 + safeRank * 0.015;
-    }
-    if (hero.heroClass === 'mage') {
-      expMult *= 1 + 0.04 + safeRank * 0.015;
-    }
-    if (hero.heroClass === 'warrior' || hero.heroClass === 'berserker' || hero.heroClass === 'monk') {
-      incomingDmgMult *= Math.max(0.55, 1 - (0.06 + safeRank * 0.015));
-    }
+    dpsMult *= modifiers.dpsMult;
+    goldMult *= modifiers.goldMult;
+    expMult *= modifiers.expMult;
+    incomingDmgMult *= modifiers.incomingDmgMult;
   }
 
   return {
@@ -833,6 +782,11 @@ function getActiveUniqueSkillMultipliers(state: GameState): {
     expMult: Math.min(6, expMult),
     incomingDmgMult: Math.max(0.3, incomingDmgMult),
   };
+}
+
+function hasEquippedUniqueWeapon(state: GameState, heroTemplateId: string): boolean {
+  const progress = state.heroUniqueGearByHeroId[heroTemplateId];
+  return !!progress && progress.rank > 0 && progress.equipped;
 }
 
 function migrateLegacyEquipmentIds(
@@ -1236,7 +1190,9 @@ function maybeAutoRecycleBackground(state: GameState): GameState {
   if (!state.autoRecycleEnabled) return state;
   const activeTeam = new Set(state.activeTeamHeroIds);
   const maxRank = rarityRank(state.autoRecycleMaxRarity);
-  const toRecycle = state.heroRoster.filter(h => !activeTeam.has(h.uid) && rarityRank(h.rarity) <= maxRank);
+  const toRecycle = state.heroRoster.filter(
+    h => !activeTeam.has(h.uid) && rarityRank(h.rarity) <= maxRank && !hasEquippedUniqueWeapon(state, h.id),
+  );
   if (toRecycle.length === 0) return state;
 
   const recycledIds = new Set(toRecycle.map(h => h.uid));
@@ -2065,7 +2021,10 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
       const rank = isRecord(raw)
         ? clampInt(raw.rank, 1, 10, 1)
         : clampInt(raw, 1, 10, 1);
-      heroUniqueGearByHeroId[heroId] = { rank };
+      const equipped = isRecord(raw)
+        ? clampBoolean(raw.equipped, true)
+        : true;
+      heroUniqueGearByHeroId[heroId] = { rank, equipped };
     }
   }
 
@@ -2109,6 +2068,25 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     equipmentInventory,
     level,
   );
+  const cleanedEquipmentInventory = Object.fromEntries(
+    Object.entries(migratedEquipmentInventory).filter(([, item]) => item.source !== 'hero_unique'),
+  ) as Record<string, EquipmentInstance>;
+  const cleanedInventoryItemIds = inventoryItemIds.filter(itemId => {
+    if (itemId.startsWith('hero_unique_')) return false;
+    const entry = migratedEquipmentInventory[itemId];
+    return !entry || entry.source !== 'hero_unique';
+  });
+  const cleanedEquippedItems = {
+    weapon: migratedEquippedItems.weapon && cleanedInventoryItemIds.includes(migratedEquippedItems.weapon)
+      ? migratedEquippedItems.weapon
+      : null,
+    armor: migratedEquippedItems.armor && cleanedInventoryItemIds.includes(migratedEquippedItems.armor)
+      ? migratedEquippedItems.armor
+      : null,
+    accessory: migratedEquippedItems.accessory && cleanedInventoryItemIds.includes(migratedEquippedItems.accessory)
+      ? migratedEquippedItems.accessory
+      : null,
+  };
 
   const usableItemCounts: Record<string, number> = {};
   if (isRecord(payload.usableItemCounts)) {
@@ -2328,9 +2306,9 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
       .filter(level => level >= 1 && level <= 10),
     dollarFirstPurchaseClaimedOfferIds: sanitizeStringList(payload.dollarFirstPurchaseClaimedOfferIds, VALID_DOLLAR_SHOP_OFFER_IDS.size)
       .filter((id): id is DollarShopOfferId => VALID_DOLLAR_SHOP_OFFER_IDS.has(id as DollarShopOfferId)),
-    inventoryItemIds,
-    equipmentInventory: migratedEquipmentInventory,
-    equippedItems: migratedEquippedItems,
+    inventoryItemIds: cleanedInventoryItemIds,
+    equipmentInventory: cleanedEquipmentInventory,
+    equippedItems: cleanedEquippedItems,
     usableItemCounts,
     autoUsePotionEnabled: clampBoolean(payload.autoUsePotionEnabled, false),
     autoUseCoolantEnabled: clampBoolean(payload.autoUseCoolantEnabled, false),
@@ -2843,6 +2821,7 @@ type Action =
   | { type: 'AUTO_RECYCLE_HEROES' }
   | { type: 'SET_AUTO_RECYCLE_MAX_RARITY'; rarity: Rarity }
   | { type: 'SET_AUTO_RECYCLE_ENABLED'; enabled: boolean }
+  | { type: 'TOGGLE_HERO_UNIQUE_WEAPON'; heroId: string }
   | { type: 'RANK_UP_HERO'; uid: string }
   | { type: 'CONVERT_SHARDS_TO_ESSENCE' }
   | { type: 'CONVERT_SHARDS_TO_SCRAP' }
@@ -3928,6 +3907,7 @@ function reducer(state: GameState, action: Action): GameState {
     case 'RECYCLE_HERO': {
       const hero = state.heroRoster.find(h => h.uid === action.uid);
       if (!hero) return state;
+      if (hasEquippedUniqueWeapon(state, hero.id)) return state;
       
       // Calculate shard reward and remove hero from roster
       const weekly = getCurrentWeeklyEvent(state);
@@ -3958,7 +3938,7 @@ function reducer(state: GameState, action: Action): GameState {
       const activeTeam = new Set(state.activeTeamHeroIds);
       const maxRank = rarityRank(state.autoRecycleMaxRarity);
       const toRecycle = state.heroRoster.filter(
-        h => !activeTeam.has(h.uid) && rarityRank(h.rarity) <= maxRank,
+        h => !activeTeam.has(h.uid) && rarityRank(h.rarity) <= maxRank && !hasEquippedUniqueWeapon(state, h.id),
       );
       if (toRecycle.length === 0) return state;
 
@@ -4452,6 +4432,22 @@ function reducer(state: GameState, action: Action): GameState {
       return {
         ...state,
         autoRecycleEnabled: action.enabled,
+      };
+    }
+
+    case 'TOGGLE_HERO_UNIQUE_WEAPON': {
+      if (!VALID_HERO_TEMPLATE_IDS.has(action.heroId)) return state;
+      const current = state.heroUniqueGearByHeroId[action.heroId];
+      if (!current || current.rank <= 0) return state;
+      return {
+        ...state,
+        heroUniqueGearByHeroId: {
+          ...state.heroUniqueGearByHeroId,
+          [action.heroId]: {
+            ...current,
+            equipped: !current.equipped,
+          },
+        },
       };
     }
 
@@ -5467,6 +5463,9 @@ export function useGameState(saveSlot: string = 'default') {
   const setAutoRecycleEnabled = useCallback((enabled: boolean) => {
     dispatch({ type: 'SET_AUTO_RECYCLE_ENABLED', enabled });
   }, []);
+  const toggleHeroUniqueWeapon = useCallback((heroId: string) => {
+    dispatch({ type: 'TOGGLE_HERO_UNIQUE_WEAPON', heroId });
+  }, []);
   const rankUpHero = useCallback((uid: string) => dispatch({ type: 'RANK_UP_HERO', uid }), []);
   const levelUpHeroGold = useCallback((uid: string) => dispatch({ type: 'LEVEL_UP_HERO_GOLD', uid }), []);
   const convertShardsToEssence = useCallback(() => dispatch({ type: 'CONVERT_SHARDS_TO_ESSENCE' }), []);
@@ -5650,6 +5649,7 @@ export function useGameState(saveSlot: string = 'default') {
     autoRecycleHeroes,
     setAutoRecycleMaxRarity,
     setAutoRecycleEnabled,
+    toggleHeroUniqueWeapon,
     rankUpHero,
     levelUpHeroGold,
     convertShardsToEssence,
