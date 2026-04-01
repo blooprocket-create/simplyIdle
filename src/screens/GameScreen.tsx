@@ -69,7 +69,7 @@ export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | '
 type HeroesSubTab = 'summon' | 'roster' | 'batch';
 type EquipmentSubTab = 'inventory' | 'craft' | 'forge';
 type AchievementsSubTab = 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex';
-type OperationsSubTab = 'facilities' | 'expeditions';
+type OperationsSubTab = 'facilities' | 'expeditions' | 'miniops' | 'dungeonops';
 type ShopTab = 'diamond' | 'gold' | 'dollar';
 export type ExpeditionType = 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss';
 export type ExpeditionRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
@@ -321,7 +321,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [warPanels, setWarPanels] = useState({
     frontline: true,
     roster: true,
-    operations: true,
     armory: false,
     growth: false,
     objectives: true,
@@ -567,7 +566,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     const nextCost = facilityUpgradeCosts[facility][level] ?? Number.MAX_SAFE_INTEGER;
     return state.gold >= nextCost;
   }).length;
-  const operationsNotificationCount = expeditionClaimableCount + expeditionLaunchableAffordableCount + facilitiesUpgradeableCount;
+  const miniOpsNotificationCount = canPlayDiceToday ? 1 : 0;
+  const dungeonOpsNotificationCount = canRunRiftToday ? 1 : 0;
+  const operationsNotificationCount = expeditionClaimableCount + expeditionLaunchableAffordableCount + facilitiesUpgradeableCount + miniOpsNotificationCount + dungeonOpsNotificationCount;
   const guidanceList = useMemo(() => {
     const recs: Array<{ title: string; detail: string; tab: Tab }> = [];
     if (canRebirthNow) {
@@ -1762,9 +1763,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             dangerLabel,
             dangerScore,
             teamSlotCap,
-            canPlayDiceToday,
-            canRunRiftToday,
-            nextTeamSlotUnlock,
             missionCards,
             weeklyEvent,
             hasClaimableRewards,
@@ -1781,11 +1779,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             setAchievementsSubTab,
             setRebirthOpen,
             autoEquipBestHeroes,
-            setDiceRollResult,
-            setDiceIsRolling,
-            setDiceRollModalOpen,
-            openRiftChallenge,
-            unlockTeamSlot,
             claimAllRewards,
             craftEquipment,
           } as any)}
@@ -1833,6 +1826,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             setExpandedHeroes,
             activeTeamSet,
             teamSlotCap,
+            nextTeamSlotUnlock,
             getClassConfig,
             getHeroPassiveTraitInfo,
             getHeroActiveArchetypeInfo,
@@ -1850,6 +1844,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             rankUpHero,
             rebirthHero,
             levelUpHeroGold,
+            unlockTeamSlot,
             batchLevelHeroes,
             setRecycleConfirmUid,
             renderSubTabBar,
@@ -1932,6 +1927,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             stats,
             operationsSubTab,
             setOperationsSubTab,
+            canPlayDiceToday,
+            canRunRiftToday,
+            setDiceRollResult,
+            setDiceIsRolling,
+            setDiceRollModalOpen,
+            openRiftChallenge,
             upgradeFacility,
             startExpedition,
             completeExpedition,

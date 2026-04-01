@@ -1971,6 +1971,41 @@ export const styles = StyleSheet.create({
     color: '#888',
     marginBottom: 8,
   },
+  heroSlotUnlockCard: {
+    marginBottom: 8,
+    backgroundColor: '#122032',
+    borderWidth: 1,
+    borderColor: '#2c4d73',
+    borderRadius: 6,
+    padding: 8,
+    gap: 6,
+  },
+  heroSlotUnlockTitle: {
+    fontSize: 11,
+    color: '#D8E9FF',
+    fontWeight: '700',
+  },
+  heroSlotUnlockMeta: {
+    fontSize: 10,
+    color: '#AFC8E8',
+  },
+  heroSlotUnlockBtn: {
+    alignSelf: 'flex-start',
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#67A1D8',
+    backgroundColor: '#234062',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  heroSlotUnlockBtnDisabled: {
+    opacity: 0.45,
+  },
+  heroSlotUnlockBtnText: {
+    fontSize: 10,
+    color: '#E7F1FF',
+    fontWeight: '700',
+  },
   recyclePickerWrap: {
     marginBottom: 8,
     backgroundColor: '#111728',

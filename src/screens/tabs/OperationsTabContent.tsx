@@ -11,6 +11,12 @@ export interface OperationsTabContentProps {
   stats: Stats;
   operationsSubTab: string;
   setOperationsSubTab: (tab: string) => void;
+  canPlayDiceToday: boolean;
+  canRunRiftToday: boolean;
+  setDiceRollResult: (result: any) => void;
+  setDiceIsRolling: (rolling: boolean) => void;
+  setDiceRollModalOpen: (open: boolean) => void;
+  openRiftChallenge: () => void;
   upgradeFacility: (facility: string) => void;
   startExpedition: (type: string, rarity: string) => void;
   completeExpedition: (expeditionId: string) => void;
@@ -24,6 +30,12 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
   stats,
   operationsSubTab,
   setOperationsSubTab,
+  canPlayDiceToday,
+  canRunRiftToday,
+  setDiceRollResult,
+  setDiceIsRolling,
+  setDiceRollModalOpen,
+  openRiftChallenge,
   upgradeFacility,
   startExpedition,
   completeExpedition,
@@ -57,16 +69,73 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
       {tab === 'operations' && (
         <View style={styles.operationsTab}>
           <Text style={styles.sectionTitle}>⚙️ Operations Command</Text>
-          {renderSubTabBar((['facilities', 'expeditions'] as const).map(st => ({
+          {renderSubTabBar((['miniops', 'dungeonops', 'facilities', 'expeditions'] as const).map(st => ({
             id: st,
-            label: st === 'facilities' ? 'Facilities' : 'Expeditions',
+            label: st === 'miniops' ? 'Mini Ops' : st === 'dungeonops' ? 'Dungeon Ops' : st === 'facilities' ? 'Facilities' : 'Expeditions',
             active: operationsSubTab === st,
             onPress: () => setOperationsSubTab(st),
             notificationCount:
-              st === 'facilities'
-                ? facilitiesUpgradeableCount
-                : expeditionClaimableCount + expeditionLaunchableAffordableCount,
+              st === 'miniops'
+                ? (canPlayDiceToday ? 1 : 0)
+                : st === 'dungeonops'
+                  ? (canRunRiftToday ? 1 : 0)
+                  : st === 'facilities'
+                    ? facilitiesUpgradeableCount
+                    : expeditionClaimableCount + expeditionLaunchableAffordableCount,
           })))}
+
+          {/* MINI OPS TAB */}
+          {operationsSubTab === 'miniops' && (
+            <View style={styles.facilitiesSection}>
+              <Text style={styles.facilitiesTitle}>🎲 Mini Ops</Text>
+              <Text style={styles.facilitiesDesc}>Daily tactical actions and quick reward bursts.</Text>
+              <View style={styles.facilityCard}>
+                <Text style={styles.facilityName}>Dice Protocol</Text>
+                <Text style={styles.facilityBonusText}>Status: {canPlayDiceToday ? 'Ready' : 'Claimed today'}</Text>
+                {state.lastDiceRollValue != null && (
+                  <Text style={styles.facilityNextBonus}>Last roll: {state.lastDiceRollValue}/20</Text>
+                )}
+                <Pressable
+                  style={[styles.warPanelActionBtn, !canPlayDiceToday && styles.warPanelActionBtnDisabled]}
+                  disabled={!canPlayDiceToday}
+                  onPress={() => {
+                    setDiceRollResult(null);
+                    setDiceIsRolling(false);
+                    setDiceRollModalOpen(true);
+                  }}
+                >
+                  <Text style={styles.warPanelActionText}>Roll Dice (+Diamonds)</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {/* DUNGEON OPS TAB */}
+          {operationsSubTab === 'dungeonops' && (
+            <View style={styles.expeditionsSection}>
+              <Text style={styles.expeditionsTitle}>🕳️ Dungeon Ops</Text>
+              <Text style={styles.expeditionsDesc}>Dedicated dungeon lane for focused resource runs.</Text>
+              <View style={styles.facilityCard}>
+                <Text style={styles.facilityName}>Rift (legacy mode)</Text>
+                <Text style={styles.facilityBonusText}>Status: {canRunRiftToday ? 'Ready' : 'Cleared today'}</Text>
+                {state.lastRiftWavesCleared > 0 && (
+                  <Text style={styles.facilityNextBonus}>Last clear: {state.lastRiftWavesCleared}/5 waves</Text>
+                )}
+                <Pressable
+                  style={[styles.warPanelActionBtn, !canRunRiftToday && styles.warPanelActionBtnDisabled]}
+                  disabled={!canRunRiftToday}
+                  onPress={openRiftChallenge}
+                >
+                  <Text style={styles.warPanelActionText}>Run Rift</Text>
+                </Pressable>
+              </View>
+              <View style={styles.facilityCard}>
+                <Text style={styles.facilityName}>Future Dungeon Lanes</Text>
+                <Text style={styles.facilityNextBonus}>Planned tracks: Gold Ops, EXP Ops, Diamond Ops, Tear Ops, and more.</Text>
+                <Text style={styles.facilityNextBonus}>This sub-tab is now the home for all dungeon systems.</Text>
+              </View>
+            </View>
+          )}
 
           {/* FACILITIES TAB */}
           {operationsSubTab === 'facilities' && (

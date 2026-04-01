@@ -26,6 +26,7 @@ export interface HeroesTabContentProps {
   setExpandedHeroes: (set: Set<string>) => void;
   activeTeamSet: Set<string>;
   teamSlotCap: number;
+  nextTeamSlotUnlock: any;
   getClassConfig: (heroClass: string) => any;
   getHeroPassiveTraitInfo: (trait: string) => any;
   getHeroActiveArchetypeInfo: (archetype: string) => any;
@@ -43,6 +44,7 @@ export interface HeroesTabContentProps {
   rankUpHero: (heroId: string) => void;
   rebirthHero: (heroId: string) => void;
   levelUpHeroGold: (heroId: string) => void;
+  unlockTeamSlot: () => void;
   batchLevelHeroes: (heroIds: string[], mode: number | 'max') => void;
   setRecycleConfirmUid: (uid: string) => void;
   renderSubTabBar: (tabs: any[]) => React.ReactNode;
@@ -69,6 +71,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
   setExpandedHeroes,
   activeTeamSet,
   teamSlotCap,
+  nextTeamSlotUnlock,
   getClassConfig,
   getHeroPassiveTraitInfo,
   getHeroActiveArchetypeInfo,
@@ -86,6 +89,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
   rankUpHero,
   rebirthHero,
   levelUpHeroGold,
+  unlockTeamSlot,
   batchLevelHeroes,
   setRecycleConfirmUid,
   renderSubTabBar,
@@ -152,6 +156,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
     Math.floor((viewportWidth - batchHorizontalPadding - batchGap * (batchColumns - 1)) / batchColumns),
   );
   const hasBatchNotification = sortedBatchHeroes.some(hero => state.gold >= getHeroGoldLevelCost(hero.level));
+  const hasUnlockableTeamSlot = !!nextTeamSlotUnlock?.canUnlock;
 
   return (
     <>
@@ -162,7 +167,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
             label: st === 'summon' ? 'Summon Bay' : st === 'roster' ? 'Roster' : 'Batch Level',
             active: heroesSubTab === st,
             onPress: () => setHeroesSubTab(st),
-            notificationCount: st === 'summon' && hasGachaNotification ? 1 : st === 'batch' && hasBatchNotification ? 1 : 0,
+            notificationCount: st === 'summon' && hasGachaNotification ? 1 : st === 'batch' && hasBatchNotification ? 1 : st === 'roster' && hasUnlockableTeamSlot ? 1 : 0,
           })))}
 
           {heroesSubTab === 'summon' && (
@@ -262,6 +267,27 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
               <Text style={styles.rosterCount}>
                 {state.heroRoster.length} heroes • {state.activeTeamHeroIds.length}/{teamSlotCap} in active team
               </Text>
+              <View style={styles.heroSlotUnlockCard}>
+                <Text style={styles.heroSlotUnlockTitle}>Formation Slots</Text>
+                {nextTeamSlotUnlock ? (
+                  <>
+                    <Text style={styles.heroSlotUnlockMeta}>
+                      Next slot {nextTeamSlotUnlock.targetSlots}: Wave {nextTeamSlotUnlock.requiredWave} • {fmt(nextTeamSlotUnlock.goldCost)} gold • {fmt(nextTeamSlotUnlock.shardCost)} shards
+                    </Text>
+                    <Pressable
+                      style={[styles.heroSlotUnlockBtn, !nextTeamSlotUnlock.canUnlock && styles.heroSlotUnlockBtnDisabled]}
+                      disabled={!nextTeamSlotUnlock.canUnlock}
+                      onPress={unlockTeamSlot}
+                    >
+                      <Text style={styles.heroSlotUnlockBtnText}>
+                        {nextTeamSlotUnlock.canUnlock ? `Unlock Slot ${nextTeamSlotUnlock.targetSlots}` : 'Requirements not met'}
+                      </Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <Text style={styles.heroSlotUnlockMeta}>All team slots unlocked.</Text>
+                )}
+              </View>
               <View style={[styles.loadoutRow, isPhoneWidth && styles.loadoutRowMobile]}>
                 {[0, 1, 2].map(slot => (
                   <View key={slot} style={[styles.loadoutCell, isPhoneWidth && styles.loadoutCellMobile]}>

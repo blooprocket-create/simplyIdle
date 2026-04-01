@@ -27,9 +27,6 @@ export interface WarroomTabContentProps {
   dangerLabel: string;
   dangerScore: number;
   teamSlotCap: number;
-  canPlayDiceToday: boolean;
-  canRunRiftToday: boolean;
-  nextTeamSlotUnlock: any;
   missionCards: any[];
   weeklyEvent: any;
   hasClaimableRewards: boolean;
@@ -46,11 +43,6 @@ export interface WarroomTabContentProps {
   setAchievementsSubTab: (tab: string) => void;
   setRebirthOpen: (open: boolean) => void;
   autoEquipBestHeroes: () => void;
-  setDiceRollResult: (result: any) => void;
-  setDiceIsRolling: (rolling: boolean) => void;
-  setDiceRollModalOpen: (open: boolean) => void;
-  openRiftChallenge: () => void;
-  unlockTeamSlot: () => void;
   claimAllRewards: () => void;
   craftEquipment: (slot: string) => void;
 }
@@ -78,9 +70,6 @@ export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
   dangerLabel,
   dangerScore,
   teamSlotCap,
-  canPlayDiceToday,
-  canRunRiftToday,
-  nextTeamSlotUnlock,
   missionCards,
   weeklyEvent,
   hasClaimableRewards,
@@ -97,11 +86,6 @@ export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
   setAchievementsSubTab,
   setRebirthOpen,
   autoEquipBestHeroes,
-  setDiceRollResult,
-  setDiceIsRolling,
-  setDiceRollModalOpen,
-  openRiftChallenge,
-  unlockTeamSlot,
   claimAllRewards,
   craftEquipment,
 }) => {
@@ -223,74 +207,6 @@ export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
                   </Pressable>
                   <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('heroes')}>
                     <Text style={styles.warPanelActionText}>Manage Roster</Text>
-                  </Pressable>
-                </View>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.warPanel}>
-            <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('operations')}>
-              <Text style={styles.warPanelTitle}>🎲 Operations</Text>
-              <Text style={styles.warPanelChevron}>{warPanels.operations ? '−' : '+'}</Text>
-            </Pressable>
-            {warPanels.operations && (
-              <View style={styles.warPanelBody}>
-                <Text style={styles.warPanelStat}>Daily Dice: {canPlayDiceToday ? 'Ready' : 'Claimed today'}</Text>
-                <Text style={styles.warPanelStat}>Rift Challenge: {canRunRiftToday ? 'Ready' : 'Cleared today'}{state.lastRiftWavesCleared > 0 ? ` • Last clear ${state.lastRiftWavesCleared}/5` : ''}</Text>
-                {state.lastDiceRollValue != null && (
-                  <Text style={styles.warPanelStat}>Last Dice Roll: {state.lastDiceRollValue}/20</Text>
-                )}
-                <Text style={styles.warPanelStat}>Formation Rule: Max 2 Front, 2 Mid, 2 Back</Text>
-                <Text style={styles.warPanelStat}>Team Slots: {state.activeTeamHeroIds.length}/{teamSlotCap}</Text>
-                {nextTeamSlotUnlock ? (
-                  <Text style={styles.warPanelStat}>
-                    Next Slot {nextTeamSlotUnlock.targetSlots}: Wave {nextTeamSlotUnlock.requiredWave}, {fmt(nextTeamSlotUnlock.goldCost)} gold, {fmt(nextTeamSlotUnlock.shardCost)} shards
-                  </Text>
-                ) : (
-                  <Text style={styles.warPanelStat}>All team slots unlocked.</Text>
-                )}
-                <View style={styles.warPanelActionRow}>
-                  <Pressable
-                    style={[styles.warPanelActionBtn, !canPlayDiceToday && styles.warPanelActionBtnDisabled]}
-                    disabled={!canPlayDiceToday}
-                    onPress={() => {
-                      setDiceRollResult(null);
-                      setDiceIsRolling(false);
-                      setDiceRollModalOpen(true);
-                    }}
-                  >
-                    <View style={{ position: 'relative', alignItems: 'center' }}>
-                      <Text style={styles.warPanelActionText}>Roll Dice (+Diamonds)</Text>
-                      {canPlayDiceToday && <View style={[styles.redDot, { position: 'absolute', top: -2, right: 0 }]} />}
-                    </View>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.warPanelActionBtn, !canRunRiftToday && styles.warPanelActionBtnDisabled]}
-                    disabled={!canRunRiftToday}
-                    onPress={openRiftChallenge}
-                  >
-                    <View style={{ position: 'relative', alignItems: 'center' }}>
-                      <Text style={styles.warPanelActionText}>Run Rift (+Diamonds)</Text>
-                      {canRunRiftToday && <View style={[styles.redDot, { position: 'absolute', top: -2, right: 0 }]} />}
-                    </View>
-                  </Pressable>
-                </View>
-                <View style={styles.warPanelActionRow}>
-                  <Pressable
-                    style={[
-                      styles.warPanelActionBtn,
-                      (!nextTeamSlotUnlock || !nextTeamSlotUnlock.canUnlock) && styles.warPanelActionBtnDisabled,
-                    ]}
-                    disabled={!nextTeamSlotUnlock || !nextTeamSlotUnlock.canUnlock}
-                    onPress={unlockTeamSlot}
-                  >
-                    <Text style={styles.warPanelActionText}>
-                      {nextTeamSlotUnlock ? `Unlock Slot ${nextTeamSlotUnlock.targetSlots}` : 'Slots Maxed'}
-                    </Text>
-                  </Pressable>
-                  <Pressable style={styles.warPanelActionBtn} onPress={() => onTabChange('heroes')}>
-                    <Text style={styles.warPanelActionText}>Edit Team</Text>
                   </Pressable>
                 </View>
               </View>
