@@ -116,7 +116,7 @@ const TAB_META: Record<Tab, { icon: string; label: string; mood: string }> = {
 
 export const ACH_BONUS_PER_UNLOCK_PCT = 3;
 export const ACH_BONUS_CAP_PCT = 75;
-const FEEDBACK_FORM_URL = 'https://forms.gle/replace-with-your-beta-form';
+const FEEDBACK_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSf6txIw9UL-F9kItXZfOfr9d0qA_XCvaNIsBUf_4NZ1HZpfrw/viewform?usp=publish-editor';
 const HAS_BETA_FEEDBACK_FORM = !FEEDBACK_FORM_URL.includes('replace-with-your-beta-form');
 const GEAR_RARITY_POINTS: Record<string, number> = { common: 40, rare: 90, epic: 170, legendary: 280, mythic: 430, transcendent: 680 };
 
