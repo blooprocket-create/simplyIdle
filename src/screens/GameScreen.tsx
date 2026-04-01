@@ -351,6 +351,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [reconPickedIndex, setReconPickedIndex] = useState<number | null>(null);
   const [reconRevealInProgress, setReconRevealInProgress] = useState(false);
   const [reconRevealComplete, setReconRevealComplete] = useState(false);
+  const [reconCardsRevealed, setReconCardsRevealed] = useState<boolean[]>([false, false, false]);
   const reconFlipAnims = useRef([
     new Animated.Value(0),
     new Animated.Value(0),
@@ -1070,6 +1071,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setReconPickedIndex(null);
     setReconRevealInProgress(false);
     setReconRevealComplete(false);
+    setReconCardsRevealed([false, false, false]);
     reconFlipAnims.forEach(anim => anim.setValue(0));
     reconSelectedScale.setValue(1);
   };
@@ -1085,6 +1087,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setReconPickedIndex(null);
     setReconRevealInProgress(false);
     setReconRevealComplete(false);
+    setReconCardsRevealed([false, false, false]);
     reconFlipAnims.forEach(anim => anim.setValue(0));
     reconSelectedScale.setValue(1);
     setReconGameOpen(true);
@@ -1096,6 +1099,16 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setReconPickedIndex(pickIndex);
 
     const otherIndices = [0, 1, 2].filter(index => index !== pickIndex && index < reconChoices.length);
+
+    // Swap card content at the midpoint of each flip (when scaleX reaches 0)
+    setTimeout(() => setReconCardsRevealed(prev => { const n = [...prev]; n[pickIndex] = true; return n; }), 160);
+    if (otherIndices[0] !== undefined) {
+      setTimeout(() => setReconCardsRevealed(prev => { const n = [...prev]; n[otherIndices[0]] = true; return n; }), 450);
+    }
+    if (otherIndices[1] !== undefined) {
+      setTimeout(() => setReconCardsRevealed(prev => { const n = [...prev]; n[otherIndices[1]] = true; return n; }), 710);
+    }
+
     const sequences: Animated.CompositeAnimation[] = [
       Animated.timing(reconFlipAnims[pickIndex], {
         toValue: 1,
@@ -3103,9 +3116,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       : choice === 'intel_buff'
                         ? 'Telemetry Feed'
                         : 'Enemy Ambush';
-                const rotateY = reconFlipAnims[index].interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['0deg', '180deg'],
+                const scaleX = reconFlipAnims[index].interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: [1, 0.01, 1],
                 });
                 const scale = picked ? reconSelectedScale : 1;
                 return (
@@ -3121,18 +3134,21 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                         picked && styles.reconChoiceCardPicked,
                         choice === 'ambush' && reconRevealComplete && styles.reconChoiceCardDanger,
                         {
-                          transform: [{ perspective: 1000 }, { rotateY }, { scale }],
+                          transform: [{ scaleX }, { scale }],
                         },
                       ]}
                     >
-                      <View style={styles.reconCardFaceFront}>
-                        <Text style={styles.reconCardBackSymbol}>🂠</Text>
-                        <View style={styles.reconCardBackStripe} />
-                        <Text style={styles.reconCardBackLabel}>RECON</Text>
-                      </View>
-                      <View style={styles.reconCardFaceBack}>
-                        <Text style={styles.reconChoiceLabel}>{label}</Text>
-                      </View>
+                      {!reconCardsRevealed[index] ? (
+                        <View style={styles.reconCardFaceFront}>
+                          <Text style={styles.reconCardBackSymbol}>🂠</Text>
+                          <View style={styles.reconCardBackStripe} />
+                          <Text style={styles.reconCardBackLabel}>RECON</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.reconCardFaceBack}>
+                          <Text style={styles.reconChoiceLabel}>{label}</Text>
+                        </View>
+                      )}
                     </Animated.View>
                   </Pressable>
                 );
