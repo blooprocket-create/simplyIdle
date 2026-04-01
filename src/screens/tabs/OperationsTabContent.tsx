@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { GameState, Stats, EXPEDITION_CONTRACT_REFRESH_MS, EXPEDITION_CONTRACT_REFRESH_GOLD_COST } from '../../useGameState';
+import { FacilityId, GameState, Stats, EXPEDITION_CONTRACT_REFRESH_MS, EXPEDITION_CONTRACT_REFRESH_GOLD_COST, FACILITY_MAX_LEVEL, getFacilityUpgradeCost } from '../../useGameState';
 import { EXPEDITION_TYPES, EXPEDITION_TYPE_META, EXPEDITION_RARITY_META, formatDurationShort, ExpeditionType, ExpeditionRarity } from '../GameScreen';
 import { fmt } from '../../utils';
 import { styles } from '../GameScreen';
@@ -51,16 +51,23 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
     const cost = EXPEDITION_RARITY_META[rarity as ExpeditionRarity]?.goldCost ?? Number.MAX_SAFE_INTEGER;
     return state.gold >= cost;
   }).length;
-  const facilityUpgradeCosts: Record<'training' | 'treasury' | 'forge' | 'tactics', number[]> = {
-    training: [5000, 12000, 30000, 75000, 150000, 300000],
-    treasury: [4000, 10000, 25000, 60000, 120000, 250000],
-    forge: [6000, 15000, 40000, 90000, 180000, 350000],
-    tactics: [5000, 12000, 30000, 75000, 150000, 300000],
+  const facilityStepPct: Record<FacilityId, number> = {
+    training: 5,
+    treasury: 2,
+    forge: 3,
+    tactics: 1,
+  };
+  const facilityCurrentLabel = (facility: FacilityId, level: number) => {
+    const pct = facilityStepPct[facility] * level;
+    if (facility === 'training') return `+${pct}% XP gain`;
+    if (facility === 'treasury') return `+${pct}% gold gain`;
+    if (facility === 'forge') return `+${pct}% gear rarity`;
+    return `+${pct}% team power`;
   };
   const facilitiesUpgradeableCount = (['training', 'treasury', 'forge', 'tactics'] as const).filter(facility => {
     const level = operationsFacilities[facility].level;
-    if (level >= 5) return false;
-    const nextCost = facilityUpgradeCosts[facility][level] ?? Number.MAX_SAFE_INTEGER;
+    if (level >= FACILITY_MAX_LEVEL) return false;
+    const nextCost = getFacilityUpgradeCost(facility, level);
     return state.gold >= nextCost;
   }).length;
   const dungeonLanes = [
@@ -213,21 +220,8 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
 
               {(['training', 'treasury', 'forge', 'tactics'] as const).map(facility => {
                 const level = operationsFacilities[facility].level;
-                const costs: Record<string, number[]> = {
-                  training: [5000, 12000, 30000, 75000, 150000, 300000],
-                  treasury: [4000, 10000, 25000, 60000, 120000, 250000],
-                  forge: [6000, 15000, 40000, 90000, 180000, 350000],
-                  tactics: [5000, 12000, 30000, 75000, 150000, 300000],
-                };
-
-                const nextCost = costs[facility][level];
-                const canUpgrade = level < 5 && state.gold >= nextCost;
-                const bonuses: Record<string, string[]> = {
-                  training: ['+5% XP gain', '+10% XP gain', '+15% XP gain', '+20% XP gain', '+25% XP gain'],
-                  treasury: ['+2% gold gain', '+4% gold gain', '+6% gold gain', '+8% gold gain', '+10% gold gain'],
-                  forge: ['+3% gear rarity', '+6% gear rarity', '+9% gear rarity', '+12% gear rarity', '+15% gear rarity'],
-                  tactics: ['+1% team power', '+2% team power', '+3% team power', '+4% team power', '+5% team power'],
-                };
+                const nextCost = getFacilityUpgradeCost(facility, level);
+                const canUpgrade = level < FACILITY_MAX_LEVEL && state.gold >= nextCost;
 
                 const icons = { training: '📚', treasury: '💰', forge: '⚒️', tactics: '🎯' };
 
@@ -235,29 +229,29 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
                   <View key={facility} style={styles.facilityCard}>
                     <View style={styles.facilityHeader}>
                       <Text style={styles.facilityName}>{icons[facility]} {facility === 'training' ? 'Training Hall' : facility === 'treasury' ? 'Treasury' : facility === 'forge' ? 'Equipment Forge' : 'Tactics Room'}</Text>
-                      <Text style={styles.facilityLevel}>Level {level}/5</Text>
+                      <Text style={styles.facilityLevel}>Level {level}/{FACILITY_MAX_LEVEL}</Text>
                     </View>
 
                     <View style={styles.facilityBonusBar}>
-                      {Array.from({ length: 5 }).map((_, i) => (
+                      {Array.from({ length: 10 }).map((_, i) => (
                         <View
                           key={i}
                           style={[
                             styles.facilityBonusSegment,
-                            i < level && styles.facilityBonusSegmentActive,
+                            i < Math.round((level / FACILITY_MAX_LEVEL) * 10) && styles.facilityBonusSegmentActive,
                           ]}
                         />
                       ))}
                     </View>
 
                     {level > 0 && (
-                      <Text style={styles.facilityBonusText}>Current: {bonuses[facility][level - 1]}</Text>
+                      <Text style={styles.facilityBonusText}>Current: {facilityCurrentLabel(facility, level)}</Text>
                     )}
-                    {level < 5 && (
-                      <Text style={styles.facilityNextBonus}>Next: {bonuses[facility][level]}</Text>
+                    {level < FACILITY_MAX_LEVEL && (
+                      <Text style={styles.facilityNextBonus}>Next: {facilityCurrentLabel(facility, level + 1)}</Text>
                     )}
 
-                    {level < 5 ? (
+                    {level < FACILITY_MAX_LEVEL ? (
                       <Pressable
                         style={[styles.facilityUpgradeBtn, !canUpgrade && styles.facilityUpgradeBtnDisabled]}
                         disabled={!canUpgrade}

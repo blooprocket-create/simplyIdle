@@ -16,7 +16,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ENABLE_SIMULATED_DOLLAR_PURCHASES, EXPEDITION_CONTRACT_REFRESH_GOLD_COST, EXPEDITION_CONTRACT_REFRESH_MS, getCharacterSaveSlot, getDpsBreakdown, getEquipmentCraftCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState, VALID_FORMATION_ROLES_FOR_CLASS } from '../useGameState';
+import { ENABLE_SIMULATED_DOLLAR_PURCHASES, EXPEDITION_CONTRACT_REFRESH_GOLD_COST, EXPEDITION_CONTRACT_REFRESH_MS, FACILITY_MAX_LEVEL, getCharacterSaveSlot, getDpsBreakdown, getEquipmentCraftCost, getFacilityUpgradeCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState, VALID_FORMATION_ROLES_FOR_CLASS } from '../useGameState';
 import { trackEvent } from '../telemetry';
 import {
   ACHIEVEMENTS,
@@ -555,16 +555,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     return state.gold >= cost;
   }).length;
   const operationsFacilities = state.guildhallFacilities;
-  const facilityUpgradeCosts: Record<'training' | 'treasury' | 'forge' | 'tactics', number[]> = {
-    training: [5000, 12000, 30000, 75000, 150000, 300000],
-    treasury: [4000, 10000, 25000, 60000, 120000, 250000],
-    forge: [6000, 15000, 40000, 90000, 180000, 350000],
-    tactics: [5000, 12000, 30000, 75000, 150000, 300000],
-  };
   const facilitiesUpgradeableCount = (['training', 'treasury', 'forge', 'tactics'] as const).filter(facility => {
     const level = operationsFacilities[facility].level;
-    if (level >= 5) return false;
-    const nextCost = facilityUpgradeCosts[facility][level] ?? Number.MAX_SAFE_INTEGER;
+    if (level >= FACILITY_MAX_LEVEL) return false;
+    const nextCost = getFacilityUpgradeCost(facility, level);
     return state.gold >= nextCost;
   }).length;
   const miniOpsNotificationCount = canPlayDiceToday ? 1 : 0;

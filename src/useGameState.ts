@@ -76,6 +76,7 @@ const HEAT_BASE_RATE_PER_SEC = 7;
 const HEAT_RECOVERY_RATE_PER_SEC = HEAT_BASE_RATE_PER_SEC * 0.66;
 const HEAT_MAX_BASE = 100;
 const HEAT_MAX_PER_LEVEL = 2;
+export const FACILITY_MAX_LEVEL = 999;
 const BURST_COST = 20;
 const BURST_BOSS_CHARGE_GAIN = 3;
 const ACTIVE_STRIKE_DPS_MULT = 0.9;
@@ -167,6 +168,7 @@ interface SummonHistoryEntry {
 type HeroFormationRole = 'front' | 'mid' | 'back';
 type CombatTempo = 1 | 2 | 4;
 type AutoTempoTarget = 2 | 4;
+export type FacilityId = 'training' | 'treasury' | 'forge' | 'tactics';
 type ExpeditionType = 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss';
 type ExpeditionRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
 type GoldShopOfferId = 'exp_cache' | 'potion_bundle' | 'armory_crate';
@@ -179,6 +181,29 @@ export const EXPEDITION_CONTRACT_REFRESH_MS = 8 * 60 * 60 * 1000;
 export const EXPEDITION_CONTRACT_REFRESH_GOLD_COST = 100_000;
 const EXPEDITION_TYPES: ExpeditionType[] = ['artifact', 'merchant', 'ruins', 'vault', 'abyss'];
 const EXPEDITION_RARITIES: ExpeditionRarity[] = ['common', 'rare', 'epic', 'legendary', 'godly'];
+
+const FACILITY_BASE_UPGRADE_COST: Record<FacilityId, number> = {
+  training: 5000,
+  treasury: 4000,
+  forge: 6000,
+  tactics: 5000,
+};
+
+const FACILITY_COST_GROWTH_RATE: Record<FacilityId, number> = {
+  training: 1.14,
+  treasury: 1.135,
+  forge: 1.145,
+  tactics: 1.14,
+};
+
+export function getFacilityUpgradeCost(facilityId: FacilityId, currentLevel: number): number {
+  const safeLevel = Math.max(0, Math.floor(currentLevel));
+  if (safeLevel >= FACILITY_MAX_LEVEL) return Number.MAX_SAFE_INTEGER;
+
+  const base = FACILITY_BASE_UPGRADE_COST[facilityId];
+  const growth = FACILITY_COST_GROWTH_RATE[facilityId];
+  return Math.max(base, Math.ceil(base * Math.pow(growth, safeLevel)));
+}
 
 export interface Stats {
   className: string;
@@ -1863,10 +1888,10 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
   );
 
   const guildhallFacilities = {
-    training: { level: clampInt(payload.guildhallFacilities?.training?.level, 0, 5, 0) },
-    treasury: { level: clampInt(payload.guildhallFacilities?.treasury?.level, 0, 5, 0) },
-    forge: { level: clampInt(payload.guildhallFacilities?.forge?.level, 0, 5, 0) },
-    tactics: { level: clampInt(payload.guildhallFacilities?.tactics?.level, 0, 5, 0) },
+    training: { level: clampInt(payload.guildhallFacilities?.training?.level, 0, FACILITY_MAX_LEVEL, 0) },
+    treasury: { level: clampInt(payload.guildhallFacilities?.treasury?.level, 0, FACILITY_MAX_LEVEL, 0) },
+    forge: { level: clampInt(payload.guildhallFacilities?.forge?.level, 0, FACILITY_MAX_LEVEL, 0) },
+    tactics: { level: clampInt(payload.guildhallFacilities?.tactics?.level, 0, FACILITY_MAX_LEVEL, 0) },
   };
 
   const validExpeditionTypes = new Set(['artifact', 'merchant', 'ruins', 'vault', 'abyss']);
@@ -3815,16 +3840,8 @@ function reducer(state: GameState, action: Action): GameState {
     case 'UPGRADE_FACILITY': {
       const facility = state.guildhallFacilities[action.facilityId];
       const currentLevel = facility.level;
-
-      const costs: Record<string, Record<number, number>> = {
-        training: { 0: 5000, 1: 12000, 2: 30000, 3: 75000, 4: 150000, 5: 300000 },
-        treasury: { 0: 4000, 1: 10000, 2: 25000, 3: 60000, 4: 120000, 5: 250000 },
-        forge: { 0: 6000, 1: 15000, 2: 40000, 3: 90000, 4: 180000, 5: 350000 },
-        tactics: { 0: 5000, 1: 12000, 2: 30000, 3: 75000, 4: 150000, 5: 300000 },
-      };
-
-      const cost = costs[action.facilityId]?.[currentLevel] ?? 0;
-      if (currentLevel >= 5 || state.gold < cost) return state;
+      const cost = getFacilityUpgradeCost(action.facilityId, currentLevel);
+      if (currentLevel >= FACILITY_MAX_LEVEL || state.gold < cost) return state;
 
       return {
         ...state,
