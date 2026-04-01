@@ -184,10 +184,10 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
           {operationsSubTab === 'miniops' && (
             <View style={styles.facilitiesSection}>
               <Text style={styles.facilitiesTitle}>🎲 Mini Ops</Text>
-              <Text style={styles.facilitiesDesc}>Daily tactical actions and quick reward bursts.</Text>
+              <Text style={styles.facilitiesDesc}>Tactical actions on a 4-hour cooldown from when each one is used.</Text>
               <View style={styles.facilityCard}>
                 <Text style={styles.facilityName}>Dice Protocol</Text>
-                <Text style={styles.facilityBonusText}>Status: {canPlayDiceToday ? 'Ready' : 'Claimed today'}</Text>
+                <Text style={styles.facilityBonusText}>Status: {canPlayDiceToday ? 'Ready' : 'Cooldown active'}</Text>
                 {state.lastDiceRollValue != null && (
                   <Text style={styles.facilityNextBonus}>Last roll: {state.lastDiceRollValue}/20</Text>
                 )}
@@ -207,7 +207,7 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
               <View style={styles.facilityCard}>
                 <Text style={styles.facilityName}>🛰️ Recon Sweep</Text>
                 <Text style={styles.facilityBonusText}>Reveal 1 of 3 intel outcomes (gold, shards, or combat telemetry).</Text>
-                <Text style={styles.facilityBonusText}>Status: {canPlayReconToday ? 'Ready' : 'Completed today'}</Text>
+                <Text style={styles.facilityBonusText}>Status: {canPlayReconToday ? 'Ready' : 'Cooldown active'}</Text>
                 <Pressable
                   style={[styles.warPanelActionBtn, !canPlayReconToday && styles.warPanelActionBtnDisabled]}
                   disabled={!canPlayReconToday}
@@ -220,7 +220,7 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
               <View style={styles.facilityCard}>
                 <Text style={styles.facilityName}>🔐 Lockpick Cache</Text>
                 <Text style={styles.facilityBonusText}>Crack a cache for diamonds, or salvage partial gold on a jam.</Text>
-                <Text style={styles.facilityBonusText}>Status: {canPlayLockpickToday ? 'Ready' : 'Completed today'}</Text>
+                <Text style={styles.facilityBonusText}>Status: {canPlayLockpickToday ? 'Ready' : 'Cooldown active'}</Text>
                 <Pressable
                   style={[styles.warPanelActionBtn, !canPlayLockpickToday && styles.warPanelActionBtnDisabled]}
                   disabled={!canPlayLockpickToday}
@@ -233,7 +233,7 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
               <View style={styles.facilityCard}>
                 <Text style={styles.facilityName}>🎯 Target Practice</Text>
                 <Text style={styles.facilityBonusText}>Score tier sets shard and diamond payout.</Text>
-                <Text style={styles.facilityBonusText}>Status: {canPlayTargetToday ? 'Ready' : 'Completed today'}</Text>
+                <Text style={styles.facilityBonusText}>Status: {canPlayTargetToday ? 'Ready' : 'Cooldown active'}</Text>
                 <Pressable
                   style={[styles.warPanelActionBtn, !canPlayTargetToday && styles.warPanelActionBtnDisabled]}
                   disabled={!canPlayTargetToday}

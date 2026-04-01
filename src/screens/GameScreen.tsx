@@ -16,7 +16,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ENABLE_SIMULATED_DOLLAR_PURCHASES, EXPEDITION_CONTRACT_REFRESH_GOLD_COST, EXPEDITION_CONTRACT_REFRESH_MS, FACILITY_MAX_LEVEL, getCharacterSaveSlot, getDpsBreakdown, getEquipmentCraftCost, getFacilityUpgradeCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState, VALID_FORMATION_ROLES_FOR_CLASS } from '../useGameState';
+import { ENABLE_SIMULATED_DOLLAR_PURCHASES, EXPEDITION_CONTRACT_REFRESH_GOLD_COST, EXPEDITION_CONTRACT_REFRESH_MS, FACILITY_MAX_LEVEL, MINI_OPS_COOLDOWN_MS, getCharacterSaveSlot, getDpsBreakdown, getEquipmentCraftCost, getFacilityUpgradeCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState, VALID_FORMATION_ROLES_FOR_CLASS } from '../useGameState';
 import { trackEvent } from '../telemetry';
 import {
   ACHIEVEMENTS,
@@ -571,12 +571,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const canRebirthNow = state.highestWaveReached >= rebirthWaveRequirement;
   const teamSlotCap = Math.max(4, Math.min(ACTIVE_TEAM_SIZE, state.teamSlotsUnlocked ?? 4));
   const nextTeamSlotUnlock = getNextTeamSlotUnlock();
+  const nowMs = Date.now();
+  const isMiniOpReady = (lastUsedMs: number | null) => lastUsedMs == null || (nowMs - lastUsedMs) >= MINI_OPS_COOLDOWN_MS;
   const currentDay = Math.floor(Date.now() / 86_400_000);
-  const canPlayDiceToday = state.lastDiceRollDay !== currentDay;
-  const canPlayReconToday = state.lastReconSweepDay !== currentDay;
-  const canPlayLockpickToday = state.lastLockpickDay !== currentDay;
-  const canPlayTargetToday = state.lastTargetPracticeDay !== currentDay;
-  const canStartBountyToday = state.lastBountyDraftDay !== currentDay && !state.miniBounty;
+  const canPlayDiceToday = isMiniOpReady(state.lastDiceRollDay);
+  const canPlayReconToday = isMiniOpReady(state.lastReconSweepDay);
+  const canPlayLockpickToday = isMiniOpReady(state.lastLockpickDay);
+  const canPlayTargetToday = isMiniOpReady(state.lastTargetPracticeDay);
+  const canStartBountyToday = isMiniOpReady(state.lastBountyDraftDay) && !state.miniBounty;
   const activeMiniBountyProgress = state.miniBounty
     ? (state.miniBounty.metric === 'wave'
       ? state.wave

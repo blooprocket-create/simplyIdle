@@ -181,6 +181,7 @@ const ACHIEVEMENT_BONUS_PER_UNLOCK = 0.03;
 const ACHIEVEMENT_BONUS_CAP = 0.75;
 export const EXPEDITION_CONTRACT_REFRESH_MS = 8 * 60 * 60 * 1000;
 export const EXPEDITION_CONTRACT_REFRESH_GOLD_COST = 100_000;
+export const MINI_OPS_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 const EXPEDITION_TYPES: ExpeditionType[] = ['artifact', 'merchant', 'ruins', 'vault', 'abyss'];
 const EXPEDITION_RARITIES: ExpeditionRarity[] = ['common', 'rare', 'epic', 'legendary', 'godly'];
 
@@ -1689,6 +1690,20 @@ function sanitizeIntList(value: unknown, maxItems: number): number[] {
   return sanitized;
 }
 
+function sanitizeMiniOpsCooldownTimestamp(value: unknown, nowMs: number): number | null {
+  if (value == null) return null;
+  const parsed = clampInt(value, 0, nowMs, 0);
+  if (parsed <= 0) return null;
+
+  // Backward compatibility: legacy saves stored a day number here.
+  if (parsed < 10_000_000_000) {
+    const migratedTs = parsed * 86_400_000;
+    return Math.min(nowMs, migratedTs);
+  }
+
+  return parsed;
+}
+
 function sanitizeStatAllocation(raw: unknown, level: number, savedUnspent?: unknown): {
   statsAlloc: StatBlock;
   unspentStatPoints: number;
@@ -2060,14 +2075,14 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     teamLoadouts,
     teamSlotsUnlocked,
     heroFormationByUid,
-    lastDiceRollDay: payload.lastDiceRollDay == null ? null : clampInt(payload.lastDiceRollDay, 0, currentDay, currentDay),
+    lastDiceRollDay: sanitizeMiniOpsCooldownTimestamp(payload.lastDiceRollDay, now),
     lastRiftRunDay: payload.lastRiftRunDay == null ? null : clampInt(payload.lastRiftRunDay, 0, currentDay, currentDay),
     lastDiceRollValue: payload.lastDiceRollValue == null ? null : clampInt(payload.lastDiceRollValue, 1, 20, 1),
     lastRiftWavesCleared: clampInt(payload.lastRiftWavesCleared, 0, 5, 0),
-    lastReconSweepDay: payload.lastReconSweepDay == null ? null : clampInt(payload.lastReconSweepDay, 0, currentDay, currentDay),
-    lastLockpickDay: payload.lastLockpickDay == null ? null : clampInt(payload.lastLockpickDay, 0, currentDay, currentDay),
-    lastTargetPracticeDay: payload.lastTargetPracticeDay == null ? null : clampInt(payload.lastTargetPracticeDay, 0, currentDay, currentDay),
-    lastBountyDraftDay: payload.lastBountyDraftDay == null ? null : clampInt(payload.lastBountyDraftDay, 0, currentDay, currentDay),
+    lastReconSweepDay: sanitizeMiniOpsCooldownTimestamp(payload.lastReconSweepDay, now),
+    lastLockpickDay: sanitizeMiniOpsCooldownTimestamp(payload.lastLockpickDay, now),
+    lastTargetPracticeDay: sanitizeMiniOpsCooldownTimestamp(payload.lastTargetPracticeDay, now),
+    lastBountyDraftDay: sanitizeMiniOpsCooldownTimestamp(payload.lastBountyDraftDay, now),
     miniBounty: isRecord(payload.miniBounty)
       ? {
         id: clampString(payload.miniBounty.id, `bounty_${currentDay}`, 64),
@@ -3650,7 +3665,8 @@ function reducer(state: GameState, action: Action): GameState {
       const baseCoreGain = 1 + Math.floor(state.prestigeCount * 0.25);
       const gainedCores = baseCoreGain + Math.floor(surplusWaves / surplusStride);
       const refundedStats = state.statsAlloc.strength + state.statsAlloc.vitality + state.statsAlloc.agility + state.statsAlloc.intelligence + state.statsAlloc.spirit;
-      return queueReward({
+      const preservedActiveTeam = normalizeTeamSelectionByRules(state, state.activeTeamHeroIds);
+      const rebirthState = {
         ...state,
         gold: 0,
         exp: 0,
@@ -3660,11 +3676,9 @@ function reducer(state: GameState, action: Action): GameState {
         wave: 1,
         monsterHp: getMonsterMaxHp(1),
         monsterMaxHp: getMonsterMaxHp(1),
-        teamHp: 100,
-        teamMaxHp: 100,
         party: initialParty(),
-        skills: new Set(),
-        activeTeamHeroIds: [],
+        skills: new Set<string>(),
+        activeTeamHeroIds: preservedActiveTeam,
         prestigeCount: state.prestigeCount + 1,
         newAchievement: null,
         damageBuffPct: 0,
@@ -3676,6 +3690,13 @@ function reducer(state: GameState, action: Action): GameState {
         seasonPoints: state.seasonPoints + 250,
         bestSeasonPoints: Math.max(state.bestSeasonPoints, state.seasonPoints + 250),
         rebirthCores: state.rebirthCores + gainedCores,
+      };
+      const nextTeamMaxHp = getTeamMaxHp(rebirthState);
+
+      return queueReward({
+        ...rebirthState,
+        teamMaxHp: nextTeamMaxHp,
+        teamHp: nextTeamMaxHp,
       }, {
         id: `rebirth_cores_${Date.now()}`,
         kind: 'system',
@@ -3795,8 +3816,8 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'PLAY_DICE_ROLL': {
-      const today = toDayNumber(Date.now());
-      if (state.lastDiceRollDay === today) return state;
+      const nowMs = Date.now();
+      if (state.lastDiceRollDay != null && (nowMs - state.lastDiceRollDay) < MINI_OPS_COOLDOWN_MS) return state;
 
       const forcedRoll = typeof action.forcedRoll === 'number' && Number.isFinite(action.forcedRoll)
         ? Math.floor(action.forcedRoll)
@@ -3810,10 +3831,10 @@ function reducer(state: GameState, action: Action): GameState {
         ...state,
         diamonds: state.diamonds + diamonds,
         heroShards: state.heroShards + shardBonus,
-        lastDiceRollDay: today,
+        lastDiceRollDay: nowMs,
         lastDiceRollValue: roll,
       }, {
-        id: `dice_roll_${today}`,
+        id: `dice_roll_${toDayNumber(nowMs)}`,
         kind: 'system',
         title: 'Dice Protocol Complete',
         detail: `Rolled ${roll}/20: +${diamonds} diamonds${shardBonus > 0 ? `, +${shardBonus} shards` : ''}`,
@@ -3821,8 +3842,8 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'PLAY_RECON_SWEEP': {
-      const today = toDayNumber(Date.now());
-      if (state.lastReconSweepDay === today) return state;
+      const nowMs = Date.now();
+      if (state.lastReconSweepDay != null && (nowMs - state.lastReconSweepDay) < MINI_OPS_COOLDOWN_MS) return state;
 
       const picks = ['intel_gold', 'intel_shards', 'intel_buff', 'ambush'] as const;
       const rolled = action.forcedOutcome && picks.includes(action.forcedOutcome)
@@ -3843,9 +3864,9 @@ function reducer(state: GameState, action: Action): GameState {
         heroShards: state.heroShards + shardGain,
         damageBuffPct: Math.max(state.damageBuffPct, buffPct),
         damageBuffMs: Math.max(state.damageBuffMs, buffMs),
-        lastReconSweepDay: today,
+        lastReconSweepDay: nowMs,
       }, {
-        id: `recon_sweep_${today}`,
+        id: `recon_sweep_${toDayNumber(nowMs)}`,
         kind: 'system',
         title: 'Recon Sweep Complete',
         detail: rolled === 'intel_shards'
@@ -3859,8 +3880,8 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'PLAY_LOCKPICK_CACHE': {
-      const today = toDayNumber(Date.now());
-      if (state.lastLockpickDay === today) return state;
+      const nowMs = Date.now();
+      if (state.lastLockpickDay != null && (nowMs - state.lastLockpickDay) < MINI_OPS_COOLDOWN_MS) return state;
 
       const success = typeof action.forcedSuccess === 'boolean' ? action.forcedSuccess : Math.random() < 0.46;
       const diamondGain = success ? Math.max(15, Math.floor(8 + state.highestWaveReached * 0.35)) : 0;
@@ -3871,9 +3892,9 @@ function reducer(state: GameState, action: Action): GameState {
         diamonds: state.diamonds + diamondGain,
         gold: state.gold + goldConsolation,
         totalGold: state.totalGold + goldConsolation,
-        lastLockpickDay: today,
+        lastLockpickDay: nowMs,
       }, {
-        id: `lockpick_cache_${today}`,
+        id: `lockpick_cache_${toDayNumber(nowMs)}`,
         kind: success ? 'system' : 'gold',
         title: success ? 'Lockpick Cache Cracked' : 'Lockpick Cache Jammed',
         detail: success ? `Vault breached: +${diamondGain} diamonds` : `Mechanism failed: +${goldConsolation} salvage gold`,
@@ -3881,8 +3902,8 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'PLAY_TARGET_PRACTICE': {
-      const today = toDayNumber(Date.now());
-      if (state.lastTargetPracticeDay === today) return state;
+      const nowMs = Date.now();
+      if (state.lastTargetPracticeDay != null && (nowMs - state.lastTargetPracticeDay) < MINI_OPS_COOLDOWN_MS) return state;
 
       const score = action.forcedScore == null
         ? Math.floor(Math.random() * 101)
@@ -3900,9 +3921,9 @@ function reducer(state: GameState, action: Action): GameState {
         ...state,
         heroShards: state.heroShards + shardGain,
         diamonds: state.diamonds + diamondGain,
-        lastTargetPracticeDay: today,
+        lastTargetPracticeDay: nowMs,
       }, {
-        id: `target_practice_${today}`,
+        id: `target_practice_${toDayNumber(nowMs)}`,
         kind: 'shard',
         title: 'Target Practice Complete',
         detail: `Score ${score}: +${shardGain} shards, +${diamondGain} diamonds`,
@@ -3910,8 +3931,8 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'START_MINI_BOUNTY_DRAFT': {
-      const today = toDayNumber(Date.now());
-      if (state.lastBountyDraftDay === today || state.miniBounty) return state;
+      const nowMs = Date.now();
+      if ((state.lastBountyDraftDay != null && (nowMs - state.lastBountyDraftDay) < MINI_OPS_COOLDOWN_MS) || state.miniBounty) return state;
 
       const draftByType: Record<MiniBountyDraftType, {
         title: string;
@@ -3960,9 +3981,9 @@ function reducer(state: GameState, action: Action): GameState {
 
       return queueReward({
         ...state,
-        lastBountyDraftDay: today,
+        lastBountyDraftDay: nowMs,
         miniBounty: {
-          id: `bounty_${today}_${action.draftType}`,
+          id: `bounty_${toDayNumber(nowMs)}_${action.draftType}`,
           title: draft.title,
           metric: draft.metric,
           startValue: currentMetric,
@@ -3973,7 +3994,7 @@ function reducer(state: GameState, action: Action): GameState {
           claimed: false,
         },
       }, {
-        id: `bounty_start_${today}`,
+        id: `bounty_start_${toDayNumber(nowMs)}`,
         kind: 'system',
         title: 'Bounty Draft Accepted',
         detail: `${draft.title}: reach +${draft.targetDelta} ${draft.metric}`,
