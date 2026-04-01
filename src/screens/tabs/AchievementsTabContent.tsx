@@ -241,11 +241,12 @@ export const AchievementsTabContent: React.FC<AchievementsTabContentProps> = ({
                     return (
                       <View key={hero.id} style={[styles.codexEntry, claimed && styles.codexEntryDone]}>
                         <Pressable
-                          style={[styles.toggleBtn, claimed && { opacity: 0.55 }]}
+                          style={[styles.toggleBtn, styles.codexHeroIconBtn, claimed && { opacity: 0.55 }]}
                           disabled={claimed}
                           onPress={() => claimCodexHeroVip(hero.id)}
                         >
                           {renderCodexHeroIcon(hero.id, hero.emoji)}
+                          {!claimed && <View style={styles.codexClaimDot} />}
                         </Pressable>
                         <View style={styles.codexEntryLeft}>
                           <Text style={[styles.codexTitle, claimed && styles.codexTitleDone]}>

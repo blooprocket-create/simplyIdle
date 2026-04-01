@@ -69,6 +69,12 @@ export const styles = StyleSheet.create({
     fontSize: 28,
     marginTop: 2,
   },
+  summonRevealPortrait: {
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    marginTop: 4,
+  },
   summonRevealName: {
     fontSize: 15,
     fontWeight: '800',
@@ -139,6 +145,11 @@ export const styles = StyleSheet.create({
   },
   cinematicSummonResultEmoji: {
     fontSize: 22,
+  },
+  cinematicSummonResultPortrait: {
+    width: 46,
+    height: 46,
+    borderRadius: 12,
   },
   cinematicSummonResultName: {
     marginTop: 4,
@@ -4572,6 +4583,21 @@ export const styles = StyleSheet.create({
   },
   codexEntryLeft: {
     flex: 1,
+  },
+  codexHeroIconBtn: {
+    position: 'relative',
+    marginRight: 8,
+  },
+  codexClaimDot: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#ff3b30',
+    borderWidth: 1,
+    borderColor: '#fff',
   },
   codexHeroPortrait: {
     width: 28,

@@ -645,6 +645,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                   const isSelected = batchLevelSelected.has(hero.uid);
                   const maxLevel = HERO_LEVEL_CAP;
                   const isOnTeam = activeTeamSet.has(hero.uid);
+                  const cls = getClassConfig(hero.heroClass);
 
                   let totalCost = 0;
                   let projectedLevel = hero.level;
@@ -693,7 +694,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                                 {isSelected && <View style={styles.batchHeroCheckboxInner} />}
                               </View>
                               <View style={styles.batchHeroInfoMobile}>
-                                <Text style={styles.batchHeroNameMobile} numberOfLines={1}>{hero.emoji} {hero.name}</Text>
+                                <Text style={styles.batchHeroNameMobile} numberOfLines={1}>{cls.emoji} {hero.name}</Text>
                                 <Text style={styles.batchHeroLevelMobile} numberOfLines={1}>
                                   Level {hero.level} → {projectedLevel}
                                 </Text>
@@ -727,7 +728,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                             {isSelected && <View style={styles.batchHeroCheckboxInner} />}
                           </View>
                           <View style={[styles.batchHeroInfo, isNarrow && { gap: 3, minWidth: 0 }]}> 
-                            <Text style={[styles.batchHeroName, isNarrow && { fontSize: 12 }]} numberOfLines={1}>{hero.emoji} {hero.name}</Text>
+                            <Text style={[styles.batchHeroName, isNarrow && { fontSize: 12 }]} numberOfLines={1}>{cls.emoji} {hero.name}</Text>
                             <Text style={[styles.batchHeroLevel, isNarrow && { fontSize: 11 }]} numberOfLines={1}>
                               {isNarrow ? `Lv ${hero.level} -> ${projectedLevel}` : `Level ${hero.level} → ${projectedLevel}`}
                             </Text>

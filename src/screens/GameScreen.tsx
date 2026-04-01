@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
+  Image,
   ScrollView,
   SafeAreaView,
   Pressable,
@@ -22,6 +23,7 @@ import { debugLog, trackEvent, trackGameplayAction } from '../telemetry';
 import {
   ACHIEVEMENTS,
   CLASSES,
+  HERO_POOL,
   PlayerClass,
   EquipmentSlot,
   RARITIES,
@@ -52,6 +54,7 @@ import {
   getUsableItem,
   Rarity,
 } from '../gameConfig';
+import { getHeroPortraitSource } from '../heroPortraits';
 import { fmt } from '../utils';
 import AchievementToast from '../components/AchievementToast';
 import RebirthModal from '../components/PrestigeModal';
@@ -79,6 +82,7 @@ export type ExpeditionRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'godly
 
 type SummonReveal = {
   id: string;
+  heroId: string | null;
   heroName: string;
   emoji: string;
   rarity: Rarity;
@@ -331,6 +335,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const seenStoryUnlockIdsRef = useRef<Set<string>>(new Set());
   const appStateRef = useRef(AppState.currentState);
   const backgroundTimeRef = useRef<number | null>(null);
+  const heroTemplateIdByName = useMemo(() => {
+    const map = new Map<string, string>();
+    HERO_POOL.forEach(hero => {
+      map.set(hero.name, hero.id);
+    });
+    return map;
+  }, []);
   const [warPanels, setWarPanels] = useState({
     frontline: true,
     roster: true,
@@ -985,6 +996,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       pendingCinematicSummonRef.current = false;
       const latestTen = state.summonHistory.slice(0, 10).map(entry => ({
         id: entry.id,
+        heroId: heroTemplateIdByName.get(entry.heroName) ?? null,
         heroName: entry.heroName,
         emoji: entry.heroEmoji,
         rarity: entry.rarity,
@@ -994,10 +1006,16 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       return;
     }
     if (cinematicSummonOpen) return;
-    setSummonReveal({ id: latest.id, heroName: latest.heroName, emoji: latest.heroEmoji, rarity: latest.rarity });
+    setSummonReveal({
+      id: latest.id,
+      heroId: heroTemplateIdByName.get(latest.heroName) ?? null,
+      heroName: latest.heroName,
+      emoji: latest.heroEmoji,
+      rarity: latest.rarity,
+    });
     const timer = setTimeout(() => setSummonReveal(null), 2000);
     return () => clearTimeout(timer);
-  }, [cinematicSummonOpen, state.summonHistory]);
+  }, [cinematicSummonOpen, heroTemplateIdByName, state.summonHistory]);
 
   useEffect(() => {
     if (!rewardPopup && !idleChestOpen) {
@@ -1384,6 +1402,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       pendingCinematicSummonRef.current = false;
       const latestTen = state.summonHistory.slice(0, 10).map(entry => ({
         id: entry.id,
+        heroId: heroTemplateIdByName.get(entry.heroName) ?? null,
         heroName: entry.heroName,
         emoji: entry.heroEmoji,
         rarity: entry.rarity,
@@ -1399,6 +1418,20 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     }, 6800);
 
     cinematicTimersRef.current.push(phaseWarp as unknown as number, fallbackReveal as unknown as number, autoClose as unknown as number);
+  };
+
+  const renderSummonPortrait = (heroId: string | null, emoji: string, large = false) => {
+    const portraitSource = heroId ? getHeroPortraitSource(heroId) : null;
+    if (portraitSource) {
+      return (
+        <Image
+          source={portraitSource}
+          style={large ? styles.summonRevealPortrait : styles.cinematicSummonResultPortrait}
+          resizeMode="cover"
+        />
+      );
+    }
+    return <Text style={large ? styles.summonRevealEmoji : styles.cinematicSummonResultEmoji}>{emoji}</Text>;
   };
 
   const hasWarRoomNotification = canRebirthNow;
@@ -1795,7 +1828,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             },
           ]}>
             <Text style={styles.summonRevealLabel}>{rarityConfig(summonReveal.rarity).label.toUpperCase()} RECRUIT</Text>
-            <Text style={styles.summonRevealEmoji}>{summonReveal.emoji}</Text>
+            {renderSummonPortrait(summonReveal.heroId, summonReveal.emoji, true)}
             <Text style={styles.summonRevealName}>{summonReveal.heroName}</Text>
             <Text style={styles.summonRevealSub}>Joined your squad</Text>
           </View>
@@ -1852,7 +1885,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     const rarity = rarityConfig(entry.rarity);
                     return (
                       <View key={entry.id} style={[styles.cinematicSummonResultCard, { borderColor: rarity.color }]}>
-                        <Text style={styles.cinematicSummonResultEmoji}>{entry.emoji}</Text>
+                        {renderSummonPortrait(entry.heroId, entry.emoji, false)}
                         <Text style={styles.cinematicSummonResultName} numberOfLines={1}>{entry.heroName}</Text>
                         <Text style={[styles.cinematicSummonResultRarity, { color: rarity.color }]}>{rarity.label}</Text>
                       </View>

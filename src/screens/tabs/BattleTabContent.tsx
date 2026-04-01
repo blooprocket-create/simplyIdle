@@ -200,7 +200,7 @@ export const BattleTabContent: React.FC<BattleTabContentProps> = ({
                   <View key={heroId} style={styles.battleHeroRow}>
                     <Text style={styles.battleHeroSlot}>#{idx + 1}</Text>
                     <Text style={[styles.battleHeroInfo, { color: rarityColor }]}>
-                      {hero.emoji} {hero.name}
+                      {cls.emoji} {hero.name}
                     </Text>
                     <Text style={styles.battleHeroStats}>
                       ⭐{hero.rank} Lv{hero.level} • {cls.name}
