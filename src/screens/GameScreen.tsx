@@ -2601,11 +2601,16 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 </View>
                 <View style={styles.settingsRowBetween}>
                   <Text style={styles.settingsLabel}>Tempo At Heat 0</Text>
-                  <Pressable style={styles.settingsCycleBtn} onPress={() => setAutoTempoTarget(state.autoTempoTarget === 2 ? 4 : 2)}>
+                  <Pressable
+                    style={[styles.settingsCycleBtn, (state.vipLevel ?? 0) < 1 && styles.settingsCycleBtnDisabled]}
+                    onPress={() => setAutoTempoTarget((state.vipLevel ?? 0) < 1 ? 2 : state.autoTempoTarget === 2 ? 4 : 2)}
+                    disabled={(state.vipLevel ?? 0) < 1}
+                  >
                     <Text style={styles.settingsCycleBtnText}>{state.autoTempoTarget}x</Text>
                   </Pressable>
                 </View>
                 <Text style={styles.settingsHintText}>At heat 0, auto tempo re-engages from 1x to your selected target.</Text>
+                {(state.vipLevel ?? 0) < 1 && <Text style={styles.settingsHintText}>4x auto tempo unlocks at VIP 1.</Text>}
               </View>
             </ScrollView>
           </View>

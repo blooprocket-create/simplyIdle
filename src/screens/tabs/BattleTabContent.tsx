@@ -41,6 +41,8 @@ export const BattleTabContent: React.FC<BattleTabContentProps> = ({
   buyPremiumCoolant,
   useUsableItem,
 }) => {
+  const hasTempo4Access = (state.vipLevel ?? 0) >= 1;
+
   const confirmUseAll = (item: any, count: number) => {
     if (count <= 0) return;
 
@@ -77,18 +79,29 @@ export const BattleTabContent: React.FC<BattleTabContentProps> = ({
             <View style={styles.battleTempoHeader}>
               <Text style={styles.battleTempoTitle}>Combat Tempo</Text>
               <View style={styles.battleTempoRow}>
-                {([1, 2, 4] as const).map(mult => (
-                  <Pressable
-                    key={mult}
-                    style={[styles.battleTempoBtn, battleSpeed === mult && styles.battleTempoBtnActive]}
-                    onPress={() => setCombatTempo(mult)}
-                  >
-                    <Text style={[styles.battleTempoBtnText, battleSpeed === mult && styles.battleTempoBtnTextActive]}>{mult}x</Text>
-                  </Pressable>
-                ))}
+                {([1, 2, 4] as const).map(mult => {
+                  const locked = mult === 4 && !hasTempo4Access;
+                  return (
+                    <Pressable
+                      key={mult}
+                      style={[
+                        styles.battleTempoBtn,
+                        battleSpeed === mult && styles.battleTempoBtnActive,
+                        locked && styles.battleTempoBtnLocked,
+                      ]}
+                      onPress={() => setCombatTempo(mult)}
+                      disabled={locked}
+                    >
+                      <Text style={[styles.battleTempoBtnText, battleSpeed === mult && styles.battleTempoBtnTextActive]}>
+                        {mult === 4 && locked ? '4x VIP1' : `${mult}x`}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             </View>
             <Text style={styles.battleTempoHint}>Higher tempo speeds up passive combat and burst payout.</Text>
+            {!hasTempo4Access && <Text style={styles.battleTempoHint}>4x unlocks at VIP 1.</Text>}
             <Text style={styles.battleTempoHint}>Heat: {Math.ceil(state.combatHeat)}/{Math.ceil(maxHeat)} {state.combatTempo > 1 ? '(building)' : '(recovering)'}</Text>
             <View style={styles.hpBarBg}>
               <View

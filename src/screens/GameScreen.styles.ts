@@ -1576,6 +1576,9 @@ export const styles = StyleSheet.create({
     borderColor: '#8FD2FF',
     backgroundColor: '#2F5275',
   },
+  battleTempoBtnLocked: {
+    opacity: 0.45,
+  },
   battleTempoBtnText: {
     fontSize: 10,
     color: '#BFD7EC',
@@ -3815,6 +3818,9 @@ export const styles = StyleSheet.create({
     backgroundColor: '#273B55',
     paddingVertical: 4,
     paddingHorizontal: 10,
+  },
+  settingsCycleBtnDisabled: {
+    opacity: 0.45,
   },
   settingsCycleBtnText: {
     fontSize: 10,

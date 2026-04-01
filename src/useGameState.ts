@@ -969,7 +969,7 @@ function updateCombatHeat(state: GameState, elapsedMs: number): GameState {
     return { ...state, combatHeat: nextHeat };
   }
 
-  const buildRate = state.combatTempo === 2 ? HEAT_BASE_RATE_PER_SEC : HEAT_BASE_RATE_PER_SEC * 3;
+  const buildRate = HEAT_BASE_RATE_PER_SEC;
   nextHeat = Math.min(maxHeat, state.combatHeat + buildRate * seconds);
   if (nextHeat >= maxHeat) {
     const overheated: GameState = {
@@ -1361,6 +1361,20 @@ function getVipGoldMultiplier(state: GameState): number {
 
 function getVipExpMultiplier(state: GameState): number {
   return 1 + state.vipLevel * VIP_EXP_PER_LEVEL;
+}
+
+function canUseTempo4(state: Pick<GameState, 'vipLevel'>): boolean {
+  return (state.vipLevel ?? 0) >= 1;
+}
+
+function clampCombatTempoForVip(tempo: CombatTempo, state: Pick<GameState, 'vipLevel'>): CombatTempo {
+  if (tempo === 4 && !canUseTempo4(state)) return 1;
+  return tempo;
+}
+
+function clampAutoTempoTargetForVip(target: AutoTempoTarget, state: Pick<GameState, 'vipLevel'>): AutoTempoTarget {
+  if (target === 4 && !canUseTempo4(state)) return 2;
+  return target;
 }
 
 function hasUnlock(state: GameState, unlock: PermanentUnlockId): boolean {
@@ -1991,8 +2005,14 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     metaDamageLevel: clampInt(payload.metaDamageLevel, 0, SAFE_INTEGER_CAP, 0),
     metaEconomyLevel: clampInt(payload.metaEconomyLevel, 0, SAFE_INTEGER_CAP, 0),
     metaSurvivalLevel: clampInt(payload.metaSurvivalLevel, 0, SAFE_INTEGER_CAP, 0),
-    vipPoints: clampInt(payload.vipPoints, 0, SAFE_INTEGER_CAP, 0),
-    vipLevel: getVipLevelFromPoints(clampInt(payload.vipPoints, 0, SAFE_INTEGER_CAP, 0)),
+    vipPoints: (() => {
+      const vipPoints = clampInt(payload.vipPoints, 0, SAFE_INTEGER_CAP, 0);
+      return vipPoints;
+    })(),
+    vipLevel: (() => {
+      const vipPoints = clampInt(payload.vipPoints, 0, SAFE_INTEGER_CAP, 0);
+      return getVipLevelFromPoints(vipPoints);
+    })(),
     vipRewardClaimedLevels: sanitizeIntList(payload.vipRewardClaimedLevels, 10)
       .filter(level => level >= 1 && level <= 10),
     dollarFirstPurchaseClaimedOfferIds: sanitizeStringList(payload.dollarFirstPurchaseClaimedOfferIds, VALID_DOLLAR_SHOP_OFFER_IDS.size)
@@ -2008,9 +2028,13 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     autoSummonEnabled: clampBoolean(payload.autoSummonEnabled, false),
     autoSummonMode,
     autoBurstEnabled: clampBoolean(payload.autoBurstEnabled, false),
-    combatTempo: payload.combatTempo === 2 || payload.combatTempo === 4 ? payload.combatTempo : 1,
+    combatTempo: clampCombatTempoForVip(payload.combatTempo === 2 || payload.combatTempo === 4 ? payload.combatTempo : 1, {
+      vipLevel: getVipLevelFromPoints(clampInt(payload.vipPoints, 0, SAFE_INTEGER_CAP, 0)),
+    }),
     autoTempoEnabled: clampBoolean(payload.autoTempoEnabled, false),
-    autoTempoTarget: payload.autoTempoTarget === 4 ? 4 : 2,
+    autoTempoTarget: clampAutoTempoTargetForVip(payload.autoTempoTarget === 4 ? 4 : 2, {
+      vipLevel: getVipLevelFromPoints(clampInt(payload.vipPoints, 0, SAFE_INTEGER_CAP, 0)),
+    }),
     autoSummonReserveGold: clampInt(payload.autoSummonReserveGold, 0, SAFE_INTEGER_CAP, 5000),
     lastActiveAt: clampInt(payload.lastActiveAt, 0, now, now),
     prestigeCount: clampInt(payload.prestigeCount, 0, SAFE_INTEGER_CAP, 0),
@@ -4037,7 +4061,7 @@ function reducer(state: GameState, action: Action): GameState {
     case 'SET_COMBAT_TEMPO': {
       return {
         ...state,
-        combatTempo: action.tempo,
+        combatTempo: clampCombatTempoForVip(action.tempo, state),
       };
     }
 
@@ -4051,7 +4075,7 @@ function reducer(state: GameState, action: Action): GameState {
     case 'SET_AUTO_TEMPO_TARGET': {
       return {
         ...state,
-        autoTempoTarget: action.target,
+        autoTempoTarget: clampAutoTempoTargetForVip(action.target, state),
       };
     }
 
@@ -4332,9 +4356,9 @@ function reducer(state: GameState, action: Action): GameState {
         autoSummonEnabled: p.autoSummonEnabled,
         autoSummonMode: p.autoSummonMode,
         autoBurstEnabled: p.autoBurstEnabled,
-        combatTempo: p.combatTempo === 2 || p.combatTempo === 4 ? p.combatTempo : 1,
+        combatTempo: clampCombatTempoForVip(p.combatTempo === 2 || p.combatTempo === 4 ? p.combatTempo : 1, p),
         autoTempoEnabled: p.autoTempoEnabled,
-        autoTempoTarget: p.autoTempoTarget === 4 ? 4 : 2,
+        autoTempoTarget: clampAutoTempoTargetForVip(p.autoTempoTarget === 4 ? 4 : 2, p),
         autoSummonReserveGold: p.autoSummonReserveGold,
         autoSummonCooldownMs: 0,
         lastActiveAt: p.lastActiveAt,
