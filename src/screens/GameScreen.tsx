@@ -2308,13 +2308,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         visible={chapterMapOpen}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setChapterMapOpen(false)}
+        onRequestClose={() => {
+          debugLog('ui', 'Close campaign map modal');
+          setChapterMapOpen(false);
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.chapterMapModalBox}>
             <View style={styles.settingsHeaderRow}>
               <Text style={styles.modalTitle}>🧭 Campaign Route</Text>
-              <Pressable style={styles.settingsCloseBtn} onPress={() => setChapterMapOpen(false)}>
+              <Pressable style={styles.settingsCloseBtn} onPress={() => {
+                debugLog('ui', 'Close campaign map modal');
+                setChapterMapOpen(false);
+              }}>
                 <Text style={styles.settingsCloseBtnText}>Close</Text>
               </Pressable>
             </View>
@@ -2350,6 +2356,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         transparent={true}
         animationType="fade"
         onRequestClose={() => {
+          debugLog('ui', 'Close idle chest modal');
           setIdleChestOpen(false);
           setIdleChestReward(null);
           clearRewardPopup();
@@ -2363,6 +2370,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             <Pressable
               style={styles.idleChestClaimBtn}
               onPress={() => {
+                debugLog('reward', 'Claim idle chest');
                 setIdleChestOpen(false);
                 setIdleChestReward(null);
                 clearRewardPopup();
@@ -2379,21 +2387,27 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         visible={shopOpen}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setShopOpen(false)}
+        onRequestClose={() => {
+          debugLog('ui', 'Close shop modal', { tab: shopTab });
+          setShopOpen(false);
+        }}
       >
         <View style={styles.bottomSheetOverlay}>
           <View style={[styles.eventsModalBox, styles.bottomSheetBox]}>
             <View style={styles.eventsHeaderRow}>
               <Text style={styles.eventsModalTitle}>🛒 Shop</Text>
-              <Pressable style={styles.settingsCloseBtn} onPress={() => setShopOpen(false)}>
+              <Pressable style={styles.settingsCloseBtn} onPress={() => {
+                debugLog('ui', 'Close shop modal from button', { tab: shopTab });
+                setShopOpen(false);
+              }}>
                 <Text style={styles.settingsCloseBtnText}>Close</Text>
               </Pressable>
             </View>
 
             {renderSubTabBar([
-              { id: 'diamond', label: 'Diamond Shop', active: shopTab === 'diamond', onPress: () => setShopTab('diamond') },
-              { id: 'gold', label: 'Gold Shop', active: shopTab === 'gold', onPress: () => setShopTab('gold') },
-              { id: 'dollar', label: 'Dollar Shop', active: shopTab === 'dollar', onPress: () => setShopTab('dollar') },
+              { id: 'diamond', label: 'Diamond Shop', active: shopTab === 'diamond', onPress: () => { debugLog('shop', 'Switch shop tab', { from: shopTab, to: 'diamond' }); setShopTab('diamond'); } },
+              { id: 'gold', label: 'Gold Shop', active: shopTab === 'gold', onPress: () => { debugLog('shop', 'Switch shop tab', { from: shopTab, to: 'gold' }); setShopTab('gold'); } },
+              { id: 'dollar', label: 'Dollar Shop', active: shopTab === 'dollar', onPress: () => { debugLog('shop', 'Switch shop tab', { from: shopTab, to: 'dollar' }); setShopTab('dollar'); } },
             ])}
 
             <ScrollView style={styles.eventsScroll} contentContainerStyle={styles.eventsScrollContent}>
@@ -2428,7 +2442,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       <Pressable
                         style={[styles.eventsActionBtn, !canClaim && styles.shopBuyBtnDisabled]}
                         disabled={!canClaim}
-                        onPress={() => claimVipReward(row.level)}
+                        onPress={() => {
+                          debugLog('shop', 'Claim VIP reward', { level: row.level });
+                          void trackGameplayAction('shop_vip_reward_claimed', { level: row.level }, 0);
+                          claimVipReward(row.level);
+                        }}
                       >
                         <Text style={styles.eventsActionBtnText}>{claimed ? 'Claimed' : canClaim ? 'Claim' : `VIP ${row.level}`}</Text>
                       </Pressable>
@@ -2453,7 +2471,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                         <Pressable
                           style={[styles.eventsActionBtn, !canBuy && styles.shopBuyBtnDisabled]}
                           disabled={!canBuy}
-                          onPress={() => buyDiamondShopItem(offer.id)}
+                          onPress={() => {
+                            debugLog('shop', 'Buy diamond shop item', { offerId: offer.id, cost: offer.cost });
+                            void trackGameplayAction('shop_diamond_purchase', { offerId: offer.id, cost: offer.cost }, 0);
+                            buyDiamondShopItem(offer.id);
+                          }}
                         >
                           <Text style={styles.eventsActionBtnText}>{canBuy ? 'Buy' : 'Need 💎'}</Text>
                         </Pressable>
@@ -2479,7 +2501,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                         <Pressable
                           style={[styles.eventsActionBtn, !canBuy && styles.shopBuyBtnDisabled]}
                           disabled={!canBuy}
-                          onPress={() => buyGoldShopItem(offer.id)}
+                          onPress={() => {
+                            debugLog('shop', 'Buy gold shop item', { offerId: offer.id, cost: offer.cost });
+                            void trackGameplayAction('shop_gold_purchase', { offerId: offer.id, cost: offer.cost }, 0);
+                            buyGoldShopItem(offer.id);
+                          }}
                         >
                           <Text style={styles.eventsActionBtnText}>{canBuy ? 'Buy' : 'Need Gold'}</Text>
                         </Pressable>
@@ -2510,7 +2536,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                         <Pressable
                           style={[styles.eventsActionBtn, !ENABLE_SIMULATED_DOLLAR_PURCHASES && styles.shopBuyBtnDisabled]}
                           disabled={!ENABLE_SIMULATED_DOLLAR_PURCHASES}
-                          onPress={() => simulateDollarPurchase(offer.id)}
+                          onPress={() => {
+                            debugLog('shop', 'Simulate IAP dollar purchase', { offerId: offer.id, firstBonus: firstBonusAvailable });
+                            void trackGameplayAction('shop_iap_simulated', { offerId: offer.id, firstBonus: firstBonusAvailable }, 0);
+                            simulateDollarPurchase(offer.id);
+                          }}
                         >
                           <Text style={styles.eventsActionBtnText}>
                             {ENABLE_SIMULATED_DOLLAR_PURCHASES
@@ -2533,13 +2563,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         visible={eventsOpen}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setEventsOpen(false)}
+        onRequestClose={() => {
+          debugLog('ui', 'Close events modal');
+          setEventsOpen(false);
+        }}
       >
         <View style={styles.bottomSheetOverlay}>
           <View style={[styles.eventsModalBox, styles.bottomSheetBox]}>
             <View style={styles.eventsHeaderRow}>
               <Text style={styles.eventsModalTitle}>🗓️ Events & Seasons</Text>
-              <Pressable style={styles.settingsCloseBtn} onPress={() => setEventsOpen(false)}>
+              <Pressable style={styles.settingsCloseBtn} onPress={() => {
+                debugLog('ui', 'Close events modal from button');
+                setEventsOpen(false);
+              }}>
                 <Text style={styles.settingsCloseBtnText}>Close</Text>
               </Pressable>
             </View>
@@ -2589,7 +2625,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Text style={styles.eventsStatLine}>{weeklyEvent.description}</Text>
                 <Text style={styles.eventsStatLine}>Weekly Kills: {state.weeklyKills}</Text>
                 <Text style={styles.eventsHint}>Earn kills to claim milestone rewards on the Achievements tab.</Text>
-                <Pressable style={styles.eventsActionBtn} onPress={() => { setEventsOpen(false); onTabChange('achievements'); setAchievementsSubTab('weekly'); }}>
+                <Pressable style={styles.eventsActionBtn} onPress={() => { 
+                  debugLog('ui', 'Navigate to weekly achievements from events');
+                  setEventsOpen(false); 
+                  onTabChange('achievements'); 
+                  setAchievementsSubTab('weekly'); 
+                }}>
                   <Text style={styles.eventsActionBtnText}>View Weekly Track</Text>
                 </Pressable>
               </View>
@@ -2680,7 +2721,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             visible={true}
             transparent={true}
             animationType="fade"
-            onRequestClose={() => setRecycleConfirmUid(null)}
+            onRequestClose={() => {
+              debugLog('ui', 'Close recycle confirm modal');
+              setRecycleConfirmUid(null);
+            }}
           >
             <View style={styles.modalOverlay}>
               <View style={styles.modalBox}>
@@ -2694,13 +2738,18 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <View style={styles.modalButtons}>
                   <Pressable
                     style={[styles.modalBtn, styles.modalBtnCancel]}
-                    onPress={() => setRecycleConfirmUid(null)}
+                    onPress={() => {
+                      debugLog('ui', 'Cancel recycle hero');
+                      setRecycleConfirmUid(null);
+                    }}
                   >
                     <Text style={styles.modalBtnText}>Cancel</Text>
                   </Pressable>
                   <Pressable
                     style={[styles.modalBtn, styles.modalBtnConfirm]}
                     onPress={() => {
+                      debugLog('hero', 'Confirm recycle hero', { heroId: recycleConfirmUid, reward: shardValue });
+                      void trackGameplayAction('hero_recycled', { heroId: recycleConfirmUid, reward: shardValue }, 0);
                       recycleHero(recycleConfirmUid);
                       setRecycleConfirmUid(null);
                     }}
@@ -2718,7 +2767,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         visible={smartCoolantConfirmOpen}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setSmartCoolantConfirmOpen(false)}
+        onRequestClose={() => {
+          debugLog('ui', 'Close smart coolant confirm modal');
+          setSmartCoolantConfirmOpen(false);
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -2732,13 +2784,18 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             <View style={styles.modalButtons}>
               <Pressable
                 style={[styles.modalBtn, styles.modalBtnCancel]}
-                onPress={() => setSmartCoolantConfirmOpen(false)}
+                onPress={() => {
+                  debugLog('ui', 'Cancel smart coolant enable');
+                  setSmartCoolantConfirmOpen(false);
+                }}
               >
                 <Text style={styles.modalBtnText}>Cancel</Text>
               </Pressable>
               <Pressable
                 style={[styles.modalBtn, styles.modalBtnConfirm]}
                 onPress={() => {
+                  debugLog('settings', 'Enable smart coolant');
+                  void trackGameplayAction('smart_coolant_enabled', {}, 0);
                   setAutoUseCoolant(true);
                   setSmartCoolantConfirmOpen(false);
                 }}
@@ -2754,13 +2811,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         visible={settingsOpen}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setSettingsOpen(false)}
+        onRequestClose={() => {
+          debugLog('ui', 'Close settings modal');
+          setSettingsOpen(false);
+        }}
       >
         <View style={styles.bottomSheetOverlay}>
           <View style={[styles.settingsModalBox, styles.bottomSheetBox]}>
             <View style={styles.settingsHeaderRow}>
               <Text style={styles.modalTitle}>⚙️ Settings & Automation</Text>
-              <Pressable style={styles.settingsCloseBtn} onPress={() => setSettingsOpen(false)}>
+              <Pressable style={styles.settingsCloseBtn} onPress={() => {
+                debugLog('ui', 'Close settings modal from button');
+                setSettingsOpen(false);
+              }}>
                 <Text style={styles.settingsCloseBtnText}>Close</Text>
               </Pressable>
             </View>
@@ -2770,7 +2833,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Text style={styles.settingsLabel}>Switch between your class-bound character slots or create a new one if an empty slot remains.</Text>
                 <Pressable
                   style={styles.settingsCycleBtn}
-                  onPress={returnToCharacterSelect}
+                  onPress={() => {
+                    debugLog('settings', 'Switch character from settings');
+                    returnToCharacterSelect();
+                  }}
                 >
                   <Text style={styles.settingsCycleBtnText}>Switch Character</Text>
                 </Pressable>
@@ -2787,6 +2853,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   style={[styles.settingsCycleBtn, !HAS_BETA_FEEDBACK_FORM && styles.shopBuyBtnDisabled]}
                   disabled={!HAS_BETA_FEEDBACK_FORM}
                   onPress={() => {
+                    debugLog('settings', 'Open feedback form');
                     void trackEvent('feedback_link_opened', { source: 'settings' });
                     void Linking.openURL(FEEDBACK_FORM_URL);
                   }}
@@ -2801,7 +2868,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Text style={styles.settingsLabel}>Enabled</Text>
                   <Pressable
                     style={[styles.settingsToggleBtn, state.autoUsePotionEnabled && styles.settingsToggleBtnActive]}
-                    onPress={() => setAutoUsePotion(!state.autoUsePotionEnabled)}
+                    onPress={() => {
+                      debugLog('settings', 'Toggle auto potion', { nextState: !state.autoUsePotionEnabled });
+                      void trackGameplayAction('setting_auto_potion_toggled', { enabled: !state.autoUsePotionEnabled }, 0);
+                      setAutoUsePotion(!state.autoUsePotionEnabled);
+                    }}
                   >
                     <Text style={styles.settingsToggleText}>{state.autoUsePotionEnabled ? 'ON' : 'OFF'}</Text>
                   </Pressable>
@@ -2809,11 +2880,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <View style={styles.settingsRowBetween}>
                   <Text style={styles.settingsLabel}>Trigger HP</Text>
                   <View style={styles.settingsAdjustWrap}>
-                    <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoUsePotionThreshold(state.autoUsePotionThresholdPct - 0.05)}>
+                    <Pressable style={styles.autoPotionAdjustBtn} onPress={() => {
+                      const nextValue = state.autoUsePotionThresholdPct - 0.05;
+                      debugLog('settings', 'Decrease auto potion threshold', { from: state.autoUsePotionThresholdPct, to: nextValue });
+                      setAutoUsePotionThreshold(nextValue);
+                    }}>
                       <Text style={styles.autoPotionAdjustText}>-</Text>
                     </Pressable>
                     <Text style={styles.settingsValueText}>{(state.autoUsePotionThresholdPct * 100).toFixed(0)}%</Text>
-                    <Pressable style={styles.autoPotionAdjustBtn} onPress={() => setAutoUsePotionThreshold(state.autoUsePotionThresholdPct + 0.05)}>
+                    <Pressable style={styles.autoPotionAdjustBtn} onPress={() => {
+                      const nextValue = state.autoUsePotionThresholdPct + 0.05;
+                      debugLog('settings', 'Increase auto potion threshold', { from: state.autoUsePotionThresholdPct, to: nextValue });
+                      setAutoUsePotionThreshold(nextValue);
+                    }}>
                       <Text style={styles.autoPotionAdjustText}>+</Text>
                     </Pressable>
                   </View>
@@ -2828,9 +2907,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       style={[styles.settingsToggleBtn, state.autoUseCoolantEnabled && styles.settingsToggleBtnActive]}
                       onPress={() => {
                         if (state.autoUseCoolantEnabled) {
+                          debugLog('settings', 'Disable smart coolant');
+                          void trackGameplayAction('smart_coolant_disabled', {}, 0);
                           setAutoUseCoolant(false);
                           return;
                         }
+                        debugLog('settings', 'Open smart coolant confirmation');
                         setSettingsOpen(false);
                         setSmartCoolantConfirmOpen(true);
                       }}
@@ -2848,14 +2930,21 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Text style={styles.settingsLabel}>Enabled</Text>
                   <Pressable
                     style={[styles.settingsToggleBtn, state.autoRecycleEnabled && styles.settingsToggleBtnActive]}
-                    onPress={() => setAutoRecycleEnabled(!state.autoRecycleEnabled)}
+                    onPress={() => {
+                      debugLog('settings', 'Toggle auto recycle', { nextState: !state.autoRecycleEnabled });
+                      void trackGameplayAction('setting_auto_recycle_toggled', { enabled: !state.autoRecycleEnabled }, 0);
+                      setAutoRecycleEnabled(!state.autoRecycleEnabled);
+                    }}
                   >
                     <Text style={styles.settingsToggleText}>{state.autoRecycleEnabled ? 'ON' : 'OFF'}</Text>
                   </Pressable>
                 </View>
                 <View style={styles.settingsRowBetween}>
                   <Text style={styles.settingsLabel}>Max Rarity</Text>
-                  <Pressable style={styles.settingsCycleBtn} onPress={cycleAutoRecycleRarity}>
+                  <Pressable style={styles.settingsCycleBtn} onPress={() => {
+                    debugLog('settings', 'Cycle auto recycle max rarity', { from: state.autoRecycleMaxRarity });
+                    cycleAutoRecycleRarity();
+                  }}>
                     <Text style={styles.settingsCycleBtnText}>{state.autoRecycleMaxRarity.toUpperCase()}</Text>
                   </Pressable>
                 </View>
@@ -2867,14 +2956,23 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Text style={styles.settingsLabel}>Enabled</Text>
                   <Pressable
                     style={[styles.settingsToggleBtn, state.autoSummonEnabled && styles.settingsToggleBtnActive]}
-                    onPress={() => setAutoSummonEnabled(!state.autoSummonEnabled)}
+                    onPress={() => {
+                      debugLog('settings', 'Toggle auto summon', { nextState: !state.autoSummonEnabled });
+                      void trackGameplayAction('setting_auto_summon_toggled', { enabled: !state.autoSummonEnabled }, 0);
+                      setAutoSummonEnabled(!state.autoSummonEnabled);
+                    }}
                   >
                     <Text style={styles.settingsToggleText}>{state.autoSummonEnabled ? 'ON' : 'OFF'}</Text>
                   </Pressable>
                 </View>
                 <View style={styles.settingsRowBetween}>
                   <Text style={styles.settingsLabel}>Mode</Text>
-                  <Pressable style={styles.settingsCycleBtn} onPress={() => setAutoSummonMode(state.autoSummonMode === 'single' ? 'x10' : 'single')}>
+                  <Pressable style={styles.settingsCycleBtn} onPress={() => {
+                    const nextMode = state.autoSummonMode === 'single' ? 'x10' : 'single';
+                    debugLog('settings', 'Change auto summon mode', { from: state.autoSummonMode, to: nextMode });
+                    void trackGameplayAction('setting_auto_summon_mode_changed', { mode: nextMode }, 0);
+                    setAutoSummonMode(nextMode);
+                  }}>
                     <Text style={styles.settingsCycleBtnText}>{state.autoSummonMode.toUpperCase()}</Text>
                   </Pressable>
                 </View>
