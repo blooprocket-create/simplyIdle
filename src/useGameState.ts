@@ -3664,15 +3664,15 @@ function reducer(state: GameState, action: Action): GameState {
       const surplusStride = Math.max(15, Math.floor(rebirthRequirement * 0.05));
       const baseCoreGain = 1 + Math.floor(state.prestigeCount * 0.25);
       const gainedCores = baseCoreGain + Math.floor(surplusWaves / surplusStride);
-      const refundedStats = state.statsAlloc.strength + state.statsAlloc.vitality + state.statsAlloc.agility + state.statsAlloc.intelligence + state.statsAlloc.spirit;
       const preservedActiveTeam = normalizeTeamSelectionByRules(state, state.activeTeamHeroIds);
       const rebirthState = {
         ...state,
         gold: 0,
         exp: 0,
         level: 1,
-        unspentStatPoints: state.unspentStatPoints + refundedStats,
-        statsAlloc: blankStats,
+        // Preserve allocated stat distribution through rebirth.
+        unspentStatPoints: state.unspentStatPoints,
+        statsAlloc: state.statsAlloc,
         wave: 1,
         monsterHp: getMonsterMaxHp(1),
         monsterMaxHp: getMonsterMaxHp(1),

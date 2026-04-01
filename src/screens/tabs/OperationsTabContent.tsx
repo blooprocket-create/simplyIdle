@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { FacilityId, GameState, Stats, EXPEDITION_CONTRACT_REFRESH_MS, EXPEDITION_CONTRACT_REFRESH_GOLD_COST, FACILITY_MAX_LEVEL, getFacilityUpgradeCost } from '../../useGameState';
+import { FacilityId, GameState, Stats, EXPEDITION_CONTRACT_REFRESH_MS, EXPEDITION_CONTRACT_REFRESH_GOLD_COST, FACILITY_MAX_LEVEL, MINI_OPS_COOLDOWN_MS, getFacilityUpgradeCost } from '../../useGameState';
 import { EXPEDITION_TYPES, EXPEDITION_TYPE_META, EXPEDITION_RARITY_META, formatDurationShort, ExpeditionType, ExpeditionRarity } from '../GameScreen';
 import { fmt } from '../../utils';
 import { styles } from '../GameScreen';
@@ -64,6 +64,22 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
   refreshExpeditionContracts,
   renderSubTabBar,
 }) => {
+  const [nowMs, setNowMs] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 1_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const miniOpRemainingMs = (lastUsedMs: number | null) => {
+    if (lastUsedMs == null) return 0;
+    return Math.max(0, MINI_OPS_COOLDOWN_MS - (nowMs - lastUsedMs));
+  };
+  const diceRemainingMs = miniOpRemainingMs(state.lastDiceRollDay);
+  const reconRemainingMs = miniOpRemainingMs(state.lastReconSweepDay);
+  const lockpickRemainingMs = miniOpRemainingMs(state.lastLockpickDay);
+  const targetRemainingMs = miniOpRemainingMs(state.lastTargetPracticeDay);
+  const bountyRemainingMs = miniOpRemainingMs(state.lastBountyDraftDay);
+
   const operationsFacilities = state.guildhallFacilities;
   const expeditionClaimableCount = state.expeditionQueue.filter(exp => (Date.now() - exp.startTime) >= exp.durationMs).length;
   const expeditionActiveTypes = new Set(state.expeditionQueue.map(exp => exp.type as ExpeditionType));
@@ -187,7 +203,7 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
               <Text style={styles.facilitiesDesc}>Tactical actions on a 4-hour cooldown from when each one is used.</Text>
               <View style={styles.facilityCard}>
                 <Text style={styles.facilityName}>Dice Protocol</Text>
-                <Text style={styles.facilityBonusText}>Status: {canPlayDiceToday ? 'Ready' : 'Cooldown active'}</Text>
+                <Text style={styles.facilityBonusText}>Status: {canPlayDiceToday ? 'Ready' : `${formatDurationShort(diceRemainingMs)} remaining`}</Text>
                 {state.lastDiceRollValue != null && (
                   <Text style={styles.facilityNextBonus}>Last roll: {state.lastDiceRollValue}/20</Text>
                 )}
@@ -207,7 +223,7 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
               <View style={styles.facilityCard}>
                 <Text style={styles.facilityName}>🛰️ Recon Sweep</Text>
                 <Text style={styles.facilityBonusText}>Reveal 1 of 3 intel outcomes (gold, shards, or combat telemetry).</Text>
-                <Text style={styles.facilityBonusText}>Status: {canPlayReconToday ? 'Ready' : 'Cooldown active'}</Text>
+                <Text style={styles.facilityBonusText}>Status: {canPlayReconToday ? 'Ready' : `${formatDurationShort(reconRemainingMs)} remaining`}</Text>
                 <Pressable
                   style={[styles.warPanelActionBtn, !canPlayReconToday && styles.warPanelActionBtnDisabled]}
                   disabled={!canPlayReconToday}
@@ -220,7 +236,7 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
               <View style={styles.facilityCard}>
                 <Text style={styles.facilityName}>🔐 Lockpick Cache</Text>
                 <Text style={styles.facilityBonusText}>Crack a cache for diamonds, or salvage partial gold on a jam.</Text>
-                <Text style={styles.facilityBonusText}>Status: {canPlayLockpickToday ? 'Ready' : 'Cooldown active'}</Text>
+                <Text style={styles.facilityBonusText}>Status: {canPlayLockpickToday ? 'Ready' : `${formatDurationShort(lockpickRemainingMs)} remaining`}</Text>
                 <Pressable
                   style={[styles.warPanelActionBtn, !canPlayLockpickToday && styles.warPanelActionBtnDisabled]}
                   disabled={!canPlayLockpickToday}
@@ -233,7 +249,7 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
               <View style={styles.facilityCard}>
                 <Text style={styles.facilityName}>🎯 Target Practice</Text>
                 <Text style={styles.facilityBonusText}>Score tier sets shard and diamond payout.</Text>
-                <Text style={styles.facilityBonusText}>Status: {canPlayTargetToday ? 'Ready' : 'Cooldown active'}</Text>
+                <Text style={styles.facilityBonusText}>Status: {canPlayTargetToday ? 'Ready' : `${formatDurationShort(targetRemainingMs)} remaining`}</Text>
                 <Pressable
                   style={[styles.warPanelActionBtn, !canPlayTargetToday && styles.warPanelActionBtnDisabled]}
                   disabled={!canPlayTargetToday}
@@ -260,29 +276,32 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
                     </Pressable>
                   </>
                 ) : (
-                  <View style={styles.warPanelActionRow}>
-                    <Pressable
-                      style={[styles.warPanelActionBtn, !canStartBountyToday && styles.warPanelActionBtnDisabled]}
-                      disabled={!canStartBountyToday}
-                      onPress={() => startMiniBountyDraft('assault')}
-                    >
-                      <Text style={styles.warPanelActionText}>Assault</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.warPanelActionBtn, !canStartBountyToday && styles.warPanelActionBtnDisabled]}
-                      disabled={!canStartBountyToday}
-                      onPress={() => startMiniBountyDraft('push')}
-                    >
-                      <Text style={styles.warPanelActionText}>Push</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.warPanelActionBtn, !canStartBountyToday && styles.warPanelActionBtnDisabled]}
-                      disabled={!canStartBountyToday}
-                      onPress={() => startMiniBountyDraft('recruit')}
-                    >
-                      <Text style={styles.warPanelActionText}>Recruit</Text>
-                    </Pressable>
-                  </View>
+                  <>
+                    {!canStartBountyToday && <Text style={styles.facilityNextBonus}>Next draft in: {formatDurationShort(bountyRemainingMs)}</Text>}
+                    <View style={styles.warPanelActionRow}>
+                      <Pressable
+                        style={[styles.warPanelActionBtn, !canStartBountyToday && styles.warPanelActionBtnDisabled]}
+                        disabled={!canStartBountyToday}
+                        onPress={() => startMiniBountyDraft('assault')}
+                      >
+                        <Text style={styles.warPanelActionText}>Assault</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[styles.warPanelActionBtn, !canStartBountyToday && styles.warPanelActionBtnDisabled]}
+                        disabled={!canStartBountyToday}
+                        onPress={() => startMiniBountyDraft('push')}
+                      >
+                        <Text style={styles.warPanelActionText}>Push</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[styles.warPanelActionBtn, !canStartBountyToday && styles.warPanelActionBtnDisabled]}
+                        disabled={!canStartBountyToday}
+                        onPress={() => startMiniBountyDraft('recruit')}
+                      >
+                        <Text style={styles.warPanelActionText}>Recruit</Text>
+                      </Pressable>
+                    </View>
+                  </>
                 )}
               </View>
             </View>
