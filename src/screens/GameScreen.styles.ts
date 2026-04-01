@@ -2647,6 +2647,17 @@ export const styles = StyleSheet.create({
     color: '#FFF',
     marginTop: 2,
   },
+  statValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+    marginTop: 2,
+  },
+  statGearValue: {
+    fontSize: 11,
+    color: '#8BC6FF',
+    fontWeight: '600',
+  },
   statDesc: {
     fontSize: 11,
     color: '#9090B8',
