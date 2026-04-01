@@ -730,6 +730,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const claimableWeeklyMilestones = WEEKLY_TRACK_MILESTONES.filter(ms => state.weeklyKills >= ms && !state.weeklyTrackClaimed.includes(ms));
   const claimableMissionIds = missionCards.filter(m => !m.claimed && m.progress.done).map(m => m.mission.id);
   const hasClaimableRewards = claimableWeeklyMilestones.length > 0 || claimableMissionIds.length > 0;
+  const claimableCodexHeroVipCount = Array.from(new Set(state.heroRoster.map(hero => hero.id)))
+    .filter(heroId => !state.codexVipClaimedHeroIds.includes(heroId)).length;
+  const claimableCodexUniqueVipCount = Object.entries(state.heroUniqueGearByHeroId)
+    .filter(([heroId, progress]) => !!progress && (progress.rank ?? 0) > 0 && !state.codexVipClaimedUniqueIds.includes(heroId)).length;
+  const hasCodexClaimableRewards = claimableCodexHeroVipCount > 0 || claimableCodexUniqueVipCount > 0;
   const vipLevel = Math.max(0, Math.min(10, state.vipLevel ?? 0));
   const vipPoints = Math.max(0, state.vipPoints ?? 0);
   const vipCurrentThreshold = VIP_LEVEL_THRESHOLDS[vipLevel] ?? 0;
@@ -1454,7 +1459,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       return bestInventoryScore > equippedScore + 0.001;
     });
   }, [equipmentInventory, state.equippedItems, state.inventoryItemIds, state.playerClass]);
-  const hasAchievementsNotification = hasClaimableRewards;
+  const hasAchievementsNotification = hasClaimableRewards || hasCodexClaimableRewards;
 
   const optimizeEquipment = () => {
     const slots: EquipmentSlot[] = ['weapon', 'armor', 'accessory'];
