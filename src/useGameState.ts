@@ -2756,10 +2756,14 @@ function checkAchievements(state: GameState): string | null {
     ...Object.values(state.equippedItems).filter((itemId): itemId is string => !!itemId),
   ]);
   let mythicPlusEquipmentCount = 0;
+  let epicPlusEquipmentCount = 0;
   let transcendentEquipmentCount = 0;
   for (const itemId of ownedEquipmentIds) {
     const item = getEquipmentEntry(state, itemId);
     if (!item) continue;
+    if (item.rarity === 'epic' || item.rarity === 'legendary' || item.rarity === 'mythic' || item.rarity === 'transcendent') {
+      epicPlusEquipmentCount += 1;
+    }
     if (item.rarity === 'mythic' || item.rarity === 'transcendent') mythicPlusEquipmentCount += 1;
     if (item.rarity === 'transcendent') transcendentEquipmentCount += 1;
   }
@@ -2785,6 +2789,7 @@ function checkAchievements(state: GameState): string | null {
     bossTears: state.bossTears,
     vipLevel: state.vipLevel,
     equipmentScrap: state.equipmentScrap,
+    epicPlusEquipmentCount,
     mythicPlusEquipmentCount,
     transcendentEquipmentCount,
     facilityTotalLevel,
@@ -2793,6 +2798,7 @@ function checkAchievements(state: GameState): string | null {
     uniqueEquippedCount,
     uniqueMaxRankCount,
     codexClaimCount,
+    permanentUnlockCount: state.permanentUnlocks.length,
     unlockedCount: state.achievements.size,
     totalAchievementCount: ACHIEVEMENTS.length,
     dailyLoginStreak: state.dailyLoginStreak,

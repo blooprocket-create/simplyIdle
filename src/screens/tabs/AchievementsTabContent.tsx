@@ -182,14 +182,17 @@ export const AchievementsTabContent: React.FC<AchievementsTabContentProps> = ({
           {(achievementsSubTab === 'overview' || achievementsSubTab === 'achievements') && <Text style={styles.sectionTitle}>🏆 Achievements</Text>}
           {(achievementsSubTab === 'overview' || achievementsSubTab === 'achievements') && ACHIEVEMENTS.map(ach => {
             const unlocked = state.achievements.has(ach.id);
+            const isHiddenLocked = !!ach.hidden && !unlocked;
             return (
               <View key={ach.id} style={[styles.achCard, unlocked && styles.achCardUnlocked]}>
-                <Text style={styles.achEmoji}>{ach.emoji}</Text>
+                <Text style={styles.achEmoji}>{isHiddenLocked ? '❔' : ach.emoji}</Text>
                 <View style={styles.achCardInfo}>
-                  <Text style={[styles.achName, unlocked && styles.achNameUnlocked]}>{ach.name}</Text>
-                  <Text style={styles.achDesc}>{ach.description}</Text>
+                  <Text style={[styles.achName, unlocked && styles.achNameUnlocked]}>{isHiddenLocked ? 'Hidden Achievement' : ach.name}</Text>
+                  <Text style={styles.achDesc}>{isHiddenLocked ? 'Unlock this by discovering an obscure milestone.' : ach.description}</Text>
                   <Text style={[styles.achBonusLine, unlocked && styles.achBonusLineUnlocked]}>
-                    {unlocked
+                    {isHiddenLocked
+                      ? `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/gold/EXP when revealed`
+                      : unlocked
                       ? `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/gold/EXP applied`
                       : `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/gold/EXP on unlock`}
                   </Text>

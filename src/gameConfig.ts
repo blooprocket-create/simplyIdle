@@ -1396,6 +1396,7 @@ export interface Achievement {
   name: string;
   description: string;
   emoji: string;
+  hidden?: boolean;
   condition: (s: AchievementContext) => boolean;
 }
 
@@ -1420,6 +1421,7 @@ export interface AchievementContext {
   bossTears: number;
   vipLevel: number;
   equipmentScrap: number;
+  epicPlusEquipmentCount: number;
   mythicPlusEquipmentCount: number;
   transcendentEquipmentCount: number;
   facilityTotalLevel: number;
@@ -1428,73 +1430,79 @@ export interface AchievementContext {
   uniqueEquippedCount: number;
   uniqueMaxRankCount: number;
   codexClaimCount: number;
+  permanentUnlockCount: number;
   unlockedCount: number;
   totalAchievementCount: number;
   dailyLoginStreak: number;
 }
 
 export const ACHIEVEMENTS: Achievement[] = [
-  { id: 'first_blood', name: 'First Blood', description: 'Defeat your first monster.', emoji: '🗡️', condition: s => s.totalKills >= 1 },
-  { id: 'kills_25', name: 'Skirmisher', description: 'Defeat 25 monsters.', emoji: '⚔️', condition: s => s.totalKills >= 25 },
-  { id: 'kills_100', name: 'Monster Slayer', description: 'Defeat 100 monsters.', emoji: '☠️', condition: s => s.totalKills >= 100 },
-  { id: 'kills_500', name: 'Warpath', description: 'Defeat 500 monsters.', emoji: '🩸', condition: s => s.totalKills >= 500 },
+  { id: 'first_blood', name: 'Ashen First Blood', description: 'Break the line and defeat your first monster.', emoji: '🗡️', condition: s => s.totalKills >= 1 },
+  { id: 'kills_25', name: 'Skirmish Doctrine', description: 'Defeat 25 monsters.', emoji: '⚔️', condition: s => s.totalKills >= 25 },
+  { id: 'kills_100', name: 'Frontier Reaper', description: 'Defeat 100 monsters.', emoji: '☠️', condition: s => s.totalKills >= 100 },
+  { id: 'kills_500', name: 'Warpath Unbroken', description: 'Defeat 500 monsters.', emoji: '🩸', condition: s => s.totalKills >= 500 },
   { id: 'kills_2500', name: 'Apex Exterminator', description: 'Defeat 2,500 monsters.', emoji: '💀', condition: s => s.totalKills >= 2500 },
-  { id: 'kills_10k', name: 'Legion Slayer', description: 'Defeat 10,000 monsters.', emoji: '⚔️', condition: s => s.totalKills >= 10000 },
-  { id: 'kills_100k', name: 'Cataclysm Herald', description: 'Defeat 100,000 monsters.', emoji: '🌪️', condition: s => s.totalKills >= 100000 },
+  { id: 'kills_10k', name: 'Legion Harrower', description: 'Defeat 10,000 monsters.', emoji: '⚔️', condition: s => s.totalKills >= 10000 },
+  { id: 'kills_100k', name: 'Cataclysm Standard', description: 'Defeat 100,000 monsters.', emoji: '🌪️', condition: s => s.totalKills >= 100000 },
   
   // Wave milestones
-  { id: 'wave_10', name: 'Gatebreaker', description: 'Reach wave 10.', emoji: '🚪', condition: s => s.wave >= 10 },
-  { id: 'wave_25', name: 'Frontline Surge', description: 'Reach wave 25.', emoji: '🌊', condition: s => s.wave >= 25 },
-  { id: 'wave_50', name: 'Veteran Front', description: 'Reach wave 50.', emoji: '⚔️', condition: s => s.wave >= 50 },
-  { id: 'wave_100', name: 'Century Siege', description: 'Reach wave 100.', emoji: '🏰', condition: s => s.wave >= 100 },
-  { id: 'wave_250', name: 'Storm Marshal', description: 'Reach wave 250.', emoji: '🌩️', condition: s => s.wave >= 250 },
-  { id: 'wave_500', name: 'Infinite Path', description: 'Reach wave 500. You are unstoppable.', emoji: '∞', condition: s => s.wave >= 500 },
-  { id: 'highest_wave_300', name: 'Last Bastion', description: 'Reach highest wave 300 in any run.', emoji: '🧱', condition: s => s.highestWaveReached >= 300 },
-  { id: 'highest_wave_1k', name: 'Epoch Conqueror', description: 'Reach highest wave 1000 in any run.', emoji: '👑', condition: s => s.highestWaveReached >= 1000 },
+  { id: 'wave_10', name: 'Gatebreaker', description: 'Push the current run to wave 10.', emoji: '🚪', condition: s => s.wave >= 10 },
+  { id: 'wave_25', name: 'Frontline Surge', description: 'Push the current run to wave 25.', emoji: '🌊', condition: s => s.wave >= 25 },
+  { id: 'wave_50', name: 'Siege Veteran', description: 'Push the current run to wave 50.', emoji: '⚔️', condition: s => s.wave >= 50 },
+  { id: 'wave_100', name: 'Century Siege', description: 'Push the current run to wave 100.', emoji: '🏰', condition: s => s.wave >= 100 },
+  { id: 'wave_250', name: 'Storm Marshal', description: 'Push the current run to wave 250.', emoji: '🌩️', condition: s => s.wave >= 250 },
+  { id: 'wave_500', name: 'Infinite March', description: 'Push the current run to wave 500.', emoji: '∞', condition: s => s.wave >= 500 },
+  { id: 'highest_wave_300', name: 'Last Bastion', description: 'Reach wave 300 in any run.', emoji: '🧱', condition: s => s.highestWaveReached >= 300 },
+  { id: 'highest_wave_1k', name: 'Epoch Conqueror', description: 'Reach wave 1,000 in any run.', emoji: '👑', condition: s => s.highestWaveReached >= 1000 },
+  { id: 'highest_wave_2500', name: 'Thronefall Survivor', description: 'Reach wave 2,500 in any run.', emoji: '🜂', hidden: true, condition: s => s.highestWaveReached >= 2500 },
   
   // Level milestones
-  { id: 'level_10', name: 'Battle-Hardened', description: 'Reach level 10.', emoji: '🛡️', condition: s => s.level >= 10 },
-  { id: 'level_25', name: 'Ascendant', description: 'Reach hero level 25.', emoji: '⭐', condition: s => s.level >= 25 },
-  { id: 'level_50', name: 'Myth Forged', description: 'Reach level 50.', emoji: '🌟', condition: s => s.level >= 50 },
-  { id: 'level_100', name: 'Godborn', description: 'Reach level 100.', emoji: '🌌', condition: s => s.level >= 100 },
-  { id: 'level_250', name: 'Eternal Legend', description: 'Reach level 250.', emoji: '👑', condition: s => s.level >= 250 },
+  { id: 'level_10', name: 'Battle-Hardened', description: 'Raise your commander to level 10.', emoji: '🛡️', condition: s => s.level >= 10 },
+  { id: 'level_25', name: 'Ascendant Standard', description: 'Raise your commander to level 25.', emoji: '⭐', condition: s => s.level >= 25 },
+  { id: 'level_50', name: 'Myth-Forged', description: 'Raise your commander to level 50.', emoji: '🌟', condition: s => s.level >= 50 },
+  { id: 'level_100', name: 'Godborne Office', description: 'Raise your commander to level 100.', emoji: '🌌', condition: s => s.level >= 100 },
+  { id: 'level_250', name: 'Eternal Regent', description: 'Raise your commander to level 250.', emoji: '👑', condition: s => s.level >= 250 },
   
   // Gold milestones
-  { id: 'gold_100k', name: 'Coin Current', description: 'Earn 100,000 total gold.', emoji: '🪙', condition: s => s.totalGold >= 100_000 },
-  { id: 'gold_1m', name: 'Gold Baron', description: 'Earn 1,000,000 total gold.', emoji: '💰', condition: s => s.totalGold >= 1_000_000 },
+  { id: 'gold_100k', name: 'Coin Current', description: 'Accumulate 100,000 total gold across all runs.', emoji: '🪙', condition: s => s.totalGold >= 100_000 },
+  { id: 'gold_1m', name: 'Gold Baron', description: 'Accumulate 1,000,000 total gold across all runs.', emoji: '💰', condition: s => s.totalGold >= 1_000_000 },
   { id: 'gold_10m', name: 'Imperial Treasury', description: 'Earn 10,000,000 total gold.', emoji: '🏦', condition: s => s.totalGold >= 10_000_000 },
-  { id: 'gold_100m', name: 'Generational Wealth', description: 'Earn 100,000,000 total gold.', emoji: '🏆', condition: s => s.totalGold >= 100_000_000 },
-  { id: 'gold_1b', name: 'Infinite Wealth', description: 'Earn 1,000,000,000 total gold.', emoji: '🤑', condition: s => s.totalGold >= 1_000_000_000 },
+  { id: 'gold_100m', name: 'Dynastic Wealth', description: 'Accumulate 100,000,000 total gold across all runs.', emoji: '🏆', condition: s => s.totalGold >= 100_000_000 },
+  { id: 'gold_1b', name: 'Infinite Treasury', description: 'Accumulate 1,000,000,000 total gold across all runs.', emoji: '🤑', condition: s => s.totalGold >= 1_000_000_000 },
   
   // Summoning achievements
   { id: 'summon_1', name: 'Recruitment Opened', description: 'Summon your first hero.', emoji: '📯', condition: s => s.totalSummons >= 1 },
-  { id: 'summon_10', name: 'Collector', description: 'Summon 10 heroes.', emoji: '🎴', condition: s => s.totalSummons >= 10 },
+  { id: 'summon_10', name: 'Banner Collector', description: 'Summon 10 heroes.', emoji: '🎴', condition: s => s.totalSummons >= 10 },
   { id: 'summon_50', name: 'Warband Architect', description: 'Summon 50 heroes.', emoji: '🧬', condition: s => s.totalSummons >= 50 },
   { id: 'summon_200', name: 'Legion Broker', description: 'Summon 200 heroes.', emoji: '👑', condition: s => s.totalSummons >= 200 },
-  { id: 'summon_1k', name: 'Infinite Gacha Master', description: 'Summon 1,000 heroes.', emoji: '🌠', condition: s => s.totalSummons >= 1000 },
+  { id: 'summon_1k', name: 'Infinite Bannerlord', description: 'Summon 1,000 heroes.', emoji: '🌠', condition: s => s.totalSummons >= 1000 },
   { id: 'godly_hero_1', name: 'Myth Walks', description: 'Own a Godly hero.', emoji: '🌟', condition: s => s.godlyHeroCount >= 1 },
   { id: 'transcendent_hero_1', name: 'Beyond the Banner', description: 'Own a Transcendent hero.', emoji: '🕳️', condition: s => s.transcendentHeroCount >= 1 },
+  { id: 'transcendent_hero_5', name: 'Court of the Beyond', description: 'Own 5 Transcendent heroes.', emoji: '🜏', hidden: true, condition: s => s.transcendentHeroCount >= 5 },
   
   // Roster achievements
   { id: 'roster_12', name: 'Field Locker', description: 'Own 12 heroes at once.', emoji: '🗃️', condition: s => s.heroRosterCount >= 12 },
   { id: 'roster_30', name: 'Banner Hall', description: 'Own 30 heroes at once.', emoji: '🏳️', condition: s => s.heroRosterCount >= 30 },
   { id: 'roster_60', name: 'Eternal Legion', description: 'Own 60 heroes at once.', emoji: '⚔️', condition: s => s.heroRosterCount >= 60 },
-  { id: 'team_full', name: 'War Council', description: 'Field a full active team.', emoji: '🪖', condition: s => s.equippedCount >= 5 },
+  { id: 'team_full', name: 'War Council', description: 'Field a full five-hero active team.', emoji: '🪖', condition: s => s.equippedCount >= 5 },
   { id: 'team_diverse', name: 'Grand Coalition', description: 'Deploy 4 different hero classes at once.', emoji: '🧭', condition: s => s.activeTeamClassCount >= 4 },
   { id: 'team_slots_5', name: 'Expanded Command', description: 'Unlock all team slots.', emoji: '🪑', condition: s => s.teamSlotCount >= 5 },
   { id: 'rank_10_1', name: 'Crowned Veteran', description: 'Raise a hero to Rank 10.', emoji: '👑', condition: s => s.maxHeroRankCount >= 1 },
   { id: 'rank_10_5', name: 'Pantheon Vanguard', description: 'Raise 5 heroes to Rank 10.', emoji: '🏛️', condition: s => s.maxHeroRankCount >= 5 },
   { id: 'hero_cap_1', name: 'Limit Breaker', description: 'Raise a hero to the level cap.', emoji: '📈', condition: s => s.maxHeroLevelCount >= 1 },
   { id: 'hero_cap_5', name: 'Endgame Battalion', description: 'Raise 5 heroes to the level cap.', emoji: '🧱', condition: s => s.maxHeroLevelCount >= 5 },
+  { id: 'lone_banner', name: 'Lone Banner', description: 'Reach wave 100 while fielding only one active hero.', emoji: '🕯️', hidden: true, condition: s => s.wave >= 100 && s.equippedCount === 1 },
+  { id: 'mono_legion', name: 'Monoculture Doctrine', description: 'Field a full team without class diversity.', emoji: '🪞', hidden: true, condition: s => s.equippedCount >= 5 && s.activeTeamClassCount === 1 },
   
   // Equipment and crafting
-  { id: 'equip_5', name: 'Dream Team', description: 'Equip 4 heroes.', emoji: '🧩', condition: s => s.equippedCount >= 4 },
-  { id: 'gear_epic', name: 'Epic Armorsmith', description: 'Craft your first Epic gear.', emoji: '🎨', condition: s => s.essence >= 5 },
-  { id: 'gear_mythic', name: 'Mythic Artisan', description: 'Own Mythic-rarity equipment.', emoji: '✨', condition: s => s.essence >= 50 },
+  { id: 'equip_5', name: 'Forward Detachment', description: 'Field at least 4 active heroes.', emoji: '🧩', condition: s => s.equippedCount >= 4 },
+  { id: 'gear_epic', name: 'Epic Armorsmith', description: 'Own an Epic-or-better equipment piece.', emoji: '🎨', condition: s => s.epicPlusEquipmentCount >= 1 },
+  { id: 'gear_mythic', name: 'Mythic Artisan', description: 'Own a Mythic-or-better equipment piece.', emoji: '✨', condition: s => s.mythicPlusEquipmentCount >= 1 },
   { id: 'scrap_1k', name: 'Scrapyard Baron', description: 'Hold 1,000 equipment scrap.', emoji: '🔩', condition: s => s.equipmentScrap >= 1000 },
   { id: 'scrap_10k', name: 'Iron Mountain', description: 'Hold 10,000 equipment scrap.', emoji: '⛰️', condition: s => s.equipmentScrap >= 10000 },
   { id: 'gear_mythic_plus_3', name: 'High Armory', description: 'Own 3 Mythic or better equipment pieces.', emoji: '🛠️', condition: s => s.mythicPlusEquipmentCount >= 3 },
   { id: 'gear_transcendent_1', name: 'Transcendent Arsenal', description: 'Own a Transcendent equipment piece.', emoji: '🗡️', condition: s => s.transcendentEquipmentCount >= 1 },
+  { id: 'gear_transcendent_3', name: 'Starvault Arsenal', description: 'Own 3 Transcendent equipment pieces.', emoji: '🌌', hidden: true, condition: s => s.transcendentEquipmentCount >= 3 },
   
   // Shard and essence
   { id: 'shards_1000', name: 'Shard Banker', description: 'Hold 1,000 hero shards at once.', emoji: '💠', condition: s => s.heroShards >= 1000 },
@@ -1503,27 +1511,30 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'essence_100', name: 'Eternal Conduit', description: 'Own 100 essence.', emoji: '✨', condition: s => s.essence >= 100 },
   { id: 'boss_tears_10', name: 'Tear Vault', description: 'Hold 10 Boss Tears at once.', emoji: '💧', condition: s => s.bossTears >= 10 },
   { id: 'boss_tears_100', name: 'Abyss Reservoir', description: 'Hold 100 Boss Tears at once.', emoji: '🌊', condition: s => s.bossTears >= 100 },
+  { id: 'boss_tears_250', name: 'Blackwell Reservoir', description: 'Hold 250 Boss Tears at once.', emoji: '🌑', hidden: true, condition: s => s.bossTears >= 250 },
   { id: 'vip_1', name: 'Patron Sigil', description: 'Reach VIP level 1.', emoji: '👑', condition: s => s.vipLevel >= 1 },
   { id: 'vip_5', name: 'Imperial Patron', description: 'Reach VIP level 5.', emoji: '💎', condition: s => s.vipLevel >= 5 },
   { id: 'vip_10', name: 'Throne Benefactor', description: 'Reach VIP level 10.', emoji: '🏰', condition: s => s.vipLevel >= 10 },
   
   // Progression unlocks
-  { id: 'unlocks_3', name: 'Relic Keeper', description: 'Unlock 3 permanent features.', emoji: '🔓', condition: s => s.unlockedCount >= 3 },
-  { id: 'unlocks_10', name: 'Vault Master', description: 'Unlock 10+ permanent features.', emoji: '🔑', condition: s => s.unlockedCount >= 10 },
+  { id: 'unlocks_3', name: 'Relic Keeper', description: 'Unlock your first permanent feature.', emoji: '🔓', condition: s => s.permanentUnlockCount >= 1 },
+  { id: 'unlocks_10', name: 'Vault Master', description: 'Unlock all permanent features.', emoji: '🔑', condition: s => s.permanentUnlockCount >= 3 },
   { id: 'facilities_20', name: 'Guildhall Clerk', description: 'Reach 20 total facility levels.', emoji: '🏗️', condition: s => s.facilityTotalLevel >= 20 },
   { id: 'facilities_80', name: 'Citadel Quartermaster', description: 'Reach 80 total facility levels.', emoji: '🏰', condition: s => s.facilityTotalLevel >= 80 },
   { id: 'forge_10', name: 'Forge Supremacy', description: 'Upgrade the Forge facility to level 10.', emoji: '🔥', condition: s => s.forgeFacilityLevel >= 10 },
+  { id: 'facilities_200', name: 'Imperial Works', description: 'Reach 200 total facility levels.', emoji: '🏛️', hidden: true, condition: s => s.facilityTotalLevel >= 200 },
   
   // Login achievements
   { id: 'streak_7', name: 'Habit of Steel', description: 'Reach a 7-day login streak.', emoji: '📅', condition: s => s.dailyLoginStreak >= 7 },
   { id: 'streak_30', name: 'Devoted Guardian', description: 'Reach a 30-day login streak.', emoji: '🗓️', condition: s => s.dailyLoginStreak >= 30 },
   
   // Rebirth achievements
-  { id: 'rebirth_1', name: 'Reborn', description: 'Complete your first Rebirth.', emoji: '♾️', condition: s => s.prestigeCount >= 1 },
+  { id: 'rebirth_1', name: 'Reborn', description: 'Complete your first rebirth.', emoji: '♾️', condition: s => s.prestigeCount >= 1 },
   { id: 'rebirth_5', name: 'Soul Cycler', description: 'Complete 5 Rebirths.', emoji: '🌀', condition: s => s.prestigeCount >= 5 },
   { id: 'rebirth_15', name: 'Eternal Cadence', description: 'Complete 15 Rebirths.', emoji: '🌌', condition: s => s.prestigeCount >= 15 },
   { id: 'rebirth_50', name: 'Infinite Returner', description: 'Complete 50 Rebirths.', emoji: '∞', condition: s => s.prestigeCount >= 50 },
   { id: 'rebirth_100', name: 'Godborne', description: 'Complete 100 Rebirths. You transcend mortality.', emoji: '👑', condition: s => s.prestigeCount >= 100 },
+  { id: 'rebirth_250', name: 'Cycle Tyrant', description: 'Complete 250 rebirths.', emoji: '🜃', hidden: true, condition: s => s.prestigeCount >= 250 },
 
   // Unique gear and codex
   { id: 'unique_1', name: 'Relic Awakened', description: 'Forge your first hero unique weapon.', emoji: '🗡️', condition: s => s.uniqueForgedCount >= 1 },
@@ -1534,6 +1545,8 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'unique_rank_10', name: 'Masterpiece Armament', description: 'Raise a unique weapon to Rank 10.', emoji: '🌟', condition: s => s.uniqueMaxRankCount >= 1 },
   { id: 'codex_claims_10', name: 'Lorekeeper', description: 'Claim 10 codex rewards.', emoji: '📚', condition: s => s.codexClaimCount >= 10 },
   { id: 'codex_claims_40', name: 'Archivist Supreme', description: 'Claim 40 codex rewards.', emoji: '📖', condition: s => s.codexClaimCount >= 40 },
+  { id: 'unique_rank_10_5', name: 'Relic Pantheon', description: 'Raise 5 unique weapons to Rank 10.', emoji: '🌠', hidden: true, condition: s => s.uniqueMaxRankCount >= 5 },
+  { id: 'codex_claims_100', name: 'Black Archive', description: 'Claim 100 codex rewards.', emoji: '🕮', hidden: true, condition: s => s.codexClaimCount >= 100 },
   
   // Achievement collection
   { id: 'legend_slate', name: 'Legend Slate', description: 'Unlock 20 achievements.', emoji: '📜', condition: s => s.unlockedCount >= 20 },
