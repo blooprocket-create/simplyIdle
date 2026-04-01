@@ -1104,7 +1104,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'gold_100k', name: 'Coin Current', description: 'Earn 100,000 total gold.', emoji: '🪙', condition: s => s.totalGold >= 100_000 },
   { id: 'gold_1m', name: 'Gold Baron', description: 'Earn 1,000,000 total gold.', emoji: '💰', condition: s => s.totalGold >= 1_000_000 },
   { id: 'gold_10m', name: 'Imperial Treasury', description: 'Earn 10,000,000 total gold.', emoji: '🏦', condition: s => s.totalGold >= 10_000_000 },
-  { id: 'gold_100m', name: 'Infinite Wealth', description: 'Earn 100,000,000 total gold.', emoji: '💎', condition: s => s.totalGold >= 100_000_000 },
+  { id: 'gold_100m', name: 'Infinite Wealth', description: 'Earn 100,000,000 total gold.', emoji: '💰', condition: s => s.totalGold >= 100_000_000 },
   
   // Summoning achievements
   { id: 'summon_1', name: 'Recruitment Opened', description: 'Summon your first hero.', emoji: '📯', condition: s => s.totalSummons >= 1 },

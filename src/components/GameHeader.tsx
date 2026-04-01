@@ -64,7 +64,7 @@ export default function GameHeader({
           <Text style={styles.resourceValue}>{formatNumber(diamonds)}</Text>
         </Pressable>
         <Pressable style={styles.resourceChip} onPress={() => {}}>
-          <Text style={styles.resourceIcon}>😭</Text>
+          <Text style={styles.resourceIcon}>💧</Text>
           <Text style={styles.resourceValue}>{formatNumber(bossTearsOrdered)}</Text>
         </Pressable>
         <Pressable style={styles.resourceChip} onPress={() => {}}>
