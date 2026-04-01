@@ -463,7 +463,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                           <>
                             {nextRankCost && (
                               <View style={styles.rankUpSection}>
-                                <Text style={styles.rankUpLabel}>Rank Up Cost: {nextRankCost} ✨</Text>
+                                <Text style={styles.rankUpLabel}>Rank Up Cost: {nextRankCost} 💠</Text>
                                 <Pressable
                                   style={[styles.rankUpBtn, !canRankUp && styles.rankUpBtnDisabled]}
                                   disabled={!canRankUp}
@@ -539,7 +539,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                               style={styles.recycleBtn}
                               onPress={() => setRecycleConfirmUid(hero.uid)}
                             >
-                              <Text style={styles.recycleBtnText}>♻️ Recycle for {shardValue} ✨</Text>
+                              <Text style={styles.recycleBtnText}>♻️ Recycle for {shardValue} 💠</Text>
                             </Pressable>
                           </>
                         )}
