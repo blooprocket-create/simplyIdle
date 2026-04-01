@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, useWindowDimensions } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
-import { RARITIES, HERO_LEVEL_CAP } from '../../gameConfig';
+import { RARITIES, HERO_LEVEL_CAP, getHeroRebirthPlan } from '../../gameConfig';
 import { fmt } from '../../utils';
 import { styles } from '../GameScreen';
 
@@ -251,8 +251,9 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                   const details = stats.heroDetails[hero.uid];
                   const isExpanded = expandedHeroes.has(hero.uid);
                   const shardValue = calculateShardReward(hero.rarity, hero.level);
-                  const heroRebirthShardCost = Math.max(250, Math.floor(shardValue * 2));
-                  const heroRebirthEssenceCost = 1;
+                  const heroRebirthPlan = getHeroRebirthPlan(hero);
+                  const heroRebirthShardCost = heroRebirthPlan.shardCost;
+                  const heroRebirthEssenceCost = heroRebirthPlan.essenceCost;
                   const nextRankCost = hero.rank < 10 ? getRankUpShardCost(hero.rarity, hero.rank + 1) : null;
                   const canRankUp = !!nextRankCost && state.heroShards >= nextRankCost;
                   const canHeroRebirth = hero.rank >= 10 && hero.level >= HERO_LEVEL_CAP && state.heroShards >= heroRebirthShardCost && state.essence >= heroRebirthEssenceCost;
@@ -458,7 +459,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                               >
                                 <Text style={styles.rankUpBtnText}>
                                   {canHeroRebirth
-                                    ? `Hero Rebirth (${heroRebirthShardCost}✨ + ${heroRebirthEssenceCost}⚡)`
+                                    ? `Hero Rebirth (${heroRebirthShardCost}✨ + ${heroRebirthEssenceCost}⚡, +${heroRebirthPlan.boostGainPct}% boost)`
                                     : `Need ${Math.max(0, heroRebirthShardCost - state.heroShards)}✨ / ${Math.max(0, heroRebirthEssenceCost - state.essence)}⚡`}
                                 </Text>
                               </Pressable>

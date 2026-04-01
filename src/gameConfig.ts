@@ -717,6 +717,54 @@ export function calculateShardReward(rarity: Rarity, level: number): number {
   return Math.floor(rarityBaseValue * levelMultiplier);
 }
 
+const HERO_REBIRTH_REFERENCE_MULT = 1.15;
+const HERO_REBIRTH_SHARD_BASE_COST = 320;
+const HERO_REBIRTH_SHARD_COST_MULT = 3.2;
+const HERO_REBIRTH_SHARD_GROWTH_PER_REBIRTH = 0.42;
+const HERO_REBIRTH_ESSENCE_BASE_COST = 1;
+const HERO_REBIRTH_ESSENCE_STEP = 2;
+const HERO_REBIRTH_BOOST_GAIN_BASE = 0.12;
+const HERO_REBIRTH_BOOST_GAIN_DECAY = 0.84;
+const HERO_REBIRTH_BOOST_GAIN_FLOOR = 0.04;
+
+export interface HeroRebirthPlan {
+  estimatedRebirths: number;
+  shardCost: number;
+  essenceCost: number;
+  nextTeamBoost: number;
+  boostGainPct: number;
+}
+
+export function getHeroRebirthPlan(hero: HeroUnit): HeroRebirthPlan {
+  const baseBoost = Math.max(0.0001, hero.baseTeamBoost * rarityConfig(hero.rarity).boostMultiplier);
+  const boostRatio = Math.max(1, hero.teamBoost / baseBoost);
+  const estimatedRebirths = Math.max(
+    0,
+    Math.floor((Math.log(boostRatio) / Math.log(HERO_REBIRTH_REFERENCE_MULT)) + 1e-6),
+  );
+
+  const baseShardCost = Math.max(
+    HERO_REBIRTH_SHARD_BASE_COST,
+    Math.floor(calculateShardReward(hero.rarity, hero.level) * HERO_REBIRTH_SHARD_COST_MULT),
+  );
+  const shardCost = Math.floor(baseShardCost * (1 + (estimatedRebirths * HERO_REBIRTH_SHARD_GROWTH_PER_REBIRTH)));
+  const essenceCost = HERO_REBIRTH_ESSENCE_BASE_COST + Math.floor(estimatedRebirths / HERO_REBIRTH_ESSENCE_STEP);
+
+  const gainPct = Math.max(
+    HERO_REBIRTH_BOOST_GAIN_FLOOR,
+    HERO_REBIRTH_BOOST_GAIN_BASE * Math.pow(HERO_REBIRTH_BOOST_GAIN_DECAY, estimatedRebirths),
+  );
+  const nextTeamBoost = Number((hero.teamBoost * (1 + gainPct)).toFixed(4));
+
+  return {
+    estimatedRebirths,
+    shardCost,
+    essenceCost,
+    nextTeamBoost,
+    boostGainPct: Number((gainPct * 100).toFixed(2)),
+  };
+}
+
 export const HERO_POOL: HeroTemplate[] = [
   { id: 'h1', name: 'Kael Ironheart', heroClass: 'warrior', emoji: '⚔️', passiveTrait: 'bulwark_instinct', activeSkillArchetype: 'frontline_ward', baseTeamBoost: 0.05 },
   { id: 'h2', name: 'Mira Oathguard', heroClass: 'warrior', emoji: '🛡️', passiveTrait: 'fortune_hunter', activeSkillArchetype: 'frontline_ward', baseTeamBoost: 0.055 },

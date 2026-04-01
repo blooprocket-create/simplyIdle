@@ -6,7 +6,6 @@ import {
   ACHIEVEMENTS,
   COST_SCALE,
   REBIRTH_BONUS,
-  REBIRTH_WAVE_THRESHOLD,
   getRebirthWaveRequirement,
   PartyId,
   PlayerClass,
@@ -55,6 +54,7 @@ import {
   getRankUpShardCost,
   getRankStatMultiplier,
   calculateShardReward,
+  getHeroRebirthPlan,
   unlockLabel,
 } from './gameConfig';
 import { buildingCost, bulkCost } from './utils';
@@ -3373,8 +3373,9 @@ function reducer(state: GameState, action: Action): GameState {
       const elapsed = Math.max(0, Math.min(action.elapsedMs, OFFLINE_PROGRESS_CAP_MS));
       if (elapsed < 5000) return { ...state, lastActiveAt: Date.now() };
 
-      const MAX_OFFLINE_KILLS = 4000;
-      const MIN_KILL_MS = 120;
+      const MAX_OFFLINE_KILLS = Math.min(3200, Math.max(1200, 900 + Math.floor(state.highestWaveReached * 1.5)));
+      const MAX_OFFLINE_WAVES = Math.min(260, Math.max(90, 60 + Math.floor(Math.sqrt(Math.max(1, state.wave)) * 10)));
+      const MIN_KILL_MS = 140;
       let remainingMs = elapsed;
       let working = state;
       const startWave = state.wave;
@@ -3384,7 +3385,12 @@ function reducer(state: GameState, action: Action): GameState {
       const baseRewardQueue = state.rewardQueue;
       const baseCombatLog = state.combatLog;
 
-      while (remainingMs > 0 && working.characterCreated && (working.totalKills - startKills) < MAX_OFFLINE_KILLS) {
+      while (
+        remainingMs > 0
+        && working.characterCreated
+        && (working.totalKills - startKills) < MAX_OFFLINE_KILLS
+        && (working.wave - startWave) < MAX_OFFLINE_WAVES
+      ) {
         const weekly = getCurrentWeeklyEvent(working);
         const affix = getMonsterAffixModifiers(working.wave);
         const dps = Math.max(1, getDps(working));
@@ -3412,6 +3418,7 @@ function reducer(state: GameState, action: Action): GameState {
       const goldGain = Math.max(0, working.gold - startGold);
       const expGain = Math.max(0, working.totalExp - startExp);
       const reachedKillCap = killsGained >= MAX_OFFLINE_KILLS;
+      const reachedWaveCap = wavesGained >= MAX_OFFLINE_WAVES;
       working = {
         ...working,
         rewardQueue: baseRewardQueue,
@@ -3425,7 +3432,7 @@ function reducer(state: GameState, action: Action): GameState {
         id: `offline_${Date.now()}`,
         kind: 'system',
         title: 'Offline Progress',
-        detail: `+${killsGained} kills • +${wavesGained} waves • +${goldGain} gold • +${expGain} EXP • now Wave ${working.wave}${reachedKillCap ? ' (simulation cap reached)' : ''}`,
+        detail: `+${killsGained} kills • +${wavesGained} waves • +${goldGain} gold • +${expGain} EXP • now Wave ${working.wave}${(reachedKillCap || reachedWaveCap) ? ' (simulation cap reached)' : ''}`,
       });
       return withAchievement((next));
     }
@@ -3467,7 +3474,10 @@ function reducer(state: GameState, action: Action): GameState {
     case 'REBIRTH': {
       const rebirthRequirement = getRebirthWaveRequirement(state.prestigeCount);
       if (state.highestWaveReached < rebirthRequirement) return state;
-      const gainedCores = Math.max(1, Math.floor((state.highestWaveReached - rebirthRequirement) / 25) + 1);
+      const surplusWaves = Math.max(0, state.highestWaveReached - rebirthRequirement);
+      const surplusStride = Math.max(15, Math.floor(rebirthRequirement * 0.05));
+      const baseCoreGain = 1 + Math.floor(state.prestigeCount * 0.25);
+      const gainedCores = baseCoreGain + Math.floor(surplusWaves / surplusStride);
       const refundedStats = state.statsAlloc.strength + state.statsAlloc.vitality + state.statsAlloc.agility + state.statsAlloc.intelligence + state.statsAlloc.spirit;
       return queueReward({
         ...state,
@@ -3499,7 +3509,7 @@ function reducer(state: GameState, action: Action): GameState {
         id: `rebirth_cores_${Date.now()}`,
         kind: 'system',
         title: 'Rebirth Complete',
-        detail: `+${gainedCores} rebirth cores • requirement was Wave ${rebirthRequirement}`,
+        detail: `+${gainedCores} rebirth cores • requirement was Wave ${rebirthRequirement} • surplus ${surplusWaves}`,
       });
     }
 
@@ -3901,15 +3911,16 @@ function reducer(state: GameState, action: Action): GameState {
       const hero = state.heroRoster.find(h => h.uid === action.uid);
       if (!hero || hero.rank < 10 || hero.level < HERO_LEVEL_CAP) return state;
 
-      const shardCost = Math.max(250, Math.floor(calculateShardReward(hero.rarity, hero.level) * 2));
-      const essenceCost = 1;
+      const rebirthPlan = getHeroRebirthPlan(hero);
+      const shardCost = rebirthPlan.shardCost;
+      const essenceCost = rebirthPlan.essenceCost;
       if (state.heroShards < shardCost || state.essence < essenceCost) return state;
 
       const updatedHero = normalizeHero({
         ...hero,
         level: 1,
         rank: 1,
-        teamBoost: Number((hero.teamBoost * 1.15).toFixed(4)),
+        teamBoost: rebirthPlan.nextTeamBoost,
       });
 
       return queueReward({
@@ -3921,7 +3932,7 @@ function reducer(state: GameState, action: Action): GameState {
         id: `hero_rebirth_${hero.uid}_${Date.now()}`,
         kind: 'system',
         title: `${hero.name} Reborn`,
-        detail: `-${shardCost} shards, -${essenceCost} essence • team boost now +${(updatedHero.teamBoost * 100).toFixed(1)}%`,
+        detail: `-${shardCost} shards, -${essenceCost} essence • +${rebirthPlan.boostGainPct}% boost gain • team boost now +${(updatedHero.teamBoost * 100).toFixed(1)}%`,
       });
     }
 
