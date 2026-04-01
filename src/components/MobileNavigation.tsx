@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Pressable, Text, StyleSheet } from 'react-native';
 import { theme } from '../theme/colors';
+import { debugLog } from '../telemetry';
 
 export type MobileTab = 'warfront' | 'roster' | 'engine' | 'progress';
 
@@ -27,7 +28,10 @@ export default function MobileNavigation({ currentTab, onTabChange, tabs }: Mobi
             <Pressable
               key={tab.id}
               style={[styles.tabButton, isActive && styles.tabButtonActive]}
-              onPress={() => onTabChange(tab.id)}
+              onPress={() => {
+                debugLog('nav', 'Mobile tab pressed', { from: currentTab, to: tab.id });
+                onTabChange(tab.id);
+              }}
             >
               <Text style={[styles.tabIcon, isActive && styles.tabIconActive]}>{tab.icon}</Text>
               <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>{tab.label}</Text>

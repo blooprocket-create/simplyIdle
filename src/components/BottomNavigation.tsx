@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Pressable, Text, Platform } from 'react-native';
 import { THEME, RADIUS, Z_INDEX } from '../theme';
+import { debugLog } from '../telemetry';
 
 export type BottomTabType = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations';
 
@@ -32,7 +33,10 @@ export default function BottomNavigation({ activeTab, onTabChange, notifications
           <Pressable
             key={tab}
             style={[styles.tab, isActive && styles.tabActive]}
-            onPress={() => onTabChange(tab)}
+            onPress={() => {
+              debugLog('nav', 'Bottom tab pressed', { from: activeTab, to: tab });
+              onTabChange(tab);
+            }}
           >
             <View style={styles.tabIconWrap}>
               <Text style={[styles.tabIcon, isActive && styles.tabIconActive]}>{icon}</Text>

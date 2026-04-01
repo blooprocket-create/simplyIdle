@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Pressable, Text, StatusBar, useWindowDimensions } from 'react-native';
 import { THEME, TYPOGRAPHY, SPACING, Z_INDEX, RADIUS } from '../theme';
+import { debugLog } from '../telemetry';
 
 interface GameHeaderProps {
   playerName: string;
@@ -116,7 +117,10 @@ export default function GameHeader({
       <View style={styles.right}>
         <Pressable
           style={styles.statButton}
-          onPress={() => setShowStatTip(!showStatTip)}
+          onPress={() => {
+            debugLog('header', 'Stat tooltip toggled', { nextOpen: !showStatTip });
+            setShowStatTip(!showStatTip);
+          }}
         >
           <View style={styles.statRow}>
             <Text style={styles.statLabel}>DPS</Text>
@@ -124,7 +128,13 @@ export default function GameHeader({
           </View>
         </Pressable>
 
-        <Pressable style={styles.actionButton} onPress={() => onActionPress('settings')}>
+        <Pressable
+          style={styles.actionButton}
+          onPress={() => {
+            debugLog('header', 'Settings action pressed');
+            onActionPress('settings');
+          }}
+        >
           <Text style={styles.actionIcon}>⚙️</Text>
         </Pressable>
       </View>

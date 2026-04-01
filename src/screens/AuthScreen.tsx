@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
+import { debugLog, trackGameplayAction } from '../telemetry';
 
 interface AuthScreenProps {
   onAuthenticated: (username: string) => void;
@@ -145,6 +146,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
 
     setBusy(true);
     setError(null);
+    debugLog('auth', 'Submit attempt', { mode, username: cleanUsername });
 
     try {
       const accounts = await loadAccounts();
@@ -152,6 +154,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
 
       if (mode === 'register') {
         if (existing) {
+          debugLog('auth', 'Register blocked: username exists', { username: cleanUsername });
           setError('Username already exists. Try logging in.');
           return;
         }
@@ -171,11 +174,14 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
         await saveAccounts(nextAccounts);
         setKnownUsernames(nextAccounts.map(account => account.username));
         await AsyncStorage.setItem(SESSION_KEY, cleanUsername);
+        debugLog('auth', 'Registration successful', { username: cleanUsername });
+        void trackGameplayAction('auth_register_success', { username: cleanUsername }, 0);
         onAuthenticated(cleanUsername);
         return;
       }
 
       if (!existing || !(await verifyPassword(existing, password))) {
+        debugLog('auth', 'Login failed', { username: cleanUsername });
         setError('Invalid username or password.');
         return;
       }
@@ -188,6 +194,8 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       }
 
       await AsyncStorage.setItem(SESSION_KEY, cleanUsername);
+      debugLog('auth', 'Login successful', { username: cleanUsername });
+      void trackGameplayAction('auth_login_success', { username: cleanUsername }, 0);
       onAuthenticated(cleanUsername);
     } finally {
       setBusy(false);
@@ -196,6 +204,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
 
   function requestWipeAllData() {
     if (busy) return;
+    debugLog('auth', 'Wipe data requested');
     Alert.alert(
       'Delete Local Data?',
       'This will erase all local accounts, sessions, saves, and telemetry on this device.',
@@ -213,6 +222,8 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               if (scopedKeys.length > 0) {
                 await AsyncStorage.multiRemove(scopedKeys);
               }
+              debugLog('auth', 'Local data wiped', { removedKeys: scopedKeys.length });
+              void trackGameplayAction('auth_wipe_local_data', { removedKeys: scopedKeys.length }, 0);
               setKnownUsernames([]);
               setUsername('');
               setPassword('');

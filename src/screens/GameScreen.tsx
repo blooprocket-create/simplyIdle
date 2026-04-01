@@ -1042,6 +1042,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   };
 
   const openRiftChallenge = () => {
+    debugLog('gameplay', 'Open Rift Challenge', { wave: state.wave, highestWave: state.highestWaveReached });
     setRiftDungeonResult(null);
     setRiftIsSimulating(false);
     setRiftSelectedBonuses([]);
@@ -1064,6 +1065,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   const openReconSweepGame = () => {
     if (!canPlayReconToday) return;
+    debugLog('gameplay', 'Open Recon Sweep', { wave: state.wave });
     const pool: ReconSweepOutcome[] = ['intel_gold', 'intel_shards', 'intel_buff', 'ambush'];
     const sampled = [...pool]
       .sort(() => Math.random() - 0.5)
@@ -1129,12 +1131,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     if (reconPickedIndex == null) return;
     const outcome = reconChoices[reconPickedIndex];
     if (!outcome) return;
+    debugLog('gameplay', 'Claim Recon Sweep', { outcome });
     playReconSweep(outcome);
     resetReconGame();
   };
 
   const openLockpickCacheGame = () => {
     if (!canPlayLockpickToday) return;
+    debugLog('gameplay', 'Open Lockpick Cache', { wave: state.wave });
     setLockpickTargetCode(Math.floor(Math.random() * 90) + 10);
     setLockpickGuessInput('');
     setLockpickAttemptsUsed(0);
@@ -1177,6 +1181,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   const claimLockpickCacheGame = () => {
     if (lockpickSolved == null) return;
+    debugLog('gameplay', 'Claim Lockpick Cache', { solved: lockpickSolved });
     playLockpickCache(lockpickSolved);
     setLockpickGameOpen(false);
     setLockpickHintText(null);
@@ -1184,6 +1189,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   const openTargetPracticeGame = () => {
     if (!canPlayTargetToday) return;
+    debugLog('gameplay', 'Open Target Practice', { wave: state.wave });
     setTargetPracticeMeter({ position: 8, direction: 1 });
     setTargetPracticeScore(null);
     setTargetPracticeGameOpen(true);
@@ -1198,6 +1204,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   const claimTargetPracticeGame = () => {
     if (targetPracticeScore == null) return;
+    debugLog('gameplay', 'Claim Target Practice', { score: targetPracticeScore });
     playTargetPractice(targetPracticeScore);
     setTargetPracticeGameOpen(false);
     setTargetPracticeScore(null);
@@ -1259,6 +1266,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const startDiceRoll = () => {
     if (diceIsRolling || !!diceRollResult) return;
 
+    debugLog('gameplay', 'Start Dice Roll', { wave: state.wave });
     setDiceIsRolling(true);
     const rolled = 1 + Math.floor(Math.random() * 20);
     setDiceFace(rolled);
@@ -1524,11 +1532,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   });
 
   function openCharacterSlot(playerClass: PlayerClass) {
+    debugLog('character', 'Open character slot', { playerClass });
     setDraftName('');
     setSelectedCharacterClass(playerClass);
   }
 
   async function deleteCharacterSlot(playerClass: PlayerClass) {
+    debugLog('character', 'Delete character slot requested', { playerClass });
     const saveKey = getSaveStorageKey(getCharacterSaveSlot(accountName, playerClass));
     await AsyncStorage.removeItem(saveKey);
 
@@ -1555,6 +1565,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     const cls = CLASSES.find(entry => entry.id === playerClass) ?? CLASSES[0];
     if (Platform.OS === 'web' && typeof globalThis.confirm === 'function') {
       const confirmed = globalThis.confirm(`Delete ${cls.name} character? This permanently removes that slot save.`);
+      debugLog('character', 'Delete character slot confirm dialog (web)', { playerClass, confirmed });
       if (confirmed) {
         void deleteCharacterSlot(playerClass);
       }
@@ -1578,6 +1589,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   }
 
   function returnToCharacterSelect() {
+    debugLog('character', 'Return to character select');
     setSettingsOpen(false);
     setDraftName('');
     setSelectedCharacterClass(null);
@@ -1695,7 +1707,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           <Pressable
             style={[styles.startBtn, draftName.trim().length === 0 && styles.startBtnDisabled]}
             disabled={draftName.trim().length === 0}
-            onPress={() => createCharacter(draftName, draftClass)}
+            onPress={() => {
+              debugLog('character', 'Create character requested', { draftClass, nameLength: draftName.trim().length });
+              createCharacter(draftName, draftClass);
+            }}
           >
             <Text style={styles.startBtnText}>Start Adventure</Text>
           </Pressable>
@@ -1783,6 +1798,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Pressable
                   style={styles.cinematicSummonCloseBtn}
                   onPress={() => {
+                    debugLog('summon', 'Close cinematic summon results', { entries: cinematicSummonResults.length });
                     setCinematicSummonOpen(false);
                     setCinematicSummonResults([]);
                     setCinematicSummonPhase('charge');
@@ -1810,6 +1826,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         dps={Math.max(1, Math.floor(stats.dps))}
         power={teamPowerIndex}
         onActionPress={(action) => {
+          debugLog('ui', 'Header action pressed', { action });
           if (action === 'settings') setSettingsOpen(true);
           else if (action === 'shop') setShopOpen(true);
           else if (action === 'events') setEventsOpen(true);
@@ -1821,13 +1838,31 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       />
 
       <View style={styles.headerQuickActionsRow}>
-        <Pressable style={styles.headerQuickActionBtn} onPress={() => setEventsOpen(true)}>
+        <Pressable
+          style={styles.headerQuickActionBtn}
+          onPress={() => {
+            debugLog('ui', 'Header quick action pressed', { action: 'events' });
+            setEventsOpen(true);
+          }}
+        >
           <Text style={styles.headerQuickActionText}>🗓️ Events</Text>
         </Pressable>
-        <Pressable style={styles.headerQuickActionBtn} onPress={() => setShopOpen(true)}>
+        <Pressable
+          style={styles.headerQuickActionBtn}
+          onPress={() => {
+            debugLog('ui', 'Header quick action pressed', { action: 'shop' });
+            setShopOpen(true);
+          }}
+        >
           <Text style={styles.headerQuickActionText}>🛒 Shop</Text>
         </Pressable>
-        <Pressable style={[styles.headerQuickActionBtn, styles.headerQuickActionBtnLogout]} onPress={onLogout}>
+        <Pressable
+          style={[styles.headerQuickActionBtn, styles.headerQuickActionBtnLogout]}
+          onPress={() => {
+            debugLog('auth', 'Logout pressed from game header');
+            onLogout();
+          }}
+        >
           <Text style={styles.headerQuickActionText}>⎋ Logout</Text>
         </Pressable>
       </View>
