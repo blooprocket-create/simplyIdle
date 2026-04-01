@@ -3121,7 +3121,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       ]}
                     >
                       <View style={styles.reconCardFaceFront}>
-                        <Text style={styles.reconChoiceLabel}>{`Node ${index + 1}`}</Text>
+                        <Text style={styles.reconCardBackSymbol}>🂠</Text>
+                        <View style={styles.reconCardBackStripe} />
+                        <Text style={styles.reconCardBackLabel}>RECON</Text>
                       </View>
                       <View style={styles.reconCardFaceBack}>
                         <Text style={styles.reconChoiceLabel}>{label}</Text>

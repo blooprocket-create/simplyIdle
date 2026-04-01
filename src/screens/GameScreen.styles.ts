@@ -4633,11 +4633,15 @@ export const styles = StyleSheet.create({
   },
   reconChoiceGrid: {
     width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     gap: 8,
   },
   reconChoiceCardTapTarget: {
-    width: '100%',
-    height: 64,
+    flex: 1,
+    height: 128,
+    minWidth: 86,
   },
   reconChoiceCard: {
     position: 'relative',
@@ -4675,6 +4679,7 @@ export const styles = StyleSheet.create({
     backgroundColor: '#112137',
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 8,
     backfaceVisibility: 'hidden',
   },
   reconCardFaceBack: {
@@ -4689,8 +4694,25 @@ export const styles = StyleSheet.create({
     backgroundColor: '#1A304A',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 8,
     backfaceVisibility: 'hidden',
     transform: [{ rotateY: '180deg' }],
+  },
+  reconCardBackSymbol: {
+    fontSize: 28,
+    color: '#D9ECFF',
+  },
+  reconCardBackStripe: {
+    width: '70%',
+    height: 3,
+    borderRadius: 999,
+    backgroundColor: '#3B5D7C',
+  },
+  reconCardBackLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#8FB2D6',
+    letterSpacing: 1,
   },
   lockpickInput: {
     width: '70%',
