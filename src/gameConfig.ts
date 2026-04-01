@@ -639,6 +639,7 @@ export interface HeroUnit extends HeroTemplate {
   level: number;  // hero's individual level
   rank: number;   // hero's star rank (1-10), separate from level
   teamBoost: number; // effective decimal after rarity multiplier
+  rebirthStatMult?: number; // hero-only stat multiplier from hero rebirths
 }
 
 // Hero rank system: grants stat bonuses per rank
@@ -731,13 +732,13 @@ export interface HeroRebirthPlan {
   estimatedRebirths: number;
   shardCost: number;
   essenceCost: number;
-  nextTeamBoost: number;
-  boostGainPct: number;
+  nextStatMultiplier: number;
+  statGainPct: number;
 }
 
 export function getHeroRebirthPlan(hero: HeroUnit): HeroRebirthPlan {
-  const baseBoost = Math.max(0.0001, hero.baseTeamBoost * rarityConfig(hero.rarity).boostMultiplier);
-  const boostRatio = Math.max(1, hero.teamBoost / baseBoost);
+  const statMult = Math.max(1, hero.rebirthStatMult ?? 1);
+  const boostRatio = Math.max(1, statMult);
   const estimatedRebirths = Math.max(
     0,
     Math.floor((Math.log(boostRatio) / Math.log(HERO_REBIRTH_REFERENCE_MULT)) + 1e-6),
@@ -754,14 +755,14 @@ export function getHeroRebirthPlan(hero: HeroUnit): HeroRebirthPlan {
     HERO_REBIRTH_BOOST_GAIN_FLOOR,
     HERO_REBIRTH_BOOST_GAIN_BASE * Math.pow(HERO_REBIRTH_BOOST_GAIN_DECAY, estimatedRebirths),
   );
-  const nextTeamBoost = Number((hero.teamBoost * (1 + gainPct)).toFixed(4));
+  const nextStatMultiplier = Number((statMult * (1 + gainPct)).toFixed(4));
 
   return {
     estimatedRebirths,
     shardCost,
     essenceCost,
-    nextTeamBoost,
-    boostGainPct: Number((gainPct * 100).toFixed(2)),
+    nextStatMultiplier,
+    statGainPct: Number((gainPct * 100).toFixed(2)),
   };
 }
 

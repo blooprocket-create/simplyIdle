@@ -448,6 +448,9 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                             <Text style={styles.heroDetail} numberOfLines={1}>
                               ⭐ Rank {hero.rank}/10 • +{(hero.teamBoost * 100).toFixed(1)}% boost
                             </Text>
+                            <Text style={styles.heroDetail} numberOfLines={1}>
+                              Rebirth Power x{(hero.rebirthStatMult ?? 1).toFixed(2)}
+                            </Text>
                           </>
                         )}
 
@@ -522,7 +525,7 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                               >
                                 <Text style={styles.rankUpBtnText}>
                                   {canHeroRebirth
-                                    ? `Hero Rebirth (${heroRebirthShardCost}✨ + ${heroRebirthEssenceCost}⚡, +${heroRebirthPlan.boostGainPct}% boost)`
+                                    ? `Hero Rebirth (${heroRebirthShardCost}✨ + ${heroRebirthEssenceCost}⚡, +${heroRebirthPlan.statGainPct}% stats)`
                                     : `Need ${Math.max(0, heroRebirthShardCost - state.heroShards)}✨ / ${Math.max(0, heroRebirthEssenceCost - state.essence)}⚡`}
                                 </Text>
                               </Pressable>

@@ -1202,7 +1202,8 @@ function getTeamMaxHp(state: GameState): number {
     if (activeTeam.has(hero.uid)) {
       const heroClass = getClassConfig(hero.heroClass);
       const rankMult = getRankMultiplier(hero.rank, hero.rarity);
-      const heroVit = (heroClass.baseStats.vitality + hero.level * 0.8) * rankMult;
+      const statMult = Math.max(1, hero.rebirthStatMult ?? 1);
+      const heroVit = (heroClass.baseStats.vitality + hero.level * 0.8) * rankMult * statMult;
       maxHp += (heroVit + 3) * 8;
     }
   }
@@ -1225,8 +1226,9 @@ function getTeamDefense(state: GameState): number {
     if (activeTeam.has(hero.uid)) {
       const heroClass = getClassConfig(hero.heroClass);
       const rankMult = getRankMultiplier(hero.rank, hero.rarity);
-      const heroVit = (heroClass.baseStats.vitality + hero.level * 0.8) * rankMult;
-      const heroSpirit = (heroClass.baseStats.spirit + hero.level * 0.5) * rankMult;
+      const statMult = Math.max(1, hero.rebirthStatMult ?? 1);
+      const heroVit = (heroClass.baseStats.vitality + hero.level * 0.8) * rankMult * statMult;
+      const heroSpirit = (heroClass.baseStats.spirit + hero.level * 0.5) * rankMult * statMult;
       defense += heroVit * 0.2 + heroSpirit * 0.1;
     }
   }
@@ -1272,12 +1274,13 @@ export function getDpsBreakdown(state: GameState): {
     if (activeTeam.has(hero.uid)) {
       const heroClass = getClassConfig(hero.heroClass);
       const rankMult = getRankMultiplier(hero.rank, hero.rarity);
-      const heroStr = (heroClass.baseStats.strength + hero.level * 0.9) * rankMult;
-      const heroInt = (heroClass.baseStats.intelligence + hero.level * 0.85) * rankMult;
-      const heroAgi = (heroClass.baseStats.agility + hero.level * 0.7) * rankMult;
+      const statMult = Math.max(1, hero.rebirthStatMult ?? 1);
+      const heroStr = (heroClass.baseStats.strength + hero.level * 0.9) * rankMult * statMult;
+      const heroInt = (heroClass.baseStats.intelligence + hero.level * 0.85) * rankMult * statMult;
+      const heroAgi = (heroClass.baseStats.agility + hero.level * 0.7) * rankMult * statMult;
 
       const heroPhy = heroStr * 2 + heroAgi * 1.2 + hero.level * 0.5;
-      const heroMag = heroInt * 2 + ((heroClass.baseStats.spirit + hero.level * 0.6) * rankMult) * 1.1;
+      const heroMag = heroInt * 2 + ((heroClass.baseStats.spirit + hero.level * 0.6) * rankMult * statMult) * 1.1;
 
       const heroDmg = ((heroPhy * heroClass.physWeight * 0.4) + (heroMag * heroClass.magicWeight * 0.3)) / 3;
       heroDps += heroDmg;
@@ -1523,6 +1526,7 @@ function normalizeHero(hero: HeroUnit): HeroUnit {
     ...hero,
     passiveTrait: hero.passiveTrait ?? defaultTraitForClass(hero.heroClass),
     activeSkillArchetype: hero.activeSkillArchetype ?? defaultActiveForClass(hero.heroClass),
+    rebirthStatMult: Number((Math.max(1, hero.rebirthStatMult ?? 1)).toFixed(4)),
   };
 }
 
@@ -1640,6 +1644,7 @@ function sanitizeLoadedHero(raw: unknown, index: number): HeroUnit | null {
   const rarityMult = rarityConfig(rarity).boostMultiplier;
   const baseBoost = Number((template.baseTeamBoost * rarityMult).toFixed(4));
   const teamBoost = clampFloat(raw.teamBoost, baseBoost, 10, baseBoost);
+  const rebirthStatMult = clampFloat(raw.rebirthStatMult, 1, 20, 1);
 
   return normalizeHero({
     ...template,
@@ -1648,6 +1653,7 @@ function sanitizeLoadedHero(raw: unknown, index: number): HeroUnit | null {
     level,
     rank,
     teamBoost: Number(teamBoost.toFixed(4)),
+    rebirthStatMult: Number(rebirthStatMult.toFixed(4)),
   });
 }
 
@@ -2035,11 +2041,12 @@ export function computeStats(state: GameState) {
   for (const hero of state.heroRoster) {
     const heroClass = getClassConfig(hero.heroClass);
     const rankMult = getRankMultiplier(hero.rank, hero.rarity);
-    const hStr = (heroClass.baseStats.strength + hero.level * 0.9) * rankMult;
-    const hInt = (heroClass.baseStats.intelligence + hero.level * 0.85) * rankMult;
-    const hAgi = (heroClass.baseStats.agility + hero.level * 0.7) * rankMult;
-    const hVit = (heroClass.baseStats.vitality + hero.level * 0.8) * rankMult;
-    const hSpr = (heroClass.baseStats.spirit + hero.level * 0.6) * rankMult;
+    const statMult = Math.max(1, hero.rebirthStatMult ?? 1);
+    const hStr = (heroClass.baseStats.strength + hero.level * 0.9) * rankMult * statMult;
+    const hInt = (heroClass.baseStats.intelligence + hero.level * 0.85) * rankMult * statMult;
+    const hAgi = (heroClass.baseStats.agility + hero.level * 0.7) * rankMult * statMult;
+    const hVit = (heroClass.baseStats.vitality + hero.level * 0.8) * rankMult * statMult;
+    const hSpr = (heroClass.baseStats.spirit + hero.level * 0.6) * rankMult * statMult;
     const heroPhy = hStr * 2 + hAgi * 1.2 + hero.level * 0.5;
     const heroMag = hInt * 2 + hSpr * 1.1;
     const heroDps = ((heroPhy * heroClass.physWeight * 0.4) + (heroMag * heroClass.magicWeight * 0.3)) / 3;
@@ -2901,6 +2908,8 @@ function reducer(state: GameState, action: Action): GameState {
       const sorted = [...state.heroRoster].sort((a, b) => {
         const rarityDiff = rarityRank(b.rarity) - rarityRank(a.rarity);
         if (rarityDiff !== 0) return rarityDiff;
+        const statMultDiff = (b.rebirthStatMult ?? 1) - (a.rebirthStatMult ?? 1);
+        if (Math.abs(statMultDiff) > 0.0001) return statMultDiff;
         if (b.level !== a.level) return b.level - a.level;
         return b.teamBoost - a.teamBoost;
       });
@@ -3920,7 +3929,7 @@ function reducer(state: GameState, action: Action): GameState {
         ...hero,
         level: 1,
         rank: 1,
-        teamBoost: rebirthPlan.nextTeamBoost,
+        rebirthStatMult: rebirthPlan.nextStatMultiplier,
       });
 
       return queueReward({
@@ -3932,7 +3941,7 @@ function reducer(state: GameState, action: Action): GameState {
         id: `hero_rebirth_${hero.uid}_${Date.now()}`,
         kind: 'system',
         title: `${hero.name} Reborn`,
-        detail: `-${shardCost} shards, -${essenceCost} essence • +${rebirthPlan.boostGainPct}% boost gain • team boost now +${(updatedHero.teamBoost * 100).toFixed(1)}%`,
+        detail: `-${shardCost} shards, -${essenceCost} essence • +${rebirthPlan.statGainPct}% hero stat gain • stat multiplier x${(updatedHero.rebirthStatMult ?? 1).toFixed(2)}`,
       });
     }
 

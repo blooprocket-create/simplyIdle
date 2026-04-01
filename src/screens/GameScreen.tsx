@@ -1144,7 +1144,24 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   };
 
   const hasWarRoomNotification = canRebirthNow || (nextTeamSlotUnlock?.canUnlock ?? false);
-  const hasEquipmentNotification = Object.values(state.equippedItems).filter(Boolean).length < 3;
+  const hasEquipmentNotification = useMemo(() => {
+    const slots: EquipmentSlot[] = ['weapon', 'armor', 'accessory'];
+    return slots.some(slot => {
+      const equippedId = state.equippedItems[slot];
+      const equippedItem = equippedId ? equipmentInventory[equippedId] ?? null : null;
+      const equippedScore = equippedItem ? scoreEquipmentForClass(equippedItem, state.playerClass) : Number.NEGATIVE_INFINITY;
+
+      let bestInventoryScore = Number.NEGATIVE_INFINITY;
+      for (const itemId of state.inventoryItemIds) {
+        const item = equipmentInventory[itemId];
+        if (!item || item.slot !== slot) continue;
+        const score = scoreEquipmentForClass(item, state.playerClass);
+        if (score > bestInventoryScore) bestInventoryScore = score;
+      }
+
+      return bestInventoryScore > equippedScore + 0.001;
+    });
+  }, [equipmentInventory, state.equippedItems, state.inventoryItemIds, state.playerClass]);
   const hasAchievementsNotification = hasClaimableRewards;
 
   const optimizeEquipment = () => {
