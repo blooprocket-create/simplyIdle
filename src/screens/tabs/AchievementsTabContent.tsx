@@ -64,6 +64,15 @@ export const AchievementsTabContent: React.FC<AchievementsTabContentProps> = ({
       });
     return entries;
   }, [state.heroUniqueGearByHeroId]);
+  const claimableCodexHeroVipCount = useMemo(
+    () => codexHeroes.filter(hero => !state.codexVipClaimedHeroIds.includes(hero.id)).length,
+    [codexHeroes, state.codexVipClaimedHeroIds],
+  );
+  const claimableCodexUniqueVipCount = useMemo(
+    () => codexUniqueEntries.filter(({ hero }) => !state.codexVipClaimedUniqueIds.includes(hero.id)).length,
+    [codexUniqueEntries, state.codexVipClaimedUniqueIds],
+  );
+  const codexNotificationCount = claimableCodexHeroVipCount + claimableCodexUniqueVipCount;
   const renderCodexHeroIcon = (heroId: string, emoji: string) => {
     const portraitSource = getHeroPortraitSource(heroId);
     if (portraitSource) {
@@ -85,6 +94,8 @@ export const AchievementsTabContent: React.FC<AchievementsTabContentProps> = ({
               ? claimableWeeklyMilestones.length
               : st === 'missions'
                 ? claimableMissionIds.length
+                : st === 'codex'
+                  ? codexNotificationCount
                 : 0,
           })))}
 
