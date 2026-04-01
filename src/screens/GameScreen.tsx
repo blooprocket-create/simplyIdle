@@ -92,6 +92,8 @@ type RiftBuffChoice = {
   defenseMult: number;
 };
 
+type ReconSweepOutcome = 'intel_gold' | 'intel_shards' | 'intel_buff' | 'ambush';
+
 interface GameScreenProps {
   accountName: string;
   onLogout: () => void;
@@ -343,6 +345,21 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [riftDungeonModalOpen, setRiftDungeonModalOpen] = useState(false);
   const [riftDungeonResult, setRiftDungeonResult] = useState<{ waves: number; diamonds: number; shards: number; essence: number } | null>(null);
   const [riftIsSimulating, setRiftIsSimulating] = useState(false);
+
+  const [reconGameOpen, setReconGameOpen] = useState(false);
+  const [reconChoices, setReconChoices] = useState<ReconSweepOutcome[]>([]);
+  const [reconPickedIndex, setReconPickedIndex] = useState<number | null>(null);
+
+  const [lockpickGameOpen, setLockpickGameOpen] = useState(false);
+  const [lockpickTargetCode, setLockpickTargetCode] = useState<number>(0);
+  const [lockpickGuessInput, setLockpickGuessInput] = useState('');
+  const [lockpickAttemptsUsed, setLockpickAttemptsUsed] = useState(0);
+  const [lockpickHintText, setLockpickHintText] = useState<string | null>(null);
+  const [lockpickSolved, setLockpickSolved] = useState<boolean | null>(null);
+
+  const [targetPracticeGameOpen, setTargetPracticeGameOpen] = useState(false);
+  const [targetPracticeMeter, setTargetPracticeMeter] = useState<{ position: number; direction: 1 | -1 }>({ position: 8, direction: 1 });
+  const [targetPracticeScore, setTargetPracticeScore] = useState<number | null>(null);
 
   // Batch leveling state
   const [batchLevelSelected, setBatchLevelSelected] = useState<Set<string>>(new Set());
@@ -1037,6 +1054,115 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setRiftDungeonModalOpen(true);
   };
 
+  const resetReconGame = () => {
+    setReconGameOpen(false);
+    setReconChoices([]);
+    setReconPickedIndex(null);
+  };
+
+  const openReconSweepGame = () => {
+    if (!canPlayReconToday) return;
+    const pool: ReconSweepOutcome[] = ['intel_gold', 'intel_shards', 'intel_buff', 'ambush'];
+    const sampled = [...pool]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3)
+      .sort(() => Math.random() - 0.5);
+    setReconChoices(sampled);
+    setReconPickedIndex(null);
+    setReconGameOpen(true);
+  };
+
+  const claimReconSweepGame = () => {
+    if (reconPickedIndex == null) return;
+    const outcome = reconChoices[reconPickedIndex];
+    if (!outcome) return;
+    playReconSweep(outcome);
+    resetReconGame();
+  };
+
+  const openLockpickCacheGame = () => {
+    if (!canPlayLockpickToday) return;
+    setLockpickTargetCode(Math.floor(Math.random() * 90) + 10);
+    setLockpickGuessInput('');
+    setLockpickAttemptsUsed(0);
+    setLockpickHintText('Enter a 2-digit code. You get 3 attempts.');
+    setLockpickSolved(null);
+    setLockpickGameOpen(true);
+  };
+
+  const submitLockpickGuess = () => {
+    if (lockpickSolved != null) return;
+    const parsed = Number(lockpickGuessInput.trim());
+    if (!Number.isFinite(parsed) || parsed < 10 || parsed > 99) {
+      setLockpickHintText('Enter a valid number from 10 to 99.');
+      return;
+    }
+
+    const guess = Math.floor(parsed);
+    if (guess === lockpickTargetCode) {
+      setLockpickSolved(true);
+      setLockpickHintText(`Code ${lockpickTargetCode} matched. Cache unlocked.`);
+      return;
+    }
+
+    const nextAttempts = lockpickAttemptsUsed + 1;
+    setLockpickAttemptsUsed(nextAttempts);
+    if (nextAttempts >= 3) {
+      setLockpickSolved(false);
+      setLockpickHintText(`Lockout triggered. Correct code was ${lockpickTargetCode}.`);
+      return;
+    }
+
+    const directionHint = guess < lockpickTargetCode ? 'higher' : 'lower';
+    setLockpickHintText(`Access denied. Try a ${directionHint} code. Attempts left: ${3 - nextAttempts}.`);
+  };
+
+  const claimLockpickCacheGame = () => {
+    if (lockpickSolved == null) return;
+    playLockpickCache(lockpickSolved);
+    setLockpickGameOpen(false);
+    setLockpickHintText(null);
+  };
+
+  const openTargetPracticeGame = () => {
+    if (!canPlayTargetToday) return;
+    setTargetPracticeMeter({ position: 8, direction: 1 });
+    setTargetPracticeScore(null);
+    setTargetPracticeGameOpen(true);
+  };
+
+  const stopTargetPractice = () => {
+    if (targetPracticeScore != null) return;
+    const distanceFromCenter = Math.abs(targetPracticeMeter.position - 50);
+    const score = Math.max(0, Math.min(100, Math.round(100 - distanceFromCenter * 2)));
+    setTargetPracticeScore(score);
+  };
+
+  const claimTargetPracticeGame = () => {
+    if (targetPracticeScore == null) return;
+    playTargetPractice(targetPracticeScore);
+    setTargetPracticeGameOpen(false);
+    setTargetPracticeScore(null);
+  };
+
+  useEffect(() => {
+    if (!targetPracticeGameOpen || targetPracticeScore != null) return;
+    const timer = setInterval(() => {
+      setTargetPracticeMeter(prev => {
+        const nextPosition = prev.position + prev.direction * 3;
+        if (nextPosition >= 100) {
+          return { position: 100, direction: -1 };
+        }
+        if (nextPosition <= 0) {
+          return { position: 0, direction: 1 };
+        }
+        return { position: nextPosition, direction: prev.direction };
+      });
+    }, 45);
+
+    return () => clearInterval(timer);
+  }, [targetPracticeGameOpen, targetPracticeScore]);
+
   const chooseRiftBuff = (choice: RiftBuffChoice) => {
     if (riftDungeonResult || riftIsSimulating) return;
 
@@ -1371,6 +1497,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   function confirmDeleteCharacterSlot(playerClass: PlayerClass) {
     const cls = CLASSES.find(entry => entry.id === playerClass) ?? CLASSES[0];
+    if (Platform.OS === 'web' && typeof globalThis.confirm === 'function') {
+      const confirmed = globalThis.confirm(`Delete ${cls.name} character? This permanently removes that slot save.`);
+      if (confirmed) {
+        void deleteCharacterSlot(playerClass);
+      }
+      return;
+    }
+
     Alert.alert(
       `Delete ${cls.name} Character?`,
       'This permanently removes that slot save. This cannot be undone.',
@@ -1417,37 +1551,35 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             {slotSummaries.map(slot => {
               const cls = CLASSES.find(entry => entry.id === slot.classId) ?? CLASSES[0];
               return (
-                <Pressable
+                <View
                   key={slot.classId}
                   style={[styles.characterSlotCard, slot.occupied && styles.characterSlotCardFilled]}
-                  onPress={() => openCharacterSlot(slot.classId)}
                 >
-                  <View style={styles.characterSlotHeader}>
-                    <Text style={styles.characterSlotTitle}>{cls.emoji} {cls.name}</Text>
-                    <Text style={[styles.characterSlotBadge, slot.occupied ? styles.characterSlotBadgeFilled : styles.characterSlotBadgeEmpty]}>
-                      {slot.occupied ? 'EXISTING' : 'EMPTY'}
+                  <Pressable onPress={() => openCharacterSlot(slot.classId)}>
+                    <View style={styles.characterSlotHeader}>
+                      <Text style={styles.characterSlotTitle}>{cls.emoji} {cls.name}</Text>
+                      <Text style={[styles.characterSlotBadge, slot.occupied ? styles.characterSlotBadgeFilled : styles.characterSlotBadgeEmpty]}>
+                        {slot.occupied ? 'EXISTING' : 'EMPTY'}
+                      </Text>
+                    </View>
+                    <Text style={styles.characterSlotFantasy}>{cls.fantasy}</Text>
+                    <Text style={styles.characterSlotBody}>
+                      {slot.occupied
+                        ? `${slot.playerName} • Lv ${slot.level} • Peak Wave ${slot.highestWaveReached}`
+                        : `Create a ${cls.name.toLowerCase()} in this slot.`}
                     </Text>
-                  </View>
-                  <Text style={styles.characterSlotFantasy}>{cls.fantasy}</Text>
-                  <Text style={styles.characterSlotBody}>
-                    {slot.occupied
-                      ? `${slot.playerName} • Lv ${slot.level} • Peak Wave ${slot.highestWaveReached}`
-                      : `Create a ${cls.name.toLowerCase()} in this slot.`}
-                  </Text>
+                  </Pressable>
                   {slot.occupied && (
                     <View style={styles.characterSlotActions}>
                       <Pressable
                         style={styles.characterSlotDeleteBtn}
-                        onPress={(event) => {
-                          event.stopPropagation();
-                          confirmDeleteCharacterSlot(slot.classId);
-                        }}
+                        onPress={() => confirmDeleteCharacterSlot(slot.classId)}
                       >
                         <Text style={styles.characterSlotDeleteBtnText}>Delete Character</Text>
                       </Pressable>
                     </View>
                   )}
-                </Pressable>
+                </View>
               );
             })}
           </View>
@@ -2027,9 +2159,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             setDiceRollResult,
             setDiceIsRolling,
             setDiceRollModalOpen,
-            playReconSweep,
-            playLockpickCache,
-            playTargetPractice,
+            openReconSweepGame,
+            openLockpickCacheGame,
+            openTargetPracticeGame,
             startMiniBountyDraft,
             claimMiniBountyDraft,
             openRiftChallenge,
@@ -2886,6 +3018,134 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   </>
                 )}
               </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={reconGameOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={resetReconGame}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.miniGameModalContent}>
+            <Text style={styles.diceRollTitle}>🛰️ Recon Sweep</Text>
+            <Text style={styles.miniGameHint}>Pick one intel node. Rewards are based on what you reveal.</Text>
+            <View style={styles.reconChoiceGrid}>
+              {reconChoices.map((choice, index) => {
+                const picked = reconPickedIndex === index;
+                const revealed = reconPickedIndex != null;
+                const label =
+                  choice === 'intel_gold'
+                    ? 'Supply Route'
+                    : choice === 'intel_shards'
+                      ? 'Shard Cache'
+                      : choice === 'intel_buff'
+                        ? 'Telemetry Feed'
+                        : 'Enemy Ambush';
+                return (
+                  <Pressable
+                    key={`${choice}_${index}`}
+                    style={[
+                      styles.reconChoiceCard,
+                      picked && styles.reconChoiceCardPicked,
+                      revealed && choice === 'ambush' && styles.reconChoiceCardDanger,
+                    ]}
+                    disabled={reconPickedIndex != null}
+                    onPress={() => setReconPickedIndex(index)}
+                  >
+                    <Text style={styles.reconChoiceLabel}>{revealed ? label : `Node ${index + 1}`}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {reconPickedIndex == null ? (
+              <Pressable style={styles.modalBtn} onPress={resetReconGame}>
+                <Text style={styles.modalBtnText}>Cancel</Text>
+              </Pressable>
+            ) : (
+              <Pressable style={styles.modalCloseBtn} onPress={claimReconSweepGame}>
+                <Text style={styles.modalCloseBtnText}>Claim Recon Rewards</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={lockpickGameOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLockpickGameOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.miniGameModalContent}>
+            <Text style={styles.diceRollTitle}>🔐 Lockpick Cache</Text>
+            <Text style={styles.miniGameHint}>Guess the 2-digit lock code before security lockout.</Text>
+            <Text style={styles.miniGameStatusText}>Attempts: {lockpickAttemptsUsed}/3</Text>
+            <TextInput
+              style={styles.lockpickInput}
+              keyboardType="number-pad"
+              maxLength={2}
+              value={lockpickGuessInput}
+              editable={lockpickSolved == null}
+              onChangeText={setLockpickGuessInput}
+              placeholder="10-99"
+              placeholderTextColor="#6F89A7"
+            />
+            <Text style={styles.miniGameStatusText}>{lockpickHintText ?? ''}</Text>
+
+            {lockpickSolved == null ? (
+              <View style={styles.warPanelActionRow}>
+                <Pressable style={styles.warPanelActionBtn} onPress={submitLockpickGuess}>
+                  <Text style={styles.warPanelActionText}>Submit Guess</Text>
+                </Pressable>
+                <Pressable style={styles.modalBtn} onPress={() => setLockpickGameOpen(false)}>
+                  <Text style={styles.modalBtnText}>Cancel</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable style={styles.modalCloseBtn} onPress={claimLockpickCacheGame}>
+                <Text style={styles.modalCloseBtnText}>{lockpickSolved ? 'Claim Diamond Cache' : 'Claim Salvage Gold'}</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={targetPracticeGameOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setTargetPracticeGameOpen(false);
+          setTargetPracticeScore(null);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.miniGameModalContent}>
+            <Text style={styles.diceRollTitle}>🎯 Target Practice</Text>
+            <Text style={styles.miniGameHint}>Stop the moving marker as close to center as possible.</Text>
+
+            <View style={styles.targetTrack}>
+              <View style={styles.targetBullseyeZone} />
+              <View style={[styles.targetMarker, { left: `${targetPracticeMeter.position}%` }]} />
+            </View>
+
+            <Text style={styles.miniGameStatusText}>
+              {targetPracticeScore == null ? 'Timer running...' : `Final score: ${targetPracticeScore}`}
+            </Text>
+
+            {targetPracticeScore == null ? (
+              <Pressable style={styles.warPanelActionBtn} onPress={stopTargetPractice}>
+                <Text style={styles.warPanelActionText}>Stop Shot</Text>
+              </Pressable>
+            ) : (
+              <Pressable style={styles.modalCloseBtn} onPress={claimTargetPracticeGame}>
+                <Text style={styles.modalCloseBtnText}>Claim Practice Rewards</Text>
+              </Pressable>
             )}
           </View>
         </View>

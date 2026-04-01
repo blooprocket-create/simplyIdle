@@ -22,9 +22,9 @@ export interface OperationsTabContentProps {
   setDiceRollResult: (result: any) => void;
   setDiceIsRolling: (rolling: boolean) => void;
   setDiceRollModalOpen: (open: boolean) => void;
-  playReconSweep: () => void;
-  playLockpickCache: () => void;
-  playTargetPractice: () => void;
+  openReconSweepGame: () => void;
+  openLockpickCacheGame: () => void;
+  openTargetPracticeGame: () => void;
   startMiniBountyDraft: (draftType: 'assault' | 'push' | 'recruit') => void;
   claimMiniBountyDraft: () => void;
   openRiftChallenge: () => void;
@@ -52,9 +52,9 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
   setDiceRollResult,
   setDiceIsRolling,
   setDiceRollModalOpen,
-  playReconSweep,
-  playLockpickCache,
-  playTargetPractice,
+  openReconSweepGame,
+  openLockpickCacheGame,
+  openTargetPracticeGame,
   startMiniBountyDraft,
   claimMiniBountyDraft,
   openRiftChallenge,
@@ -83,7 +83,7 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
     const pct = facilityStepPct[facility] * level;
     if (facility === 'training') return `+${pct}% XP gain`;
     if (facility === 'treasury') return `+${pct}% gold gain`;
-    if (facility === 'forge') return `+${pct}% gear rarity`;
+    if (facility === 'forge') return `+${pct}% gear stats`;
     return `+${pct}% team power`;
   };
   const facilitiesUpgradeableCount = (['training', 'treasury', 'forge', 'tactics'] as const).filter(facility => {
@@ -211,9 +211,9 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
                 <Pressable
                   style={[styles.warPanelActionBtn, !canPlayReconToday && styles.warPanelActionBtnDisabled]}
                   disabled={!canPlayReconToday}
-                  onPress={playReconSweep}
+                  onPress={openReconSweepGame}
                 >
-                  <Text style={styles.warPanelActionText}>Run Recon Sweep</Text>
+                  <Text style={styles.warPanelActionText}>Play Recon Sweep</Text>
                 </Pressable>
               </View>
 
@@ -224,9 +224,9 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
                 <Pressable
                   style={[styles.warPanelActionBtn, !canPlayLockpickToday && styles.warPanelActionBtnDisabled]}
                   disabled={!canPlayLockpickToday}
-                  onPress={playLockpickCache}
+                  onPress={openLockpickCacheGame}
                 >
-                  <Text style={styles.warPanelActionText}>Attempt Lockpick</Text>
+                  <Text style={styles.warPanelActionText}>Play Lockpick</Text>
                 </Pressable>
               </View>
 
@@ -237,9 +237,9 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
                 <Pressable
                   style={[styles.warPanelActionBtn, !canPlayTargetToday && styles.warPanelActionBtnDisabled]}
                   disabled={!canPlayTargetToday}
-                  onPress={playTargetPractice}
+                  onPress={openTargetPracticeGame}
                 >
-                  <Text style={styles.warPanelActionText}>Run Target Practice</Text>
+                  <Text style={styles.warPanelActionText}>Play Target Practice</Text>
                 </Pressable>
               </View>
 

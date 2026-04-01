@@ -573,6 +573,11 @@ function equipmentBudgetFor(baseItem: EquipmentItem, itemLevel: number): number 
   return Math.max(2, Math.round(sumBonusStats(baseItem.bonus) * rarityMultiplier[baseItem.rarity] * slotMultiplier[baseItem.slot] * levelMultiplier));
 }
 
+function getForgeStatMultiplier(forgeLevel: number): number {
+  const safeLevel = Math.max(0, Math.floor(forgeLevel));
+  return 1 + safeLevel * 0.03;
+}
+
 function getEquipmentStatWeights(playerClass: PlayerClass, slot: EquipmentSlot): Record<keyof StatBlock, number> {
   const cls = getClassConfig(playerClass);
   const offenseWeight = slot === 'weapon' ? 1.2 : slot === 'accessory' ? 1 : 0.82;
@@ -587,11 +592,11 @@ function getEquipmentStatWeights(playerClass: PlayerClass, slot: EquipmentSlot):
   };
 }
 
-function randomizeEquipmentBonus(baseItem: EquipmentItem, itemLevel: number): Partial<StatBlock> {
+function randomizeEquipmentBonus(baseItem: EquipmentItem, itemLevel: number, statMultiplier = 1): Partial<StatBlock> {
   const playerClass = baseItem.allowedClasses[0] ?? 'warrior';
   const weights = getEquipmentStatWeights(playerClass, baseItem.slot);
   const keys = Object.keys(weights) as Array<keyof StatBlock>;
-  const budget = equipmentBudgetFor(baseItem, itemLevel);
+  const scaledBudget = Math.max(2, Math.round(equipmentBudgetFor(baseItem, itemLevel) * Math.max(1, statMultiplier)));
   const rolledWeights = keys.reduce<Record<keyof StatBlock, number>>((acc, key) => {
     acc[key] = weights[key] * (0.82 + Math.random() * 0.45);
     return acc;
@@ -601,11 +606,11 @@ function randomizeEquipmentBonus(baseItem: EquipmentItem, itemLevel: number): Pa
   let assigned = 0;
 
   keys.forEach((key, index) => {
-    const remaining = budget - assigned;
+    const remaining = scaledBudget - assigned;
     if (remaining <= 0) return;
     const rawValue = index === keys.length - 1
       ? remaining
-      : Math.max(0, Math.round((budget * rolledWeights[key]) / totalWeight));
+      : Math.max(0, Math.round((scaledBudget * rolledWeights[key]) / totalWeight));
     const value = Math.min(remaining, rawValue);
     if (value > 0) {
       bonus[key] = value;
@@ -623,7 +628,7 @@ function randomizeEquipmentBonus(baseItem: EquipmentItem, itemLevel: number): Pa
   return bonus;
 }
 
-function createEquipmentInstance(baseItem: EquipmentItem, itemLevel: number, source: EquipmentSource): EquipmentInstance {
+function createEquipmentInstance(baseItem: EquipmentItem, itemLevel: number, source: EquipmentSource, statMultiplier = 1): EquipmentInstance {
   const instanceId = `eq_${source}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const clampedLevel = Math.max(1, Math.floor(itemLevel));
   return {
@@ -635,7 +640,7 @@ function createEquipmentInstance(baseItem: EquipmentItem, itemLevel: number, sou
     rarity: baseItem.rarity,
     allowedClasses: [...baseItem.allowedClasses],
     description: baseItem.description,
-    bonus: randomizeEquipmentBonus(baseItem, clampedLevel),
+    bonus: randomizeEquipmentBonus(baseItem, clampedLevel, statMultiplier),
     itemLevel: clampedLevel,
     source,
   };
@@ -2414,7 +2419,8 @@ function killMonster(state: GameState): GameState {
     const source = pool.length > 0 ? pool : fallbackPool;
     if (source.length > 0) {
       const baseItem = source[Math.floor(Math.random() * source.length)];
-      const item = createEquipmentInstance(baseItem, Math.max(1, newState.level), 'drop');
+      const forgeMult = getForgeStatMultiplier(newState.guildhallFacilities.forge.level);
+      const item = createEquipmentInstance(baseItem, Math.max(1, newState.level), 'drop', forgeMult);
       if (!newState.inventoryItemIds.includes(item.id)) {
         newState = queueReward({
           ...newState,
@@ -3316,7 +3322,8 @@ function reducer(state: GameState, action: Action): GameState {
       const rolledRarity = rollEquipmentRarityByTier(Math.random(), hasUnlock(state, 'mythic_equipment'));
       const rarityPool = classSlotItems.filter(i => i.rarity === rolledRarity);
       const source = rarityPool.length > 0 ? rarityPool : classSlotItems;
-      const item = createEquipmentInstance(source[Math.floor(Math.random() * source.length)], Math.max(1, state.level), 'craft');
+      const forgeMult = getForgeStatMultiplier(state.guildhallFacilities.forge.level);
+      const item = createEquipmentInstance(source[Math.floor(Math.random() * source.length)], Math.max(1, state.level), 'craft', forgeMult);
 
       return queueReward({
         ...state,
