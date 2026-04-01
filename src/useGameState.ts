@@ -5307,6 +5307,10 @@ export function useGameState(saveSlot: string = 'default') {
     dispatch({ type: 'COMPLETE_EXPEDITION', expeditionId });
   }, []);
 
+  const applyOfflineProgress = useCallback((elapsedMs: number) => {
+    dispatch({ type: 'APPLY_OFFLINE_PROGRESS', elapsedMs });
+  }, []);
+
   const stats = computeStats(state);
 
   return {
@@ -5389,6 +5393,7 @@ export function useGameState(saveSlot: string = 'default') {
     getUpgradePlan,
     getWeeklyEvent,
     getMissionProgress,
+    applyOfflineProgress,
   };
 }
 

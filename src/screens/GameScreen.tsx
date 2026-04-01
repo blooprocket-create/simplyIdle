@@ -14,6 +14,7 @@ import {
   Animated,
   Easing,
   useWindowDimensions,
+  AppState,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ENABLE_SIMULATED_DOLLAR_PURCHASES, EXPEDITION_CONTRACT_REFRESH_GOLD_COST, EXPEDITION_CONTRACT_REFRESH_MS, FACILITY_MAX_LEVEL, MINI_OPS_COOLDOWN_MS, getCharacterSaveSlot, getDpsBreakdown, getEquipmentCraftCost, getFacilityUpgradeCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState, VALID_FORMATION_ROLES_FOR_CLASS } from '../useGameState';
@@ -284,6 +285,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     startExpedition,
     refreshExpeditionContracts,
     completeExpedition,
+    applyOfflineProgress,
   } = useGameState(selectedCharacterClass ? getCharacterSaveSlot(accountName, selectedCharacterClass) : '__character_slot_preview__');
 
   const [tab, setTab] = useState<Tab>('warroom');
@@ -326,6 +328,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const topChipRefs = useRef<Record<'dps' | 'power' | 'gear', View | null>>({ dps: null, power: null, gear: null });
   const storyUnlockInitRef = useRef(false);
   const seenStoryUnlockIdsRef = useRef<Set<string>>(new Set());
+  const appStateRef = useRef(AppState.currentState);
+  const backgroundTimeRef = useRef<number | null>(null);
   const [warPanels, setWarPanels] = useState({
     frontline: true,
     roster: true,
@@ -382,6 +386,31 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   // Timer tick for expedition countdown display
   const [timerTick, setTimerTick] = useState(0);
+
+  // Handle app state changes: track time when app goes to background
+  // and apply offline progression when it returns to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription.remove();
+  }, [hydrated, state.lastActiveAt]);
+
+  const handleAppStateChange = (nextState: typeof AppState.currentState) => {
+    if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
+      // App has come to foreground
+      if (backgroundTimeRef.current && hydrated && state.characterCreated) {
+        const elapsed = Date.now() - backgroundTimeRef.current;
+        if (elapsed > 5000) {
+          // Apply offline progression if away for > 5 seconds
+          applyOfflineProgress(elapsed);
+        }
+      }
+      backgroundTimeRef.current = null;
+    } else if (nextState.match(/inactive|background/)) {
+      // App going to background or becoming inactive
+      backgroundTimeRef.current = Date.now();
+    }
+    appStateRef.current = nextState;
+  };
 
   useEffect(() => {
     let cancelled = false;
