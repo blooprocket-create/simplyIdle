@@ -1408,10 +1408,28 @@ export interface AchievementContext {
   prestigeCount: number;
   totalSummons: number;
   equippedCount: number;
+  activeTeamClassCount: number;
+  teamSlotCount: number;
   heroRosterCount: number;
+  godlyHeroCount: number;
+  transcendentHeroCount: number;
+  maxHeroRankCount: number;
+  maxHeroLevelCount: number;
   heroShards: number;
   essence: number;
+  bossTears: number;
+  vipLevel: number;
+  equipmentScrap: number;
+  mythicPlusEquipmentCount: number;
+  transcendentEquipmentCount: number;
+  facilityTotalLevel: number;
+  forgeFacilityLevel: number;
+  uniqueForgedCount: number;
+  uniqueEquippedCount: number;
+  uniqueMaxRankCount: number;
+  codexClaimCount: number;
   unlockedCount: number;
+  totalAchievementCount: number;
   dailyLoginStreak: number;
 }
 
@@ -1454,26 +1472,47 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'summon_50', name: 'Warband Architect', description: 'Summon 50 heroes.', emoji: '🧬', condition: s => s.totalSummons >= 50 },
   { id: 'summon_200', name: 'Legion Broker', description: 'Summon 200 heroes.', emoji: '👑', condition: s => s.totalSummons >= 200 },
   { id: 'summon_1k', name: 'Infinite Gacha Master', description: 'Summon 1,000 heroes.', emoji: '🌠', condition: s => s.totalSummons >= 1000 },
+  { id: 'godly_hero_1', name: 'Myth Walks', description: 'Own a Godly hero.', emoji: '🌟', condition: s => s.godlyHeroCount >= 1 },
+  { id: 'transcendent_hero_1', name: 'Beyond the Banner', description: 'Own a Transcendent hero.', emoji: '🕳️', condition: s => s.transcendentHeroCount >= 1 },
   
   // Roster achievements
   { id: 'roster_12', name: 'Field Locker', description: 'Own 12 heroes at once.', emoji: '🗃️', condition: s => s.heroRosterCount >= 12 },
   { id: 'roster_30', name: 'Banner Hall', description: 'Own 30 heroes at once.', emoji: '🏳️', condition: s => s.heroRosterCount >= 30 },
   { id: 'roster_60', name: 'Eternal Legion', description: 'Own 60 heroes at once.', emoji: '⚔️', condition: s => s.heroRosterCount >= 60 },
+  { id: 'team_full', name: 'War Council', description: 'Field a full active team.', emoji: '🪖', condition: s => s.equippedCount >= 5 },
+  { id: 'team_diverse', name: 'Grand Coalition', description: 'Deploy 4 different hero classes at once.', emoji: '🧭', condition: s => s.activeTeamClassCount >= 4 },
+  { id: 'team_slots_5', name: 'Expanded Command', description: 'Unlock all team slots.', emoji: '🪑', condition: s => s.teamSlotCount >= 5 },
+  { id: 'rank_10_1', name: 'Crowned Veteran', description: 'Raise a hero to Rank 10.', emoji: '👑', condition: s => s.maxHeroRankCount >= 1 },
+  { id: 'rank_10_5', name: 'Pantheon Vanguard', description: 'Raise 5 heroes to Rank 10.', emoji: '🏛️', condition: s => s.maxHeroRankCount >= 5 },
+  { id: 'hero_cap_1', name: 'Limit Breaker', description: 'Raise a hero to the level cap.', emoji: '📈', condition: s => s.maxHeroLevelCount >= 1 },
+  { id: 'hero_cap_5', name: 'Endgame Battalion', description: 'Raise 5 heroes to the level cap.', emoji: '🧱', condition: s => s.maxHeroLevelCount >= 5 },
   
   // Equipment and crafting
   { id: 'equip_5', name: 'Dream Team', description: 'Equip 4 heroes.', emoji: '🧩', condition: s => s.equippedCount >= 4 },
   { id: 'gear_epic', name: 'Epic Armorsmith', description: 'Craft your first Epic gear.', emoji: '🎨', condition: s => s.essence >= 5 },
   { id: 'gear_mythic', name: 'Mythic Artisan', description: 'Own Mythic-rarity equipment.', emoji: '✨', condition: s => s.essence >= 50 },
+  { id: 'scrap_1k', name: 'Scrapyard Baron', description: 'Hold 1,000 equipment scrap.', emoji: '🔩', condition: s => s.equipmentScrap >= 1000 },
+  { id: 'scrap_10k', name: 'Iron Mountain', description: 'Hold 10,000 equipment scrap.', emoji: '⛰️', condition: s => s.equipmentScrap >= 10000 },
+  { id: 'gear_mythic_plus_3', name: 'High Armory', description: 'Own 3 Mythic or better equipment pieces.', emoji: '🛠️', condition: s => s.mythicPlusEquipmentCount >= 3 },
+  { id: 'gear_transcendent_1', name: 'Transcendent Arsenal', description: 'Own a Transcendent equipment piece.', emoji: '🗡️', condition: s => s.transcendentEquipmentCount >= 1 },
   
   // Shard and essence
   { id: 'shards_1000', name: 'Shard Banker', description: 'Hold 1,000 hero shards at once.', emoji: '💠', condition: s => s.heroShards >= 1000 },
   { id: 'shards_10k', name: 'Crystalline Hoard', description: 'Hold 10,000 hero shards at once.', emoji: '💠', condition: s => s.heroShards >= 10000 },
   { id: 'essence_25', name: 'Essence Channel', description: 'Own 25 essence.', emoji: '✨', condition: s => s.essence >= 25 },
   { id: 'essence_100', name: 'Eternal Conduit', description: 'Own 100 essence.', emoji: '✨', condition: s => s.essence >= 100 },
+  { id: 'boss_tears_10', name: 'Tear Vault', description: 'Hold 10 Boss Tears at once.', emoji: '💧', condition: s => s.bossTears >= 10 },
+  { id: 'boss_tears_100', name: 'Abyss Reservoir', description: 'Hold 100 Boss Tears at once.', emoji: '🌊', condition: s => s.bossTears >= 100 },
+  { id: 'vip_1', name: 'Patron Sigil', description: 'Reach VIP level 1.', emoji: '👑', condition: s => s.vipLevel >= 1 },
+  { id: 'vip_5', name: 'Imperial Patron', description: 'Reach VIP level 5.', emoji: '💎', condition: s => s.vipLevel >= 5 },
+  { id: 'vip_10', name: 'Throne Benefactor', description: 'Reach VIP level 10.', emoji: '🏰', condition: s => s.vipLevel >= 10 },
   
   // Progression unlocks
   { id: 'unlocks_3', name: 'Relic Keeper', description: 'Unlock 3 permanent features.', emoji: '🔓', condition: s => s.unlockedCount >= 3 },
   { id: 'unlocks_10', name: 'Vault Master', description: 'Unlock 10+ permanent features.', emoji: '🔑', condition: s => s.unlockedCount >= 10 },
+  { id: 'facilities_20', name: 'Guildhall Clerk', description: 'Reach 20 total facility levels.', emoji: '🏗️', condition: s => s.facilityTotalLevel >= 20 },
+  { id: 'facilities_80', name: 'Citadel Quartermaster', description: 'Reach 80 total facility levels.', emoji: '🏰', condition: s => s.facilityTotalLevel >= 80 },
+  { id: 'forge_10', name: 'Forge Supremacy', description: 'Upgrade the Forge facility to level 10.', emoji: '🔥', condition: s => s.forgeFacilityLevel >= 10 },
   
   // Login achievements
   { id: 'streak_7', name: 'Habit of Steel', description: 'Reach a 7-day login streak.', emoji: '📅', condition: s => s.dailyLoginStreak >= 7 },
@@ -1485,11 +1524,21 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'rebirth_15', name: 'Eternal Cadence', description: 'Complete 15 Rebirths.', emoji: '🌌', condition: s => s.prestigeCount >= 15 },
   { id: 'rebirth_50', name: 'Infinite Returner', description: 'Complete 50 Rebirths.', emoji: '∞', condition: s => s.prestigeCount >= 50 },
   { id: 'rebirth_100', name: 'Godborne', description: 'Complete 100 Rebirths. You transcend mortality.', emoji: '👑', condition: s => s.prestigeCount >= 100 },
+
+  // Unique gear and codex
+  { id: 'unique_1', name: 'Relic Awakened', description: 'Forge your first hero unique weapon.', emoji: '🗡️', condition: s => s.uniqueForgedCount >= 1 },
+  { id: 'unique_10', name: 'Armory Curator', description: 'Forge 10 hero unique weapons.', emoji: '🗃️', condition: s => s.uniqueForgedCount >= 10 },
+  { id: 'unique_25', name: 'Dynastic Relic Hall', description: 'Forge 25 hero unique weapons.', emoji: '🏛️', condition: s => s.uniqueForgedCount >= 25 },
+  { id: 'unique_50', name: 'Imperial Reliquary', description: 'Forge 50 hero unique weapons.', emoji: '👑', condition: s => s.uniqueForgedCount >= 50 },
+  { id: 'unique_equipped_5', name: 'Relic Doctrine', description: 'Have 5 unique weapons equipped at once.', emoji: '⚜️', condition: s => s.uniqueEquippedCount >= 5 },
+  { id: 'unique_rank_10', name: 'Masterpiece Armament', description: 'Raise a unique weapon to Rank 10.', emoji: '🌟', condition: s => s.uniqueMaxRankCount >= 1 },
+  { id: 'codex_claims_10', name: 'Lorekeeper', description: 'Claim 10 codex rewards.', emoji: '📚', condition: s => s.codexClaimCount >= 10 },
+  { id: 'codex_claims_40', name: 'Archivist Supreme', description: 'Claim 40 codex rewards.', emoji: '📖', condition: s => s.codexClaimCount >= 40 },
   
   // Achievement collection
   { id: 'legend_slate', name: 'Legend Slate', description: 'Unlock 20 achievements.', emoji: '📜', condition: s => s.unlockedCount >= 20 },
   { id: 'pantheon_ascend', name: 'Pantheon Ascendant', description: 'Unlock 50 achievements.', emoji: '⭐', condition: s => s.unlockedCount >= 50 },
-  { id: 'ultimate_champion', name: 'Ultimate Champion', description: 'Unlock all achievements. You are eternal.', emoji: '🏆', condition: s => s.unlockedCount >= 70 },
+  { id: 'ultimate_champion', name: 'Ultimate Champion', description: 'Unlock all achievements. You are eternal.', emoji: '🏆', condition: s => s.unlockedCount >= s.totalAchievementCount - 1 },
 ];
 
 export interface StoryBeat {

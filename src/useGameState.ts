@@ -2732,6 +2732,38 @@ function killMonster(state: GameState): GameState {
 }
 
 function checkAchievements(state: GameState): string | null {
+  const activeTeam = new Set(state.activeTeamHeroIds);
+  const activeTeamClassCount = new Set(
+    state.heroRoster
+      .filter(hero => activeTeam.has(hero.uid))
+      .map(hero => hero.heroClass),
+  ).size;
+
+  const maxHeroRankCount = state.heroRoster.filter(hero => hero.rank >= 10).length;
+  const maxHeroLevelCount = state.heroRoster.filter(hero => hero.level >= HERO_LEVEL_CAP).length;
+  const godlyHeroCount = state.heroRoster.filter(hero => hero.rarity === 'godly').length;
+  const transcendentHeroCount = state.heroRoster.filter(hero => hero.rarity === 'transcendent').length;
+  const uniqueEntries = Object.values(state.heroUniqueGearByHeroId);
+  const uniqueForgedCount = uniqueEntries.filter(progress => (progress?.rank ?? 0) > 0).length;
+  const uniqueEquippedCount = uniqueEntries.filter(progress => (progress?.rank ?? 0) > 0 && !!progress?.equipped).length;
+  const uniqueMaxRankCount = uniqueEntries.filter(progress => (progress?.rank ?? 0) >= 10).length;
+  const codexClaimCount = state.codexVipClaimedHeroIds.length + state.codexVipClaimedUniqueIds.length;
+  const facilityTotalLevel = Object.values(state.guildhallFacilities).reduce((sum, facility) => sum + facility.level, 0);
+  const forgeFacilityLevel = state.guildhallFacilities.forge.level;
+
+  const ownedEquipmentIds = new Set<string>([
+    ...state.inventoryItemIds,
+    ...Object.values(state.equippedItems).filter((itemId): itemId is string => !!itemId),
+  ]);
+  let mythicPlusEquipmentCount = 0;
+  let transcendentEquipmentCount = 0;
+  for (const itemId of ownedEquipmentIds) {
+    const item = getEquipmentEntry(state, itemId);
+    if (!item) continue;
+    if (item.rarity === 'mythic' || item.rarity === 'transcendent') mythicPlusEquipmentCount += 1;
+    if (item.rarity === 'transcendent') transcendentEquipmentCount += 1;
+  }
+
   const ctx = {
     totalGold: state.totalGold,
     totalKills: state.totalKills,
@@ -2741,10 +2773,28 @@ function checkAchievements(state: GameState): string | null {
     prestigeCount: state.prestigeCount,
     totalSummons: state.totalSummons,
     equippedCount: state.activeTeamHeroIds.length,
+    activeTeamClassCount,
+    teamSlotCount: state.teamSlotsUnlocked,
     heroRosterCount: state.heroRoster.length,
+    godlyHeroCount,
+    transcendentHeroCount,
+    maxHeroRankCount,
+    maxHeroLevelCount,
     heroShards: state.heroShards,
     essence: state.essence,
+    bossTears: state.bossTears,
+    vipLevel: state.vipLevel,
+    equipmentScrap: state.equipmentScrap,
+    mythicPlusEquipmentCount,
+    transcendentEquipmentCount,
+    facilityTotalLevel,
+    forgeFacilityLevel,
+    uniqueForgedCount,
+    uniqueEquippedCount,
+    uniqueMaxRankCount,
+    codexClaimCount,
     unlockedCount: state.achievements.size,
+    totalAchievementCount: ACHIEVEMENTS.length,
     dailyLoginStreak: state.dailyLoginStreak,
   };
 
