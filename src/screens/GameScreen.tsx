@@ -1143,7 +1143,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     cinematicTimersRef.current.push(phaseWarp as unknown as number, fallbackReveal as unknown as number, autoClose as unknown as number);
   };
 
-  const hasWarRoomNotification = canRebirthNow || (nextTeamSlotUnlock?.canUnlock ?? false);
+  const hasWarRoomNotification = canRebirthNow;
   const hasEquipmentNotification = useMemo(() => {
     const slots: EquipmentSlot[] = ['weapon', 'armor', 'accessory'];
     return slots.some(slot => {

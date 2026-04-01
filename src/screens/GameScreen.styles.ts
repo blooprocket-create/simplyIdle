@@ -1478,6 +1478,27 @@ export const styles = StyleSheet.create({
     color: '#D6ECFF',
     fontWeight: '700',
   },
+  warRoomAlertHint: {
+    fontSize: 10,
+    color: '#FF9B9B',
+    fontWeight: '700',
+  },
+  warPanelTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  warPanelAlertDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 999,
+    backgroundColor: '#FF5E5E',
+    shadowColor: '#FF5E5E',
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 2,
+  },
   warPanelChevron: {
     fontSize: 16,
     color: '#99C4E1',

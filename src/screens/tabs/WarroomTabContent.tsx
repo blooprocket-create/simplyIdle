@@ -95,6 +95,7 @@ export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
         <View style={styles.warRoomTab}>
           <Text style={styles.sectionTitle}>🛰️ War Room Command</Text>
           <Text style={styles.warRoomIntro}>One-screen operations hub. Expand panels for details, jump to deep tabs when needed.</Text>
+          {canRebirthNow && <Text style={styles.warRoomAlertHint}>Alert markers show where action is ready.</Text>}
 
           <View style={styles.campaignRail}>
             <View style={styles.campaignRailCard}>
@@ -155,7 +156,10 @@ export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
 
           <View style={styles.warPanel}>
             <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('frontline')}>
-              <Text style={styles.warPanelTitle}>⚔️ Frontline</Text>
+              <View style={styles.warPanelTitleRow}>
+                {canRebirthNow && <View style={styles.warPanelAlertDot} />}
+                <Text style={styles.warPanelTitle}>⚔️ Frontline</Text>
+              </View>
               <Text style={styles.warPanelChevron}>{warPanels.frontline ? '−' : '+'}</Text>
             </Pressable>
             {warPanels.frontline && (
@@ -284,7 +288,10 @@ export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
 
           <View style={styles.warPanel}>
             <Pressable style={styles.warPanelHeader} onPress={() => toggleWarPanel('prestige')}>
-              <Text style={styles.warPanelTitle}>♾️ Prestige Milestones</Text>
+              <View style={styles.warPanelTitleRow}>
+                {canRebirthNow && <View style={styles.warPanelAlertDot} />}
+                <Text style={styles.warPanelTitle}>♾️ Prestige Milestones</Text>
+              </View>
               <Text style={styles.warPanelChevron}>{warPanels.prestige ? '−' : '+'}</Text>
             </Pressable>
             {warPanels.prestige && (
