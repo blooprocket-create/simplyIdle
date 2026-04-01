@@ -1850,7 +1850,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         gold={state.gold}
         diamonds={state.diamonds}
         bossTearsOrdered={state.bossTears}
-        essenceShards={state.essence}
+        heroShards={state.heroShards}
+        essence={state.essence}
         dps={Math.max(1, Math.floor(stats.dps))}
         power={teamPowerIndex}
         onActionPress={(action) => {

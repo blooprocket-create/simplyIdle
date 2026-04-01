@@ -9,7 +9,8 @@ interface GameHeaderProps {
   gold: number;
   diamonds: number;
   bossTearsOrdered: number;
-  essenceShards: number;
+  heroShards: number;
+  essence: number;
   dps: number;
   power: number;
   onActionPress: (action: 'stats' | 'shop' | 'settings' | 'events') => void;
@@ -22,7 +23,8 @@ export default function GameHeader({
   gold,
   diamonds,
   bossTearsOrdered,
-  essenceShards,
+  heroShards,
+  essence,
   dps,
   power,
   onActionPress,
@@ -68,8 +70,12 @@ export default function GameHeader({
           <Text style={styles.resourceValue}>{formatNumber(bossTearsOrdered)}</Text>
         </Pressable>
         <Pressable style={styles.resourceChip} onPress={() => {}}>
+          <Text style={styles.resourceIcon}>💠</Text>
+          <Text style={styles.resourceValue}>{formatNumber(heroShards)}</Text>
+        </Pressable>
+        <Pressable style={styles.resourceChip} onPress={() => {}}>
           <Text style={styles.resourceIcon}>✨</Text>
-          <Text style={styles.resourceValue}>{formatNumber(essenceShards)}</Text>
+          <Text style={styles.resourceValue}>{formatNumber(essence)}</Text>
         </Pressable>
       </View>
 
