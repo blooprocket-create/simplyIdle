@@ -625,59 +625,78 @@ export function getHeroTemplateById(heroId: string): HeroTemplate | undefined {
   return HERO_POOL.find(hero => hero.id === heroId);
 }
 
-function hashTextSeed(input: string): number {
-  let hash = 0;
-  for (let i = 0; i < input.length; i++) {
-    hash = ((hash << 5) - hash) + input.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
+const HERO_BACKSTORIES: Record<string, string> = {
+  h1: 'Kael Ironheart held the breach at Blackgate for three days with a shattered shield and a single oath: no civilian falls while he still stands.',
+  h2: 'Mira Oathguard was the youngest captain ever sworn to the Crownfall Wall and secretly funded refugee caravans with her campaign stipends.',
+  h3: 'Drogan Ashfury was exiled for refusing a staged duel and returned years later to save the same clan that cast him out.',
+  h4: 'Thorn Bloodhide stitched his own war mantle from the hides of siege beasts and now leads frontline charges in silence.',
+  h5: 'Sylvi Windmark learned to read storm drafts by sleeping in watchtowers and can split a moving target at full gallop.',
+  h6: 'Riven Hawkeye once served as a royal execution archer and now uses that precision against tyrants instead of prisoners.',
+  h7: 'Lunara Frostweave froze a collapsing bridge long enough for an entire battalion to cross and never speaks of the cost.',
+  h8: 'Aziel Embermind was a court pyromancer who burned his own rank sigil after refusing to torch a rebel district.',
+  h9: 'Shen Dawnfist defended a monastery granary through a seven-day siege using only open-hand forms and improvised staves.',
+  h10: 'Iria Lotusveil preserved forbidden healing sutras by encoding them into prayer choreography taught only at dawn.',
+  h11: 'Borin Stonewall is a quarry-born veteran who names each suit of armor after the village it protects.',
+  h12: 'Karra Rageborn survived the Red Pit trials at sixteen and now channels that fury to break slaver battalions.',
+  h13: 'Nyx Whisperleaf ran courier routes through occupied forests, mapping every patrol path from memory.',
+  h14: 'Vex Starchant rebuilt a ruined observatory into a battlefield command post powered by prism relays.',
+  h15: 'Tarin Sunstep turned a ceremonial dance discipline into a mobile combat doctrine used by temple guards.',
+  h16: 'Orin Bastionforge is a smith-general who tempers armor in ashwater and tests every plate in live drills.',
+  h17: 'Selene Ironbanner reclaimed three fallen standards in one night raid and became a symbol of stubborn resistance.',
+  h18: 'Varric Doomhowl was raised in war camps and can identify enemy banners by horn cadence alone.',
+  h19: 'Morga Chainstorm broke her captor legions by turning their own chainfields into trap corridors.',
+  h20: 'Aela Windpierce trained with cliff rangers and specializes in anti-commander shots beyond normal sight lines.',
+  h21: 'Kestrel Moonshot marks targets by moon angle and once ended a naval siege with three impossible arrows.',
+  h22: 'Seris Riftborn survived a laboratory collapse that fused void scar tissue into her casting channels.',
+  h23: 'Noctis Emberveil was a siege lanternkeeper who learned to weaponize beacon fire into precision spell bursts.',
+  h24: 'Korin Stillwater mediates feuds between rival houses by day and breaks their mercenary lines by night.',
+  h25: 'Maeve Stormpalm perfected thunder-breath kata after losing her hearing in a temple collapse.',
+  h26: 'Gideon Flamecrest commanded the Ember Watch and abandoned nobility titles to stay with his rank-and-file unit.',
+  h27: 'Rook Ashrender dismantled an entire war machine convoy using salvaged powder and timed ambushes.',
+  h28: 'Lyra Starquill is a battlefield cartographer whose star charts double as long-range firing solutions.',
+  h29: 'Eldrin Palefire studied mortuary rites and now bends soul-lamps into defensive wards for civilians.',
+  h30: 'Jin Hollowreed trained in floodplains where every stance must adapt to unstable footing and shifting currents.',
+  h31: 'Thors Ironpeak was a mine guard who organized worker militias when the barons hired private armies.',
+  h32: 'Valkyra Shieldborn forged pact shields for orphan cohorts and treats every squadmate as sworn kin.',
+  h33: 'Brutus Ironjaw won pit titles across five provinces before defecting to fight for frontier settlements.',
+  h34: 'Magus Stonereave channels seismic shock through gauntlets etched with quarry sigils of his ancestors.',
+  h35: 'Vesper Silverbow served in traveling caravans and became famous for shooting while mounted at full sprint.',
+  h36: 'Fenwick Swiftbrand pioneered relay skirmish tactics that rotate archers in waves to maintain constant pressure.',
+  h37: 'Thalia Duskborn studied eclipse rituals and turned them into stealth spell doctrine for night assaults.',
+  h38: 'Corvus Nightwhisper intercepted imperial cipher traffic and rewrote battlefield orders before dawn.',
+  h39: 'Kalen Dawnbringer rebuilt a shattered monastery wall by hand and then defended it through winter offensives.',
+  h40: 'Sera Veilwanderer crossed plague quarantines with medicine convoys and refused every order to withdraw.',
+  h41: 'Karthus Soulforge binds memory shards into his blade, carrying the resolve of every fallen comrade.',
+  h42: 'Azura Dawnbearer is heir to a dissolved house and now fights to build a republic instead of a throne.',
+  h43: 'Viktor Darkbane hunted warlords across border ruins and leaves no fortress with its command intact.',
+  h44: 'Morgath Terrorforge once led a fear cult militia before turning on its prophets and burning their sanctums.',
+  h45: 'Zara Voidarchress learned vacuum-shot archery on collapsed skybridges where one misstep means death.',
+  h46: 'Kastor Deathmark served as a bounty warden and now uses those dossiers to dismantle corrupt command chains.',
+  h47: 'Iris Veilbearer shields entire formations with layered prism veils tuned to enemy tempo.',
+  h48: 'Arctus Frostking mastered cryo-siege doctrine and can halt armored advances with staged ice fractures.',
+  h49: 'Sorena Lightfury combines solar breath forms with shock-step footwork to crack elite lines.',
+  h50: 'Orion Soulshaper guides broken veterans through recovery rites and returns them to battle stronger.',
+  h51: 'Aethermaw Unbounded emerged from the Eclipse Front carrying relic scales and a doctrine built for extinction wars.',
+  h52: 'Seraph the Infinite abandoned celestial office to stand with mortal ranks against collapsing empires.',
+  h53: 'Ragnar Hellborn was raised in abyssal arenas and now treats every warlord citadel as another ring to conquer.',
+  h54: 'Vyxara Shadow Empress ruled a covert syndicate before redirecting its network toward anti-tyrant operations.',
+  h55: 'Zephyr Starreacher commands high-altitude strike wings and is known for ending battles before first impact.',
+  h56: 'Nyx Void Chosen infiltrated cult command circles for years and collapsed them from the inside in one night.',
+  h57: 'Archaon Time Weaver maps probable futures in combat and chooses the branch where civilians survive.',
+  h58: 'Pyritess Eternal Flame carries a furnace heart relic that turns battlefield panic into focused output.',
+  h59: 'Luminion Stellarch rebuilt the Stellar Cloister and trains monk officers for multi-front command.',
+  h60: 'Void Sovereign returned from the Rift March with a vow to seal every breach before another age is erased.',
+  h61: 'Titan Worldrender was forged in orbital siege furnaces and now shatters god-plate battalions at the spearhead.',
+  h62: 'Leviathan Depths rose from abyssal trenches to break fleet fortresses with tidal-impact assault doctrine.',
+  h63: 'Phoenix Eternal leads skyfire hunter cadres and has survived more confirmed downings than any living archer.',
+  h64: 'Celestial Architect rewrites battle geometry in real time, turning impossible theaters into executable plans.',
+  h65: 'Dharma Eternal Cycle guards the Last Wheel archive, preserving combat wisdom across rebirth eras.',
+};
 
 export function getHeroBackstory(heroId: string): string {
   const hero = getHeroTemplateById(heroId);
   if (!hero) return 'A nameless wanderer whose legend has yet to be written.';
-
-  const classOrigins: Record<PlayerClass, string[]> = {
-    warrior: [
-      'once commanded the shattered wall-guard of Crownfall',
-      'was forged in the siege pits beneath the Glass Citadel',
-      'carried an oathblade through the ash storms of the frontier',
-    ],
-    berserker: [
-      'survived the blood rites of the Howling Deep',
-      'earned renown by breaking leviathan chains bare-handed',
-      'walked out of a doomed warband as its only heartbeat',
-    ],
-    archer: [
-      'learned wind-reading on the cliffs above Verdant Ruin',
-      'served as a ghost scout between collapsing kingdoms',
-      'made their name by ending wars before horns were blown',
-    ],
-    mage: [
-      'decoded forbidden sigils from a fractured star archive',
-      'studied at a moonlit academy erased from imperial maps',
-      'bound raw riftfire into disciplined battlecraft',
-    ],
-    monk: [
-      'trained in a hidden temple built around a silent crater',
-      'mastered breath forms while empires rose and fell',
-      'kept the old cycle teachings when every order fractured',
-    ],
-  };
-
-  const motives = [
-    'Now they fight to keep the next age from repeating the last.',
-    'They march so no dynasty can chain fate again.',
-    'Each battle is a vow to break the engines of endless war.',
-    'Their campaign is a reckoning written in steel and starlight.',
-    'They seek the final throne before the void can claim it.',
-  ];
-
-  const seed = hashTextSeed(`${hero.id}:${hero.name}`);
-  const origin = classOrigins[hero.heroClass][seed % classOrigins[hero.heroClass].length];
-  const motive = motives[seed % motives.length];
-  return `${hero.name} ${origin}. ${motive}`;
+  return HERO_BACKSTORIES[heroId] ?? `${hero.name} carries an untold legend from the frontier wars.`;
 }
 
 export function getSummonRarityPool(postgameUnlocked: boolean): RarityConfig[] {
