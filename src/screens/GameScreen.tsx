@@ -2024,7 +2024,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               TTK {ttkSeconds >= 99 ? '99s+' : `${ttkSeconds.toFixed(1)}s`} • Danger {dangerLabel} ({dangerScore.toFixed(0)}%)
             </Text>
             <Text style={styles.teamSynergyInline}>
-              Rewards: 💰 {fmt(getMonsterGold(state.wave))} • ✨ {fmt(getMonsterExp(state.wave))} {isBoss ? '• 👹 Boss bonus' : ''}
+              Rewards: 💰 {fmt(getMonsterGold(state.wave))} • ⭐ {fmt(getMonsterExp(state.wave))} EXP{isBoss ? ' • 👹 Boss bonus' : ''}
             </Text>
             {stats.synergies.length > 0 && (
               <Text style={styles.teamSynergyInline}>
@@ -2963,7 +2963,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   {diceRollResult.shards > 0 && (
                     <View style={styles.rewardItem}>
                       <Text style={styles.rewardLabel}>Shards</Text>
-                      <Text style={styles.rewardValue}>✨ +{diceRollResult.shards}</Text>
+                      <Text style={styles.rewardValue}>💠 +{diceRollResult.shards}</Text>
                     </View>
                   )}
                 </View>
@@ -3040,12 +3040,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   </View>
                   <View style={styles.rewardItem}>
                     <Text style={styles.rewardLabel}>Shards</Text>
-                    <Text style={styles.rewardValue}>✨ +{riftDungeonResult.shards}</Text>
+                    <Text style={styles.rewardValue}>💠 +{riftDungeonResult.shards}</Text>
                   </View>
                   {riftDungeonResult.essence > 0 && (
                     <View style={styles.rewardItem}>
                       <Text style={styles.rewardLabel}>Essence</Text>
-                      <Text style={styles.rewardValue}>⚡ +{riftDungeonResult.essence}</Text>
+                      <Text style={styles.rewardValue}>✨ +{riftDungeonResult.essence}</Text>
                     </View>
                   )}
                 </View>
