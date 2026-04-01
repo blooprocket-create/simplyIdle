@@ -226,6 +226,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     toggleEquipHero,
     setHeroFormation,
     playDiceRoll,
+    playReconSweep,
+    playLockpickCache,
+    playTargetPractice,
+    startMiniBountyDraft,
+    claimMiniBountyDraft,
     runRiftDungeon,
     allocateStat,
     allocateStatMax,
@@ -543,6 +548,18 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const nextTeamSlotUnlock = getNextTeamSlotUnlock();
   const currentDay = Math.floor(Date.now() / 86_400_000);
   const canPlayDiceToday = state.lastDiceRollDay !== currentDay;
+  const canPlayReconToday = state.lastReconSweepDay !== currentDay;
+  const canPlayLockpickToday = state.lastLockpickDay !== currentDay;
+  const canPlayTargetToday = state.lastTargetPracticeDay !== currentDay;
+  const canStartBountyToday = state.lastBountyDraftDay !== currentDay && !state.miniBounty;
+  const activeMiniBountyProgress = state.miniBounty
+    ? (state.miniBounty.metric === 'wave'
+      ? state.wave
+      : state.miniBounty.metric === 'summons'
+        ? state.totalSummons
+        : state.totalKills)
+    : 0;
+  const canClaimMiniBounty = !!state.miniBounty && activeMiniBountyProgress >= state.miniBounty.targetValue;
   const canRunRiftToday = state.lastRiftRunDay !== currentDay;
   const rebirthProgressPct = Math.max(0, Math.min(1, state.highestWaveReached / rebirthWaveRequirement)) * 100;
   const rebirthWavesLeft = Math.max(0, rebirthWaveRequirement - state.highestWaveReached);
@@ -561,7 +578,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     const nextCost = getFacilityUpgradeCost(facility, level);
     return state.gold >= nextCost;
   }).length;
-  const miniOpsNotificationCount = canPlayDiceToday ? 1 : 0;
+  const miniOpsNotificationCount =
+    (canPlayDiceToday ? 1 : 0)
+    + (canPlayReconToday ? 1 : 0)
+    + (canPlayLockpickToday ? 1 : 0)
+    + (canPlayTargetToday ? 1 : 0)
+    + (canStartBountyToday || canClaimMiniBounty ? 1 : 0);
   const dungeonOpsNotificationCount = canRunRiftToday ? 1 : 0;
   const operationsNotificationCount = expeditionClaimableCount + expeditionLaunchableAffordableCount + facilitiesUpgradeableCount + miniOpsNotificationCount + dungeonOpsNotificationCount;
   const guidanceList = useMemo(() => {
@@ -1995,10 +2017,21 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             operationsSubTab,
             setOperationsSubTab,
             canPlayDiceToday,
+            canPlayReconToday,
+            canPlayLockpickToday,
+            canPlayTargetToday,
+            canStartBountyToday,
+            canClaimMiniBounty,
+            activeMiniBountyProgress,
             canRunRiftToday,
             setDiceRollResult,
             setDiceIsRolling,
             setDiceRollModalOpen,
+            playReconSweep,
+            playLockpickCache,
+            playTargetPractice,
+            startMiniBountyDraft,
+            claimMiniBountyDraft,
             openRiftChallenge,
             upgradeFacility,
             startExpedition,

@@ -169,6 +169,8 @@ type HeroFormationRole = 'front' | 'mid' | 'back';
 type CombatTempo = 1 | 2 | 4;
 type AutoTempoTarget = 2 | 4;
 export type FacilityId = 'training' | 'treasury' | 'forge' | 'tactics';
+type MiniBountyMetric = 'kills' | 'wave' | 'summons';
+type MiniBountyDraftType = 'assault' | 'push' | 'recruit';
 type ExpeditionType = 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss';
 type ExpeditionRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
 type GoldShopOfferId = 'exp_cache' | 'potion_bundle' | 'armory_crate';
@@ -287,6 +289,21 @@ export interface GameState {
   lastRiftRunDay: number | null;
   lastDiceRollValue: number | null;
   lastRiftWavesCleared: number;
+  lastReconSweepDay: number | null;
+  lastLockpickDay: number | null;
+  lastTargetPracticeDay: number | null;
+  lastBountyDraftDay: number | null;
+  miniBounty: {
+    id: string;
+    title: string;
+    metric: MiniBountyMetric;
+    startValue: number;
+    targetValue: number;
+    rewardGold: number;
+    rewardShards: number;
+    rewardDiamonds: number;
+    claimed: boolean;
+  } | null;
 
   // Guild Hall / Facilities
   guildhallFacilities: Record<'training' | 'treasury' | 'forge' | 'tactics', { level: number }>;
@@ -432,6 +449,11 @@ const DEFAULT_STATE: GameState = {
   lastRiftRunDay: null,
   lastDiceRollValue: null,
   lastRiftWavesCleared: 0,
+  lastReconSweepDay: null,
+  lastLockpickDay: null,
+  lastTargetPracticeDay: null,
+  lastBountyDraftDay: null,
+  miniBounty: null,
 
   guildhallFacilities: {
     training: { level: 0 },
@@ -2016,6 +2038,27 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     lastRiftRunDay: payload.lastRiftRunDay == null ? null : clampInt(payload.lastRiftRunDay, 0, currentDay, currentDay),
     lastDiceRollValue: payload.lastDiceRollValue == null ? null : clampInt(payload.lastDiceRollValue, 1, 20, 1),
     lastRiftWavesCleared: clampInt(payload.lastRiftWavesCleared, 0, 5, 0),
+    lastReconSweepDay: payload.lastReconSweepDay == null ? null : clampInt(payload.lastReconSweepDay, 0, currentDay, currentDay),
+    lastLockpickDay: payload.lastLockpickDay == null ? null : clampInt(payload.lastLockpickDay, 0, currentDay, currentDay),
+    lastTargetPracticeDay: payload.lastTargetPracticeDay == null ? null : clampInt(payload.lastTargetPracticeDay, 0, currentDay, currentDay),
+    lastBountyDraftDay: payload.lastBountyDraftDay == null ? null : clampInt(payload.lastBountyDraftDay, 0, currentDay, currentDay),
+    miniBounty: isRecord(payload.miniBounty)
+      ? {
+        id: clampString(payload.miniBounty.id, `bounty_${currentDay}`, 64),
+        title: clampString(payload.miniBounty.title, 'Mini Bounty', 64),
+        metric: payload.miniBounty.metric === 'wave'
+          ? 'wave'
+          : payload.miniBounty.metric === 'summons'
+            ? 'summons'
+            : 'kills',
+        startValue: clampInt(payload.miniBounty.startValue, 0, SAFE_INTEGER_CAP, 0),
+        targetValue: clampInt(payload.miniBounty.targetValue, 0, SAFE_INTEGER_CAP, 0),
+        rewardGold: clampInt(payload.miniBounty.rewardGold, 0, SAFE_INTEGER_CAP, 0),
+        rewardShards: clampInt(payload.miniBounty.rewardShards, 0, SAFE_INTEGER_CAP, 0),
+        rewardDiamonds: clampInt(payload.miniBounty.rewardDiamonds, 0, SAFE_INTEGER_CAP, 0),
+        claimed: clampBoolean(payload.miniBounty.claimed, false),
+      }
+      : null,
     guildhallFacilities,
     expeditionQueue,
     lastExpeditionDay,
@@ -2553,6 +2596,11 @@ type Action =
   | { type: 'SET_ACTIVE_TEAM'; heroIds: string[] }
   | { type: 'SET_HERO_FORMATION'; uid: string; role: HeroFormationRole }
   | { type: 'PLAY_DICE_ROLL'; forcedRoll?: number }
+  | { type: 'PLAY_RECON_SWEEP'; forcedOutcome?: 'intel_gold' | 'intel_shards' | 'intel_buff' | 'ambush' }
+  | { type: 'PLAY_LOCKPICK_CACHE'; forcedSuccess?: boolean }
+  | { type: 'PLAY_TARGET_PRACTICE'; forcedScore?: number }
+  | { type: 'START_MINI_BOUNTY_DRAFT'; draftType: MiniBountyDraftType }
+  | { type: 'CLAIM_MINI_BOUNTY_DRAFT' }
   | { type: 'RUN_RIFT_DUNGEON'; forcedWaves?: number; forcedDiamonds?: number; forcedShards?: number; forcedEssence?: number }
   | { type: 'RECYCLE_HERO'; uid: string }
   | { type: 'AUTO_RECYCLE_HEROES' }
@@ -3744,6 +3792,192 @@ function reducer(state: GameState, action: Action): GameState {
       });
     }
 
+    case 'PLAY_RECON_SWEEP': {
+      const today = toDayNumber(Date.now());
+      if (state.lastReconSweepDay === today) return state;
+
+      const picks = ['intel_gold', 'intel_shards', 'intel_buff', 'ambush'] as const;
+      const rolled = action.forcedOutcome && picks.includes(action.forcedOutcome)
+        ? action.forcedOutcome
+        : picks[Math.floor(Math.random() * picks.length)];
+
+      const baseGold = Math.max(2500, Math.floor(getMonsterGold(state.wave) * 18));
+      const baseShards = Math.max(90, Math.floor(40 + state.highestWaveReached * 1.8));
+      const goldGain = rolled === 'ambush' ? Math.floor(baseGold * 0.35) : baseGold;
+      const shardGain = rolled === 'intel_shards' ? baseShards : 0;
+      const buffPct = rolled === 'intel_buff' ? 0.18 : 0;
+      const buffMs = rolled === 'intel_buff' ? 120_000 : 0;
+
+      return queueReward({
+        ...state,
+        gold: state.gold + goldGain,
+        totalGold: state.totalGold + goldGain,
+        heroShards: state.heroShards + shardGain,
+        damageBuffPct: Math.max(state.damageBuffPct, buffPct),
+        damageBuffMs: Math.max(state.damageBuffMs, buffMs),
+        lastReconSweepDay: today,
+      }, {
+        id: `recon_sweep_${today}`,
+        kind: 'system',
+        title: 'Recon Sweep Complete',
+        detail: rolled === 'intel_shards'
+          ? `Intel cache secured: +${goldGain} gold, +${shardGain} shards`
+          : rolled === 'intel_buff'
+            ? `Combat telemetry synced: +${goldGain} gold, +18% DPS for 2m`
+            : rolled === 'ambush'
+              ? `Ambush contact: partial extraction +${goldGain} gold`
+              : `Supply intel acquired: +${goldGain} gold`,
+      });
+    }
+
+    case 'PLAY_LOCKPICK_CACHE': {
+      const today = toDayNumber(Date.now());
+      if (state.lastLockpickDay === today) return state;
+
+      const success = typeof action.forcedSuccess === 'boolean' ? action.forcedSuccess : Math.random() < 0.46;
+      const diamondGain = success ? Math.max(15, Math.floor(8 + state.highestWaveReached * 0.35)) : 0;
+      const goldConsolation = success ? 0 : Math.max(4000, Math.floor(getMonsterGold(state.wave) * 20));
+
+      return queueReward({
+        ...state,
+        diamonds: state.diamonds + diamondGain,
+        gold: state.gold + goldConsolation,
+        totalGold: state.totalGold + goldConsolation,
+        lastLockpickDay: today,
+      }, {
+        id: `lockpick_cache_${today}`,
+        kind: success ? 'system' : 'gold',
+        title: success ? 'Lockpick Cache Cracked' : 'Lockpick Cache Jammed',
+        detail: success ? `Vault breached: +${diamondGain} diamonds` : `Mechanism failed: +${goldConsolation} salvage gold`,
+      });
+    }
+
+    case 'PLAY_TARGET_PRACTICE': {
+      const today = toDayNumber(Date.now());
+      if (state.lastTargetPracticeDay === today) return state;
+
+      const score = action.forcedScore == null
+        ? Math.floor(Math.random() * 101)
+        : Math.max(0, Math.min(100, Math.floor(action.forcedScore)));
+
+      const weekly = getCurrentWeeklyEvent(state);
+      const shardGain = score >= 85
+        ? Math.max(140, Math.floor((80 + state.highestWaveReached * 1.8) * weekly.shardMultiplier))
+        : score >= 60
+          ? Math.max(70, Math.floor((40 + state.highestWaveReached * 1.1) * weekly.shardMultiplier))
+          : Math.max(35, Math.floor((20 + state.highestWaveReached * 0.7) * weekly.shardMultiplier));
+      const diamondGain = score >= 85 ? 12 : score >= 60 ? 6 : 2;
+
+      return queueReward({
+        ...state,
+        heroShards: state.heroShards + shardGain,
+        diamonds: state.diamonds + diamondGain,
+        lastTargetPracticeDay: today,
+      }, {
+        id: `target_practice_${today}`,
+        kind: 'shard',
+        title: 'Target Practice Complete',
+        detail: `Score ${score}: +${shardGain} shards, +${diamondGain} diamonds`,
+      });
+    }
+
+    case 'START_MINI_BOUNTY_DRAFT': {
+      const today = toDayNumber(Date.now());
+      if (state.lastBountyDraftDay === today || state.miniBounty) return state;
+
+      const draftByType: Record<MiniBountyDraftType, {
+        title: string;
+        metric: MiniBountyMetric;
+        targetDelta: number;
+        rewards: { gold: number; shards: number; diamonds: number };
+      }> = {
+        assault: {
+          title: 'Assault Writ',
+          metric: 'kills',
+          targetDelta: Math.max(120, Math.floor(80 + state.wave * 0.9)),
+          rewards: {
+            gold: Math.max(10000, Math.floor(getMonsterGold(state.wave) * 50)),
+            shards: Math.max(80, Math.floor(state.highestWaveReached * 0.9)),
+            diamonds: 6,
+          },
+        },
+        push: {
+          title: 'Frontline Push',
+          metric: 'wave',
+          targetDelta: 8,
+          rewards: {
+            gold: Math.max(12000, Math.floor(getMonsterGold(state.wave) * 65)),
+            shards: Math.max(90, Math.floor(state.highestWaveReached * 1.1)),
+            diamonds: 8,
+          },
+        },
+        recruit: {
+          title: 'Recruit Surge',
+          metric: 'summons',
+          targetDelta: 8,
+          rewards: {
+            gold: Math.max(8000, Math.floor(getMonsterGold(state.wave) * 40)),
+            shards: Math.max(70, Math.floor(state.highestWaveReached * 0.75)),
+            diamonds: 5,
+          },
+        },
+      };
+
+      const draft = draftByType[action.draftType];
+      const currentMetric = draft.metric === 'wave'
+        ? state.wave
+        : draft.metric === 'summons'
+          ? state.totalSummons
+          : state.totalKills;
+
+      return queueReward({
+        ...state,
+        lastBountyDraftDay: today,
+        miniBounty: {
+          id: `bounty_${today}_${action.draftType}`,
+          title: draft.title,
+          metric: draft.metric,
+          startValue: currentMetric,
+          targetValue: currentMetric + draft.targetDelta,
+          rewardGold: draft.rewards.gold,
+          rewardShards: draft.rewards.shards,
+          rewardDiamonds: draft.rewards.diamonds,
+          claimed: false,
+        },
+      }, {
+        id: `bounty_start_${today}`,
+        kind: 'system',
+        title: 'Bounty Draft Accepted',
+        detail: `${draft.title}: reach +${draft.targetDelta} ${draft.metric}`,
+      });
+    }
+
+    case 'CLAIM_MINI_BOUNTY_DRAFT': {
+      const bounty = state.miniBounty;
+      if (!bounty || bounty.claimed) return state;
+
+      const current = bounty.metric === 'wave'
+        ? state.wave
+        : bounty.metric === 'summons'
+          ? state.totalSummons
+          : state.totalKills;
+      if (current < bounty.targetValue) return state;
+
+      return queueReward({
+        ...state,
+        gold: state.gold + bounty.rewardGold,
+        totalGold: state.totalGold + bounty.rewardGold,
+        heroShards: state.heroShards + bounty.rewardShards,
+        diamonds: state.diamonds + bounty.rewardDiamonds,
+        miniBounty: null,
+      }, {
+        id: `bounty_claim_${Date.now()}`,
+        kind: 'system',
+        title: `Bounty Complete: ${bounty.title}`,
+        detail: `+${bounty.rewardGold} gold, +${bounty.rewardShards} shards, +${bounty.rewardDiamonds} diamonds`,
+      });
+    }
+
     case 'RUN_RIFT_DUNGEON': {
       const today = toDayNumber(Date.now());
       if (state.lastRiftRunDay === today) return state;
@@ -4373,6 +4607,20 @@ function reducer(state: GameState, action: Action): GameState {
         lastRiftRunDay: p.lastRiftRunDay,
         lastDiceRollValue: p.lastDiceRollValue,
         lastRiftWavesCleared: p.lastRiftWavesCleared,
+        lastReconSweepDay: p.lastReconSweepDay,
+        lastLockpickDay: p.lastLockpickDay,
+        lastTargetPracticeDay: p.lastTargetPracticeDay,
+        lastBountyDraftDay: p.lastBountyDraftDay,
+        miniBounty: p.miniBounty
+          ? {
+            ...p.miniBounty,
+            metric: p.miniBounty.metric === 'wave'
+              ? 'wave'
+              : p.miniBounty.metric === 'summons'
+                ? 'summons'
+                : 'kills',
+          }
+          : null,
         guildhallFacilities: p.guildhallFacilities ?? DEFAULT_STATE.guildhallFacilities,
         expeditionQueue: p.expeditionQueue ?? DEFAULT_STATE.expeditionQueue,
         lastExpeditionDay: p.lastExpeditionDay ?? DEFAULT_STATE.lastExpeditionDay,
@@ -4484,6 +4732,21 @@ interface SaveData {
   lastRiftRunDay?: number | null;
   lastDiceRollValue?: number | null;
   lastRiftWavesCleared?: number;
+  lastReconSweepDay?: number | null;
+  lastLockpickDay?: number | null;
+  lastTargetPracticeDay?: number | null;
+  lastBountyDraftDay?: number | null;
+  miniBounty?: {
+    id: string;
+    title: string;
+    metric: MiniBountyMetric;
+    startValue: number;
+    targetValue: number;
+    rewardGold: number;
+    rewardShards: number;
+    rewardDiamonds: number;
+    claimed: boolean;
+  } | null;
 
   guildhallFacilities?: Record<'training' | 'treasury' | 'forge' | 'tactics', { level: number }>;
   expeditionQueue?: Array<any>;
@@ -4588,6 +4851,11 @@ function serialize(state: GameState): SaveData {
     lastRiftRunDay: state.lastRiftRunDay,
     lastDiceRollValue: state.lastDiceRollValue,
     lastRiftWavesCleared: state.lastRiftWavesCleared,
+    lastReconSweepDay: state.lastReconSweepDay,
+    lastLockpickDay: state.lastLockpickDay,
+    lastTargetPracticeDay: state.lastTargetPracticeDay,
+    lastBountyDraftDay: state.lastBountyDraftDay,
+    miniBounty: state.miniBounty,
     guildhallFacilities: state.guildhallFacilities,
     expeditionQueue: state.expeditionQueue,
     lastExpeditionDay: state.lastExpeditionDay,
@@ -4819,6 +5087,21 @@ export function useGameState(saveSlot: string = 'default') {
     dispatch({ type: 'SET_HERO_FORMATION', uid, role });
   }, []);
   const playDiceRoll = useCallback((forcedRoll?: number) => dispatch({ type: 'PLAY_DICE_ROLL', forcedRoll }), []);
+  const playReconSweep = useCallback((forcedOutcome?: 'intel_gold' | 'intel_shards' | 'intel_buff' | 'ambush') => {
+    dispatch({ type: 'PLAY_RECON_SWEEP', forcedOutcome });
+  }, []);
+  const playLockpickCache = useCallback((forcedSuccess?: boolean) => {
+    dispatch({ type: 'PLAY_LOCKPICK_CACHE', forcedSuccess });
+  }, []);
+  const playTargetPractice = useCallback((forcedScore?: number) => {
+    dispatch({ type: 'PLAY_TARGET_PRACTICE', forcedScore });
+  }, []);
+  const startMiniBountyDraft = useCallback((draftType: MiniBountyDraftType) => {
+    dispatch({ type: 'START_MINI_BOUNTY_DRAFT', draftType });
+  }, []);
+  const claimMiniBountyDraft = useCallback(() => {
+    dispatch({ type: 'CLAIM_MINI_BOUNTY_DRAFT' });
+  }, []);
   const runRiftDungeon = useCallback((payload?: { waves: number; diamonds: number; shards: number; essence: number }) => {
     if (!payload) {
       dispatch({ type: 'RUN_RIFT_DUNGEON' });
@@ -4998,6 +5281,11 @@ export function useGameState(saveSlot: string = 'default') {
     setActiveTeam,
     setHeroFormation,
     playDiceRoll,
+    playReconSweep,
+    playLockpickCache,
+    playTargetPractice,
+    startMiniBountyDraft,
+    claimMiniBountyDraft,
     runRiftDungeon,
     batchLevelHeroes,
     upgradeFacility,

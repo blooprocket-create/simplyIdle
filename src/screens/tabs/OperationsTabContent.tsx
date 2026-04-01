@@ -12,10 +12,21 @@ export interface OperationsTabContentProps {
   operationsSubTab: string;
   setOperationsSubTab: (tab: string) => void;
   canPlayDiceToday: boolean;
+  canPlayReconToday: boolean;
+  canPlayLockpickToday: boolean;
+  canPlayTargetToday: boolean;
+  canStartBountyToday: boolean;
+  canClaimMiniBounty: boolean;
+  activeMiniBountyProgress: number;
   canRunRiftToday: boolean;
   setDiceRollResult: (result: any) => void;
   setDiceIsRolling: (rolling: boolean) => void;
   setDiceRollModalOpen: (open: boolean) => void;
+  playReconSweep: () => void;
+  playLockpickCache: () => void;
+  playTargetPractice: () => void;
+  startMiniBountyDraft: (draftType: 'assault' | 'push' | 'recruit') => void;
+  claimMiniBountyDraft: () => void;
   openRiftChallenge: () => void;
   upgradeFacility: (facility: string) => void;
   startExpedition: (type: string, rarity: string) => void;
@@ -31,10 +42,21 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
   operationsSubTab,
   setOperationsSubTab,
   canPlayDiceToday,
+  canPlayReconToday,
+  canPlayLockpickToday,
+  canPlayTargetToday,
+  canStartBountyToday,
+  canClaimMiniBounty,
+  activeMiniBountyProgress,
   canRunRiftToday,
   setDiceRollResult,
   setDiceIsRolling,
   setDiceRollModalOpen,
+  playReconSweep,
+  playLockpickCache,
+  playTargetPractice,
+  startMiniBountyDraft,
+  claimMiniBountyDraft,
   openRiftChallenge,
   upgradeFacility,
   startExpedition,
@@ -146,7 +168,11 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
             onPress: () => setOperationsSubTab(st),
             notificationCount:
               st === 'miniops'
-                ? (canPlayDiceToday ? 1 : 0)
+                ? ((canPlayDiceToday ? 1 : 0)
+                  + (canPlayReconToday ? 1 : 0)
+                  + (canPlayLockpickToday ? 1 : 0)
+                  + (canPlayTargetToday ? 1 : 0)
+                  + ((canStartBountyToday || canClaimMiniBounty) ? 1 : 0))
                 : st === 'dungeonops'
                   ? dungeonOpsReadyCount
                   : st === 'facilities'
@@ -176,6 +202,88 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
                 >
                   <Text style={styles.warPanelActionText}>Roll Dice (+Diamonds)</Text>
                 </Pressable>
+              </View>
+
+              <View style={styles.facilityCard}>
+                <Text style={styles.facilityName}>🛰️ Recon Sweep</Text>
+                <Text style={styles.facilityBonusText}>Reveal 1 of 3 intel outcomes (gold, shards, or combat telemetry).</Text>
+                <Text style={styles.facilityBonusText}>Status: {canPlayReconToday ? 'Ready' : 'Completed today'}</Text>
+                <Pressable
+                  style={[styles.warPanelActionBtn, !canPlayReconToday && styles.warPanelActionBtnDisabled]}
+                  disabled={!canPlayReconToday}
+                  onPress={playReconSweep}
+                >
+                  <Text style={styles.warPanelActionText}>Run Recon Sweep</Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.facilityCard}>
+                <Text style={styles.facilityName}>🔐 Lockpick Cache</Text>
+                <Text style={styles.facilityBonusText}>Crack a cache for diamonds, or salvage partial gold on a jam.</Text>
+                <Text style={styles.facilityBonusText}>Status: {canPlayLockpickToday ? 'Ready' : 'Completed today'}</Text>
+                <Pressable
+                  style={[styles.warPanelActionBtn, !canPlayLockpickToday && styles.warPanelActionBtnDisabled]}
+                  disabled={!canPlayLockpickToday}
+                  onPress={playLockpickCache}
+                >
+                  <Text style={styles.warPanelActionText}>Attempt Lockpick</Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.facilityCard}>
+                <Text style={styles.facilityName}>🎯 Target Practice</Text>
+                <Text style={styles.facilityBonusText}>Score tier sets shard and diamond payout.</Text>
+                <Text style={styles.facilityBonusText}>Status: {canPlayTargetToday ? 'Ready' : 'Completed today'}</Text>
+                <Pressable
+                  style={[styles.warPanelActionBtn, !canPlayTargetToday && styles.warPanelActionBtnDisabled]}
+                  disabled={!canPlayTargetToday}
+                  onPress={playTargetPractice}
+                >
+                  <Text style={styles.warPanelActionText}>Run Target Practice</Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.facilityCard}>
+                <Text style={styles.facilityName}>📜 Bounty Draft</Text>
+                <Text style={styles.facilityBonusText}>Pick one contract for this cycle and claim when objective is done.</Text>
+                {state.miniBounty ? (
+                  <>
+                    <Text style={styles.facilityBonusText}>Active: {state.miniBounty.title}</Text>
+                    <Text style={styles.facilityNextBonus}>Progress: {Math.min(activeMiniBountyProgress, state.miniBounty.targetValue)}/{state.miniBounty.targetValue}</Text>
+                    <Text style={styles.facilityNextBonus}>Reward: +{fmt(state.miniBounty.rewardGold)} gold, +{fmt(state.miniBounty.rewardShards)} shards, +{state.miniBounty.rewardDiamonds} diamonds</Text>
+                    <Pressable
+                      style={[styles.warPanelActionBtn, !canClaimMiniBounty && styles.warPanelActionBtnDisabled]}
+                      disabled={!canClaimMiniBounty}
+                      onPress={claimMiniBountyDraft}
+                    >
+                      <Text style={styles.warPanelActionText}>{canClaimMiniBounty ? 'Claim Bounty' : 'In Progress'}</Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <View style={styles.warPanelActionRow}>
+                    <Pressable
+                      style={[styles.warPanelActionBtn, !canStartBountyToday && styles.warPanelActionBtnDisabled]}
+                      disabled={!canStartBountyToday}
+                      onPress={() => startMiniBountyDraft('assault')}
+                    >
+                      <Text style={styles.warPanelActionText}>Assault</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.warPanelActionBtn, !canStartBountyToday && styles.warPanelActionBtnDisabled]}
+                      disabled={!canStartBountyToday}
+                      onPress={() => startMiniBountyDraft('push')}
+                    >
+                      <Text style={styles.warPanelActionText}>Push</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.warPanelActionBtn, !canStartBountyToday && styles.warPanelActionBtnDisabled]}
+                      disabled={!canStartBountyToday}
+                      onPress={() => startMiniBountyDraft('recruit')}
+                    >
+                      <Text style={styles.warPanelActionText}>Recruit</Text>
+                    </Pressable>
+                  </View>
+                )}
               </View>
             </View>
           )}
