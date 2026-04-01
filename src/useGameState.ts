@@ -578,6 +578,21 @@ function getForgeStatMultiplier(forgeLevel: number): number {
   return 1 + safeLevel * 0.03;
 }
 
+function getTrainingExpMultiplier(state: Pick<GameState, 'guildhallFacilities'>): number {
+  const lvl = Math.max(0, Math.floor(state.guildhallFacilities.training.level));
+  return 1 + lvl * 0.05;
+}
+
+function getTreasuryGoldMultiplier(state: Pick<GameState, 'guildhallFacilities'>): number {
+  const lvl = Math.max(0, Math.floor(state.guildhallFacilities.treasury.level));
+  return 1 + lvl * 0.02;
+}
+
+function getTacticsPowerMultiplier(state: Pick<GameState, 'guildhallFacilities'>): number {
+  const lvl = Math.max(0, Math.floor(state.guildhallFacilities.tactics.level));
+  return 1 + lvl * 0.01;
+}
+
 function getEquipmentStatWeights(playerClass: PlayerClass, slot: EquipmentSlot): Record<keyof StatBlock, number> {
   const cls = getClassConfig(playerClass);
   const offenseWeight = slot === 'weapon' ? 1.2 : slot === 'accessory' ? 1 : 0.82;
@@ -1275,7 +1290,8 @@ function getTeamMaxHp(state: GameState): number {
   const synergy = getTeamSynergy(state);
   const masteryLevel = getClassMasteryLevel(state, state.playerClass);
   const masteryHpMult = 1 + Math.min(0.25, Math.floor(masteryLevel / 4) * 0.02);
-  return Math.ceil(maxHp * survivalMult * getRebirthSurvivalMultiplier(state) * formation.hpMult * synergy.hpMult * masteryHpMult);
+  const tacticsPowerMult = getTacticsPowerMultiplier(state);
+  return Math.ceil(maxHp * survivalMult * getRebirthSurvivalMultiplier(state) * formation.hpMult * synergy.hpMult * masteryHpMult * tacticsPowerMult);
 }
 
 function getTeamDefense(state: GameState): number {
@@ -1297,7 +1313,8 @@ function getTeamDefense(state: GameState): number {
 
   const formation = getFormationMultipliers(state);
   const synergy = getTeamSynergy(state);
-  return Math.max(0, defense * getMetaSurvivalMultiplier(state) * getRebirthSurvivalMultiplier(state) * formation.hpMult * synergy.hpMult);
+  const tacticsPowerMult = getTacticsPowerMultiplier(state);
+  return Math.max(0, defense * getMetaSurvivalMultiplier(state) * getRebirthSurvivalMultiplier(state) * formation.hpMult * synergy.hpMult * tacticsPowerMult);
 }
 
 export function getDpsBreakdown(state: GameState): {
@@ -1308,6 +1325,7 @@ export function getDpsBreakdown(state: GameState): {
     achievementLegacy: number;
     metaDamage: number;
     rebirthDamagePath: number;
+    tacticsFacility: number;
     classPassive: number;
     heroPassives: number;
     formation: number;
@@ -1358,11 +1376,13 @@ export function getDpsBreakdown(state: GameState): {
   const masteryLevel = getClassMasteryLevel(state, state.playerClass);
   const masteryDpsMult = 1 + Math.min(0.4, masteryLevel * 0.01);
   const vipDamageMult = getVipDamageMultiplier(state);
+  const tacticsPowerMult = getTacticsPowerMultiplier(state);
   const multipliers = {
     rebirthLegacy: rebirthMult,
     achievementLegacy: getAchievementBonusMultiplier(state),
     metaDamage: getMetaDamageMultiplier(state),
     rebirthDamagePath: getRebirthDamageMultiplier(state),
+    tacticsFacility: tacticsPowerMult,
     classPassive: classPassiveMult,
     heroPassives: heroPassive.dpsMult,
     formation: formation.dpsMult,
@@ -1375,6 +1395,7 @@ export function getDpsBreakdown(state: GameState): {
     * multipliers.achievementLegacy
     * multipliers.metaDamage
     * multipliers.rebirthDamagePath
+    * multipliers.tacticsFacility
     * multipliers.classPassive
     * multipliers.heroPassives
     * multipliers.formation
@@ -2328,8 +2349,8 @@ function killMonster(state: GameState): GameState {
   const synergy = getTeamSynergy(state);
   const masteryLevel = getClassMasteryLevel(state, state.playerClass);
   const masteryEconomyMult = 1 + Math.min(0.25, Math.floor(masteryLevel / 5) * 0.01);
-  const goldReward = Math.ceil(getMonsterGold(state.wave) * Math.pow(REBIRTH_BONUS, state.prestigeCount) * achievementMult * affix.goldMult * economyMult * getRebirthEconomyMultiplier(state) * heroPassive.goldMult * synergy.goldMult * masteryEconomyMult * weekly.goldMultiplier * getVipGoldMultiplier(state));
-  const expReward = Math.ceil(getMonsterExp(state.wave) * achievementMult * affix.expMult * heroPassive.expMult * synergy.expMult * weekly.expMultiplier * getVipExpMultiplier(state));
+  const goldReward = Math.ceil(getMonsterGold(state.wave) * Math.pow(REBIRTH_BONUS, state.prestigeCount) * achievementMult * affix.goldMult * economyMult * getRebirthEconomyMultiplier(state) * heroPassive.goldMult * synergy.goldMult * masteryEconomyMult * weekly.goldMultiplier * getVipGoldMultiplier(state) * getTreasuryGoldMultiplier(state));
+  const expReward = Math.ceil(getMonsterExp(state.wave) * achievementMult * affix.expMult * heroPassive.expMult * synergy.expMult * weekly.expMultiplier * getVipExpMultiplier(state) * getTrainingExpMultiplier(state));
   const lvl = processLevelUp(state.exp + expReward, state.level);
   const isBoss = state.wave % 10 === 0;
   const act = getActForWave(state.wave);
