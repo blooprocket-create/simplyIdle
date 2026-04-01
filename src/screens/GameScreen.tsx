@@ -66,10 +66,10 @@ import {
 import { styles } from './GameScreen.styles';
 
 export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'guildhall';
-type HeroesSubTab = 'summon' | 'roster';
+type HeroesSubTab = 'summon' | 'roster' | 'batch';
 type EquipmentSubTab = 'inventory' | 'craft' | 'forge';
 type AchievementsSubTab = 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex';
-type GuildhallSubTab = 'batch' | 'facilities' | 'expeditions';
+type GuildhallSubTab = 'facilities' | 'expeditions';
 type ShopTab = 'diamond' | 'gold' | 'dollar';
 export type ExpeditionType = 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss';
 export type ExpeditionRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
@@ -111,7 +111,7 @@ const TAB_META: Record<Tab, { icon: string; label: string; mood: string }> = {
   stats: { icon: '📊', label: 'Growth', mood: 'Power Grid' },
   equipment: { icon: '🎒', label: 'Armory', mood: 'Forge Gear' },
   achievements: { icon: '🏆', label: 'Legends', mood: 'Milestones' },
-  guildhall: { icon: '🏰', label: 'Guild Hall', mood: 'Infrastructure' },
+  guildhall: { icon: '🏰', label: 'Operations', mood: 'Infrastructure' },
 };
 
 export const ACH_BONUS_PER_UNLOCK_PCT = 3;
@@ -294,7 +294,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [heroesSubTab, setHeroesSubTab] = useState<HeroesSubTab>('summon');
   const [equipmentSubTab, setEquipmentSubTab] = useState<EquipmentSubTab>('inventory');
   const [achievementsSubTab, setAchievementsSubTab] = useState<AchievementsSubTab>('overview');
-  const [guildhallSubTab, setGuildhallSubTab] = useState<GuildhallSubTab>('batch');
+  const [guildhallSubTab, setGuildhallSubTab] = useState<GuildhallSubTab>('facilities');
   const [eventsOpen, setEventsOpen] = useState(false);
   const [chapterMapOpen, setChapterMapOpen] = useState(false);
   const [compareItemId, setCompareItemId] = useState<string | null>(null);
@@ -1817,6 +1817,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             stats,
             heroesSubTab,
             setHeroesSubTab,
+            batchLevelMode,
+            setBatchLevelMode,
+            batchLevelSelected,
+            setBatchLevelSelected,
             canGachaX10,
             canGachaOnce,
             pityRemaining,
@@ -1845,6 +1849,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             rankUpHero,
             rebirthHero,
             levelUpHeroGold,
+            batchLevelHeroes,
             setRecycleConfirmUid,
             renderSubTabBar,
           } as any)}
@@ -1926,12 +1931,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             stats,
             guildhallSubTab,
             setGuildhallSubTab,
-            batchLevelMode,
-            setBatchLevelMode,
-            batchLevelSelected,
-            setBatchLevelSelected,
             getHeroGoldLevelCost,
-            batchLevelHeroes,
             upgradeFacility,
             startExpedition,
             completeExpedition,

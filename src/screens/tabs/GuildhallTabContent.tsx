@@ -107,18 +107,16 @@ export const GuildhallTabContent: React.FC<GuildhallTabContentProps> = ({
     <>
       {tab === 'guildhall' && (
         <View style={styles.guildhallTab}>
-          <Text style={styles.sectionTitle}>⚔️ Guild Headquarters</Text>
-          {renderSubTabBar((['batch', 'facilities', 'expeditions'] as const).map(st => ({
+          <Text style={styles.sectionTitle}>⚙️ Operations Command</Text>
+          {renderSubTabBar((['facilities', 'expeditions'] as const).map(st => ({
             id: st,
-            label: st === 'batch' ? 'Batch Level' : st === 'facilities' ? 'Facilities' : 'Expeditions',
+            label: st === 'facilities' ? 'Facilities' : 'Expeditions',
             active: guildhallSubTab === st,
             onPress: () => setGuildhallSubTab(st),
             notificationCount:
               st === 'facilities'
                 ? facilitiesUpgradeableCount
-                : st === 'expeditions'
-                  ? expeditionClaimableCount + expeditionLaunchableAffordableCount
-                  : 0,
+                : expeditionClaimableCount + expeditionLaunchableAffordableCount,
           })))}
 
           {/* BATCH LEVELING TAB */}
