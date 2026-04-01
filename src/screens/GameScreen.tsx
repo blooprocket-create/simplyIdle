@@ -1946,8 +1946,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           <Text style={styles.metaChipValue}>{powerTier}</Text>
         </View>
         <View style={styles.metaChip}>
-          <Text style={styles.metaChipLabel}>Highest Wave</Text>
-          <Text style={styles.metaChipValue}>Wave {state.highestWaveReached}</Text>
+          <Text style={styles.metaChipLabel}>Peak Progress</Text>
+          <Text style={styles.metaChipValue}>{getActForWave(state.highestWaveReached).emoji} W{state.highestWaveReached}</Text>
         </View>
         <Pressable style={[styles.metaChip, styles.metaChipAction]} onPress={() => setChapterMapOpen(true)}>
           <Text style={styles.metaChipLabel}>Campaign Map</Text>
@@ -1978,7 +1978,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
           {/* Monster Zone */}
           <View style={styles.monsterZone}>
-            <Text style={styles.waveLabel}>Wave {state.wave} {isBoss ? '👑' : ''}</Text>
+            <Text style={styles.waveLabel}>{currentAct.emoji} {currentAct.name} • W{state.wave}{isBoss ? ' 👑' : ''}</Text>
             {isBossImminent && !isBoss && <Text style={styles.bossImminentText}>⚠️ Boss Approaching</Text>}
             <Text style={styles.monsterEmoji}>{monster.emoji}</Text>
             <Text style={styles.monsterName}>{monster.name}</Text>
@@ -2609,7 +2609,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Text style={styles.eventsCardTitle}>🏆 Season Ladder</Text>
                 <Text style={styles.eventsSubtitle}>Season score: {fmt(seasonScore)} pts</Text>
                 <Text style={styles.eventsStatLine}>Best this season: {fmt(state.bestSeasonPoints)} pts</Text>
-                <Text style={styles.eventsStatLine}>Highest wave reached: Wave {state.highestWaveReached}</Text>
+                <Text style={styles.eventsStatLine}>Peak progress: {getActForWave(state.highestWaveReached).emoji} {getActForWave(state.highestWaveReached).name} • W{state.highestWaveReached}</Text>
                 <Text style={[styles.seasonRankBadge]}>{seasonRank}</Text>
                 <Text style={styles.eventsHint}>Score based on wave progression + rebirths. Top ranks earn cosmetic banners at season end.</Text>
                 {[

@@ -164,7 +164,7 @@ export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
             </Pressable>
             {warPanels.frontline && (
               <View style={styles.warPanelBody}>
-                <Text style={styles.warPanelStat}>Wave {state.wave} • {monster.name} {isBoss ? '(Boss)' : ''}</Text>
+                <Text style={styles.warPanelStat}>{currentAct.emoji} {currentAct.name} • W{state.wave} • {monster.name} {isBoss ? '(Boss)' : ''}</Text>
                 <Text style={styles.warPanelStat}>Team HP: {Math.ceil(state.teamHp)} / {state.teamMaxHp}</Text>
                 <Text style={styles.warPanelStat}>Danger: {dangerLabel} ({dangerScore.toFixed(0)}%)</Text>
                 <Text style={styles.actTitle}>{currentAct.emoji} Act {currentAct.id}: {currentAct.name}</Text>
@@ -172,7 +172,7 @@ export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
                 <View style={styles.hpBarBg}>
                   <View style={[styles.hpBarFill, { width: `${actProgressPct}%`, backgroundColor: '#5DA8FF' }]} />
                 </View>
-                <Text style={styles.actProgress}>Wave {state.wave} • Boss at Wave {currentAct.bossWave}</Text>
+                <Text style={styles.actProgress}>{currentAct.emoji} W{state.wave} • Boss at W{currentAct.bossWave}</Text>
                 {nextBossUnlock ? (
                   <Text style={styles.actUnlockHint}>Next boss unlock: {unlockLabel(nextBossUnlock)}</Text>
                 ) : (
