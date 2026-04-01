@@ -182,27 +182,37 @@ export const EXPEDITION_CONTRACT_REFRESH_GOLD_COST = 100_000;
 const EXPEDITION_TYPES: ExpeditionType[] = ['artifact', 'merchant', 'ruins', 'vault', 'abyss'];
 const EXPEDITION_RARITIES: ExpeditionRarity[] = ['common', 'rare', 'epic', 'legendary', 'godly'];
 
-const FACILITY_BASE_UPGRADE_COST: Record<FacilityId, number> = {
-  training: 5000,
-  treasury: 4000,
-  forge: 6000,
-  tactics: 5000,
+const FACILITY_INITIAL_UPGRADE_COSTS: Record<FacilityId, number[]> = {
+  // Preserve the original 1-5 era curve exactly.
+  training: [5000, 12000, 30000, 75000, 150000, 300000],
+  treasury: [4000, 10000, 25000, 60000, 120000, 250000],
+  forge: [6000, 15000, 40000, 90000, 180000, 350000],
+  tactics: [5000, 12000, 30000, 75000, 150000, 300000],
 };
 
-const FACILITY_COST_GROWTH_RATE: Record<FacilityId, number> = {
-  training: 1.14,
-  treasury: 1.135,
-  forge: 1.145,
-  tactics: 1.14,
+const FACILITY_POST_5_GROWTH_RATE: Record<FacilityId, number> = {
+  training: 2,
+  treasury: 2,
+  forge: 2,
+  tactics: 2,
 };
 
 export function getFacilityUpgradeCost(facilityId: FacilityId, currentLevel: number): number {
   const safeLevel = Math.max(0, Math.floor(currentLevel));
   if (safeLevel >= FACILITY_MAX_LEVEL) return Number.MAX_SAFE_INTEGER;
+  const openingCurve = FACILITY_INITIAL_UPGRADE_COSTS[facilityId];
+  if (safeLevel < openingCurve.length) return openingCurve[safeLevel];
 
-  const base = FACILITY_BASE_UPGRADE_COST[facilityId];
-  const growth = FACILITY_COST_GROWTH_RATE[facilityId];
-  return Math.max(base, Math.ceil(base * Math.pow(growth, safeLevel)));
+  let cost = openingCurve[openingCurve.length - 1];
+  const growth = FACILITY_POST_5_GROWTH_RATE[facilityId];
+  for (let level = openingCurve.length - 1; level < safeLevel; level++) {
+    cost = Math.ceil(cost * growth);
+    if (!Number.isFinite(cost) || cost > Number.MAX_SAFE_INTEGER) {
+      return Number.MAX_SAFE_INTEGER;
+    }
+  }
+
+  return cost;
 }
 
 export interface Stats {
