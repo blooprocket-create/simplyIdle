@@ -99,6 +99,7 @@ const DIAMOND_SHOP_COSTS: Record<DiamondShopOfferId, number> = {
   coolant_i_pack: 24,
   coolant_ii_pack: 58,
   elite_supply: 120,
+  rift_raid_ticket: 45,
 };
 const DOLLAR_SHOP_PACKS: Record<DollarShopOfferId, { usdCents: number; diamonds: number }> = {
   usd_499: { usdCents: 499, diamonds: 500 },
@@ -202,7 +203,7 @@ type MiniBountyDraftType = 'assault' | 'push' | 'recruit';
 type ExpeditionType = 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss';
 type ExpeditionRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
 type GoldShopOfferId = 'exp_cache' | 'potion_bundle' | 'armory_crate';
-type DiamondShopOfferId = 'coolant_i_pack' | 'coolant_ii_pack' | 'elite_supply';
+type DiamondShopOfferId = 'coolant_i_pack' | 'coolant_ii_pack' | 'elite_supply' | 'rift_raid_ticket';
 type DollarShopOfferId = 'usd_499' | 'usd_1999' | 'usd_4999' | 'usd_9999';
 
 const ACHIEVEMENT_BONUS_PER_UNLOCK = 0.03;
@@ -316,7 +317,11 @@ export interface GameState {
   heroFormationByUid: Record<string, HeroFormationRole>;
   heroUniqueGearByHeroId: Record<string, HeroUniqueGearProgress>;
   lastDiceRollDay: number | null;
-  lastRiftRunDay: number | null;
+  riftDungeonLevel: number;
+  riftEntriesUsedToday: number;
+  riftEntryDay: number | null;
+  riftRaidTickets: number;
+  lastRiftBossDamagePct: number;
   lastDiceRollValue: number | null;
   lastRiftWavesCleared: number;
   lastReconSweepDay: number | null;
@@ -484,7 +489,11 @@ const DEFAULT_STATE: GameState = {
   heroFormationByUid: {},
   heroUniqueGearByHeroId: {},
   lastDiceRollDay: null,
-  lastRiftRunDay: null,
+  riftDungeonLevel: 1,
+  riftEntriesUsedToday: 0,
+  riftEntryDay: null,
+  riftRaidTickets: 0,
+  lastRiftBossDamagePct: 0,
   lastDiceRollValue: null,
   lastRiftWavesCleared: 0,
   lastReconSweepDay: null,
@@ -2265,7 +2274,15 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     heroFormationByUid,
     heroUniqueGearByHeroId,
     lastDiceRollDay: sanitizeMiniOpsCooldownTimestamp(payload.lastDiceRollDay, now),
-    lastRiftRunDay: payload.lastRiftRunDay == null ? null : clampInt(payload.lastRiftRunDay, 0, currentDay, currentDay),
+    riftDungeonLevel: clampInt(payload.riftDungeonLevel, 1, MAX_SAVE_PLAYER_LEVEL, 1),
+    riftEntryDay: payload.riftEntryDay == null
+      ? (payload.lastRiftRunDay == null ? null : clampInt(payload.lastRiftRunDay, 0, currentDay, currentDay))
+      : clampInt(payload.riftEntryDay, 0, currentDay, currentDay),
+    riftEntriesUsedToday: payload.riftEntriesUsedToday == null
+      ? (payload.lastRiftRunDay === currentDay ? 1 : 0)
+      : clampInt(payload.riftEntriesUsedToday, 0, 10, 0),
+    riftRaidTickets: clampInt(payload.riftRaidTickets, 0, SAFE_INTEGER_CAP, 0),
+    lastRiftBossDamagePct: clampFloat(payload.lastRiftBossDamagePct, 0, 1, 0),
     lastDiceRollValue: payload.lastDiceRollValue == null ? null : clampInt(payload.lastDiceRollValue, 1, 20, 1),
     lastRiftWavesCleared: clampInt(payload.lastRiftWavesCleared, 0, 5, 0),
     lastReconSweepDay: sanitizeMiniOpsCooldownTimestamp(payload.lastReconSweepDay, now),
@@ -2548,6 +2565,12 @@ function getMonsterAffixModifiers(wave: number) {
 
 function toDayNumber(ts: number): number {
   return Math.floor(ts / 86_400_000);
+}
+
+function getRiftDailyEntryCap(state: Pick<GameState, 'vipLevel'>): number {
+  if (state.vipLevel >= 4) return 5;
+  if (state.vipLevel >= 2) return 4;
+  return 3;
 }
 
 function killMonster(state: GameState): GameState {
@@ -2895,7 +2918,7 @@ type Action =
   | { type: 'PLAY_TARGET_PRACTICE'; forcedScore?: number }
   | { type: 'START_MINI_BOUNTY_DRAFT'; draftType: MiniBountyDraftType }
   | { type: 'CLAIM_MINI_BOUNTY_DRAFT' }
-  | { type: 'RUN_RIFT_DUNGEON'; forcedWaves?: number; forcedDiamonds?: number; forcedShards?: number; forcedEssence?: number }
+  | { type: 'RUN_RIFT_DUNGEON'; useRaidTicket?: boolean }
   | { type: 'RECYCLE_HERO'; uid: string }
   | { type: 'AUTO_RECYCLE_HEROES' }
   | { type: 'SET_AUTO_RECYCLE_MAX_RARITY'; rarity: Rarity }
@@ -4300,45 +4323,67 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'RUN_RIFT_DUNGEON': {
       const today = toDayNumber(Date.now());
-      if (state.lastRiftRunDay === today) return state;
+      const useRaidTicket = !!action.useRaidTicket;
+      const activeLevel = Math.max(1, state.riftDungeonLevel);
+      const targetLevel = useRaidTicket ? Math.max(1, activeLevel - 1) : activeLevel;
+      const entryCap = getRiftDailyEntryCap(state);
+      const entriesUsed = state.riftEntryDay === today ? state.riftEntriesUsedToday : 0;
 
-      const hasForcedOutcome =
-        typeof action.forcedWaves === 'number' && Number.isFinite(action.forcedWaves) &&
-        typeof action.forcedDiamonds === 'number' && Number.isFinite(action.forcedDiamonds) &&
-        typeof action.forcedShards === 'number' && Number.isFinite(action.forcedShards) &&
-        typeof action.forcedEssence === 'number' && Number.isFinite(action.forcedEssence);
+      if (useRaidTicket) {
+        if (state.riftRaidTickets <= 0) return state;
+        if (activeLevel <= 1) return state;
 
-      const teamPower = Math.max(1, getDps(state));
-      const monsterMaxHpHere = Math.max(1, getMonsterMaxHp(state.wave));
-      const expected = Math.min(5, Math.max(1, Math.floor((teamPower / (monsterMaxHpHere * 0.12)) * 2)));
-      const variance = Math.floor(Math.random() * 3) - 1;
-      const fallbackWaves = Math.max(1, Math.min(5, expected + variance));
+        const raidDiamonds = Math.max(10, Math.floor(12 + targetLevel * 5.5));
+        const raidShards = Math.max(80, Math.floor(140 + targetLevel * 130));
 
-      const clearedWaves = hasForcedOutcome
-        ? Math.max(1, Math.min(5, Math.floor(action.forcedWaves!)))
-        : fallbackWaves;
-      const diamonds = hasForcedOutcome
-        ? Math.max(0, Math.floor(action.forcedDiamonds!))
-        : Math.max(8, Math.floor(8 + clearedWaves * 4 + (clearedWaves === 5 ? 8 : 0)));
-      const shardReward = hasForcedOutcome
-        ? Math.max(0, Math.floor(action.forcedShards!))
-        : Math.max(40, Math.floor(clearedWaves * 90 * (1 + state.highestWaveReached / 250)));
-      const essenceReward = hasForcedOutcome
-        ? Math.max(0, Math.floor(action.forcedEssence!))
-        : (clearedWaves >= 4 ? 1 : 0);
+        return queueReward({
+          ...state,
+          diamonds: state.diamonds + raidDiamonds,
+          heroShards: state.heroShards + raidShards,
+          riftRaidTickets: state.riftRaidTickets - 1,
+          lastRiftBossDamagePct: 1,
+          lastRiftWavesCleared: 1,
+        }, {
+          id: `rift_raid_${Date.now()}`,
+          kind: 'system',
+          title: 'Rift Raid Complete',
+          detail: `Raided L${targetLevel} boss (+${raidDiamonds} diamonds, +${raidShards} shards). Free entries not consumed.`,
+        });
+      }
+
+      if (entriesUsed >= entryCap) return state;
+
+      const bossLevel = targetLevel * 10;
+      const bossHp = Math.max(1, Math.floor(getMonsterMaxHp(bossLevel) * (6 + targetLevel * 0.35)));
+      const dps = Math.max(1, getDps(state));
+      const damageVariance = 0.9 + Math.random() * 0.2;
+      const damageDone = dps * 120 * damageVariance;
+      const damagePct = Math.max(0, Math.min(1, damageDone / bossHp));
+      const cleared = damagePct >= 1;
+
+      const fullDiamonds = Math.max(10, Math.floor(12 + targetLevel * 5.5));
+      const fullShards = Math.max(80, Math.floor(140 + targetLevel * 130));
+      const rewardScale = cleared ? 1 : damagePct;
+      const diamonds = Math.max(0, Math.floor(fullDiamonds * rewardScale));
+      const shardReward = Math.max(0, Math.floor(fullShards * rewardScale));
+
+      const nextLevel = cleared ? targetLevel + 1 : targetLevel;
+      const nextEntriesUsed = entriesUsed + 1;
 
       return queueReward({
         ...state,
         diamonds: state.diamonds + diamonds,
         heroShards: state.heroShards + shardReward,
-        essence: state.essence + essenceReward,
-        lastRiftRunDay: today,
-        lastRiftWavesCleared: clearedWaves,
+        riftDungeonLevel: nextLevel,
+        riftEntryDay: today,
+        riftEntriesUsedToday: nextEntriesUsed,
+        lastRiftBossDamagePct: damagePct,
+        lastRiftWavesCleared: cleared ? 1 : 0,
       }, {
-        id: `rift_run_${today}`,
+        id: `rift_run_${Date.now()}`,
         kind: 'system',
-        title: 'Rift Breach Cleared',
-        detail: `${clearedWaves}/5 waves: +${diamonds} diamonds, +${shardReward} shards${essenceReward > 0 ? `, +${essenceReward} essence` : ''}`,
+        title: cleared ? 'Rift Breach Cleared' : 'Rift Breach Failed',
+        detail: `L${targetLevel} boss (Lv ${bossLevel}) • ${Math.round(damagePct * 100)}% damage • +${diamonds} diamonds, +${shardReward} shards${cleared ? ` • Dungeon advanced to L${nextLevel}` : ''}`,
       });
     }
 
@@ -4782,6 +4827,17 @@ function reducer(state: GameState, action: Action): GameState {
       } else if (action.offerId === 'coolant_ii_pack') {
         counts = addUsableItemCount(counts, 'coolant_mk2', 3);
         detail = '-58 diamonds, +3 Coolant Capsule II';
+      } else if (action.offerId === 'rift_raid_ticket') {
+        return queueReward({
+          ...state,
+          diamonds: state.diamonds - cost,
+          riftRaidTickets: state.riftRaidTickets + 1,
+        }, {
+          id: `shop_diamond_rift_ticket_${Date.now()}`,
+          kind: 'item',
+          title: 'Diamond Shop Purchase: Dungeon Raid Ticket',
+          detail: '-45 diamonds, +1 Dungeon Raid Ticket',
+        });
       } else {
         counts = addUsableItemCount(counts, 'coolant_mk1', 5);
         counts = addUsableItemCount(counts, 'coolant_mk2', 3);
@@ -5010,7 +5066,11 @@ function reducer(state: GameState, action: Action): GameState {
         heroFormationByUid: p.heroFormationByUid,
         heroUniqueGearByHeroId: p.heroUniqueGearByHeroId ?? {},
         lastDiceRollDay: p.lastDiceRollDay,
-        lastRiftRunDay: p.lastRiftRunDay,
+        riftDungeonLevel: p.riftDungeonLevel ?? 1,
+        riftEntriesUsedToday: p.riftEntriesUsedToday ?? ((p.lastRiftRunDay != null && p.lastRiftRunDay === toDayNumber(Date.now())) ? 1 : 0),
+        riftEntryDay: p.riftEntryDay ?? p.lastRiftRunDay ?? null,
+        riftRaidTickets: p.riftRaidTickets ?? 0,
+        lastRiftBossDamagePct: p.lastRiftBossDamagePct ?? 0,
         lastDiceRollValue: p.lastDiceRollValue,
         lastRiftWavesCleared: p.lastRiftWavesCleared,
         lastReconSweepDay: p.lastReconSweepDay,
@@ -5139,6 +5199,11 @@ interface SaveData {
   heroUniqueGearByHeroId: Record<string, HeroUniqueGearProgress>;
   lastDiceRollDay?: number | null;
   lastRiftRunDay?: number | null;
+  riftDungeonLevel?: number;
+  riftEntriesUsedToday?: number;
+  riftEntryDay?: number | null;
+  riftRaidTickets?: number;
+  lastRiftBossDamagePct?: number;
   lastDiceRollValue?: number | null;
   lastRiftWavesCleared?: number;
   lastReconSweepDay?: number | null;
@@ -5260,7 +5325,11 @@ function serialize(state: GameState): SaveData {
     heroFormationByUid: state.heroFormationByUid,
     heroUniqueGearByHeroId: state.heroUniqueGearByHeroId,
     lastDiceRollDay: state.lastDiceRollDay,
-    lastRiftRunDay: state.lastRiftRunDay,
+    riftDungeonLevel: state.riftDungeonLevel,
+    riftEntriesUsedToday: state.riftEntriesUsedToday,
+    riftEntryDay: state.riftEntryDay,
+    riftRaidTickets: state.riftRaidTickets,
+    lastRiftBossDamagePct: state.lastRiftBossDamagePct,
     lastDiceRollValue: state.lastDiceRollValue,
     lastRiftWavesCleared: state.lastRiftWavesCleared,
     lastReconSweepDay: state.lastReconSweepDay,
@@ -5561,18 +5630,8 @@ export function useGameState(saveSlot: string = 'default') {
   const claimMiniBountyDraft = useCallback(() => {
     dispatch({ type: 'CLAIM_MINI_BOUNTY_DRAFT' });
   }, []);
-  const runRiftDungeon = useCallback((payload?: { waves: number; diamonds: number; shards: number; essence: number }) => {
-    if (!payload) {
-      dispatch({ type: 'RUN_RIFT_DUNGEON' });
-      return;
-    }
-    dispatch({
-      type: 'RUN_RIFT_DUNGEON',
-      forcedWaves: payload.waves,
-      forcedDiamonds: payload.diamonds,
-      forcedShards: payload.shards,
-      forcedEssence: payload.essence,
-    });
+  const runRiftDungeon = useCallback((useRaidTicket = false) => {
+    dispatch({ type: 'RUN_RIFT_DUNGEON', useRaidTicket });
   }, []);
   const recycleHero = useCallback((uid: string) => dispatch({ type: 'RECYCLE_HERO', uid }), []);
   const autoRecycleHeroes = useCallback(() => dispatch({ type: 'AUTO_RECYCLE_HEROES' }), []);

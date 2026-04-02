@@ -143,6 +143,7 @@ const GOLD_SHOP_OFFERS = [
 const DIAMOND_SHOP_OFFERS = [
   { id: 'coolant_i_pack', name: 'Coolant Pack I', desc: '+4 Coolant Capsule I', cost: 24 },
   { id: 'coolant_ii_pack', name: 'Coolant Pack II', desc: '+3 Coolant Capsule II', cost: 58 },
+  { id: 'rift_raid_ticket', name: 'Dungeon Raid Ticket', desc: '+1 ticket (raids prior Rift level, no free-entry cost)', cost: 45 },
   { id: 'elite_supply', name: 'Elite Supply Crate', desc: '+5 Coolant I, +3 Coolant II, +2 Grand Potions', cost: 120 },
 ] as const;
 const DOLLAR_SHOP_OFFERS = [
@@ -636,7 +637,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         : state.totalKills)
     : 0;
   const canClaimMiniBounty = !!state.miniBounty && activeMiniBountyProgress >= state.miniBounty.targetValue;
-  const canRunRiftToday = state.lastRiftRunDay !== currentDay;
+  const riftEntryCap = state.vipLevel >= 4 ? 5 : state.vipLevel >= 2 ? 4 : 3;
+  const riftEntriesUsed = state.riftEntryDay === currentDay ? state.riftEntriesUsedToday : 0;
+  const riftEntriesRemaining = Math.max(0, riftEntryCap - riftEntriesUsed);
+  const canRunRiftEntry = riftEntriesRemaining > 0;
+  const canRaidRift = state.riftRaidTickets > 0 && state.riftDungeonLevel > 1;
   const rebirthWavesLeft = Math.max(0, rebirthWaveRequirement - state.highestWaveReached);
   const expeditionClaimableCount = state.expeditionQueue.filter(exp => (Date.now() - exp.startTime) >= exp.durationMs).length;
   const expeditionActiveTypes = new Set(state.expeditionQueue.map(exp => exp.type));
@@ -659,7 +664,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     + (canPlayLockpickToday ? 1 : 0)
     + (canPlayTargetToday ? 1 : 0)
     + (canStartBountyToday || canClaimMiniBounty ? 1 : 0);
-  const dungeonOpsNotificationCount = canRunRiftToday ? 1 : 0;
+  const dungeonOpsNotificationCount = (canRunRiftEntry ? 1 : 0) + (canRaidRift ? 1 : 0);
   const operationsNotificationCount = expeditionClaimableCount + expeditionLaunchableAffordableCount + facilitiesUpgradeableCount + miniOpsNotificationCount + dungeonOpsNotificationCount;
   const guidanceList = useMemo(() => {
     const recs: Array<{ title: string; detail: string; tab: Tab }> = [];
@@ -1102,15 +1107,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     });
   };
 
-  const openRiftChallenge = () => {
-    debugLog('gameplay', 'Open Rift Challenge', { wave: state.wave, highestWave: state.highestWaveReached });
-    setRiftDungeonResult(null);
-    setRiftIsSimulating(false);
-    setRiftSelectedBonuses([]);
-    setRiftWavePredictions([]);
-    setRiftBonusRound(1);
-    setRiftCurrentBonuses(buildRiftChoices(1));
-    setRiftDungeonModalOpen(true);
+  const openRiftChallenge = (useRaidTicket = false) => {
+    debugLog('gameplay', useRaidTicket ? 'Run Rift Raid' : 'Run Rift Entry', {
+      wave: state.wave,
+      highestWave: state.highestWaveReached,
+      riftDungeonLevel: state.riftDungeonLevel,
+      useRaidTicket,
+    });
+    runRiftDungeon(useRaidTicket);
   };
 
   const resetReconGame = () => {
@@ -2355,7 +2359,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             canStartBountyToday,
             canClaimMiniBounty,
             activeMiniBountyProgress,
-            canRunRiftToday,
+            riftDungeonLevel: state.riftDungeonLevel,
+            riftEntriesUsed,
+            riftEntriesRemaining,
+            riftEntryCap,
+            riftRaidTickets: state.riftRaidTickets,
+            lastRiftBossDamagePct: state.lastRiftBossDamagePct,
+            canRunRiftEntry,
+            canRaidRift,
             setDiceRollResult,
             setDiceIsRolling,
             setDiceRollModalOpen,
@@ -3248,7 +3259,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Pressable
                   style={styles.modalCloseBtn}
                   onPress={() => {
-                    runRiftDungeon(riftDungeonResult);
+                    runRiftDungeon(false);
                     setRiftDungeonModalOpen(false);
                     setRiftDungeonResult(null);
                     setRiftSelectedBonuses([]);

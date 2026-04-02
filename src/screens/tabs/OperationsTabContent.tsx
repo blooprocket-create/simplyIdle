@@ -18,7 +18,14 @@ export interface OperationsTabContentProps {
   canStartBountyToday: boolean;
   canClaimMiniBounty: boolean;
   activeMiniBountyProgress: number;
-  canRunRiftToday: boolean;
+  riftDungeonLevel: number;
+  riftEntriesUsed: number;
+  riftEntriesRemaining: number;
+  riftEntryCap: number;
+  riftRaidTickets: number;
+  lastRiftBossDamagePct: number;
+  canRunRiftEntry: boolean;
+  canRaidRift: boolean;
   setDiceRollResult: (result: any) => void;
   setDiceIsRolling: (rolling: boolean) => void;
   setDiceRollModalOpen: (open: boolean) => void;
@@ -27,7 +34,7 @@ export interface OperationsTabContentProps {
   openTargetPracticeGame: () => void;
   startMiniBountyDraft: (draftType: 'assault' | 'push' | 'recruit') => void;
   claimMiniBountyDraft: () => void;
-  openRiftChallenge: () => void;
+  openRiftChallenge: (useRaidTicket?: boolean) => void;
   upgradeFacility: (facility: string) => void;
   startExpedition: (type: string, rarity: string) => void;
   completeExpedition: (expeditionId: string) => void;
@@ -48,7 +55,14 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
   canStartBountyToday,
   canClaimMiniBounty,
   activeMiniBountyProgress,
-  canRunRiftToday,
+  riftDungeonLevel,
+  riftEntriesUsed,
+  riftEntriesRemaining,
+  riftEntryCap,
+  riftRaidTickets,
+  lastRiftBossDamagePct,
+  canRunRiftEntry,
+  canRaidRift,
   setDiceRollResult,
   setDiceIsRolling,
   setDiceRollModalOpen,
@@ -113,12 +127,12 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
       id: 'rift',
       title: 'Rift Breach',
       icon: '🕳️',
-      rewardFocus: 'Diamonds + shards burst run',
+      rewardFocus: '2-minute boss run: diamonds + shard burst',
       unlockText: 'Always available',
       unlocked: true,
-      actionable: canRunRiftToday,
-      status: canRunRiftToday ? 'Ready' : 'Cleared today',
-      onPress: openRiftChallenge,
+      actionable: canRunRiftEntry || canRaidRift,
+      status: canRunRiftEntry ? `Entry ready (${riftEntriesRemaining}/${riftEntryCap} left)` : 'No free entries left',
+      onPress: () => openRiftChallenge(false),
       ctaText: 'Run Rift',
     },
     {
@@ -321,19 +335,43 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
                   <Text style={styles.facilityBonusText}>{lane.rewardFocus}</Text>
                   <Text style={styles.facilityNextBonus}>{lane.unlockText}</Text>
                   <Text style={styles.facilityBonusText}>Status: {lane.status}</Text>
-                  {lane.id === 'rift' && state.lastRiftWavesCleared > 0 && (
-                    <Text style={styles.facilityNextBonus}>Last clear: {state.lastRiftWavesCleared}/5 waves</Text>
+                  {lane.id === 'rift' && (
+                    <>
+                      <Text style={styles.facilityNextBonus}>Dungeon Level: {riftDungeonLevel} (Boss Lv {riftDungeonLevel * 10})</Text>
+                      <Text style={styles.facilityNextBonus}>Free entries used today: {riftEntriesUsed}/{riftEntryCap}</Text>
+                      <Text style={styles.facilityNextBonus}>Raid Tickets: {riftRaidTickets}</Text>
+                      <Text style={styles.facilityNextBonus}>Last run damage: {Math.round(lastRiftBossDamagePct * 100)}%</Text>
+                    </>
                   )}
-                  <Pressable
-                    style={[
-                      styles.warPanelActionBtn,
-                      (!lane.actionable || !lane.unlocked) && styles.warPanelActionBtnDisabled,
-                    ]}
-                    disabled={!lane.actionable || !lane.unlocked}
-                    onPress={lane.onPress}
-                  >
-                    <Text style={styles.warPanelActionText}>{lane.ctaText}</Text>
-                  </Pressable>
+                  {lane.id === 'rift' ? (
+                    <View style={styles.warPanelActionRow}>
+                      <Pressable
+                        style={[styles.warPanelActionBtn, !canRunRiftEntry && styles.warPanelActionBtnDisabled]}
+                        disabled={!canRunRiftEntry}
+                        onPress={() => openRiftChallenge(false)}
+                      >
+                        <Text style={styles.warPanelActionText}>Run Entry</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[styles.warPanelActionBtn, !canRaidRift && styles.warPanelActionBtnDisabled]}
+                        disabled={!canRaidRift}
+                        onPress={() => openRiftChallenge(true)}
+                      >
+                        <Text style={styles.warPanelActionText}>Raid Prior Lvl</Text>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <Pressable
+                      style={[
+                        styles.warPanelActionBtn,
+                        (!lane.actionable || !lane.unlocked) && styles.warPanelActionBtnDisabled,
+                      ]}
+                      disabled={!lane.actionable || !lane.unlocked}
+                      onPress={lane.onPress}
+                    >
+                      <Text style={styles.warPanelActionText}>{lane.ctaText}</Text>
+                    </Pressable>
+                  )}
                 </View>
               ))}
             </View>
