@@ -204,6 +204,32 @@ export interface MailMessage {
   attachments: MailAttachments;
 }
 
+const WELCOME_GIFT_MAIL_ID = 'mail_welcome_gift_v1';
+const WELCOME_GIFT_ATTACHMENTS: MailAttachments = {
+  gold: 10_000_000,
+  shards: 50_000,
+  diamonds: 500,
+  essence: 500,
+  tears: 20,
+};
+
+function createWelcomeGiftMail(): MailMessage {
+  return {
+    id: `${WELCOME_GIFT_MAIL_ID}_${Date.now()}`,
+    subject: 'Welcome to SimplyIdle',
+    from: 'SimplyIdle Team',
+    sentAt: Date.now(),
+    message: 'Thank you for joining SimplyIdle. We are grateful to have you with us at launch, and we hope this Welcome Gift helps you begin your journey with momentum. Build your roster, push deeper waves, and we will continue improving the experience with every update.',
+    attachments: {
+      gold: WELCOME_GIFT_ATTACHMENTS.gold,
+      shards: WELCOME_GIFT_ATTACHMENTS.shards,
+      diamonds: WELCOME_GIFT_ATTACHMENTS.diamonds,
+      essence: WELCOME_GIFT_ATTACHMENTS.essence,
+      tears: WELCOME_GIFT_ATTACHMENTS.tears,
+    },
+  };
+}
+
 interface SummonHistoryEntry {
   id: string;
   heroName: string;
@@ -3150,6 +3176,7 @@ type Action =
 function reducer(state: GameState, action: Action): GameState {
   switch (action.type) {
     case 'CREATE_CHARACTER': {
+      if (state.characterCreated) return state;
       const name = action.name.trim().slice(0, 24);
       if (!name) return state;
       const starterItems = getStarterEquipmentForClass(action.playerClass)
@@ -3175,6 +3202,10 @@ function reducer(state: GameState, action: Action): GameState {
         inventoryItemIds: starterItems.map(item => item.id),
         equipmentInventory: Object.fromEntries(starterItems.map(item => [item.id, item])),
         equippedItems: starterEquip,
+        mailbox: [
+          createWelcomeGiftMail(),
+          ...state.mailbox.filter(mail => !mail.id.startsWith(WELCOME_GIFT_MAIL_ID)),
+        ].slice(0, 100),
       };
       const maxHp = getTeamMaxHp(newState);
       return { ...newState, teamHp: maxHp, teamMaxHp: maxHp };
