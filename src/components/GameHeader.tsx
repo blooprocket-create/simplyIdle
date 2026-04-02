@@ -7,6 +7,8 @@ interface GameHeaderProps {
   playerName: string;
   playerVipStatus: string;
   playerClass: string;
+  onlineSyncState: 'local-only' | 'syncing' | 'synced' | 'conflict' | 'error';
+  onlineSyncAt: number | null;
   gold: number;
   diamonds: number;
   bossTearsOrdered: number;
@@ -22,6 +24,8 @@ export default function GameHeader({
   playerName,
   playerVipStatus,
   playerClass,
+  onlineSyncState,
+  onlineSyncAt,
   gold,
   diamonds,
   bossTearsOrdered,
@@ -43,6 +47,20 @@ export default function GameHeader({
     return num.toString();
   };
 
+  const syncMeta = (() => {
+    if (onlineSyncState === 'synced') {
+      const ageSec = onlineSyncAt ? Math.max(0, Math.floor((Date.now() - onlineSyncAt) / 1000)) : 0;
+      return {
+        label: ageSec <= 10 ? 'Cloud Synced just now' : `Cloud Synced ${ageSec}s ago`,
+        color: '#7CE58D',
+      };
+    }
+    if (onlineSyncState === 'syncing') return { label: 'Cloud Syncing...', color: '#FFCC66' };
+    if (onlineSyncState === 'conflict') return { label: 'Cloud Conflict Resolved', color: '#FFB86B' };
+    if (onlineSyncState === 'error') return { label: 'Cloud Sync Error', color: '#FF7C7C' };
+    return { label: 'Local Save Only', color: '#A8B0C3' };
+  })();
+
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor={THEME.header.bg} />
@@ -58,6 +76,9 @@ export default function GameHeader({
           </Text>
         </View>
         <Text style={styles.playerClass}>{playerClass}</Text>
+        <Text style={[styles.syncStatus, { color: syncMeta.color }]} numberOfLines={1}>
+          {syncMeta.label}
+        </Text>
       </View>
 
       {/* Center: Core Resources */}
@@ -214,6 +235,11 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: THEME.text.tertiary,
     fontWeight: '600',
+    marginTop: 2,
+  },
+  syncStatus: {
+    fontSize: 8,
+    fontWeight: '700',
     marginTop: 2,
   },
 

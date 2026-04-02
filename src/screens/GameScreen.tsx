@@ -249,6 +249,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [slotListLoading, setSlotListLoading] = useState(true);
   const {
     hydrated,
+    onlineSyncState,
+    onlineSyncAt,
     state,
     stats,
     createCharacter,
@@ -2198,6 +2200,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         playerName={state.playerName}
         playerVipStatus={vipLevel >= 10 ? `VIP ${vipLevel} (MAX)` : `VIP ${vipLevel} (${fmt(vipPoints)}/${fmt(vipNextThreshold)})`}
         playerClass={`${stats.className} • Lv ${state.level}`}
+        onlineSyncState={onlineSyncState}
+        onlineSyncAt={onlineSyncAt}
         gold={state.gold}
         diamonds={state.diamonds}
         bossTearsOrdered={state.bossTears}

@@ -64,10 +64,12 @@ import {
 } from './gameConfig';
 import { buildingCost, bulkCost } from './utils';
 import { debugLog, trackEvent, trackGameplayAction } from './telemetry';
+import { isOnlineSaveAvailable, loadOnlineSave, writeOnlineSave } from './services/onlineSave';
 
 const SAVE_KEY = 'idlerpg_save_v3';
 const TICK_MS = 100;
 const SAVE_INTERVAL_MS = 5000;
+const ONLINE_SAVE_INTERVAL_MS = 12000;
 const STAT_POINTS_PER_LEVEL = 5;
 const OFFLINE_PROGRESS_CAP_MS = 8 * 60 * 60 * 1000;
 const PITY_THRESHOLD = 30;
@@ -5718,10 +5720,14 @@ export function useGameState(saveSlot: string = 'default') {
   const saveKey = getSaveStorageKey(saveSlot);
   const [state, rawDispatch] = useReducer(reducer, DEFAULT_STATE);
   const [hydrated, setHydrated] = useState(false);
+  const [onlineSyncState, setOnlineSyncState] = useState<'local-only' | 'syncing' | 'synced' | 'conflict' | 'error'>('local-only');
+  const [onlineSyncAt, setOnlineSyncAt] = useState<number | null>(null);
   const lastTickRef = useRef(Date.now());
   const lastSaveRef = useRef(Date.now());
   const stateRef = useRef(state);
   const claimFingerprintRef = useRef('');
+  const onlineRevisionRef = useRef<number | null>(null);
+  const lastOnlineSaveRef = useRef(0);
   const sessionStartedRef = useRef(false);
   const sessionStartedAtRef = useRef(0);
   const prevSummonsRef = useRef(0);
@@ -5761,6 +5767,55 @@ export function useGameState(saveSlot: string = 'default') {
     }
   }, [saveSlot]);
 
+  const persistSnapshot = useCallback(async (forceOnline = false) => {
+    const snapshot = serialize(stateRef.current);
+    await AsyncStorage.setItem(saveKey, JSON.stringify(snapshot));
+
+    if (!isOnlineSaveAvailable()) {
+      setOnlineSyncState('local-only');
+      return;
+    }
+
+    const now = Date.now();
+    if (!forceOnline && now - lastOnlineSaveRef.current < ONLINE_SAVE_INTERVAL_MS) return;
+
+    setOnlineSyncState('syncing');
+    const firstAttempt = await writeOnlineSave(saveSlot, snapshot as unknown as Record<string, unknown>, onlineRevisionRef.current);
+    if (firstAttempt.ok) {
+      onlineRevisionRef.current = firstAttempt.revision;
+      lastOnlineSaveRef.current = now;
+      setOnlineSyncState('synced');
+      setOnlineSyncAt(now);
+      return;
+    }
+
+    const remote = firstAttempt.remote;
+    if (!remote) {
+      setOnlineSyncState('error');
+      return;
+    }
+
+    const remoteUpdatedAt = Math.max(0, Math.floor(remote.updatedAt));
+    const localUpdatedAt = typeof snapshot.lastActiveAt === 'number' ? snapshot.lastActiveAt : now;
+    if (remoteUpdatedAt > localUpdatedAt) {
+      onlineRevisionRef.current = remote.revision;
+      setOnlineSyncState('conflict');
+      dispatch({ type: 'LOAD', payload: remote.payload as Partial<SaveData> });
+      return;
+    }
+
+    const retryAttempt = await writeOnlineSave(saveSlot, snapshot as unknown as Record<string, unknown>, remote.revision);
+    if (retryAttempt.ok) {
+      onlineRevisionRef.current = retryAttempt.revision;
+      lastOnlineSaveRef.current = now;
+      setOnlineSyncState('synced');
+      setOnlineSyncAt(now);
+    } else if (retryAttempt.remote) {
+      onlineRevisionRef.current = retryAttempt.remote.revision;
+      setOnlineSyncState('error');
+    }
+  }, [dispatch, saveKey, saveSlot]);
+
   useEffect(() => {
     setHydrated(false);
     debugLog('save', 'Loading save slot', { saveSlot, saveKey });
@@ -5770,35 +5825,91 @@ export function useGameState(saveSlot: string = 'default') {
     prevSummonsRef.current = 0;
     prevHighestWaveRef.current = 1;
     prevPrestigeRef.current = 0;
+    onlineRevisionRef.current = null;
+    lastOnlineSaveRef.current = 0;
+    setOnlineSyncState(isOnlineSaveAvailable() ? 'syncing' : 'local-only');
+    setOnlineSyncAt(null);
     claimFingerprintRef.current = '';
     lastTickRef.current = Date.now();
     lastSaveRef.current = Date.now();
 
-    AsyncStorage.getItem(saveKey)
-      .then(raw => {
-        if (!raw) {
-          debugLog('save', 'No existing save found; using defaults', { saveSlot });
-          return;
-        }
+    let cancelled = false;
+    void (async () => {
+      const onlineAvailable = isOnlineSaveAvailable();
+      const [localRaw, remote] = await Promise.all([
+        AsyncStorage.getItem(saveKey),
+        onlineAvailable
+          ? loadOnlineSave<Record<string, unknown>>(saveSlot)
+          : Promise.resolve(null),
+      ]);
+      if (cancelled) return;
+
+      let localData: SaveData | null = null;
+      if (localRaw) {
         try {
-          const data: SaveData = JSON.parse(raw);
-          debugLog('save', 'Save loaded successfully', {
-            saveSlot,
-            wave: data.wave,
-            level: data.level,
-            highestWave: data.highestWaveReached,
-          });
-          dispatch({ type: 'LOAD', payload: data });
-          const elapsed = Date.now() - (data.lastActiveAt ?? Date.now());
-          dispatch({ type: 'APPLY_OFFLINE_PROGRESS', elapsedMs: elapsed });
-          dispatch({ type: 'APPLY_DAILY_LOGIN', nowMs: Date.now() });
-          dispatch({ type: 'APPLY_WEEKLY_ROLLOVER', nowMs: Date.now() });
+          localData = JSON.parse(localRaw) as SaveData;
         } catch {
-          debugLog('save', 'Save payload was corrupted; falling back to defaults', { saveSlot });
-          // Ignore corrupted save and continue fresh.
+          debugLog('save', 'Local save payload was corrupted; ignoring local save', { saveSlot });
         }
-      })
-      .finally(() => setHydrated(true));
+      }
+
+      if (!localData && !remote) {
+        debugLog('save', 'No existing save found; using defaults', { saveSlot });
+        return;
+      }
+
+      const localUpdatedAt = localData?.lastActiveAt ?? 0;
+      const remoteUpdatedAt = remote?.updatedAt ?? 0;
+      const useRemote = !!remote && (!localData || remoteUpdatedAt >= localUpdatedAt);
+      const selectedPayload = (useRemote ? remote?.payload : localData) ?? {};
+
+      if (useRemote) {
+        onlineRevisionRef.current = remote?.revision ?? null;
+        setOnlineSyncState(onlineAvailable ? 'synced' : 'local-only');
+        setOnlineSyncAt(remote?.updatedAt ?? null);
+        debugLog('save', 'Loaded cloud save', {
+          saveSlot,
+          wave: (selectedPayload as Partial<SaveData>).wave,
+          level: (selectedPayload as Partial<SaveData>).level,
+          revision: remote?.revision ?? 0,
+        });
+      } else {
+        onlineRevisionRef.current = remote?.revision ?? null;
+        setOnlineSyncState(onlineAvailable ? 'synced' : 'local-only');
+        setOnlineSyncAt(localData?.lastActiveAt ?? null);
+        debugLog('save', 'Loaded local save', {
+          saveSlot,
+          wave: localData?.wave,
+          level: localData?.level,
+        });
+      }
+
+      dispatch({ type: 'LOAD', payload: selectedPayload as Partial<SaveData> });
+      const elapsed = Date.now() - ((selectedPayload as Partial<SaveData>).lastActiveAt ?? Date.now());
+      dispatch({ type: 'APPLY_OFFLINE_PROGRESS', elapsedMs: elapsed });
+      dispatch({ type: 'APPLY_DAILY_LOGIN', nowMs: Date.now() });
+      dispatch({ type: 'APPLY_WEEKLY_ROLLOVER', nowMs: Date.now() });
+
+      // Backfill cloud if local won reconciliation.
+      if (!useRemote && onlineAvailable && localData) {
+        const backfill = await writeOnlineSave(saveSlot, localData as unknown as Record<string, unknown>, remote?.revision ?? 0);
+        if (backfill.ok) {
+          onlineRevisionRef.current = backfill.revision;
+          lastOnlineSaveRef.current = Date.now();
+          setOnlineSyncState('synced');
+          setOnlineSyncAt(Date.now());
+        } else {
+          setOnlineSyncState('error');
+        }
+      }
+    })()
+      .finally(() => {
+        if (!cancelled) setHydrated(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [saveKey]);
 
   useEffect(() => {
@@ -5823,7 +5934,7 @@ export function useGameState(saveSlot: string = 'default') {
     if (fingerprint === claimFingerprintRef.current) return;
     claimFingerprintRef.current = fingerprint;
     lastSaveRef.current = Date.now();
-    void AsyncStorage.setItem(saveKey, JSON.stringify(serialize(stateRef.current)));
+    void persistSnapshot(true);
   }, [
     hydrated,
     state.characterCreated,
@@ -5833,7 +5944,7 @@ export function useGameState(saveSlot: string = 'default') {
     state.codexVipClaimedUniqueIds,
     state.vipRewardClaimedLevels,
     state.dollarFirstPurchaseClaimedOfferIds,
-    saveKey,
+    persistSnapshot,
   ]);
 
   useEffect(() => {
@@ -5845,11 +5956,11 @@ export function useGameState(saveSlot: string = 'default') {
 
       if (stateRef.current.characterCreated && now - lastSaveRef.current >= SAVE_INTERVAL_MS) {
         lastSaveRef.current = now;
-        AsyncStorage.setItem(saveKey, JSON.stringify(serialize(stateRef.current)));
+        void persistSnapshot();
       }
     }, TICK_MS);
     return () => clearInterval(id);
-  }, [saveKey]);
+  }, [persistSnapshot]);
 
   useEffect(() => {
     if (!state.characterCreated || sessionStartedRef.current) return;
@@ -6126,6 +6237,8 @@ export function useGameState(saveSlot: string = 'default') {
 
   return {
     hydrated,
+    onlineSyncState,
+    onlineSyncAt,
     state,
     stats,
     createCharacter,

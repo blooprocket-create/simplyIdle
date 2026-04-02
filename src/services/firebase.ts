@@ -1,8 +1,10 @@
 import { FirebaseApp, getApp, getApps, initializeApp } from 'firebase/app';
 import { Auth, getAuth } from 'firebase/auth';
+import { Firestore, getFirestore } from 'firebase/firestore';
 
 let cachedApp: FirebaseApp | null = null;
 let cachedAuth: Auth | null = null;
+let cachedDb: Firestore | null = null;
 
 // Firebase config provided for SimplyIdle. Expo public env vars still override these.
 const FALLBACK_FIREBASE_CONFIG = {
@@ -44,4 +46,12 @@ export function getFirebaseAuth(): Auth | null {
   if (!app) return null;
   cachedAuth = getAuth(app);
   return cachedAuth;
+}
+
+export function getFirebaseFirestore(): Firestore | null {
+  if (cachedDb) return cachedDb;
+  const app = getFirebaseApp();
+  if (!app) return null;
+  cachedDb = getFirestore(app);
+  return cachedDb;
 }
