@@ -72,6 +72,7 @@ import {
 import { styles } from './GameScreen.styles';
 import { isCurrentUserAdmin } from '../services/adminAccess';
 import { normalizeCharacterNameForCompare, releaseCharacterName, reserveCharacterName } from '../services/characterNameRegistry';
+import { fetchCurrentUserRank, fetchLeaderboardTop, isLiveLeaderboardAvailable, submitLeaderboardScore } from '../services/leaderboard';
 
 export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations';
 type HeroesSubTab = 'summon' | 'roster' | 'batch';
@@ -228,6 +229,14 @@ interface CharacterSlotSummary {
   occupied: boolean;
 }
 
+interface LiveLeaderboardRow {
+  rank: number;
+  name: string;
+  score: number;
+  badge: string;
+  isYou: boolean;
+}
+
 function getLastCharacterSlotKey(accountName: string): string {
   return `idlerpg_last_character_slot_v1_${accountName}`;
 }
@@ -355,6 +364,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [achievementsSubTab, setAchievementsSubTab] = useState<AchievementsSubTab>('overview');
   const [operationsSubTab, setOperationsSubTab] = useState<OperationsSubTab>('facilities');
   const [eventsOpen, setEventsOpen] = useState(false);
+  const [liveLeaderboardRows, setLiveLeaderboardRows] = useState<LiveLeaderboardRow[]>([]);
+  const [liveLeaderboardRank, setLiveLeaderboardRank] = useState<number | null>(null);
+  const [liveLeaderboardLoading, setLiveLeaderboardLoading] = useState(false);
+  const [liveLeaderboardError, setLiveLeaderboardError] = useState<string | null>(null);
   const [devCommandInput, setDevCommandInput] = useState('');
   const [devCommandOutput, setDevCommandOutput] = useState<string>('');
   const [chapterMapOpen, setChapterMapOpen] = useState(false);
@@ -1603,6 +1616,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   };
 
   const seasonScore = state.seasonPoints;
+  const playerBoardScore =
+    seasonScore
+    + Math.floor(state.bestSeasonPoints * 0.35)
+    + state.wave * 12
+    + state.highestWaveReached * 9
+    + state.prestigeCount * 280;
   const seasonRank = seasonScore < 1000 ? '🥉 Bronze' : seasonScore < 5000 ? '🥈 Silver' : seasonScore < 15000 ? '🥇 Gold' : seasonScore < 40000 ? '💎 Diamond' : '👑 Legend';
   const classMasteryLevel = Math.floor((state.playerClass ? state.classMasteryXp[state.playerClass] : 0) / 100);
   const campaignChapter = Math.floor((Math.max(1, state.wave) - 1) / 20) + 1;
@@ -1610,50 +1629,77 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const campaignBossStage = 20;
   const powerTier = teamPowerIndex < 12000 ? 'Recruit' : teamPowerIndex < 55000 ? 'Elite' : teamPowerIndex < 180000 ? 'Mythic' : 'Ascendant';
   const guildRank = state.totalKills < 500 ? 'Bronze Order' : state.totalKills < 2500 ? 'Silver Order' : state.totalKills < 9000 ? 'Gold Order' : 'Eternal Order';
-  const betaLeaderboardRows = useMemo(() => {
-    const playerBoardScore =
-      seasonScore
-      + Math.floor(state.bestSeasonPoints * 0.35)
-      + state.wave * 12
-      + state.highestWaveReached * 9
-      + state.prestigeCount * 280;
-
-    const seeded = [
-      { name: 'NovaMarshal', score: Math.floor(playerBoardScore * 1.22), badge: '👑', isYou: false },
-      { name: 'AsterVow', score: Math.floor(playerBoardScore * 1.14), badge: '💎', isYou: false },
-      { name: 'RiftKite', score: Math.floor(playerBoardScore * 1.07), badge: '🥇', isYou: false },
-      { name: 'NightRelay', score: Math.floor(playerBoardScore * 0.98), badge: '🥈', isYou: false },
-      { name: 'LumenForge', score: Math.floor(playerBoardScore * 0.9), badge: '🥉', isYou: false },
-      { name: 'ShardNomad', score: Math.floor(playerBoardScore * 0.83), badge: '⚔️', isYou: false },
-    ];
-
-    const allRows = [
-      ...seeded,
-      { name: state.playerName || 'You', score: playerBoardScore, badge: '🛰️', isYou: true },
-    ]
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 8)
-      .map((row, idx) => ({ ...row, rank: idx + 1 }));
-
-    const myRank = allRows.find(r => r.isYou)?.rank ?? allRows.length;
-    return {
-      rows: allRows,
-      myRank,
-      playerBoardScore,
-    };
-  }, [seasonScore, state.bestSeasonPoints, state.wave, state.highestWaveReached, state.prestigeCount, state.playerName]);
-
   useEffect(() => {
     if (!eventsOpen) return;
     void trackEvent('leaderboard_viewed', {
-      rank: betaLeaderboardRows.myRank,
-      score: betaLeaderboardRows.playerBoardScore,
+      rank: liveLeaderboardRank ?? 0,
+      score: playerBoardScore,
     });
     void trackEvent('leaderboard_rank', {
-      rank: betaLeaderboardRows.myRank,
-      score: betaLeaderboardRows.playerBoardScore,
+      rank: liveLeaderboardRank ?? 0,
+      score: playerBoardScore,
     });
-  }, [eventsOpen, betaLeaderboardRows.myRank, betaLeaderboardRows.playerBoardScore]);
+  }, [eventsOpen, liveLeaderboardRank, playerBoardScore]);
+
+  useEffect(() => {
+    if (!eventsOpen || !state.characterCreated) return;
+
+    let cancelled = false;
+    setLiveLeaderboardLoading(true);
+    setLiveLeaderboardError(null);
+
+    void (async () => {
+      try {
+        if (isLiveLeaderboardAvailable()) {
+          await submitLeaderboardScore({
+            accountName,
+            playerName: state.playerName || 'Commander',
+            score: playerBoardScore,
+            highestWaveReached: state.highestWaveReached,
+            prestigeCount: state.prestigeCount,
+          });
+
+          const [topRows, myRank] = await Promise.all([
+            fetchLeaderboardTop(15),
+            fetchCurrentUserRank(playerBoardScore),
+          ]);
+
+          if (cancelled) return;
+
+          const mapped = topRows.map((row, index) => ({
+            rank: index + 1,
+            name: row.playerName,
+            score: row.score,
+            badge: index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '⚔️',
+            isYou: row.accountName === accountName,
+          }));
+
+          setLiveLeaderboardRows(mapped);
+          setLiveLeaderboardRank(myRank);
+          return;
+        }
+
+        const fallbackRows: LiveLeaderboardRow[] = [
+          { rank: 1, name: state.playerName || 'You', score: playerBoardScore, badge: '🛰️', isYou: true },
+        ];
+        if (!cancelled) {
+          setLiveLeaderboardRows(fallbackRows);
+          setLiveLeaderboardRank(1);
+        }
+      } catch {
+        if (cancelled) return;
+        setLiveLeaderboardError('Leaderboard is currently unavailable.');
+      } finally {
+        if (!cancelled) {
+          setLiveLeaderboardLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [eventsOpen, state.characterCreated, accountName, state.playerName, playerBoardScore, state.highestWaveReached, state.prestigeCount]);
 
   // Manage expedition queue timer display (ticks every second to update countdown display)
   useEffect(() => {
@@ -3162,16 +3208,18 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               </View>
 
               <View style={styles.eventsCard}>
-                <Text style={styles.eventsCardTitle}>🌐 Beta Leaderboard</Text>
-                <Text style={styles.eventsSubtitle}>Multiplayer snapshot rank: #{betaLeaderboardRows.myRank} • Score {fmt(betaLeaderboardRows.playerBoardScore)}</Text>
-                {betaLeaderboardRows.rows.map(row => (
+                <Text style={styles.eventsCardTitle}>🌐 Global Leaderboard</Text>
+                <Text style={styles.eventsSubtitle}>Current rank: #{liveLeaderboardRank ?? '-'} • Score {fmt(playerBoardScore)}</Text>
+                {liveLeaderboardLoading && <Text style={styles.eventsHint}>Updating leaderboard...</Text>}
+                {!!liveLeaderboardError && <Text style={styles.eventsHint}>{liveLeaderboardError}</Text>}
+                {liveLeaderboardRows.map(row => (
                   <View key={`${row.name}_${row.rank}`} style={[styles.betaBoardRow, row.isYou && styles.betaBoardRowYou]}>
                     <Text style={styles.betaBoardRank}>#{row.rank}</Text>
                     <Text style={styles.betaBoardName}>{row.badge} {row.name}{row.isYou ? ' (You)' : ''}</Text>
                     <Text style={styles.betaBoardScore}>{fmt(row.score)}</Text>
                   </View>
                 ))}
-                <Text style={styles.eventsHint}>Beta note: global server board will replace this local snapshot in public beta.</Text>
+                <Text style={styles.eventsHint}>Live leaderboard is synced to Firebase while you are signed in.</Text>
               </View>
 
               {/* Formation Info */}
