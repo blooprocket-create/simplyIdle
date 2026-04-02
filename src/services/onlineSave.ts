@@ -19,7 +19,8 @@ interface SaveDocRecord {
   payload: Record<string, unknown>;
 }
 
-const NESTED_ARRAY_MARKER = '__simplyIdle_nested_array_v1__';
+const NESTED_ARRAY_MARKER = 'simplyIdleNestedArrayV1';
+const LEGACY_NESTED_ARRAY_MARKER = '__simplyIdle_nested_array_v1__';
 const OMIT_VALUE = Symbol('omit-firestore-value');
 
 type EncodedFirestoreValue =
@@ -139,10 +140,13 @@ function decodeFirestoreValue(value: unknown): unknown {
   const asRecord = value as Record<string, unknown>;
   if (
     Object.keys(asRecord).length === 1
-    && NESTED_ARRAY_MARKER in asRecord
-    && Array.isArray(asRecord[NESTED_ARRAY_MARKER])
+    && (
+      (NESTED_ARRAY_MARKER in asRecord && Array.isArray(asRecord[NESTED_ARRAY_MARKER]))
+      || (LEGACY_NESTED_ARRAY_MARKER in asRecord && Array.isArray(asRecord[LEGACY_NESTED_ARRAY_MARKER]))
+    )
   ) {
-    return (asRecord[NESTED_ARRAY_MARKER] as unknown[]).map(decodeFirestoreValue);
+    const encodedArray = (asRecord[NESTED_ARRAY_MARKER] ?? asRecord[LEGACY_NESTED_ARRAY_MARKER]) as unknown[];
+    return encodedArray.map(decodeFirestoreValue);
   }
 
   const decoded: Record<string, unknown> = {};
