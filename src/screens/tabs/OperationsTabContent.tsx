@@ -364,9 +364,9 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
                     <Pressable
                       style={[
                         styles.warPanelActionBtn,
-                        (!lane.actionable || !lane.unlocked) && styles.warPanelActionBtnDisabled,
+                        !lane.actionable && styles.warPanelActionBtnDisabled,
                       ]}
-                      disabled={!lane.actionable || !lane.unlocked}
+                      disabled={!lane.actionable}
                       onPress={lane.onPress}
                     >
                       <Text style={styles.warPanelActionText}>{lane.ctaText}</Text>
