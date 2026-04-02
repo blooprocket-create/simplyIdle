@@ -143,6 +143,7 @@ type SaveMailboxEntry = {
     gold: number;
     diamonds: number;
     tears: number;
+    essence: number;
   };
 };
 
@@ -308,6 +309,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     claimCodexHeroVip,
     claimCodexUniqueVip,
     markHintSeen,
+    appendMailboxMessages,
     claimMailAttachment,
     claimAllMailAttachments,
     clearAchievement,
@@ -651,7 +653,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   const rewardPopup = state.rewardQueue[0] ?? null;
   const unreadMailCount = state.mailbox.filter(mail =>
-    (mail.attachments.shards + mail.attachments.gold + mail.attachments.diamonds + mail.attachments.tears) > 0,
+    (mail.attachments.shards + mail.attachments.gold + mail.attachments.diamonds + mail.attachments.tears + mail.attachments.essence) > 0,
   ).length;
   const selectedMail = state.mailbox.find(mail => mail.id === selectedMailId) ?? null;
   const isOfflineRewardPopup = !!rewardPopup && `${rewardPopup.title} ${rewardPopup.detail}`.toLowerCase().includes('offline progress');
@@ -1829,7 +1831,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     if (command === '/sendmsg') {
       const parsed = rawCommand.match(/^\/sendMsg\s+(\S+)\s+#([^#]+)#\s+##([\s\S]*?)##\s*(.*)$/i);
       if (!parsed) {
-        setDevCommandOutput('Usage: /sendMsg (sendAll|User|User+CharName) #subject# ##message## $shard X, $gold X, $diamond X, $tears X');
+        setDevCommandOutput('Usage: /sendMsg (sendAll|User|User+CharName) #subject# ##message## $shard X, $gold X, $diamond X, $tears X, $essence X');
         return;
       }
 
@@ -1842,8 +1844,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         return;
       }
 
-      const attachments: SaveMailboxEntry['attachments'] = { shards: 0, gold: 0, diamonds: 0, tears: 0 };
-      const regex = /\$(shard|gold|diamond|tears)\s+(\d+)/gi;
+      const attachments: SaveMailboxEntry['attachments'] = { shards: 0, gold: 0, diamonds: 0, tears: 0, essence: 0 };
+      const regex = /\$(shard|gold|diamond|tears|essence)\s+(\d+)/gi;
       let match: RegExpExecArray | null = regex.exec(attachmentText);
       while (match) {
         const key = (match[1] ?? '').toLowerCase();
@@ -1853,6 +1855,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           if (key === 'gold') attachments.gold += amount;
           if (key === 'diamond') attachments.diamonds += amount;
           if (key === 'tears') attachments.tears += amount;
+          if (key === 'essence') attachments.essence += amount;
         }
         match = regex.exec(attachmentText);
       }
@@ -1869,49 +1872,67 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           gold: attachments.gold,
           diamonds: attachments.diamonds,
           tears: attachments.tears,
+          essence: attachments.essence,
         },
       });
 
-      const appendMailToSnapshot = async (snapshot: CharacterSnapshot): Promise<boolean> => {
+      const appendMailToSnapshot = async (snapshot: CharacterSnapshot): Promise<SaveMailboxEntry | null> => {
         const saveSlot = getCharacterSaveSlot(snapshot.account, snapshot.classId);
         const saveKey = getSaveStorageKey(saveSlot);
         const raw = await AsyncStorage.getItem(saveKey);
-        if (!raw) return false;
+        if (!raw) return null;
 
         try {
           const savePayload = JSON.parse(raw) as Record<string, unknown>;
           const mailbox = Array.isArray(savePayload.mailbox)
             ? savePayload.mailbox.filter(entry => !!entry && typeof entry === 'object') as SaveMailboxEntry[]
             : [];
-          mailbox.push(buildMail());
+          const outgoingMail = buildMail();
+          mailbox.push(outgoingMail);
           savePayload.mailbox = mailbox.slice(-100);
           await AsyncStorage.setItem(saveKey, JSON.stringify(savePayload));
-          return true;
+          return outgoingMail;
         } catch {
-          return false;
+          return null;
         }
       };
 
       const snapshots = await collectCharacterSnapshots();
-      if (snapshots.length === 0) {
+      const currentSnapshot = (state.characterCreated && selectedCharacterClass)
+        ? {
+          account: accountName,
+          classId: selectedCharacterClass,
+          playerName: state.playerName,
+          level: state.level,
+          highestWaveReached: state.highestWaveReached,
+          lastActiveAt: Date.now(),
+          isOnline: true,
+        } as CharacterSnapshot
+        : null;
+
+      const allSnapshots = currentSnapshot && !snapshots.some(snapshot => snapshot.account === currentSnapshot.account && snapshot.classId === currentSnapshot.classId)
+        ? [currentSnapshot, ...snapshots]
+        : snapshots;
+
+      if (allSnapshots.length === 0) {
         setDevCommandOutput('No character targets found.');
         return;
       }
 
       let targets: CharacterSnapshot[] = [];
       if (targetSpec.toLowerCase() === 'sendall') {
-        targets = snapshots;
+        targets = allSnapshots;
       } else if (targetSpec.includes('+')) {
         const [userRaw, charRaw] = targetSpec.split('+');
         const user = (userRaw ?? '').trim().toLowerCase();
         const char = (charRaw ?? '').trim().toLowerCase();
-        targets = snapshots.filter(snapshot =>
+        targets = allSnapshots.filter(snapshot =>
           snapshot.account === user
           && (snapshot.classId.toLowerCase() === char || snapshot.playerName.trim().toLowerCase() === char),
         );
       } else {
         const user = targetSpec.trim().toLowerCase();
-        targets = snapshots.filter(snapshot => snapshot.account === user);
+        targets = allSnapshots.filter(snapshot => snapshot.account === user);
       }
 
       if (targets.length === 0) {
@@ -1920,10 +1941,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       }
 
       let delivered = 0;
+      const localMails: SaveMailboxEntry[] = [];
       for (const target of targets) {
-        if (await appendMailToSnapshot(target)) {
+        const createdMail = await appendMailToSnapshot(target);
+        if (createdMail) {
           delivered += 1;
+          if (target.account === accountName && target.classId === selectedCharacterClass) {
+            localMails.push(createdMail);
+          }
         }
+      }
+
+      if (localMails.length > 0) {
+        appendMailboxMessages(localMails);
       }
 
       setDevCommandOutput(`Mail sent to ${delivered}/${targets.length} target character(s). Subject: ${subject}`);
@@ -1931,7 +1961,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     }
 
     setDevCommandOutput(`Unknown command: ${tokens[0]}. Supported: /sendMsg, /showOnlineusersAndCharacters`);
-  }, [collectCharacterSnapshots, devCommandInput, state.playerName]);
+  }, [accountName, appendMailboxMessages, collectCharacterSnapshots, devCommandInput, selectedCharacterClass, state.characterCreated, state.highestWaveReached, state.level, state.playerName]);
 
   if (slotListLoading) {
     return (
@@ -3242,7 +3272,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
               <View style={styles.settingsCard}>
                 <Text style={styles.settingsCardTitle}>Dev Mail Console</Text>
-                <Text style={styles.settingsLabel}>Commands: /sendMsg (sendAll|User|User+CharName) #subject# ##message## $shard X, $gold X, $diamond X, $tears X</Text>
+                <Text style={styles.settingsLabel}>Commands: /sendMsg (sendAll|User|User+CharName) #subject# ##message## $shard X, $gold X, $diamond X, $tears X, $essence X</Text>
                 <Text style={styles.settingsLabel}>Commands: /showOnlineusersAndCharacters</Text>
                 <View style={styles.devCommandRow}>
                   <TextInput
@@ -3455,7 +3485,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   .slice()
                   .sort((a, b) => b.sentAt - a.sentAt)
                   .map(mail => {
-                    const hasAttachments = (mail.attachments.shards + mail.attachments.gold + mail.attachments.diamonds + mail.attachments.tears) > 0;
+                    const hasAttachments = (mail.attachments.shards + mail.attachments.gold + mail.attachments.diamonds + mail.attachments.tears + mail.attachments.essence) > 0;
                     return (
                       <Pressable
                         key={mail.id}
@@ -3484,7 +3514,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       <Text style={styles.mailDetailMessage}>{selectedMail.message}</Text>
                     </ScrollView>
                     <View style={styles.mailAttachmentRow}>
-                      {(Object.keys(selectedMail.attachments) as Array<'shards' | 'gold' | 'diamonds' | 'tears'>).map(key => {
+                      {(Object.keys(selectedMail.attachments) as Array<'shards' | 'gold' | 'diamonds' | 'tears' | 'essence'>).map(key => {
                         const amount = selectedMail.attachments[key];
                         if (amount <= 0) return null;
                         const label = key === 'shards'
@@ -3493,7 +3523,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                             ? 'Gold'
                             : key === 'diamonds'
                               ? 'Diamonds'
-                              : 'Tears';
+                              : key === 'tears'
+                                ? 'Tears'
+                                : 'Essence';
                         return (
                           <Pressable
                             key={`${selectedMail.id}_${key}`}
