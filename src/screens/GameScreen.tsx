@@ -75,7 +75,8 @@ import { normalizeCharacterNameForCompare, releaseCharacterName, reserveCharacte
 import { fetchCurrentUserRank, fetchLeaderboardTop, isLiveLeaderboardAvailable, submitLeaderboardScore } from '../services/leaderboard';
 import { deleteOnlineSave } from '../services/onlineSave';
 import { getCachedPublicUsername, refreshCurrentUserPublicUsername } from '../services/publicProfile';
-import { getFirebaseAuth } from '../services/firebase';
+import { getFirebaseAuth, getFirebaseFirestore } from '../services/firebase';
+import { collectionGroup, getDocs, getDoc, doc as firestoreDoc } from 'firebase/firestore';
 
 export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations';
 type HeroesSubTab = 'summon' | 'roster' | 'batch';
@@ -1860,57 +1861,66 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   }
 
   const collectCharacterSnapshots = useCallback(async (): Promise<CharacterSnapshot[]> => {
-    const rawAccounts = await AsyncStorage.getItem(ACCOUNTS_KEY);
-    const rawSession = await AsyncStorage.getItem(SESSION_KEY);
-    const currentSession = (rawSession ?? '').trim().toLowerCase();
+    const db = getFirebaseFirestore();
+    if (!db) return [];
+
     const now = Date.now();
 
-    let accounts: string[] = [];
+    let allDocs: Awaited<ReturnType<typeof getDocs>>;
     try {
-      const parsed = JSON.parse(rawAccounts ?? '[]') as Array<{ username?: string }>;
-      accounts = parsed
-        .map(entry => (typeof entry.username === 'string' ? entry.username.trim().toLowerCase() : ''))
-        .filter(Boolean);
+      allDocs = await getDocs(collectionGroup(db, 'saveSlots'));
     } catch {
-      accounts = [];
+      return [];
     }
 
-    const snapshots: CharacterSnapshot[] = [];
-    for (const username of accounts) {
-      for (const cls of CLASSES) {
-        const saveSlot = getCharacterSaveSlot(username, cls.id);
-        const saveKey = getSaveStorageKey(saveSlot);
-        const raw = await AsyncStorage.getItem(saveKey);
-        if (!raw) continue;
+    // Collect unique UIDs so we can resolve public usernames
+    const uids = new Set<string>();
+    for (const docSnap of allDocs.docs) {
+      const uid = docSnap.ref.parent.parent?.id;
+      if (uid) uids.add(uid);
+    }
 
-        try {
-          const parsed = JSON.parse(raw) as Record<string, unknown>;
-          if (parsed.characterCreated !== true) continue;
-          const playerName = typeof parsed.playerName === 'string' ? parsed.playerName.trim().slice(0, 24) : '';
-          if (!playerName) continue;
-          const level = typeof parsed.level === 'number' && Number.isFinite(parsed.level)
-            ? Math.max(1, Math.floor(parsed.level))
-            : 1;
-          const highestWaveReached = typeof parsed.highestWaveReached === 'number' && Number.isFinite(parsed.highestWaveReached)
-            ? Math.max(1, Math.floor(parsed.highestWaveReached))
-            : 1;
-          const lastActiveAt = typeof parsed.lastActiveAt === 'number' && Number.isFinite(parsed.lastActiveAt)
-            ? Math.max(0, Math.floor(parsed.lastActiveAt))
-            : 0;
-          const isOnline = currentSession === username && (now - lastActiveAt) <= ONLINE_WINDOW_MS;
-          snapshots.push({
-            account: username,
-            classId: cls.id,
-            playerName,
-            level,
-            highestWaveReached,
-            lastActiveAt,
-            isOnline,
-          });
-        } catch {
-          // Ignore corrupted slot snapshot entries.
+    // Batch-read userProfiles for display names
+    const uidToUsername = new Map<string, string>();
+    await Promise.all(Array.from(uids).map(async uid => {
+      try {
+        const profileSnap = await getDoc(firestoreDoc(db, 'userProfiles', uid));
+        if (profileSnap.exists()) {
+          const u = profileSnap.data()?.publicUsername;
+          if (typeof u === 'string' && u) uidToUsername.set(uid, u);
         }
+      } catch {
+        // leave unmapped; will fall back to uid prefix
       }
+    }));
+
+    const snapshots: CharacterSnapshot[] = [];
+    for (const docSnap of allDocs.docs) {
+      const data = docSnap.data() as Record<string, unknown>;
+      const payload = (data.payload ?? {}) as Record<string, unknown>;
+      if (payload.characterCreated !== true) continue;
+
+      const playerName = typeof payload.playerName === 'string' ? payload.playerName.trim().slice(0, 24) : '';
+      if (!playerName) continue;
+
+      const classId = typeof payload.playerClass === 'string' ? payload.playerClass.trim() : '';
+      if (!classId || !CLASSES.some(c => c.id === classId)) continue;
+
+      const uid = docSnap.ref.parent.parent?.id ?? '';
+      const account = uidToUsername.get(uid) ?? uid.slice(0, 12);
+
+      const level = typeof payload.level === 'number' && Number.isFinite(payload.level)
+        ? Math.max(1, Math.floor(payload.level))
+        : 1;
+      const highestWaveReached = typeof payload.highestWaveReached === 'number' && Number.isFinite(payload.highestWaveReached)
+        ? Math.max(1, Math.floor(payload.highestWaveReached))
+        : 1;
+      const lastActiveAt = typeof payload.lastActiveAt === 'number' && Number.isFinite(payload.lastActiveAt)
+        ? Math.max(0, Math.floor(payload.lastActiveAt))
+        : (typeof data.updatedAt === 'number' ? (data.updatedAt as number) : 0);
+      const isOnline = (now - lastActiveAt) <= ONLINE_WINDOW_MS;
+
+      snapshots.push({ account, classId: classId as PlayerClass, playerName, level, highestWaveReached, lastActiveAt, isOnline });
     }
 
     return snapshots.sort((a, b) => {
