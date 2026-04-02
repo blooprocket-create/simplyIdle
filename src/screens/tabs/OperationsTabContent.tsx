@@ -26,6 +26,15 @@ export interface OperationsTabContentProps {
   lastRiftBossDamagePct: number;
   canRunRiftEntry: boolean;
   canRaidRift: boolean;
+  treasureDungeonLevel: number;
+  treasureEntriesUsed: number;
+  treasureEntriesRemaining: number;
+  treasuryEntryCap: number;
+  lastTreasureHaulPct: number;
+  lastTreasureWiped: boolean;
+  canRunTreasuryEntry: boolean;
+  canRaidTreasury: boolean;
+  openTreasuryRaid: (useRaidTicket?: boolean) => void;
   setDiceRollResult: (result: any) => void;
   setDiceIsRolling: (rolling: boolean) => void;
   setDiceRollModalOpen: (open: boolean) => void;
@@ -63,6 +72,15 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
   lastRiftBossDamagePct,
   canRunRiftEntry,
   canRaidRift,
+  treasureDungeonLevel,
+  treasureEntriesUsed,
+  treasureEntriesRemaining,
+  treasuryEntryCap,
+  lastTreasureHaulPct,
+  lastTreasureWiped,
+  canRunTreasuryEntry,
+  canRaidTreasury,
+  openTreasuryRaid,
   setDiceRollResult,
   setDiceIsRolling,
   setDiceRollModalOpen,
@@ -139,13 +157,17 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
       id: 'gold',
       title: 'Treasury Raid',
       icon: '💰',
-      rewardFocus: 'Gold-focused dungeon lane',
+      rewardFocus: '90s wave gauntlet: gold + equipment scrap',
       unlockText: 'Unlock at highest wave 80',
       unlocked: state.highestWaveReached >= 80,
-      actionable: false,
-      status: state.highestWaveReached >= 80 ? 'Coming soon' : `Locked (${state.highestWaveReached}/80)`,
-      onPress: undefined,
-      ctaText: 'Coming Soon',
+      actionable: state.highestWaveReached >= 80 && (canRunTreasuryEntry || canRaidTreasury),
+      status: !state.highestWaveReached || state.highestWaveReached < 80
+        ? `Locked (${state.highestWaveReached}/80)`
+        : canRunTreasuryEntry
+          ? `Entry ready (${treasureEntriesRemaining}/${treasuryEntryCap} left)`
+          : 'No free entries left',
+      onPress: () => openTreasuryRaid(false),
+      ctaText: 'Run Raid',
     },
     {
       id: 'exp',
@@ -343,19 +365,27 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
                       <Text style={styles.facilityNextBonus}>Last run damage: {Math.round(lastRiftBossDamagePct * 100)}%</Text>
                     </>
                   )}
-                  {lane.id === 'rift' ? (
+                  {lane.id === 'gold' && state.highestWaveReached >= 80 && (
+                    <>
+                      <Text style={styles.facilityNextBonus}>Vault Level: {treasureDungeonLevel} ({treasureDungeonLevel * 2 + 3} waves)</Text>
+                      <Text style={styles.facilityNextBonus}>Free entries used today: {treasureEntriesUsed}/{treasuryEntryCap}</Text>
+                      <Text style={styles.facilityNextBonus}>Raid Tickets: {riftRaidTickets}</Text>
+                      <Text style={styles.facilityNextBonus}>Last haul: {Math.round(lastTreasureHaulPct * 100)}%{lastTreasureWiped ? ' (wiped)' : ''}</Text>
+                    </>
+                  )}
+                  {lane.id === 'rift' || lane.id === 'gold' ? (
                     <View style={styles.warPanelActionRow}>
                       <Pressable
-                        style={[styles.warPanelActionBtn, !canRunRiftEntry && styles.warPanelActionBtnDisabled]}
-                        disabled={!canRunRiftEntry}
-                        onPress={() => openRiftChallenge(false)}
+                        style={[styles.warPanelActionBtn, !(lane.id === 'gold' ? canRunTreasuryEntry : canRunRiftEntry) && styles.warPanelActionBtnDisabled]}
+                        disabled={!(lane.id === 'gold' ? canRunTreasuryEntry : canRunRiftEntry)}
+                        onPress={() => lane.id === 'gold' ? openTreasuryRaid(false) : openRiftChallenge(false)}
                       >
                         <Text style={styles.warPanelActionText}>Run Entry</Text>
                       </Pressable>
                       <Pressable
-                        style={[styles.warPanelActionBtn, !canRaidRift && styles.warPanelActionBtnDisabled]}
-                        disabled={!canRaidRift}
-                        onPress={() => openRiftChallenge(true)}
+                        style={[styles.warPanelActionBtn, !(lane.id === 'gold' ? canRaidTreasury : canRaidRift) && styles.warPanelActionBtnDisabled]}
+                        disabled={!(lane.id === 'gold' ? canRaidTreasury : canRaidRift)}
+                        onPress={() => lane.id === 'gold' ? openTreasuryRaid(true) : openRiftChallenge(true)}
                       >
                         <Text style={styles.warPanelActionText}>Raid Prior Lvl</Text>
                       </Pressable>

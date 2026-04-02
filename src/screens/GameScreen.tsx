@@ -243,6 +243,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     startMiniBountyDraft,
     claimMiniBountyDraft,
     runRiftDungeon,
+    runTreasuryRaid,
     allocateStat,
     allocateStatMax,
     allocateStatN,
@@ -642,6 +643,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const riftEntriesRemaining = Math.max(0, riftEntryCap - riftEntriesUsed);
   const canRunRiftEntry = riftEntriesRemaining > 0;
   const canRaidRift = state.riftRaidTickets > 0 && state.riftDungeonLevel > 1;
+  const treasuryEntryCap = state.vipLevel >= 4 ? 5 : state.vipLevel >= 2 ? 4 : 3;
+  const treasuryEntriesUsed = state.treasureEntryDay === currentDay ? state.treasureEntriesUsedToday : 0;
+  const treasuryEntriesRemaining = Math.max(0, treasuryEntryCap - treasuryEntriesUsed);
+  const canRunTreasuryEntry = state.highestWaveReached >= 80 && treasuryEntriesRemaining > 0;
+  const canRaidTreasury = state.highestWaveReached >= 80 && state.riftRaidTickets > 0 && state.treasureDungeonLevel > 1;
   const rebirthWavesLeft = Math.max(0, rebirthWaveRequirement - state.highestWaveReached);
   const expeditionClaimableCount = state.expeditionQueue.filter(exp => (Date.now() - exp.startTime) >= exp.durationMs).length;
   const expeditionActiveTypes = new Set(state.expeditionQueue.map(exp => exp.type));
@@ -664,7 +670,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     + (canPlayLockpickToday ? 1 : 0)
     + (canPlayTargetToday ? 1 : 0)
     + (canStartBountyToday || canClaimMiniBounty ? 1 : 0);
-  const dungeonOpsNotificationCount = (canRunRiftEntry ? 1 : 0) + (canRaidRift ? 1 : 0);
+  const dungeonOpsNotificationCount = (canRunRiftEntry ? 1 : 0) + (canRaidRift ? 1 : 0) + (canRunTreasuryEntry ? 1 : 0) + (canRaidTreasury ? 1 : 0);
   const operationsNotificationCount = expeditionClaimableCount + expeditionLaunchableAffordableCount + facilitiesUpgradeableCount + miniOpsNotificationCount + dungeonOpsNotificationCount;
   const guidanceList = useMemo(() => {
     const recs: Array<{ title: string; detail: string; tab: Tab }> = [];
@@ -1117,6 +1123,16 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     runRiftDungeon(useRaidTicket);
   };
 
+  const openTreasuryRaid = (useRaidTicket = false) => {
+    debugLog('gameplay', useRaidTicket ? 'Run Treasury Raid Ticket' : 'Run Treasury Entry', {
+      wave: state.wave,
+      highestWave: state.highestWaveReached,
+      treasureDungeonLevel: state.treasureDungeonLevel,
+      useRaidTicket,
+    });
+    runTreasuryRaid(useRaidTicket);
+  };
+
   const resetReconGame = () => {
     setReconGameOpen(false);
     setReconChoices([]);
@@ -1161,7 +1177,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     if (otherIndices[1] !== undefined) {
       setTimeout(() => setReconCardsRevealed(prev => { const n = [...prev]; n[otherIndices[1]] = true; return n; }), 710);
     }
-
     const sequences: Animated.CompositeAnimation[] = [
       Animated.timing(reconFlipAnims[pickIndex], {
         toValue: 1,
@@ -2367,6 +2382,15 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             lastRiftBossDamagePct: state.lastRiftBossDamagePct,
             canRunRiftEntry,
             canRaidRift,
+            treasureDungeonLevel: state.treasureDungeonLevel,
+            treasureEntriesUsed: treasuryEntriesUsed,
+            treasureEntriesRemaining: treasuryEntriesRemaining,
+            treasuryEntryCap,
+            lastTreasureHaulPct: state.lastTreasureHaulPct,
+            lastTreasureWiped: state.lastTreasureWiped,
+            canRunTreasuryEntry,
+            canRaidTreasury,
+            openTreasuryRaid,
             setDiceRollResult,
             setDiceIsRolling,
             setDiceRollModalOpen,

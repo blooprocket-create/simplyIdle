@@ -324,6 +324,11 @@ export interface GameState {
   lastRiftBossDamagePct: number;
   lastDiceRollValue: number | null;
   lastRiftWavesCleared: number;
+  treasureDungeonLevel: number;
+  treasureEntriesUsedToday: number;
+  treasureEntryDay: number | null;
+  lastTreasureHaulPct: number;
+  lastTreasureWiped: boolean;
   lastReconSweepDay: number | null;
   lastLockpickDay: number | null;
   lastTargetPracticeDay: number | null;
@@ -496,6 +501,11 @@ const DEFAULT_STATE: GameState = {
   lastRiftBossDamagePct: 0,
   lastDiceRollValue: null,
   lastRiftWavesCleared: 0,
+  treasureDungeonLevel: 1,
+  treasureEntriesUsedToday: 0,
+  treasureEntryDay: null,
+  lastTreasureHaulPct: 0,
+  lastTreasureWiped: false,
   lastReconSweepDay: null,
   lastLockpickDay: null,
   lastTargetPracticeDay: null,
@@ -2285,6 +2295,11 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     lastRiftBossDamagePct: clampFloat(payload.lastRiftBossDamagePct, 0, 1, 0),
     lastDiceRollValue: payload.lastDiceRollValue == null ? null : clampInt(payload.lastDiceRollValue, 1, 20, 1),
     lastRiftWavesCleared: clampInt(payload.lastRiftWavesCleared, 0, 5, 0),
+    treasureDungeonLevel: clampInt(payload.treasureDungeonLevel, 1, MAX_SAVE_PLAYER_LEVEL, 1),
+    treasureEntriesUsedToday: clampInt(payload.treasureEntriesUsedToday, 0, 10, 0),
+    treasureEntryDay: payload.treasureEntryDay == null ? null : clampInt(payload.treasureEntryDay, 0, currentDay, currentDay),
+    lastTreasureHaulPct: clampFloat(payload.lastTreasureHaulPct, 0, 1, 0),
+    lastTreasureWiped: clampBoolean(payload.lastTreasureWiped, false),
     lastReconSweepDay: sanitizeMiniOpsCooldownTimestamp(payload.lastReconSweepDay, now),
     lastLockpickDay: sanitizeMiniOpsCooldownTimestamp(payload.lastLockpickDay, now),
     lastTargetPracticeDay: sanitizeMiniOpsCooldownTimestamp(payload.lastTargetPracticeDay, now),
@@ -2568,6 +2583,12 @@ function toDayNumber(ts: number): number {
 }
 
 function getRiftDailyEntryCap(state: Pick<GameState, 'vipLevel'>): number {
+  if (state.vipLevel >= 4) return 5;
+  if (state.vipLevel >= 2) return 4;
+  return 3;
+}
+
+function getTreasuryDailyEntryCap(state: Pick<GameState, 'vipLevel'>): number {
   if (state.vipLevel >= 4) return 5;
   if (state.vipLevel >= 2) return 4;
   return 3;
@@ -2919,6 +2940,7 @@ type Action =
   | { type: 'START_MINI_BOUNTY_DRAFT'; draftType: MiniBountyDraftType }
   | { type: 'CLAIM_MINI_BOUNTY_DRAFT' }
   | { type: 'RUN_RIFT_DUNGEON'; useRaidTicket?: boolean }
+  | { type: 'RUN_TREASURY_RAID'; useRaidTicket?: boolean }
   | { type: 'RECYCLE_HERO'; uid: string }
   | { type: 'AUTO_RECYCLE_HEROES' }
   | { type: 'SET_AUTO_RECYCLE_MAX_RARITY'; rarity: Rarity }
@@ -4387,6 +4409,81 @@ function reducer(state: GameState, action: Action): GameState {
       });
     }
 
+    case 'RUN_TREASURY_RAID': {
+      const today = toDayNumber(Date.now());
+      const useRaidTicket = !!action.useRaidTicket;
+      const activeLevel = Math.max(1, state.treasureDungeonLevel);
+      const targetLevel = useRaidTicket ? Math.max(1, activeLevel - 1) : activeLevel;
+      const entryCap = getTreasuryDailyEntryCap(state);
+      const entriesUsed = state.treasureEntryDay === today ? state.treasureEntriesUsedToday : 0;
+
+      if (useRaidTicket) {
+        if (state.riftRaidTickets <= 0) return state;
+        if (activeLevel <= 1) return state;
+
+        const raidGold = Math.max(500, Math.floor(800 + targetLevel * 600));
+        const raidScrap = Math.max(2, Math.floor(3 + targetLevel * 1.5));
+
+        return queueReward({
+          ...state,
+          gold: state.gold + raidGold,
+          totalGold: state.totalGold + raidGold,
+          equipmentScrap: state.equipmentScrap + raidScrap,
+          riftRaidTickets: state.riftRaidTickets - 1,
+          lastTreasureHaulPct: 1,
+          lastTreasureWiped: false,
+        }, {
+          id: `treasury_raid_${Date.now()}`,
+          kind: 'system',
+          title: 'Treasury Raid Complete',
+          detail: `Raided Vault L${targetLevel} (+${raidGold.toLocaleString()} gold, +${raidScrap} scrap). Free entries not consumed.`,
+        });
+      }
+
+      if (entriesUsed >= entryCap) return state;
+
+      // Wave gauntlet simulation: 90 seconds of DPS vs vault guards
+      const waveCount = targetLevel * 2 + 3;
+      const waveHp = Math.max(1, Math.floor(getMonsterMaxHp(targetLevel * 8) * (2 + targetLevel * 0.2)));
+      const tdps = Math.max(1, getDps(state));
+      const tVariance = 0.88 + Math.random() * 0.24;
+      const totalDamage = tdps * 90 * tVariance;
+      const wavesCleared = Math.min(waveCount, Math.floor(totalDamage / waveHp));
+      const cleared = wavesCleared >= waveCount;
+      const haulPct = wavesCleared / waveCount;
+
+      // Partial clear: wipe chance scales with how little was cleared
+      const wipeChance = cleared ? 0 : Math.max(0, 1 - haulPct * 1.5);
+      const wiped = !cleared && Math.random() < wipeChance;
+      const rewardScale = cleared ? 1 : wiped ? haulPct * 0.5 : haulPct;
+
+      const fullGold = Math.max(500, Math.floor(800 + targetLevel * 600));
+      const fullScrap = Math.max(2, Math.floor(3 + targetLevel * 1.5));
+      const goldReward = Math.max(0, Math.floor(fullGold * rewardScale));
+      const scrapReward = Math.max(0, Math.floor(fullScrap * rewardScale));
+
+      const nextLevel = cleared ? targetLevel + 1 : targetLevel;
+      const nextEntriesUsed = entriesUsed + 1;
+      const wipeNote = wiped ? ' (wiped — 50% haul penalty)' : '';
+
+      return queueReward({
+        ...state,
+        gold: state.gold + goldReward,
+        totalGold: state.totalGold + goldReward,
+        equipmentScrap: state.equipmentScrap + scrapReward,
+        treasureDungeonLevel: nextLevel,
+        treasureEntryDay: today,
+        treasureEntriesUsedToday: nextEntriesUsed,
+        lastTreasureHaulPct: haulPct,
+        lastTreasureWiped: wiped,
+      }, {
+        id: `treasury_entry_${Date.now()}`,
+        kind: 'system',
+        title: cleared ? 'Treasury Raid Cleared' : wiped ? 'Treasury Raid — Wiped!' : 'Treasury Raid — Partial Haul',
+        detail: `Vault L${targetLevel} • ${wavesCleared}/${waveCount} waves • +${goldReward.toLocaleString()} gold, +${scrapReward} scrap${wipeNote}${cleared ? ` • Vault advanced to L${nextLevel}` : ''}`,
+      });
+    }
+
     case 'BATCH_LEVEL_HEROES': {
       const selected = new Set(action.heroIds);
       if (selected.size === 0) return state;
@@ -5073,6 +5170,11 @@ function reducer(state: GameState, action: Action): GameState {
         lastRiftBossDamagePct: p.lastRiftBossDamagePct ?? 0,
         lastDiceRollValue: p.lastDiceRollValue,
         lastRiftWavesCleared: p.lastRiftWavesCleared,
+        treasureDungeonLevel: p.treasureDungeonLevel ?? 1,
+        treasureEntriesUsedToday: p.treasureEntriesUsedToday ?? 0,
+        treasureEntryDay: p.treasureEntryDay ?? null,
+        lastTreasureHaulPct: p.lastTreasureHaulPct ?? 0,
+        lastTreasureWiped: p.lastTreasureWiped ?? false,
         lastReconSweepDay: p.lastReconSweepDay,
         lastLockpickDay: p.lastLockpickDay,
         lastTargetPracticeDay: p.lastTargetPracticeDay,
@@ -5206,6 +5308,11 @@ interface SaveData {
   lastRiftBossDamagePct?: number;
   lastDiceRollValue?: number | null;
   lastRiftWavesCleared?: number;
+  treasureDungeonLevel?: number;
+  treasureEntriesUsedToday?: number;
+  treasureEntryDay?: number | null;
+  lastTreasureHaulPct?: number;
+  lastTreasureWiped?: boolean;
   lastReconSweepDay?: number | null;
   lastLockpickDay?: number | null;
   lastTargetPracticeDay?: number | null;
@@ -5332,6 +5439,11 @@ function serialize(state: GameState): SaveData {
     lastRiftBossDamagePct: state.lastRiftBossDamagePct,
     lastDiceRollValue: state.lastDiceRollValue,
     lastRiftWavesCleared: state.lastRiftWavesCleared,
+    treasureDungeonLevel: state.treasureDungeonLevel,
+    treasureEntriesUsedToday: state.treasureEntriesUsedToday,
+    treasureEntryDay: state.treasureEntryDay,
+    lastTreasureHaulPct: state.lastTreasureHaulPct,
+    lastTreasureWiped: state.lastTreasureWiped,
     lastReconSweepDay: state.lastReconSweepDay,
     lastLockpickDay: state.lastLockpickDay,
     lastTargetPracticeDay: state.lastTargetPracticeDay,
@@ -5633,6 +5745,9 @@ export function useGameState(saveSlot: string = 'default') {
   const runRiftDungeon = useCallback((useRaidTicket = false) => {
     dispatch({ type: 'RUN_RIFT_DUNGEON', useRaidTicket });
   }, []);
+  const runTreasuryRaid = useCallback((useRaidTicket = false) => {
+    dispatch({ type: 'RUN_TREASURY_RAID', useRaidTicket });
+  }, []);
   const recycleHero = useCallback((uid: string) => dispatch({ type: 'RECYCLE_HERO', uid }), []);
   const autoRecycleHeroes = useCallback(() => dispatch({ type: 'AUTO_RECYCLE_HEROES' }), []);
   const setAutoRecycleMaxRarity = useCallback((rarity: Rarity) => {
@@ -5821,6 +5936,7 @@ export function useGameState(saveSlot: string = 'default') {
     startMiniBountyDraft,
     claimMiniBountyDraft,
     runRiftDungeon,
+    runTreasuryRaid,
     batchLevelHeroes,
     upgradeFacility,
     startExpedition,
