@@ -7,7 +7,6 @@ import {
   Pressable,
   StyleSheet,
   StatusBar,
-  Alert,
   KeyboardAvoidingView,
   ScrollView,
   Platform,
@@ -53,7 +52,6 @@ interface AccountRecord {
 
 const ACCOUNTS_KEY = 'idlerpg_accounts_v1';
 const SESSION_KEY = 'idlerpg_current_account_v1';
-const STORAGE_PREFIXES_TO_CLEAR = ['idlerpg_', 'simplyidle_'];
 const HASH_ROUNDS = 12000;
 const USERNAME_MIN_LENGTH = 3;
 const USERNAME_MAX_LENGTH = 24;
@@ -367,42 +365,6 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     }
   }
 
-  function requestWipeAllData() {
-    if (busy) return;
-    Alert.alert(
-      'Delete Local Data?',
-      'This erases local accounts, sessions, cached saves, and telemetry on this device. It does not delete Firebase accounts.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete Everything',
-          style: 'destructive',
-          onPress: async () => {
-            setBusy(true);
-            setError(null);
-            try {
-              const keys = await AsyncStorage.getAllKeys();
-              const scopedKeys = keys.filter(key => STORAGE_PREFIXES_TO_CLEAR.some(prefix => key.startsWith(prefix)));
-              if (scopedKeys.length > 0) {
-                await AsyncStorage.multiRemove(scopedKeys);
-              }
-              setKnownUsernames([]);
-              setIdentifier('');
-              setPassword('');
-              setConfirmPassword('');
-              setMode('login');
-              setError(`Local data wiped. Removed ${scopedKeys.length} storage keys.`);
-            } catch {
-              setError('Failed to wipe local data. Please try again.');
-            } finally {
-              setBusy(false);
-            }
-          },
-        },
-      ],
-    );
-  }
-
   const identityLabel = onlineAuthEnabled ? 'Email' : 'Username';
   const identityPlaceholder = onlineAuthEnabled ? 'commander@domain.com' : 'your_username';
   const submitLabel = busy ? 'Please wait...' : mode === 'login' ? 'Log In' : 'Create Account';
@@ -550,10 +512,6 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               onPress={handleSubmit}
             >
               {busy ? <ActivityIndicator color="#08131E" /> : <Text style={styles.submitBtnText}>{submitLabel}</Text>}
-            </Pressable>
-
-            <Pressable style={[styles.wipeBtn, busy && styles.buttonDisabled]} disabled={busy} onPress={requestWipeAllData}>
-              <Text style={styles.wipeBtnText}>Delete Local Cache</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -779,21 +737,6 @@ const styles = StyleSheet.create({
     color: '#08131E',
     fontSize: 15,
     fontWeight: '900',
-  },
-  wipeBtn: {
-    minHeight: 46,
-    borderRadius: 14,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#60323B',
-    backgroundColor: '#231218',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  wipeBtnText: {
-    color: '#FFBAC2',
-    fontSize: 12,
-    fontWeight: '800',
   },
   buttonDisabled: {
     opacity: 0.55,
