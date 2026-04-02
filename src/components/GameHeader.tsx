@@ -14,7 +14,8 @@ interface GameHeaderProps {
   essence: number;
   dps: number;
   power: number;
-  onActionPress: (action: 'stats' | 'shop' | 'settings' | 'events') => void;
+  mailUnreadCount: number;
+  onActionPress: (action: 'stats' | 'shop' | 'settings' | 'events' | 'mail') => void;
 }
 
 export default function GameHeader({
@@ -28,6 +29,7 @@ export default function GameHeader({
   essence,
   dps,
   power,
+  mailUnreadCount,
   onActionPress,
 }: GameHeaderProps) {
   const [showStatTip, setShowStatTip] = useState(false);
@@ -116,6 +118,31 @@ export default function GameHeader({
       {/* Right: Key Stats + Actions */}
       <View style={styles.right}>
         <Pressable
+          style={styles.actionButton}
+          onPress={() => {
+            debugLog('header', 'Settings action pressed');
+            onActionPress('settings');
+          }}
+        >
+          <Text style={styles.actionIcon}>⚙️</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.actionButton}
+          onPress={() => {
+            debugLog('header', 'Mail action pressed');
+            onActionPress('mail');
+          }}
+        >
+          <Text style={styles.actionIcon}>✉️</Text>
+          {mailUnreadCount > 0 && (
+            <View style={styles.actionBadge}>
+              <Text style={styles.actionBadgeText}>{mailUnreadCount > 99 ? '99+' : `${mailUnreadCount}`}</Text>
+            </View>
+          )}
+        </Pressable>
+
+        <Pressable
           style={styles.statButton}
           onPress={() => {
             debugLog('header', 'Stat tooltip toggled', { nextOpen: !showStatTip });
@@ -126,16 +153,6 @@ export default function GameHeader({
             <Text style={styles.statLabel}>DPS</Text>
             <Text style={styles.statValueDps}>{formatNumber(dps)}</Text>
           </View>
-        </Pressable>
-
-        <Pressable
-          style={styles.actionButton}
-          onPress={() => {
-            debugLog('header', 'Settings action pressed');
-            onActionPress('settings');
-          }}
-        >
-          <Text style={styles.actionIcon}>⚙️</Text>
         </Pressable>
       </View>
 
@@ -278,6 +295,23 @@ const styles = StyleSheet.create({
   },
   actionIcon: {
     fontSize: 14,
+  },
+  actionBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#B3261E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  actionBadgeText: {
+    fontSize: 7,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 
   statTooltip: {

@@ -132,6 +132,20 @@ type CharacterSnapshot = {
   isOnline: boolean;
 };
 
+type SaveMailboxEntry = {
+  id: string;
+  subject: string;
+  message: string;
+  from: string;
+  sentAt: number;
+  attachments: {
+    shards: number;
+    gold: number;
+    diamonds: number;
+    tears: number;
+  };
+};
+
 function scoreEquipmentForClass(item: { rarity: string; bonus: Record<string, number | undefined | null> }, playerClass: PlayerClass | null): number {
   const cls = getClassConfig(playerClass ?? 'warrior');
   const statWeights = {
@@ -294,6 +308,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     claimCodexHeroVip,
     claimCodexUniqueVip,
     markHintSeen,
+    claimMailAttachment,
+    claimAllMailAttachments,
     clearAchievement,
     clearRewardPopup,
     rebirth,
@@ -320,6 +336,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [recycleConfirmUid, setRecycleConfirmUid] = useState<string | null>(null);
   const [smartCoolantConfirmOpen, setSmartCoolantConfirmOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mailOpen, setMailOpen] = useState(false);
+  const [selectedMailId, setSelectedMailId] = useState<string | null>(null);
   const [shopOpen, setShopOpen] = useState(false);
   const [shopTab, setShopTab] = useState<ShopTab>('diamond');
   const [heroesSubTab, setHeroesSubTab] = useState<HeroesSubTab>('summon');
@@ -632,6 +650,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const activeHint = hintCandidates[0] ?? null;
 
   const rewardPopup = state.rewardQueue[0] ?? null;
+  const unreadMailCount = state.mailbox.filter(mail =>
+    (mail.attachments.shards + mail.attachments.gold + mail.attachments.diamonds + mail.attachments.tears) > 0,
+  ).length;
+  const selectedMail = state.mailbox.find(mail => mail.id === selectedMailId) ?? null;
   const isOfflineRewardPopup = !!rewardPopup && `${rewardPopup.title} ${rewardPopup.detail}`.toLowerCase().includes('offline progress');
   const rebirthWaveRequirement = getRebirthWaveRequirement(state.prestigeCount);
   const canRebirthNow = state.highestWaveReached >= rebirthWaveRequirement;
@@ -1804,85 +1826,112 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       return;
     }
 
-    if (command === '/sendshard') {
-      if (tokens.length < 4) {
-        setDevCommandOutput('Usage: /sendShard <amount> <username> <charactername>');
+    if (command === '/sendmsg') {
+      const parsed = rawCommand.match(/^\/sendMsg\s+(\S+)\s+#([^#]+)#\s+##([\s\S]*?)##\s*(.*)$/i);
+      if (!parsed) {
+        setDevCommandOutput('Usage: /sendMsg (sendAll|User|User+CharName) #subject# ##message## $shard X, $gold X, $diamond X, $tears X');
         return;
       }
 
-      const amount = Math.max(0, Math.floor(Number(tokens[1])));
-      if (!Number.isFinite(amount) || amount <= 0) {
-        setDevCommandOutput('Amount must be a positive integer.');
+      const targetSpec = (parsed[1] ?? '').trim();
+      const subject = (parsed[2] ?? '').trim();
+      const message = (parsed[3] ?? '').trim();
+      const attachmentText = (parsed[4] ?? '').trim();
+      if (!subject || !message) {
+        setDevCommandOutput('Subject and message are required.');
         return;
       }
 
-      const username = (tokens[2] ?? '').trim().toLowerCase();
-      const characterArg = tokens.slice(3).join(' ').trim().toLowerCase();
-      if (!username || !characterArg) {
-        setDevCommandOutput('Usage: /sendShard <amount> <username> <charactername>');
-        return;
+      const attachments: SaveMailboxEntry['attachments'] = { shards: 0, gold: 0, diamonds: 0, tears: 0 };
+      const regex = /\$(shard|gold|diamond|tears)\s+(\d+)/gi;
+      let match: RegExpExecArray | null = regex.exec(attachmentText);
+      while (match) {
+        const key = (match[1] ?? '').toLowerCase();
+        const amount = Math.max(0, Math.floor(Number(match[2])));
+        if (Number.isFinite(amount) && amount > 0) {
+          if (key === 'shard') attachments.shards += amount;
+          if (key === 'gold') attachments.gold += amount;
+          if (key === 'diamond') attachments.diamonds += amount;
+          if (key === 'tears') attachments.tears += amount;
+        }
+        match = regex.exec(attachmentText);
       }
+
+      const senderName = state.playerName || 'Dev Team';
+      const buildMail = (): SaveMailboxEntry => ({
+        id: `mail_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        subject: subject.slice(0, 80),
+        message: message.slice(0, 280),
+        from: senderName,
+        sentAt: Date.now(),
+        attachments: {
+          shards: attachments.shards,
+          gold: attachments.gold,
+          diamonds: attachments.diamonds,
+          tears: attachments.tears,
+        },
+      });
+
+      const appendMailToSnapshot = async (snapshot: CharacterSnapshot): Promise<boolean> => {
+        const saveSlot = getCharacterSaveSlot(snapshot.account, snapshot.classId);
+        const saveKey = getSaveStorageKey(saveSlot);
+        const raw = await AsyncStorage.getItem(saveKey);
+        if (!raw) return false;
+
+        try {
+          const savePayload = JSON.parse(raw) as Record<string, unknown>;
+          const mailbox = Array.isArray(savePayload.mailbox)
+            ? savePayload.mailbox.filter(entry => !!entry && typeof entry === 'object') as SaveMailboxEntry[]
+            : [];
+          mailbox.push(buildMail());
+          savePayload.mailbox = mailbox.slice(-100);
+          await AsyncStorage.setItem(saveKey, JSON.stringify(savePayload));
+          return true;
+        } catch {
+          return false;
+        }
+      };
 
       const snapshots = await collectCharacterSnapshots();
-      const accountCharacters = snapshots.filter(snapshot => snapshot.account === username);
-      if (accountCharacters.length === 0) {
-        setDevCommandOutput(`No characters found for account "${username}".`);
+      if (snapshots.length === 0) {
+        setDevCommandOutput('No character targets found.');
         return;
       }
 
-      let target = accountCharacters.find(snapshot => snapshot.classId.toLowerCase() === characterArg);
-      if (!target) {
-        const byName = accountCharacters.filter(snapshot => snapshot.playerName.trim().toLowerCase() === characterArg);
-        if (byName.length === 1) {
-          target = byName[0];
-        } else if (byName.length > 1) {
-          setDevCommandOutput(`Character name "${characterArg}" is ambiguous for ${username}. Use class slot name (warrior/berserker/archer/mage/monk).`);
-          return;
+      let targets: CharacterSnapshot[] = [];
+      if (targetSpec.toLowerCase() === 'sendall') {
+        targets = snapshots;
+      } else if (targetSpec.includes('+')) {
+        const [userRaw, charRaw] = targetSpec.split('+');
+        const user = (userRaw ?? '').trim().toLowerCase();
+        const char = (charRaw ?? '').trim().toLowerCase();
+        targets = snapshots.filter(snapshot =>
+          snapshot.account === user
+          && (snapshot.classId.toLowerCase() === char || snapshot.playerName.trim().toLowerCase() === char),
+        );
+      } else {
+        const user = targetSpec.trim().toLowerCase();
+        targets = snapshots.filter(snapshot => snapshot.account === user);
+      }
+
+      if (targets.length === 0) {
+        setDevCommandOutput(`No matching targets for "${targetSpec}".`);
+        return;
+      }
+
+      let delivered = 0;
+      for (const target of targets) {
+        if (await appendMailToSnapshot(target)) {
+          delivered += 1;
         }
       }
 
-      if (!target) {
-        setDevCommandOutput(`Could not find character "${characterArg}" for account "${username}".`);
-        return;
-      }
-
-      const targetSaveSlot = getCharacterSaveSlot(target.account, target.classId);
-      const targetSaveKey = getSaveStorageKey(targetSaveSlot);
-      const raw = await AsyncStorage.getItem(targetSaveKey);
-      if (!raw) {
-        setDevCommandOutput(`Target save not found for ${target.account}/${target.classId}.`);
-        return;
-      }
-
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      const mailbox = Array.isArray(parsed.devMailbox)
-        ? parsed.devMailbox.filter(entry => !!entry && typeof entry === 'object') as Array<Record<string, unknown>>
-        : [];
-
-      mailbox.push({
-        id: `dev_mail_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-        kind: 'shards',
-        amount,
-        title: 'Developer Mail',
-        detail: `+${amount} Hero Shards`,
-        from: 'Dev Team',
-        sentAt: Date.now(),
-      });
-
-      parsed.devMailbox = mailbox.slice(-100);
-      await AsyncStorage.setItem(targetSaveKey, JSON.stringify(parsed));
-
-      const isCurrentCharacter = target.account === accountName && target.classId === selectedCharacterClass;
-      setDevCommandOutput(
-        isCurrentCharacter
-          ? `Mail queued for ${target.playerName} (${target.classId}). Re-open this character slot to receive +${amount} shards.`
-          : `Mail queued for ${target.playerName} (${target.classId}) on ${target.account}: +${amount} Hero Shards.`,
-      );
+      setDevCommandOutput(`Mail sent to ${delivered}/${targets.length} target character(s). Subject: ${subject}`);
       return;
     }
 
-    setDevCommandOutput(`Unknown command: ${tokens[0]}. Supported: /sendShard, /showOnlineusersAndCharacters`);
-  }, [accountName, collectCharacterSnapshots, devCommandInput, selectedCharacterClass]);
+    setDevCommandOutput(`Unknown command: ${tokens[0]}. Supported: /sendMsg, /showOnlineusersAndCharacters`);
+  }, [collectCharacterSnapshots, devCommandInput, state.playerName]);
 
   if (slotListLoading) {
     return (
@@ -2126,9 +2175,16 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         essence={state.essence}
         dps={Math.max(1, Math.floor(stats.dps))}
         power={teamPowerIndex}
+        mailUnreadCount={unreadMailCount}
         onActionPress={(action) => {
           debugLog('ui', 'Header action pressed', { action });
           if (action === 'settings') setSettingsOpen(true);
+          else if (action === 'mail') {
+            setMailOpen(true);
+            if (!selectedMailId && state.mailbox.length > 0) {
+              setSelectedMailId(state.mailbox[0].id);
+            }
+          }
           else if (action === 'shop') setShopOpen(true);
           else if (action === 'events') setEventsOpen(true);
           else if (action === 'stats') {
@@ -3186,12 +3242,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
               <View style={styles.settingsCard}>
                 <Text style={styles.settingsCardTitle}>Dev Mail Console</Text>
-                <Text style={styles.settingsLabel}>Commands: /sendShard 10000 username charactername</Text>
+                <Text style={styles.settingsLabel}>Commands: /sendMsg (sendAll|User|User+CharName) #subject# ##message## $shard X, $gold X, $diamond X, $tears X</Text>
                 <Text style={styles.settingsLabel}>Commands: /showOnlineusersAndCharacters</Text>
                 <View style={styles.devCommandRow}>
                   <TextInput
                     style={styles.devCommandInput}
-                    placeholder="/sendShard 10000 username charactername"
+                    placeholder="/sendMsg sendAll #WELCOME# ##message## $shard 100"
                     placeholderTextColor="#7F9CB8"
                     value={devCommandInput}
                     onChangeText={setDevCommandInput}
@@ -3361,6 +3417,100 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 {(state.vipLevel ?? 0) < 1 && <Text style={styles.settingsHintText}>4x auto tempo unlocks at VIP 1.</Text>}
               </View>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={mailOpen}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          debugLog('ui', 'Close mail modal');
+          setMailOpen(false);
+        }}
+      >
+        <View style={styles.bottomSheetOverlay}>
+          <View style={[styles.settingsModalBox, styles.bottomSheetBox]}>
+            <View style={styles.settingsHeaderRow}>
+              <Text style={styles.modalTitle}>✉️ Mailbox</Text>
+              <Pressable style={styles.settingsCloseBtn} onPress={() => setMailOpen(false)}>
+                <Text style={styles.settingsCloseBtnText}>Close</Text>
+              </Pressable>
+            </View>
+            <View style={styles.mailboxHeaderRow}>
+              <Text style={styles.settingsLabel}>Letters: {state.mailbox.length}</Text>
+              <Pressable
+                style={[styles.settingsCycleBtn, unreadMailCount === 0 && styles.settingsCycleBtnDisabled]}
+                disabled={unreadMailCount === 0}
+                onPress={() => claimAllMailAttachments()}
+              >
+                <Text style={styles.settingsCycleBtnText}>Quick Claim All</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.mailboxBodyRow}>
+              <ScrollView style={styles.mailboxListPane}>
+                {state.mailbox
+                  .slice()
+                  .sort((a, b) => b.sentAt - a.sentAt)
+                  .map(mail => {
+                    const hasAttachments = (mail.attachments.shards + mail.attachments.gold + mail.attachments.diamonds + mail.attachments.tears) > 0;
+                    return (
+                      <Pressable
+                        key={mail.id}
+                        style={[
+                          styles.mailCard,
+                          selectedMailId === mail.id && styles.mailCardActive,
+                        ]}
+                        onPress={() => setSelectedMailId(mail.id)}
+                      >
+                        <View style={styles.mailCardTopRow}>
+                          <Text style={styles.mailCardSubject} numberOfLines={1}>{mail.subject}</Text>
+                          <Text style={styles.mailCardAttachmentIcon}>{hasAttachments ? '📎' : '✓'}</Text>
+                        </View>
+                        <Text style={styles.mailCardMeta} numberOfLines={1}>From {mail.from}</Text>
+                      </Pressable>
+                    );
+                  })}
+              </ScrollView>
+
+              <View style={styles.mailboxDetailPane}>
+                {selectedMail ? (
+                  <>
+                    <Text style={styles.mailDetailSubject}>{selectedMail.subject}</Text>
+                    <Text style={styles.mailDetailFrom}>From {selectedMail.from}</Text>
+                    <ScrollView style={styles.mailDetailMessageWrap}>
+                      <Text style={styles.mailDetailMessage}>{selectedMail.message}</Text>
+                    </ScrollView>
+                    <View style={styles.mailAttachmentRow}>
+                      {(Object.keys(selectedMail.attachments) as Array<'shards' | 'gold' | 'diamonds' | 'tears'>).map(key => {
+                        const amount = selectedMail.attachments[key];
+                        if (amount <= 0) return null;
+                        const label = key === 'shards'
+                          ? 'Shards'
+                          : key === 'gold'
+                            ? 'Gold'
+                            : key === 'diamonds'
+                              ? 'Diamonds'
+                              : 'Tears';
+                        return (
+                          <Pressable
+                            key={`${selectedMail.id}_${key}`}
+                            style={styles.mailAttachmentBtn}
+                            onPress={() => claimMailAttachment(selectedMail.id, key)}
+                          >
+                            <Text style={styles.mailAttachmentBtnText}>Claim {label} +{amount}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : (
+                  <Text style={styles.settingsLabel}>Select a letter to view message and attachments.</Text>
+                )}
+              </View>
+            </View>
           </View>
         </View>
       </Modal>

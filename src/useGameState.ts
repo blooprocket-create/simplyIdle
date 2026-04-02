@@ -185,14 +185,20 @@ interface RewardPopup {
   detail: string;
 }
 
-interface DevMailboxEntry {
+export interface MailAttachments {
+  shards: number;
+  gold: number;
+  diamonds: number;
+  tears: number;
+}
+
+export interface MailMessage {
   id: string;
-  kind: 'shards';
-  amount: number;
-  title: string;
-  detail: string;
+  subject: string;
+  message: string;
   from: string;
   sentAt: number;
+  attachments: MailAttachments;
 }
 
 interface SummonHistoryEntry {
@@ -422,7 +428,7 @@ export interface GameState {
   damageReductionBuffPct: number;
   damageReductionBuffMs: number;
   heroActiveCdMs: Record<string, number>;
-  devMailbox?: DevMailboxEntry[];
+  mailbox: MailMessage[];
 }
 
 const initialParty = (): Record<PartyId, number> =>
@@ -601,6 +607,7 @@ const DEFAULT_STATE: GameState = {
   damageReductionBuffPct: 0,
   damageReductionBuffMs: 0,
   heroActiveCdMs: {},
+  mailbox: [],
 };
 
 function sumStats(a: StatBlock, b: StatBlock): StatBlock {
@@ -1196,28 +1203,78 @@ function queueCombatLog(state: GameState, line: string): GameState {
   };
 }
 
-function applyDevMailbox(state: GameState, mailbox: DevMailboxEntry[]): GameState {
-  if (!Array.isArray(mailbox) || mailbox.length === 0) return state;
+type MailAttachmentKey = keyof MailAttachments;
+
+function emptyAttachments(): MailAttachments {
+  return { shards: 0, gold: 0, diamonds: 0, tears: 0 };
+}
+
+function hasAnyAttachment(attachments: MailAttachments): boolean {
+  return attachments.shards > 0 || attachments.gold > 0 || attachments.diamonds > 0 || attachments.tears > 0;
+}
+
+function claimMailAttachments(state: GameState, mailId: string, keys: MailAttachmentKey[]): GameState {
+  const targetMail = state.mailbox.find(mail => mail.id === mailId);
+  if (!targetMail) return state;
+
+  const claimSet = new Set(keys);
+  const prev = targetMail.attachments;
+  const addShards = claimSet.has('shards') ? Math.max(0, prev.shards) : 0;
+  const addGold = claimSet.has('gold') ? Math.max(0, prev.gold) : 0;
+  const addDiamonds = claimSet.has('diamonds') ? Math.max(0, prev.diamonds) : 0;
+  const addTears = claimSet.has('tears') ? Math.max(0, prev.tears) : 0;
+  if (addShards + addGold + addDiamonds + addTears <= 0) return state;
+
+  const nextMailbox = state.mailbox.map(mail => {
+    if (mail.id !== mailId) return mail;
+    const nextAttachments: MailAttachments = {
+      shards: claimSet.has('shards') ? 0 : mail.attachments.shards,
+      gold: claimSet.has('gold') ? 0 : mail.attachments.gold,
+      diamonds: claimSet.has('diamonds') ? 0 : mail.attachments.diamonds,
+      tears: claimSet.has('tears') ? 0 : mail.attachments.tears,
+    };
+    return {
+      ...mail,
+      attachments: nextAttachments,
+    };
+  });
+
+  let nextState: GameState = {
+    ...state,
+    heroShards: state.heroShards + addShards,
+    gold: state.gold + addGold,
+    totalGold: state.totalGold + addGold,
+    diamonds: state.diamonds + addDiamonds,
+    bossTears: state.bossTears + addTears,
+    mailbox: nextMailbox,
+  };
+
+  const summary: string[] = [];
+  if (addShards > 0) summary.push(`+${addShards} shards`);
+  if (addGold > 0) summary.push(`+${addGold} gold`);
+  if (addDiamonds > 0) summary.push(`+${addDiamonds} diamonds`);
+  if (addTears > 0) summary.push(`+${addTears} tears`);
+
+  nextState = queueReward(nextState, {
+    id: `mail_claim_${mailId}_${Date.now()}`,
+    kind: 'system',
+    title: 'Mail Attachment Claimed',
+    detail: summary.join(' • '),
+  });
+
+  return queueCombatLog(nextState, `Mail claimed: ${summary.join(', ')}`);
+}
+
+function claimAllMailAttachments(state: GameState): GameState {
+  const claimable = state.mailbox
+    .filter(mail => hasAnyAttachment(mail.attachments))
+    .map(mail => mail.id);
+  if (claimable.length === 0) return state;
 
   let nextState = state;
-  for (const mail of mailbox) {
-    if (mail.kind !== 'shards') continue;
-    const amount = clampInt(mail.amount, 1, SAFE_INTEGER_CAP, 0);
-    if (amount <= 0) continue;
-
-    nextState = queueReward({
-      ...nextState,
-      heroShards: nextState.heroShards + amount,
-    }, {
-      id: mail.id || `dev_mail_${Date.now()}`,
-      kind: 'system',
-      title: mail.title || 'Developer Mail',
-      detail: `${mail.detail || `+${amount} Hero Shards`} • From ${mail.from || 'Dev Team'}`,
-    });
-
-    nextState = queueCombatLog(nextState, `Developer Mail: +${amount} Hero Shards`);
+  for (const mailId of claimable) {
+    nextState = claimMailAttachments(nextState, mailId, ['shards', 'gold', 'diamonds', 'tears']);
   }
-
   return nextState;
 }
 
@@ -2305,20 +2362,24 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     now,
   );
 
-  const rawDevMailbox = Array.isArray((payload as { devMailbox?: unknown[] }).devMailbox)
-    ? (payload as { devMailbox: unknown[] }).devMailbox
+  const rawMailbox = Array.isArray((payload as { mailbox?: unknown[] }).mailbox)
+    ? (payload as { mailbox: unknown[] }).mailbox
     : [];
-  const devMailbox: DevMailboxEntry[] = rawDevMailbox
+  const mailbox: MailMessage[] = rawMailbox
     .filter((entry): entry is Record<string, unknown> => isRecord(entry))
     .slice(0, 100)
     .map((entry, index) => ({
-        id: clampString(entry.id, `dev_mail_${index}`, 80),
-        kind: 'shards',
-        amount: clampInt(entry.amount, 1, SAFE_INTEGER_CAP, 1),
-        title: clampString(entry.title, 'Developer Mail', 80),
-        detail: clampString(entry.detail, 'Compensation package', 140),
+        id: clampString(entry.id, `mail_${index}`, 80),
+        subject: clampString(entry.subject, 'Developer Mail', 80),
+        message: clampString(entry.message, 'Compensation package', 280),
         from: clampString(entry.from, 'Dev Team', 48),
         sentAt: clampInt(entry.sentAt, 0, now, now),
+        attachments: {
+          shards: clampInt(isRecord(entry.attachments) ? entry.attachments.shards : 0, 0, SAFE_INTEGER_CAP, 0),
+          gold: clampInt(isRecord(entry.attachments) ? entry.attachments.gold : 0, 0, SAFE_INTEGER_CAP, 0),
+          diamonds: clampInt(isRecord(entry.attachments) ? entry.attachments.diamonds : 0, 0, SAFE_INTEGER_CAP, 0),
+          tears: clampInt(isRecord(entry.attachments) ? entry.attachments.tears : 0, 0, SAFE_INTEGER_CAP, 0),
+        },
       }));
 
 
@@ -2474,7 +2535,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     damageReductionBuffPct: clampFloat(payload.damageReductionBuffPct, 0, 1, 0),
     damageReductionBuffMs: clampInt(payload.damageReductionBuffMs, 0, 600_000, 0),
     heroActiveCdMs,
-    devMailbox,
+    mailbox,
   };
 }
 
@@ -3063,6 +3124,8 @@ type Action =
   | { type: 'CLAIM_CODEX_HERO_VIP'; heroId: string }
   | { type: 'CLAIM_CODEX_UNIQUE_VIP'; heroId: string }
   | { type: 'MARK_HINT_SEEN'; hintId: string }
+  | { type: 'CLAIM_MAIL_ATTACHMENT'; mailId: string; attachment: MailAttachmentKey }
+  | { type: 'CLAIM_ALL_MAIL_ATTACHMENTS' }
   | { type: 'APPLY_OFFLINE_PROGRESS'; elapsedMs: number }
   | { type: 'APPLY_DAILY_LOGIN'; nowMs: number }
   | { type: 'REBIRTH' }
@@ -3964,6 +4027,14 @@ function reducer(state: GameState, action: Action): GameState {
         ...state,
         seenHintIds: [...state.seenHintIds, action.hintId],
       };
+    }
+
+    case 'CLAIM_MAIL_ATTACHMENT': {
+      return claimMailAttachments(state, action.mailId, [action.attachment]);
+    }
+
+    case 'CLAIM_ALL_MAIL_ATTACHMENTS': {
+      return claimAllMailAttachments(state);
     }
 
     case 'APPLY_OFFLINE_PROGRESS': {
@@ -5216,7 +5287,7 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'LOAD': {
       const p = sanitizeSaveData(action.payload);
-      const hydratedState = maybeAutoRefreshExpeditionContracts({
+      return maybeAutoRefreshExpeditionContracts({
         ...DEFAULT_STATE,
         playerName: p.playerName,
         playerClass: p.playerClass,
@@ -5347,9 +5418,8 @@ function reducer(state: GameState, action: Action): GameState {
         damageReductionBuffPct: p.damageReductionBuffPct,
         damageReductionBuffMs: p.damageReductionBuffMs,
         heroActiveCdMs: p.heroActiveCdMs,
+        mailbox: p.mailbox ?? [],
       }, Date.now());
-
-      return applyDevMailbox(hydratedState, p.devMailbox ?? []);
     }
 
     default:
@@ -5487,7 +5557,7 @@ interface SaveData {
   damageReductionBuffPct: number;
   damageReductionBuffMs: number;
   heroActiveCdMs: Record<string, number>;
-  devMailbox?: DevMailboxEntry[];
+  mailbox?: MailMessage[];
 }
 
 function serialize(state: GameState): SaveData {
@@ -5607,6 +5677,7 @@ function serialize(state: GameState): SaveData {
     damageReductionBuffPct: state.damageReductionBuffPct,
     damageReductionBuffMs: state.damageReductionBuffMs,
     heroActiveCdMs: state.heroActiveCdMs,
+    mailbox: state.mailbox,
   };
 }
 
@@ -5914,6 +5985,12 @@ export function useGameState(saveSlot: string = 'default') {
   const markHintSeen = useCallback((hintId: string) => {
     dispatch({ type: 'MARK_HINT_SEEN', hintId });
   }, []);
+  const claimMailAttachment = useCallback((mailId: string, attachment: MailAttachmentKey) => {
+    dispatch({ type: 'CLAIM_MAIL_ATTACHMENT', mailId, attachment });
+  }, []);
+  const claimAllMailAttachments = useCallback(() => {
+    dispatch({ type: 'CLAIM_ALL_MAIL_ATTACHMENTS' });
+  }, []);
   const rebirth = useCallback(() => dispatch({ type: 'REBIRTH' }), []);
   const clearAchievement = useCallback(() => dispatch({ type: 'CLEAR_ACHIEVEMENT' }), []);
   const clearRewardPopup = useCallback(() => dispatch({ type: 'CLEAR_REWARD_POPUP' }), []);
@@ -6084,6 +6161,8 @@ export function useGameState(saveSlot: string = 'default') {
     claimCodexHeroVip,
     claimCodexUniqueVip,
     markHintSeen,
+    claimMailAttachment,
+    claimAllMailAttachments,
     rebirth,
     clearAchievement,
     clearRewardPopup,
