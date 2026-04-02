@@ -143,7 +143,7 @@ const GOLD_SHOP_OFFERS = [
 const DIAMOND_SHOP_OFFERS = [
   { id: 'coolant_i_pack', name: 'Coolant Pack I', desc: '+4 Coolant Capsule I', cost: 24 },
   { id: 'coolant_ii_pack', name: 'Coolant Pack II', desc: '+3 Coolant Capsule II', cost: 58 },
-  { id: 'rift_raid_ticket', name: 'Dungeon Raid Ticket', desc: '+1 ticket (raids prior Rift level, no free-entry cost)', cost: 45 },
+  { id: 'rift_raid_ticket', name: 'Dungeon Raid Ticket', desc: '+1 ticket (raids prior Rift level, no free-entry cost)', cost: 150 },
   { id: 'elite_supply', name: 'Elite Supply Crate', desc: '+5 Coolant I, +3 Coolant II, +2 Grand Potions', cost: 120 },
 ] as const;
 const DOLLAR_SHOP_OFFERS = [
