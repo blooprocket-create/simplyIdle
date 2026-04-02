@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import GameScreen from './src/screens/GameScreen';
 import AuthScreen, { AUTH_STORAGE_KEYS, getValidStoredSession } from './src/screens/AuthScreen';
 import { debugLog, identifyTelemetryDevice, initTelemetry, trackEvent, trackTelemetryHeartbeat } from './src/telemetry';
+import { getValidOnlineSession, isOnlineAuthAvailable, logoutOnline } from './src/services/onlineAuth';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -44,8 +45,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    getValidStoredSession()
-      .then(name => setAccountName(name))
+    (async () => {
+      if (isOnlineAuthAvailable()) {
+        const online = await getValidOnlineSession();
+        if (online) {
+          setAccountName(online);
+          return;
+        }
+      }
+
+      const local = await getValidStoredSession();
+      setAccountName(local);
+    })()
       .finally(() => setLoading(false));
   }, []);
 
@@ -79,6 +90,9 @@ export default function App() {
     <GameScreen
       accountName={accountName}
       onLogout={async () => {
+        if (isOnlineAuthAvailable()) {
+          await logoutOnline();
+        }
         await AsyncStorage.removeItem(AUTH_STORAGE_KEYS.session);
         setAccountName(null);
       }}

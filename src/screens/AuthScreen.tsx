@@ -12,6 +12,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { debugLog, trackGameplayAction } from '../telemetry';
+import { isOnlineAuthAvailable, loginOnline, registerOnline } from '../services/onlineAuth';
 
 interface AuthScreenProps {
   onAuthenticated: (username: string) => void;
@@ -115,6 +116,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [knownUsernames, setKnownUsernames] = useState<string[]>([]);
+  const onlineAuthEnabled = isOnlineAuthAvailable();
 
   React.useEffect(() => {
     let cancelled = false;
@@ -149,6 +151,18 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     debugLog('auth', 'Submit attempt', { mode, username: cleanUsername });
 
     try {
+      if (onlineAuthEnabled) {
+        const authenticatedUsername = mode === 'register'
+          ? await registerOnline(cleanUsername, password)
+          : await loginOnline(cleanUsername, password);
+
+        await AsyncStorage.setItem(SESSION_KEY, authenticatedUsername);
+        debugLog('auth', 'Online auth successful', { mode, username: authenticatedUsername });
+        void trackGameplayAction(mode === 'register' ? 'auth_register_success' : 'auth_login_success', { username: authenticatedUsername, provider: 'firebase' }, 0);
+        onAuthenticated(authenticatedUsername);
+        return;
+      }
+
       const accounts = await loadAccounts();
       const existing = accounts.find(a => a.username === cleanUsername);
 
@@ -247,7 +261,11 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       <View style={styles.wrap}>
         <Text style={styles.title}>SimplyIdle</Text>
         <Text style={styles.subtitle}>Create a local profile or log in on this device.</Text>
-        <Text style={styles.note}>Profiles are stored locally. Do not reuse a real password here.</Text>
+        <Text style={styles.note}>
+          {onlineAuthEnabled
+            ? 'Cloud auth enabled (Firebase). Use unique credentials for your account.'
+            : 'Profiles are stored locally. Do not reuse a real password here.'}
+        </Text>
 
         <View style={styles.modeRow}>
           <Pressable
