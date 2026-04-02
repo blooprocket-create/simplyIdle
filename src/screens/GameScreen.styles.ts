@@ -4051,6 +4051,27 @@ export const styles = StyleSheet.create({
     fontSize: 10,
     color: '#82A3C4',
   },
+  devCommandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  devCommandInput: {
+    flex: 1,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#3E5D7D',
+    backgroundColor: '#0F1C2C',
+    color: '#E4F2FF',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    fontSize: 11,
+  },
+  devCommandOutput: {
+    fontSize: 10,
+    color: '#9FD0FF',
+    lineHeight: 14,
+  },
   chapterMapModalBox: {
     backgroundColor: '#0F1A2A',
     borderRadius: 14,

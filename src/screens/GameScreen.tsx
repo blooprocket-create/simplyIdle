@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -118,6 +118,19 @@ export const ACH_BONUS_CAP_PCT = 75;
 const FEEDBACK_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSf6txIw9UL-F9kItXZfOfr9d0qA_XCvaNIsBUf_4NZ1HZpfrw/viewform?usp=publish-editor';
 const HAS_BETA_FEEDBACK_FORM = !FEEDBACK_FORM_URL.includes('replace-with-your-beta-form');
 const GEAR_RARITY_POINTS: Record<string, number> = { common: 40, rare: 90, epic: 170, legendary: 280, mythic: 430, transcendent: 680 };
+const ACCOUNTS_KEY = 'idlerpg_accounts_v1';
+const SESSION_KEY = 'idlerpg_current_account_v1';
+const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+
+type CharacterSnapshot = {
+  account: string;
+  classId: PlayerClass;
+  playerName: string;
+  level: number;
+  highestWaveReached: number;
+  lastActiveAt: number;
+  isOnline: boolean;
+};
 
 function scoreEquipmentForClass(item: { rarity: string; bonus: Record<string, number | undefined | null> }, playerClass: PlayerClass | null): number {
   const cls = getClassConfig(playerClass ?? 'warrior');
@@ -314,6 +327,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [achievementsSubTab, setAchievementsSubTab] = useState<AchievementsSubTab>('overview');
   const [operationsSubTab, setOperationsSubTab] = useState<OperationsSubTab>('facilities');
   const [eventsOpen, setEventsOpen] = useState(false);
+  const [devCommandInput, setDevCommandInput] = useState('');
+  const [devCommandOutput, setDevCommandOutput] = useState<string>('');
   const [chapterMapOpen, setChapterMapOpen] = useState(false);
   const [compareItemId, setCompareItemId] = useState<string | null>(null);
   const [summonReveal, setSummonReveal] = useState<SummonReveal | null>(null);
@@ -1705,6 +1720,170 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setSelectedCharacterClass(null);
   }
 
+  const collectCharacterSnapshots = useCallback(async (): Promise<CharacterSnapshot[]> => {
+    const rawAccounts = await AsyncStorage.getItem(ACCOUNTS_KEY);
+    const rawSession = await AsyncStorage.getItem(SESSION_KEY);
+    const currentSession = (rawSession ?? '').trim().toLowerCase();
+    const now = Date.now();
+
+    let accounts: string[] = [];
+    try {
+      const parsed = JSON.parse(rawAccounts ?? '[]') as Array<{ username?: string }>;
+      accounts = parsed
+        .map(entry => (typeof entry.username === 'string' ? entry.username.trim().toLowerCase() : ''))
+        .filter(Boolean);
+    } catch {
+      accounts = [];
+    }
+
+    const snapshots: CharacterSnapshot[] = [];
+    for (const username of accounts) {
+      for (const cls of CLASSES) {
+        const saveSlot = getCharacterSaveSlot(username, cls.id);
+        const saveKey = getSaveStorageKey(saveSlot);
+        const raw = await AsyncStorage.getItem(saveKey);
+        if (!raw) continue;
+
+        try {
+          const parsed = JSON.parse(raw) as Record<string, unknown>;
+          if (parsed.characterCreated !== true) continue;
+          const playerName = typeof parsed.playerName === 'string' ? parsed.playerName.trim().slice(0, 24) : '';
+          if (!playerName) continue;
+          const level = typeof parsed.level === 'number' && Number.isFinite(parsed.level)
+            ? Math.max(1, Math.floor(parsed.level))
+            : 1;
+          const highestWaveReached = typeof parsed.highestWaveReached === 'number' && Number.isFinite(parsed.highestWaveReached)
+            ? Math.max(1, Math.floor(parsed.highestWaveReached))
+            : 1;
+          const lastActiveAt = typeof parsed.lastActiveAt === 'number' && Number.isFinite(parsed.lastActiveAt)
+            ? Math.max(0, Math.floor(parsed.lastActiveAt))
+            : 0;
+          const isOnline = currentSession === username && (now - lastActiveAt) <= ONLINE_WINDOW_MS;
+          snapshots.push({
+            account: username,
+            classId: cls.id,
+            playerName,
+            level,
+            highestWaveReached,
+            lastActiveAt,
+            isOnline,
+          });
+        } catch {
+          // Ignore corrupted slot snapshot entries.
+        }
+      }
+    }
+
+    return snapshots.sort((a, b) => {
+      if (a.account !== b.account) return a.account.localeCompare(b.account);
+      if (a.playerName !== b.playerName) return a.playerName.localeCompare(b.playerName);
+      return a.classId.localeCompare(b.classId);
+    });
+  }, []);
+
+  const runDevCommand = useCallback(async () => {
+    const rawCommand = devCommandInput.trim();
+    if (!rawCommand) {
+      setDevCommandOutput('Enter a command first.');
+      return;
+    }
+
+    const tokens = rawCommand.split(/\s+/);
+    const command = (tokens[0] ?? '').toLowerCase();
+
+    if (command === '/showonlineusersandcharacters') {
+      const snapshots = await collectCharacterSnapshots();
+      if (snapshots.length === 0) {
+        setDevCommandOutput('No accounts or characters found.');
+        return;
+      }
+
+      const onlineCount = snapshots.filter(s => s.isOnline).length;
+      const lines = snapshots.map(snapshot => `${snapshot.isOnline ? 'ONLINE' : 'offline'} • ${snapshot.account} • ${snapshot.playerName} (${snapshot.classId}) • Lv ${snapshot.level} • Wave ${snapshot.highestWaveReached}`);
+      setDevCommandOutput(`Users+Characters (${onlineCount}/${snapshots.length} online)\n${lines.join('\n')}`);
+      return;
+    }
+
+    if (command === '/sendshard') {
+      if (tokens.length < 4) {
+        setDevCommandOutput('Usage: /sendShard <amount> <username> <charactername>');
+        return;
+      }
+
+      const amount = Math.max(0, Math.floor(Number(tokens[1])));
+      if (!Number.isFinite(amount) || amount <= 0) {
+        setDevCommandOutput('Amount must be a positive integer.');
+        return;
+      }
+
+      const username = (tokens[2] ?? '').trim().toLowerCase();
+      const characterArg = tokens.slice(3).join(' ').trim().toLowerCase();
+      if (!username || !characterArg) {
+        setDevCommandOutput('Usage: /sendShard <amount> <username> <charactername>');
+        return;
+      }
+
+      const snapshots = await collectCharacterSnapshots();
+      const accountCharacters = snapshots.filter(snapshot => snapshot.account === username);
+      if (accountCharacters.length === 0) {
+        setDevCommandOutput(`No characters found for account "${username}".`);
+        return;
+      }
+
+      let target = accountCharacters.find(snapshot => snapshot.classId.toLowerCase() === characterArg);
+      if (!target) {
+        const byName = accountCharacters.filter(snapshot => snapshot.playerName.trim().toLowerCase() === characterArg);
+        if (byName.length === 1) {
+          target = byName[0];
+        } else if (byName.length > 1) {
+          setDevCommandOutput(`Character name "${characterArg}" is ambiguous for ${username}. Use class slot name (warrior/berserker/archer/mage/monk).`);
+          return;
+        }
+      }
+
+      if (!target) {
+        setDevCommandOutput(`Could not find character "${characterArg}" for account "${username}".`);
+        return;
+      }
+
+      const targetSaveSlot = getCharacterSaveSlot(target.account, target.classId);
+      const targetSaveKey = getSaveStorageKey(targetSaveSlot);
+      const raw = await AsyncStorage.getItem(targetSaveKey);
+      if (!raw) {
+        setDevCommandOutput(`Target save not found for ${target.account}/${target.classId}.`);
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const mailbox = Array.isArray(parsed.devMailbox)
+        ? parsed.devMailbox.filter(entry => !!entry && typeof entry === 'object') as Array<Record<string, unknown>>
+        : [];
+
+      mailbox.push({
+        id: `dev_mail_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        kind: 'shards',
+        amount,
+        title: 'Developer Mail',
+        detail: `+${amount} Hero Shards`,
+        from: 'Dev Team',
+        sentAt: Date.now(),
+      });
+
+      parsed.devMailbox = mailbox.slice(-100);
+      await AsyncStorage.setItem(targetSaveKey, JSON.stringify(parsed));
+
+      const isCurrentCharacter = target.account === accountName && target.classId === selectedCharacterClass;
+      setDevCommandOutput(
+        isCurrentCharacter
+          ? `Mail queued for ${target.playerName} (${target.classId}). Re-open this character slot to receive +${amount} shards.`
+          : `Mail queued for ${target.playerName} (${target.classId}) on ${target.account}: +${amount} Hero Shards.`,
+      );
+      return;
+    }
+
+    setDevCommandOutput(`Unknown command: ${tokens[0]}. Supported: /sendShard, /showOnlineusersAndCharacters`);
+  }, [accountName, collectCharacterSnapshots, devCommandInput, selectedCharacterClass]);
+
   if (slotListLoading) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -3003,6 +3182,27 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 >
                   <Text style={styles.settingsCycleBtnText}>{HAS_BETA_FEEDBACK_FORM ? 'Open Feedback Form' : 'Feedback Form Soon'}</Text>
                 </Pressable>
+              </View>
+
+              <View style={styles.settingsCard}>
+                <Text style={styles.settingsCardTitle}>Dev Mail Console</Text>
+                <Text style={styles.settingsLabel}>Commands: /sendShard 10000 username charactername</Text>
+                <Text style={styles.settingsLabel}>Commands: /showOnlineusersAndCharacters</Text>
+                <View style={styles.devCommandRow}>
+                  <TextInput
+                    style={styles.devCommandInput}
+                    placeholder="/sendShard 10000 username charactername"
+                    placeholderTextColor="#7F9CB8"
+                    value={devCommandInput}
+                    onChangeText={setDevCommandInput}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <Pressable style={styles.settingsCycleBtn} onPress={() => { void runDevCommand(); }}>
+                    <Text style={styles.settingsCycleBtnText}>Run</Text>
+                  </Pressable>
+                </View>
+                {!!devCommandOutput && <Text style={styles.devCommandOutput}>{devCommandOutput}</Text>}
               </View>
 
               <View style={styles.settingsCard}>

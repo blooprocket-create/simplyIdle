@@ -185,6 +185,16 @@ interface RewardPopup {
   detail: string;
 }
 
+interface DevMailboxEntry {
+  id: string;
+  kind: 'shards';
+  amount: number;
+  title: string;
+  detail: string;
+  from: string;
+  sentAt: number;
+}
+
 interface SummonHistoryEntry {
   id: string;
   heroName: string;
@@ -412,6 +422,7 @@ export interface GameState {
   damageReductionBuffPct: number;
   damageReductionBuffMs: number;
   heroActiveCdMs: Record<string, number>;
+  devMailbox?: DevMailboxEntry[];
 }
 
 const initialParty = (): Record<PartyId, number> =>
@@ -1183,6 +1194,31 @@ function queueCombatLog(state: GameState, line: string): GameState {
     ...state,
     combatLog: [`${new Date().toLocaleTimeString()} • ${line}`, ...state.combatLog].slice(0, 24),
   };
+}
+
+function applyDevMailbox(state: GameState, mailbox: DevMailboxEntry[]): GameState {
+  if (!Array.isArray(mailbox) || mailbox.length === 0) return state;
+
+  let nextState = state;
+  for (const mail of mailbox) {
+    if (mail.kind !== 'shards') continue;
+    const amount = clampInt(mail.amount, 1, SAFE_INTEGER_CAP, 0);
+    if (amount <= 0) continue;
+
+    nextState = queueReward({
+      ...nextState,
+      heroShards: nextState.heroShards + amount,
+    }, {
+      id: mail.id || `dev_mail_${Date.now()}`,
+      kind: 'system',
+      title: mail.title || 'Developer Mail',
+      detail: `${mail.detail || `+${amount} Hero Shards`} • From ${mail.from || 'Dev Team'}`,
+    });
+
+    nextState = queueCombatLog(nextState, `Developer Mail: +${amount} Hero Shards`);
+  }
+
+  return nextState;
 }
 
 function getHeroPassiveMultipliers(state: GameState): {
@@ -2269,6 +2305,22 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     now,
   );
 
+  const rawDevMailbox = Array.isArray((payload as { devMailbox?: unknown[] }).devMailbox)
+    ? (payload as { devMailbox: unknown[] }).devMailbox
+    : [];
+  const devMailbox: DevMailboxEntry[] = rawDevMailbox
+    .filter((entry): entry is Record<string, unknown> => isRecord(entry))
+    .slice(0, 100)
+    .map((entry, index) => ({
+        id: clampString(entry.id, `dev_mail_${index}`, 80),
+        kind: 'shards',
+        amount: clampInt(entry.amount, 1, SAFE_INTEGER_CAP, 1),
+        title: clampString(entry.title, 'Developer Mail', 80),
+        detail: clampString(entry.detail, 'Compensation package', 140),
+        from: clampString(entry.from, 'Dev Team', 48),
+        sentAt: clampInt(entry.sentAt, 0, now, now),
+      }));
+
 
   return {
     playerName,
@@ -2422,6 +2474,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     damageReductionBuffPct: clampFloat(payload.damageReductionBuffPct, 0, 1, 0),
     damageReductionBuffMs: clampInt(payload.damageReductionBuffMs, 0, 600_000, 0),
     heroActiveCdMs,
+    devMailbox,
   };
 }
 
@@ -5163,7 +5216,7 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'LOAD': {
       const p = sanitizeSaveData(action.payload);
-      return maybeAutoRefreshExpeditionContracts({
+      const hydratedState = maybeAutoRefreshExpeditionContracts({
         ...DEFAULT_STATE,
         playerName: p.playerName,
         playerClass: p.playerClass,
@@ -5295,6 +5348,8 @@ function reducer(state: GameState, action: Action): GameState {
         damageReductionBuffMs: p.damageReductionBuffMs,
         heroActiveCdMs: p.heroActiveCdMs,
       }, Date.now());
+
+      return applyDevMailbox(hydratedState, p.devMailbox ?? []);
     }
 
     default:
@@ -5432,6 +5487,7 @@ interface SaveData {
   damageReductionBuffPct: number;
   damageReductionBuffMs: number;
   heroActiveCdMs: Record<string, number>;
+  devMailbox?: DevMailboxEntry[];
 }
 
 function serialize(state: GameState): SaveData {
