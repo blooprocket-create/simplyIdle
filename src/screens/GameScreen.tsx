@@ -124,8 +124,6 @@ export const ACH_BONUS_CAP_PCT = 75;
 const FEEDBACK_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSf6txIw9UL-F9kItXZfOfr9d0qA_XCvaNIsBUf_4NZ1HZpfrw/viewform?usp=publish-editor';
 const HAS_BETA_FEEDBACK_FORM = !FEEDBACK_FORM_URL.includes('replace-with-your-beta-form');
 const GEAR_RARITY_POINTS: Record<string, number> = { common: 40, rare: 90, epic: 170, legendary: 280, mythic: 430, transcendent: 680 };
-const ACCOUNTS_KEY = 'idlerpg_accounts_v1';
-const SESSION_KEY = 'idlerpg_current_account_v1';
 const ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
 type CharacterSnapshot = {
@@ -1826,6 +1824,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     const trimmedName = draftName.trim();
     if (!trimmedName || characterCreatePending) return;
 
+    void trackEvent('character_creation_attempt', {
+      classId: draftClass,
+      nameLength: trimmedName.length,
+    });
+
     setCharacterNameError(null);
     setCharacterCreatePending(true);
 
@@ -1834,6 +1837,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       const snapshots = await collectCharacterSnapshots();
       const alreadyUsed = snapshots.some(snapshot => normalizeCharacterNameForCompare(snapshot.playerName) === normalizedDraftName);
       if (alreadyUsed) {
+        void trackEvent('character_creation_blocked', { reason: 'name_taken' });
         setCharacterNameError('That character name is already taken. Pick another name.');
         return;
       }
@@ -1841,18 +1845,22 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       const reserveResult = await reserveCharacterName(trimmedName, accountName);
       if (!reserveResult.ok) {
         if (reserveResult.error === 'taken') {
+          void trackEvent('character_creation_blocked', { reason: 'name_taken' });
           setCharacterNameError('That character name is already taken. Pick another name.');
           return;
         }
         if (reserveResult.error === 'unavailable') {
+          void trackEvent('character_creation_blocked', { reason: 'name_service_unavailable' });
           setCharacterNameError('Could not verify name availability right now. Try again in a moment.');
           return;
         }
+        void trackEvent('character_creation_blocked', { reason: reserveResult.error ?? 'name_reservation_failed' });
         setCharacterNameError('Unable to reserve this character name. Please try another name.');
         return;
       }
 
       debugLog('character', 'Create character requested', { draftClass, nameLength: trimmedName.length });
+      void trackEvent('character_creation_completed', { classId: draftClass });
       createCharacter(trimmedName, draftClass);
     } finally {
       setCharacterCreatePending(false);
@@ -1944,6 +1952,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     const tokens = rawCommand.split(/\s+/);
     const command = (tokens[0] ?? '').toLowerCase();
     const currentUid = getFirebaseAuth()?.currentUser?.uid ?? '';
+    const validClasses: PlayerClass[] = ['warrior', 'berserker', 'archer', 'mage', 'monk'];
     const currentSnapshot = (state.characterCreated && selectedCharacterClass)
       ? {
         account: publicUsername || accountName,
@@ -1957,6 +1966,91 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         isOnline: true,
       } as CharacterSnapshot
       : null;
+
+    if (command === '/devhelp') {
+      setDevCommandOutput([
+        'Dev commands:',
+        '/showOnlineUsersAndCharacters',
+        '/sendMsg (sendAll|User|User+CharName) #subject# ##message## $shard X, $gold X, $diamond X, $tears X, $essence X',
+        '/clearSlot <classId>',
+        '/whoAmI',
+        '/showSlot <classId>',
+        '/devDiag',
+      ].join('\n'));
+      return;
+    }
+
+    if (command === '/whoami') {
+      setDevCommandOutput([
+        `uid: ${currentUid || '(none)'}`,
+        `account: ${publicUsername || accountName}`,
+        `admin: ${isAdmin ? 'yes' : 'no'}`,
+        `activeClass: ${selectedCharacterClass ?? '(none)'}`,
+      ].join('\n'));
+      return;
+    }
+
+    if (command === '/showslot') {
+      const classArg = (tokens[1] ?? '').trim().toLowerCase() as PlayerClass;
+      if (!classArg || !validClasses.includes(classArg)) {
+        setDevCommandOutput(`Usage: /showSlot <classId>\nValid classes: ${validClasses.join(', ')}`);
+        return;
+      }
+
+      const slotId = getCharacterSaveSlot(accountName, classArg);
+      const slotResult = await loadOnlineSave<Record<string, unknown>>(slotId);
+      if (!slotResult.ok) {
+        setDevCommandOutput(`showSlot failed (${slotResult.errorCode ?? 'unknown'}) for ${classArg}.`);
+        return;
+      }
+
+      if (!slotResult.data) {
+        setDevCommandOutput(`Slot ${classArg} is empty in Firestore (slotId: ${slotId}).`);
+        return;
+      }
+
+      const payload = slotResult.data.payload;
+      const playerName = typeof payload.playerName === 'string' ? payload.playerName : '(none)';
+      const level = typeof payload.level === 'number' ? Math.floor(payload.level) : 1;
+      const wave = typeof payload.highestWaveReached === 'number' ? Math.floor(payload.highestWaveReached) : 1;
+      const created = payload.characterCreated === true ? 'yes' : 'no';
+      setDevCommandOutput([
+        `showSlot ${classArg}`,
+        `slotId: ${slotId}`,
+        `characterCreated: ${created}`,
+        `playerName: ${playerName}`,
+        `level: ${level}`,
+        `highestWaveReached: ${wave}`,
+        `revision: ${slotResult.data.revision}`,
+        `updatedAt: ${new Date(slotResult.data.updatedAt).toISOString()}`,
+      ].join('\n'));
+      return;
+    }
+
+    if (command === '/devdiag') {
+      const db = getFirebaseFirestore();
+      if (!db) {
+        setDevCommandOutput('devDiag: Firestore is not configured.');
+        return;
+      }
+
+      try {
+        const allDocs = await getDocs(collectionGroup(db, 'saveSlots'));
+        setDevCommandOutput([
+          'devDiag',
+          `uid: ${currentUid || '(none)'}`,
+          `isAdmin: ${isAdmin ? 'yes' : 'no'}`,
+          `saveSlotDocsReadable: ${allDocs.size}`,
+          `hasCurrentSnapshotFallback: ${currentSnapshot ? 'yes' : 'no'}`,
+        ].join('\n'));
+      } catch (error) {
+        const errorCode = typeof error === 'object' && error && 'code' in error
+          ? String((error as { code: unknown }).code)
+          : 'unknown';
+        setDevCommandOutput(`devDiag query failed (${errorCode}). Check Firestore admin rules and auth token refresh.`);
+      }
+      return;
+    }
 
     if (command === '/showonlineusersandcharacters') {
       const snapshots = await collectCharacterSnapshots();
@@ -2075,7 +2169,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         const createdMail = await appendMailToSnapshot(target);
         if (createdMail) {
           delivered += 1;
-          if (target.account === accountName && target.classId === selectedCharacterClass) {
+          if (target.uid === currentUid && target.classId === selectedCharacterClass) {
             localMails.push(createdMail);
           }
         }
@@ -2093,7 +2187,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       // Usage: /clearslot <classId>
       // Wipes the current user's Firestore save slot.
       const classArg = (tokens[1] ?? '').trim().toLowerCase() as PlayerClass;
-      const validClasses: PlayerClass[] = ['warrior', 'berserker', 'archer', 'mage', 'monk'];
       if (!classArg || !validClasses.includes(classArg)) {
         setDevCommandOutput(`Usage: /clearslot <classId>\nValid classes: ${validClasses.join(', ')}`);
         return;
@@ -2110,7 +2203,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       return;
     }
 
-    setDevCommandOutput(`Unknown command: ${tokens[0]}. Supported: /sendMsg, /showOnlineusersAndCharacters, /clearslot`);
+    setDevCommandOutput(`Unknown command: ${tokens[0]}. Use /devHelp for available commands.`);
   }, [accountName, appendMailboxMessages, collectCharacterSnapshots, devCommandInput, isAdmin, publicUsername, selectedCharacterClass, state.characterCreated, state.highestWaveReached, state.level, state.playerName]);
 
   useEffect(() => {
@@ -3461,8 +3554,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               {isAdmin ? (
                 <View style={styles.settingsCard}>
                   <Text style={styles.settingsCardTitle}>Dev Mail Console</Text>
-                  <Text style={styles.settingsLabel}>Commands: /sendMsg (sendAll|User|User+CharName) #subject# ##message## $shard X, $gold X, $diamond X, $tears X, $essence X</Text>
-                  <Text style={styles.settingsLabel}>Commands: /showOnlineusersAndCharacters</Text>
+                  <Text style={styles.settingsLabel}>Use /devHelp to list all available commands.</Text>
+                  <Text style={styles.settingsLabel}>Quick: /showOnlineUsersAndCharacters, /showSlot warrior, /whoAmI, /devDiag, /clearSlot warrior</Text>
                   <View style={styles.devCommandRow}>
                     <TextInput
                       style={styles.devCommandInput}

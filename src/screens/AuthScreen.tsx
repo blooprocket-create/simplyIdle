@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
-import { debugLog, trackGameplayAction } from '../telemetry';
+import { debugLog, trackEvent, trackGameplayAction } from '../telemetry';
 import {
   getGoogleAuthConfig,
   isGoogleAuthAvailable,
@@ -184,6 +184,10 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       username: accountName,
       provider,
     }, 0);
+    void trackEvent('auth_success', {
+      mode: authMode,
+      provider,
+    });
     onAuthenticated(accountName);
   }
 
@@ -292,7 +296,13 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       }
 
     } catch (submitError) {
-      setError(mapAuthError(submitError));
+      const mappedError = mapAuthError(submitError);
+      setError(mappedError);
+      void trackEvent('auth_failure', {
+        mode,
+        provider: 'email',
+        reason: mappedError.slice(0, 80),
+      });
     } finally {
       setBusy(false);
     }
@@ -319,7 +329,13 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
 
       setBusy(false);
     } catch (googleError) {
-      setError(mapAuthError(googleError));
+      const mappedError = mapAuthError(googleError);
+      setError(mappedError);
+      void trackEvent('auth_failure', {
+        mode: 'login',
+        provider: 'google',
+        reason: mappedError.slice(0, 80),
+      });
       setBusy(false);
     }
   }

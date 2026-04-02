@@ -5756,6 +5756,7 @@ export function useGameState(saveSlot: string = 'default') {
   const onlineSyncDisabledRef = useRef(false);
   const sessionStartedRef = useRef(false);
   const sessionStartedAtRef = useRef(0);
+  const sessionStartHighestWaveRef = useRef(1);
   const prevSummonsRef = useRef(0);
   const prevHighestWaveRef = useRef(1);
   const prevPrestigeRef = useRef(0);
@@ -5893,6 +5894,7 @@ export function useGameState(saveSlot: string = 'default') {
     dispatch({ type: 'LOAD', payload: {} });
     sessionStartedRef.current = false;
     sessionStartedAtRef.current = 0;
+    sessionStartHighestWaveRef.current = 1;
     prevSummonsRef.current = 0;
     prevHighestWaveRef.current = 1;
     prevPrestigeRef.current = 0;
@@ -6012,6 +6014,7 @@ export function useGameState(saveSlot: string = 'default') {
     if (!state.characterCreated || sessionStartedRef.current) return;
     sessionStartedRef.current = true;
     sessionStartedAtRef.current = Date.now();
+    sessionStartHighestWaveRef.current = state.highestWaveReached;
     prevSummonsRef.current = state.totalSummons;
     prevHighestWaveRef.current = state.highestWaveReached;
     prevPrestigeRef.current = state.prestigeCount;
@@ -6027,12 +6030,17 @@ export function useGameState(saveSlot: string = 'default') {
     return () => {
       if (!sessionStartedRef.current) return;
       const durationSec = Math.max(1, Math.floor((Date.now() - sessionStartedAtRef.current) / 1000));
+      const highestWaveStart = sessionStartHighestWaveRef.current;
+      const highestWaveEnd = stateRef.current.highestWaveReached;
+      const highestWaveGain = Math.max(0, highestWaveEnd - highestWaveStart);
       void trackEvent('session_end', {
         saveSlot,
         durationSec,
         level: stateRef.current.level,
         wave: stateRef.current.wave,
-        highestWave: stateRef.current.highestWaveReached,
+        highestWave: highestWaveEnd,
+        highestWaveGain,
+        progressed: highestWaveGain > 0,
       });
     };
   }, [saveSlot]);
