@@ -1069,17 +1069,16 @@ export function calculateShardReward(rarity: Rarity, level: number): number {
   return Math.floor(rarityBaseValue * levelMultiplier);
 }
 
-export const HERO_REBIRTH_REFERENCE_MULT = 1.15;
+const HERO_REBIRTH_REFERENCE_MULT = 1.15;
 const HERO_REBIRTH_SHARD_BASE_COST = 320;
 const HERO_REBIRTH_SHARD_COST_MULT = 1.4;
 const HERO_REBIRTH_SHARD_GROWTH_PER_REBIRTH = 0.22;
 const HERO_REBIRTH_SHARD_LEVEL_REFERENCE = 80;
 const HERO_REBIRTH_ESSENCE_BASE_COST = 1;
 const HERO_REBIRTH_ESSENCE_STEP = 2;
-export const HERO_REBIRTH_BOOST_GAIN_BASE = 0.75;
-export const HERO_REBIRTH_BOOST_GAIN_DECAY = 0.84;
-export const HERO_REBIRTH_BOOST_GAIN_FLOOR = 0.04;
-export { HERO_REBIRTH_REFERENCE_MULT };
+const HERO_REBIRTH_BOOST_GAIN_BASE = 0.75;
+const HERO_REBIRTH_BOOST_GAIN_DECAY = 0.84;
+const HERO_REBIRTH_BOOST_GAIN_FLOOR = 0.04;
 
 export interface HeroRebirthPlan {
   estimatedRebirths: number;
