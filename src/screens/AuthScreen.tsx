@@ -226,7 +226,6 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const googleAuthEnabled = isGoogleAuthAvailable();
   const googleConfig = getGoogleAuthConfig();
   const hasNativeGoogleConfig = !!(googleConfig.expoClientId || googleConfig.androidClientId || googleConfig.iosClientId);
-  const hasWebGoogleConfig = !!googleConfig.webClientId;
 
   React.useEffect(() => {
     let cancelled = false;
@@ -351,9 +350,6 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
 
     try {
       if (Platform.OS === 'web') {
-        if (!hasWebGoogleConfig) {
-          throw new Error('Google web client ID is missing. Add EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID.');
-        }
         const authenticatedName = await loginOnlineWithGooglePopup();
         await completeOnlineLogin(authenticatedName, 'google', 'login');
         setBusy(false);
@@ -414,9 +410,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     ? 'Firebase auth is active. Use email/password or continue with Google.'
     : 'Offline fallback mode is active. Accounts are stored only on this device.';
   const googleNote = Platform.OS === 'web'
-    ? hasWebGoogleConfig
-      ? 'Google sign-in uses the Firebase web popup flow.'
-      : 'Google web sign-in needs EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID.'
+    ? 'Google sign-in uses the Firebase web popup flow configured in Firebase.'
     : googleAuthEnabled
       ? 'Google sign-in is ready for this build.'
       : 'Google sign-in needs Expo Google client IDs in your public env vars for native builds.';
@@ -470,8 +464,8 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               <>
                 {Platform.OS === 'web' || !hasNativeGoogleConfig ? (
                   <Pressable
-                    style={[styles.googleBtn, (busy || !(Platform.OS === 'web' ? hasWebGoogleConfig : hasNativeGoogleConfig)) && styles.buttonDisabled]}
-                    disabled={busy || !(Platform.OS === 'web' ? hasWebGoogleConfig : hasNativeGoogleConfig)}
+                    style={[styles.googleBtn, (busy || (Platform.OS !== 'web' && !hasNativeGoogleConfig)) && styles.buttonDisabled]}
+                    disabled={busy || (Platform.OS !== 'web' && !hasNativeGoogleConfig)}
                     onPress={handleGoogleContinue}
                   >
                     {busy ? <ActivityIndicator color="#08131E" /> : <Text style={styles.googleBtnText}>Continue with Google</Text>}
