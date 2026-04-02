@@ -510,16 +510,6 @@ export const USABLE_ITEMS: UsableItem[] = [
     dropWeight: 7,
   },
   {
-    id: 'vip_token',
-    name: 'Sovereign VIP Writ',
-    emoji: '👑',
-    description: 'Instantly grants 100 VIP points.',
-    itemType: 'basic',
-    effect: 'gain_vip_points_flat',
-    value: 100,
-    dropWeight: 3,
-  },
-  {
     id: 'grand_potion',
     name: 'Grand Vital Elixir',
     emoji: '🧴',
