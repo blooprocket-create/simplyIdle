@@ -54,7 +54,7 @@ export interface HeroesTabContentProps {
   saveTeamLoadout: (slot: number) => void;
   loadTeamLoadout: (slot: number) => void;
   toggleEquipHero: (heroId: string) => void;
-  toggleHeroUniqueWeapon: (heroId: string) => void;
+  toggleHeroUniqueWeapon: (heroUid: string) => void;
   rankUpHero: (heroId: string) => void;
   rebirthHero: (heroId: string) => void;
   levelUpHeroGold: (heroId: string) => void;
@@ -176,18 +176,9 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
     const bearerByHeroId: Record<string, string> = {};
 
     for (const [heroId, progress] of Object.entries(state.heroUniqueGearByHeroId)) {
-      if (!progress || progress.rank <= 0 || !progress.equipped) continue;
-      const copies = state.heroRoster.filter(hero => hero.id === heroId);
-      if (copies.length === 0) continue;
-      const best = copies.sort((a, b) => {
-        const rarityDiff = (rarityRank[b.rarity] ?? 0) - (rarityRank[a.rarity] ?? 0);
-        if (rarityDiff !== 0) return rarityDiff;
-        if (b.level !== a.level) return b.level - a.level;
-        if (b.rank !== a.rank) return b.rank - a.rank;
-        if (b.teamBoost !== a.teamBoost) return b.teamBoost - a.teamBoost;
-        return a.uid.localeCompare(b.uid);
-      })[0];
-      bearerByHeroId[heroId] = best.uid;
+      if (!progress || progress.rank <= 0 || !progress.equippedByUid) continue;
+      const bearer = state.heroRoster.find(hero => hero.uid === progress.equippedByUid && hero.id === heroId);
+      if (bearer) bearerByHeroId[heroId] = bearer.uid;
     }
 
     return bearerByHeroId;
@@ -389,9 +380,20 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
                   const activeArchetype = getHeroActiveArchetypeInfo(hero.activeSkillArchetype);
                   const uniqueProgress = state.heroUniqueGearByHeroId[hero.id];
                   const uniqueRank = uniqueProgress?.rank ?? 0;
-                  const uniqueEquipped = !!uniqueProgress?.equipped;
                   const uniqueBearerUid = uniqueBearerByHeroId[hero.id] ?? null;
-                  const isUniqueBearer = uniqueEquipped && uniqueBearerUid === hero.uid;
+                  const uniqueEquipped = !!uniqueBearerUid;
+                  const isUniqueBearer = uniqueBearerUid === hero.uid;
+                  const highestEligibleCopy = state.heroRoster
+                    .filter(copy => copy.id === hero.id)
+                    .sort((a, b) => {
+                      const rarityDiff = (rarityRank[b.rarity] ?? 0) - (rarityRank[a.rarity] ?? 0);
+                      if (rarityDiff !== 0) return rarityDiff;
+                      if (b.level !== a.level) return b.level - a.level;
+                      if (b.rank !== a.rank) return b.rank - a.rank;
+                      if (b.teamBoost !== a.teamBoost) return b.teamBoost - a.teamBoost;
+                      return a.uid.localeCompare(b.uid);
+                    })[0] ?? null;
+                  const canToggleUnique = uniqueRank > 0 && highestEligibleCopy?.uid === hero.uid;
                   const uniqueWeaponName = getHeroUniqueWeaponName(hero.id);
                   const uniqueDoctrine = getHeroUniqueEffectFamilyLabel(hero.id);
                   const uniqueSkill = uniqueRank > 0
@@ -574,10 +576,17 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
 
                             {uniqueRank > 0 && (
                               <Pressable
-                                style={styles.rankUpBtn}
-                                onPress={() => toggleHeroUniqueWeapon(hero.id)}
+                                style={[styles.rankUpBtn, !canToggleUnique && styles.rankUpBtnDisabled]}
+                                disabled={!canToggleUnique}
+                                onPress={() => toggleHeroUniqueWeapon(hero.uid)}
                               >
-                                <Text style={styles.rankUpBtnText}>{uniqueEquipped ? 'Unequip Unique Weapon' : 'Equip Unique Weapon'}</Text>
+                                <Text style={styles.rankUpBtnText}>
+                                  {canToggleUnique
+                                    ? uniqueEquipped
+                                      ? 'Unequip Unique Weapon'
+                                      : 'Equip Unique Weapon'
+                                    : 'Only highest-rarity copy can equip'}
+                                </Text>
                               </Pressable>
                             )}
 

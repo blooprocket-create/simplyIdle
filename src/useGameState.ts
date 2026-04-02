@@ -429,7 +429,7 @@ type EquipmentSource = 'starter' | 'drop' | 'craft' | 'crate' | 'upgrade' | 'leg
 
 export interface HeroUniqueGearProgress {
   rank: number;
-  equipped: boolean;
+  equippedByUid: string | null;
 }
 
 export interface EquipmentInstance {
@@ -746,9 +746,17 @@ function grantHeroUniqueGear(state: GameState, hero: HeroUnit): GameState {
   if (current >= 10) return state;
 
   const alreadyOwned = current > 0;
+  const eligibleCopies = state.heroRoster.filter(copy => copy.id === hero.id);
+  const preferredBearer = eligibleCopies.reduce<HeroUnit | null>((best, copy) => {
+    if (!best || isPreferredUniqueBearer(copy, best)) return copy;
+    return best;
+  }, null);
   const nextUnique = {
     ...state.heroUniqueGearByHeroId,
-    [hero.id]: { rank: nextRank, equipped: progress?.equipped ?? true },
+    [hero.id]: {
+      rank: nextRank,
+      equippedByUid: progress?.equippedByUid ?? preferredBearer?.uid ?? hero.uid,
+    },
   };
   const storySnippet = getHeroBackstory(hero.id);
   const uniqueWeaponName = getHeroUniqueWeaponName(hero.id);
@@ -782,7 +790,10 @@ function isPreferredUniqueBearer(candidate: HeroUnit, current: HeroUnit): boolea
 
 function getUniqueWeaponBearerUid(state: GameState, heroTemplateId: string): string | null {
   const progress = state.heroUniqueGearByHeroId[heroTemplateId];
-  if (!progress || progress.rank <= 0 || !progress.equipped) return null;
+  if (!progress || progress.rank <= 0 || !progress.equippedByUid) return null;
+
+  const bearer = state.heroRoster.find(hero => hero.uid === progress.equippedByUid && hero.id === heroTemplateId);
+  if (bearer) return bearer.uid;
 
   let best: HeroUnit | null = null;
   for (const hero of state.heroRoster) {
@@ -808,7 +819,7 @@ function getActiveUniqueSkillMultipliers(state: GameState): {
   let incomingDmgMult = 1;
 
   for (const [heroTemplateId, progress] of Object.entries(state.heroUniqueGearByHeroId)) {
-    if (!progress?.equipped) continue;
+    if (!progress?.equippedByUid) continue;
     const rank = progress.rank ?? 0;
     if (rank <= 0) continue;
     const bearerUid = getUniqueWeaponBearerUid(state, heroTemplateId);
@@ -2061,10 +2072,21 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
       const rank = isRecord(raw)
         ? clampInt(raw.rank, 1, 10, 1)
         : clampInt(raw, 1, 10, 1);
-      const equipped = isRecord(raw)
-        ? clampBoolean(raw.equipped, true)
-        : true;
-      heroUniqueGearByHeroId[heroId] = { rank, equipped };
+      const equippedByUid = isRecord(raw) && typeof raw.equippedByUid === 'string'
+        ? clampString(raw.equippedByUid, '', 128) || null
+        : isRecord(raw) && clampBoolean(raw.equipped, true)
+          ? heroRoster
+            .filter(hero => hero.id === heroId)
+            .sort((a, b) => {
+              const rarityDiff = rarityRank(b.rarity) - rarityRank(a.rarity);
+              if (rarityDiff !== 0) return rarityDiff;
+              if (b.level !== a.level) return b.level - a.level;
+              if (b.rank !== a.rank) return b.rank - a.rank;
+              if (b.teamBoost !== a.teamBoost) return b.teamBoost - a.teamBoost;
+              return a.uid.localeCompare(b.uid);
+            })[0]?.uid ?? null
+          : null;
+      heroUniqueGearByHeroId[heroId] = { rank, equippedByUid };
     }
   }
 
@@ -2789,7 +2811,7 @@ function checkAchievements(state: GameState): string | null {
   const transcendentHeroCount = state.heroRoster.filter(hero => hero.rarity === 'transcendent').length;
   const uniqueEntries = Object.values(state.heroUniqueGearByHeroId);
   const uniqueForgedCount = uniqueEntries.filter(progress => (progress?.rank ?? 0) > 0).length;
-  const uniqueEquippedCount = uniqueEntries.filter(progress => (progress?.rank ?? 0) > 0 && !!progress?.equipped).length;
+  const uniqueEquippedCount = uniqueEntries.filter(progress => (progress?.rank ?? 0) > 0 && !!progress?.equippedByUid).length;
   const uniqueMaxRankCount = uniqueEntries.filter(progress => (progress?.rank ?? 0) >= 10).length;
   const codexClaimCount = state.codexVipClaimedHeroIds.length + state.codexVipClaimedUniqueIds.length;
   const facilityTotalLevel = Object.values(state.guildhallFacilities).reduce((sum, facility) => sum + facility.level, 0);
@@ -2945,7 +2967,7 @@ type Action =
   | { type: 'AUTO_RECYCLE_HEROES' }
   | { type: 'SET_AUTO_RECYCLE_MAX_RARITY'; rarity: Rarity }
   | { type: 'SET_AUTO_RECYCLE_ENABLED'; enabled: boolean }
-  | { type: 'TOGGLE_HERO_UNIQUE_WEAPON'; heroId: string }
+  | { type: 'TOGGLE_HERO_UNIQUE_WEAPON'; heroUid: string }
   | { type: 'RANK_UP_HERO'; uid: string }
   | { type: 'CONVERT_SHARDS_TO_ESSENCE' }
   | { type: 'CONVERT_SHARDS_TO_SCRAP' }
@@ -4658,16 +4680,26 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'TOGGLE_HERO_UNIQUE_WEAPON': {
-      if (!VALID_HERO_TEMPLATE_IDS.has(action.heroId)) return state;
-      const current = state.heroUniqueGearByHeroId[action.heroId];
+      const hero = state.heroRoster.find(entry => entry.uid === action.heroUid);
+      if (!hero || !VALID_HERO_TEMPLATE_IDS.has(hero.id)) return state;
+      const current = state.heroUniqueGearByHeroId[hero.id];
       if (!current || current.rank <= 0) return state;
+
+      const copies = state.heroRoster.filter(copy => copy.id === hero.id);
+      const eligibleBearer = copies.reduce<HeroUnit | null>((best, copy) => {
+        if (!best || isPreferredUniqueBearer(copy, best)) return copy;
+        return best;
+      }, null);
+      if (!eligibleBearer) return state;
+
+      const isCurrentlyEquipped = current.equippedByUid === eligibleBearer.uid;
       return {
         ...state,
         heroUniqueGearByHeroId: {
           ...state.heroUniqueGearByHeroId,
-          [action.heroId]: {
+          [hero.id]: {
             ...current,
-            equipped: !current.equipped,
+            equippedByUid: isCurrentlyEquipped ? null : eligibleBearer.uid,
           },
         },
       };
@@ -5756,8 +5788,8 @@ export function useGameState(saveSlot: string = 'default') {
   const setAutoRecycleEnabled = useCallback((enabled: boolean) => {
     dispatch({ type: 'SET_AUTO_RECYCLE_ENABLED', enabled });
   }, []);
-  const toggleHeroUniqueWeapon = useCallback((heroId: string) => {
-    dispatch({ type: 'TOGGLE_HERO_UNIQUE_WEAPON', heroId });
+  const toggleHeroUniqueWeapon = useCallback((heroUid: string) => {
+    dispatch({ type: 'TOGGLE_HERO_UNIQUE_WEAPON', heroUid });
   }, []);
   const rankUpHero = useCallback((uid: string) => dispatch({ type: 'RANK_UP_HERO', uid }), []);
   const levelUpHeroGold = useCallback((uid: string) => dispatch({ type: 'LEVEL_UP_HERO_GOLD', uid }), []);

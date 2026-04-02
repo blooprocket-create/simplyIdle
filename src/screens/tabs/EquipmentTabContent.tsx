@@ -22,7 +22,7 @@ export interface EquipmentTabContentProps {
   autoDismantleEquipment: () => void;
   craftEquipment: (slot: EquipmentSlot) => void;
   equipItem: (itemId: string) => void;
-  toggleHeroUniqueWeapon: (heroId: string) => void;
+  toggleHeroUniqueWeapon: (heroUid: string) => void;
   upgradeEquipmentRarity: (itemId: string) => void;
   dismantleEquipment: (itemId: string) => void;
   convertShardsToEssence: () => void;
@@ -82,12 +82,14 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
       .map(hero => {
         const progress = state.heroUniqueGearByHeroId[hero.id];
         const copyCount = state.heroRoster.filter(copy => copy.id === hero.id).length;
+        const uniqueBearerUid = progress?.equippedByUid ?? null;
         return {
           hero,
           progress,
           copyCount,
           uniqueRank: progress?.rank ?? 0,
-          uniqueEquipped: !!progress?.equipped,
+          uniqueEquipped: !!uniqueBearerUid,
+          uniqueBearerUid,
         };
       })
       .sort((a, b) => {
@@ -162,14 +164,15 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
               {uniqueArmoryEntries.length === 0 ? (
                 <Text style={styles.emptyMsg}>Summon heroes to start building the armory. Owned heroes appear here even before their unique weapon is forged.</Text>
               ) : (
-                uniqueArmoryEntries.map(({ hero, copyCount, uniqueRank, uniqueEquipped }) => {
+                uniqueArmoryEntries.map(({ hero, copyCount, uniqueRank, uniqueEquipped, uniqueBearerUid }) => {
                     const uniqueWeaponName = getHeroUniqueWeaponName(hero.id);
                     const uniqueDoctrine = getHeroUniqueEffectFamilyLabel(hero.id);
                     const isLocked = uniqueRank <= 0;
+                    const bearer = state.heroRoster.find(copy => copy.uid === uniqueBearerUid) ?? hero;
                     const uniqueSkillText = isLocked
                       ? `Locked • ${uniqueWeaponName} has not been forged yet.`
                       : getHeroUniqueSkillDescription(hero.id, uniqueRank);
-                    const bearerLabel = `${hero.name} • ${hero.rarity.toUpperCase()} • Lv ${hero.level} • Rank ${hero.rank}`;
+                    const bearerLabel = `${bearer.name} • ${bearer.rarity.toUpperCase()} • Lv ${bearer.level} • Rank ${bearer.rank}`;
                     return (
                       <View key={hero.id} style={[styles.uniqueArmoryCard, uniqueEquipped && styles.uniqueArmoryCardEquipped, isLocked && styles.uniqueArmoryCardLocked]}>
                         <View style={styles.uniqueArmoryCardTop}>
@@ -195,7 +198,7 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
                         <Text style={styles.uniqueArmoryLore}>{getHeroBackstory(hero.id)}</Text>
                         <Text style={styles.uniqueArmoryRule}>Only {hero.name} can wield this weapon.</Text>
                         {!isLocked && (
-                          <Pressable style={styles.uniqueArmoryToggleBtn} onPress={() => toggleHeroUniqueWeapon(hero.id)}>
+                          <Pressable style={styles.uniqueArmoryToggleBtn} onPress={() => toggleHeroUniqueWeapon(bearer.uid)}>
                             <Text style={styles.uniqueArmoryToggleBtnText}>{uniqueEquipped ? 'Unequip Unique Weapon' : 'Equip Unique Weapon'}</Text>
                           </Pressable>
                         )}
