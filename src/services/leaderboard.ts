@@ -16,7 +16,7 @@ const LEADERBOARD_COLLECTION = 'leaderboard_global_v1';
 export interface LeaderboardEntry {
   uid: string;
   accountName: string;
-  playerName: string;
+  publicUsername: string;
   score: number;
   highestWaveReached: number;
   prestigeCount: number;
@@ -25,7 +25,7 @@ export interface LeaderboardEntry {
 
 export interface SubmitLeaderboardScoreInput {
   accountName: string;
-  playerName: string;
+  publicUsername: string;
   score: number;
   highestWaveReached: number;
   prestigeCount: number;
@@ -42,7 +42,7 @@ function isEntry(value: unknown): value is LeaderboardEntry {
   return (
     typeof entry.uid === 'string'
     && typeof entry.accountName === 'string'
-    && typeof entry.playerName === 'string'
+    && typeof entry.publicUsername === 'string'
     && typeof entry.score === 'number'
     && typeof entry.highestWaveReached === 'number'
     && typeof entry.prestigeCount === 'number'
@@ -75,7 +75,7 @@ export async function submitLeaderboardScore(input: SubmitLeaderboardScoreInput)
     tx.set(ref, {
       uid,
       accountName: input.accountName.trim().toLowerCase().slice(0, 48),
-      playerName: input.playerName.trim().slice(0, 24) || 'Commander',
+      publicUsername: input.publicUsername.trim().slice(0, 24) || 'Commander',
       score,
       highestWaveReached: clampScore(input.highestWaveReached),
       prestigeCount: clampScore(input.prestigeCount),

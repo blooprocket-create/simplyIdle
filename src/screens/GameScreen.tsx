@@ -74,6 +74,8 @@ import { isCurrentUserAdmin } from '../services/adminAccess';
 import { normalizeCharacterNameForCompare, releaseCharacterName, reserveCharacterName } from '../services/characterNameRegistry';
 import { fetchCurrentUserRank, fetchLeaderboardTop, isLiveLeaderboardAvailable, submitLeaderboardScore } from '../services/leaderboard';
 import { deleteOnlineSave } from '../services/onlineSave';
+import { getCachedPublicUsername, refreshCurrentUserPublicUsername } from '../services/publicProfile';
+import { getFirebaseAuth } from '../services/firebase';
 
 export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations';
 type HeroesSubTab = 'summon' | 'roster' | 'batch';
@@ -365,6 +367,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [achievementsSubTab, setAchievementsSubTab] = useState<AchievementsSubTab>('overview');
   const [operationsSubTab, setOperationsSubTab] = useState<OperationsSubTab>('facilities');
   const [eventsOpen, setEventsOpen] = useState(false);
+  const [publicUsername, setPublicUsername] = useState('');
   const [liveLeaderboardRows, setLiveLeaderboardRows] = useState<LiveLeaderboardRow[]>([]);
   const [liveLeaderboardRank, setLiveLeaderboardRank] = useState<number | null>(null);
   const [liveLeaderboardLoading, setLiveLeaderboardLoading] = useState(false);
@@ -1654,7 +1657,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         if (isLiveLeaderboardAvailable()) {
           await submitLeaderboardScore({
             accountName,
-            playerName: state.playerName || 'Commander',
+            publicUsername: publicUsername || accountName,
             score: playerBoardScore,
             highestWaveReached: state.highestWaveReached,
             prestigeCount: state.prestigeCount,
@@ -1669,10 +1672,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
           const mapped = topRows.map((row, index) => ({
             rank: index + 1,
-            name: row.playerName,
+            name: row.publicUsername,
             score: row.score,
             badge: index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '⚔️',
-            isYou: row.accountName === accountName,
+            isYou: row.uid === (getFirebaseAuth()?.currentUser?.uid ?? ''),
           }));
 
           setLiveLeaderboardRows(mapped);
@@ -1700,7 +1703,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [eventsOpen, state.characterCreated, accountName, state.playerName, playerBoardScore, state.highestWaveReached, state.prestigeCount]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventsOpen, state.characterCreated, accountName, publicUsername, playerBoardScore, state.highestWaveReached, state.prestigeCount]);
 
   // Manage expedition queue timer display (ticks every second to update countdown display)
   useEffect(() => {
@@ -2104,6 +2108,17 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
     setDevCommandOutput(`Unknown command: ${tokens[0]}. Supported: /sendMsg, /showOnlineusersAndCharacters, /clearslot`);
   }, [accountName, appendMailboxMessages, collectCharacterSnapshots, devCommandInput, isAdmin, selectedCharacterClass, state.characterCreated, state.highestWaveReached, state.level, state.playerName]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const cached = await getCachedPublicUsername();
+      if (!cancelled && cached) setPublicUsername(cached);
+      const fresh = await refreshCurrentUserPublicUsername();
+      if (!cancelled && fresh) setPublicUsername(fresh);
+    })();
+    return () => { cancelled = true; };
+  }, [accountName]);
 
   useEffect(() => {
     let cancelled = false;

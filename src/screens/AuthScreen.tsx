@@ -26,6 +26,17 @@ import {
   loginOnlineWithGoogleTokens,
   registerOnline,
 } from '../services/onlineAuth';
+import { getFirebaseAuth } from '../services/firebase';
+import {
+  getCachedPublicUsername,
+  isPublicUsernameAvailable,
+  loadPublicUsername,
+  normalizePublicUsername,
+  PUBLIC_USERNAME_MAX,
+  PUBLIC_USERNAME_MIN,
+  reservePublicUsername,
+  validatePublicUsername,
+} from '../services/publicProfile';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -219,6 +230,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [publicUsername, setPublicUsername] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [knownUsernames, setKnownUsernames] = useState<string[]>([]);
@@ -253,7 +265,10 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     if (onlineAuthEnabled) {
       if (!EMAIL_REGEX.test(normalizedEmail)) return false;
       if (password.length < PASSWORD_MIN_LENGTH) return false;
-      if (mode === 'register' && password !== confirmPassword) return false;
+      if (mode === 'register') {
+        if (password !== confirmPassword) return false;
+        if (validatePublicUsername(publicUsername) !== null) return false;
+      }
       return true;
     }
 
@@ -262,10 +277,15 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     if (mode === 'register' && password !== confirmPassword) return false;
     if (isUsernameTaken) return false;
     return true;
-  }, [busy, onlineAuthEnabled, normalizedEmail, password, mode, confirmPassword, cleanIdentifier, isUsernameTaken]);
+  }, [busy, onlineAuthEnabled, normalizedEmail, password, mode, confirmPassword, cleanIdentifier, isUsernameTaken, publicUsername]);
 
   async function completeOnlineLogin(accountName: string, provider: 'email' | 'google', authMode: 'login' | 'register') {
     await AsyncStorage.setItem(SESSION_KEY, accountName);
+    // Refresh the public username cache in the background (non-blocking).
+    const uid = getFirebaseAuth()?.currentUser?.uid;
+    if (uid) {
+      void loadPublicUsername(uid);
+    }
     debugLog('auth', 'Online auth successful', { mode: authMode, provider, username: accountName });
     void trackGameplayAction(authMode === 'register' ? 'auth_register_success' : 'auth_login_success', {
       username: accountName,
@@ -283,9 +303,36 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
 
     try {
       if (onlineAuthEnabled) {
+        if (mode === 'register') {
+          // Validate format first (canSubmit also guards this, but double-check).
+          const formatError = validatePublicUsername(publicUsername);
+          if (formatError) {
+            setError(formatError);
+            return;
+          }
+          // Pre-check uniqueness (non-transactional, catches most conflicts early).
+          const available = await isPublicUsernameAvailable(publicUsername);
+          if (!available) {
+            setError('That username is already taken. Please choose another.');
+            return;
+          }
+        }
+
         const authenticatedName = mode === 'register'
           ? await registerOnline(normalizedEmail, password)
           : await loginOnline(normalizedEmail, password);
+
+        if (mode === 'register') {
+          const uid = getFirebaseAuth()?.currentUser?.uid;
+          if (uid) {
+            const result = await reservePublicUsername(publicUsername.trim(), uid);
+            if (!result.ok) {
+              // Rare race condition — account is created but username was sniped.
+              // Proceed with login; the user can update their display name later.
+              debugLog('auth', 'Public username reservation failed after account creation', { error: result.error });
+            }
+          }
+        }
 
         await completeOnlineLogin(authenticatedName, 'email', mode);
         return;
@@ -409,6 +456,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                 onPress={() => {
                   setMode('login');
                   setError(null);
+                  setPublicUsername('');
                 }}
               >
                 <Text style={[styles.modeBtnText, mode === 'login' && styles.modeBtnTextActive]}>Log In</Text>
@@ -418,6 +466,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                 onPress={() => {
                   setMode('register');
                   setError(null);
+                  setPublicUsername('');
                 }}
               >
                 <Text style={[styles.modeBtnText, mode === 'register' && styles.modeBtnTextActive]}>Create</Text>
@@ -505,6 +554,28 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   {confirmPassword.length === 0 || password === confirmPassword
                     ? 'Confirmation must match exactly.'
                     : 'Passwords do not match.'}
+                </Text>
+              </>
+            )}
+
+            {mode === 'register' && onlineAuthEnabled && (
+              <>
+                <Text style={styles.fieldLabel}>Public Username</Text>
+                <TextInput
+                  value={publicUsername}
+                  onChangeText={setPublicUsername}
+                  style={styles.input}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="username"
+                  placeholder="your_username"
+                  placeholderTextColor="#6D7A90"
+                  maxLength={PUBLIC_USERNAME_MAX}
+                />
+                <Text style={[styles.helperText, publicUsername.length > 0 && validatePublicUsername(publicUsername) !== null && styles.helperTextError]}>
+                  {publicUsername.length > 0 && validatePublicUsername(publicUsername)
+                    ? validatePublicUsername(publicUsername) ?? ''
+                    : `${PUBLIC_USERNAME_MIN}–${PUBLIC_USERNAME_MAX} characters, letters/numbers/underscores. This name is shown publicly on the leaderboard.`}
                 </Text>
               </>
             )}

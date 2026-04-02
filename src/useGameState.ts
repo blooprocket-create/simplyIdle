@@ -101,7 +101,7 @@ const DIAMOND_SHOP_COSTS: Record<DiamondShopOfferId, number> = {
   coolant_i_pack: 24,
   coolant_ii_pack: 58,
   elite_supply: 120,
-  rift_raid_ticket: 45,
+  rift_raid_ticket: 150,
 };
 const DOLLAR_SHOP_PACKS: Record<DollarShopOfferId, { usdCents: number; diamonds: number }> = {
   usd_499: { usdCents: 499, diamonds: 500 },
@@ -5172,7 +5172,7 @@ function reducer(state: GameState, action: Action): GameState {
           id: `shop_diamond_rift_ticket_${Date.now()}`,
           kind: 'item',
           title: 'Diamond Shop Purchase: Dungeon Raid Ticket',
-          detail: '-45 diamonds, +1 Dungeon Raid Ticket',
+          detail: '-150 diamonds, +1 Dungeon Raid Ticket',
         });
       } else {
         counts = addUsableItemCount(counts, 'coolant_mk1', 5);
