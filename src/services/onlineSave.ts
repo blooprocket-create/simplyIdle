@@ -19,6 +19,17 @@ interface SaveDocRecord {
   payload: Record<string, unknown>;
 }
 
+const NESTED_ARRAY_MARKER = '__simplyIdle_nested_array_v1__';
+const OMIT_VALUE = Symbol('omit-firestore-value');
+
+type EncodedFirestoreValue =
+  | null
+  | string
+  | number
+  | boolean
+  | EncodedFirestoreValue[]
+  | { [key: string]: EncodedFirestoreValue };
+
 export type OnlineSaveWriteResult<TPayload extends Record<string, unknown>> =
   | { ok: true; revision: number }
   | { ok: false; remote: OnlineSaveEnvelope<TPayload> | null; errorCode?: OnlineSaveErrorCode };
@@ -64,8 +75,88 @@ function toEnvelope<TPayload extends Record<string, unknown>>(raw: unknown): Onl
   return {
     revision: Math.max(0, Math.floor(raw.revision)),
     updatedAt: Math.max(0, Math.floor(raw.updatedAt)),
-    payload: raw.payload as TPayload,
+    payload: decodeFirestorePayload(raw.payload) as TPayload,
   };
+}
+
+function encodeFirestoreValue(value: unknown, parentIsArray = false): EncodedFirestoreValue | typeof OMIT_VALUE {
+  if (value === undefined) {
+    return parentIsArray ? null : OMIT_VALUE;
+  }
+
+  if (value === null) return null;
+
+  if (Array.isArray(value)) {
+    const encodedItems = value
+      .map(item => encodeFirestoreValue(item, true))
+      .map(item => (item === OMIT_VALUE ? null : item));
+
+    if (parentIsArray) {
+      return { [NESTED_ARRAY_MARKER]: encodedItems };
+    }
+
+    return encodedItems;
+  }
+
+  if (typeof value === 'object') {
+    const encodedObject: Record<string, EncodedFirestoreValue> = {};
+    Object.entries(value as Record<string, unknown>).forEach(([key, nested]) => {
+      const encoded = encodeFirestoreValue(nested, false);
+      if (encoded !== OMIT_VALUE) {
+        encodedObject[key] = encoded;
+      }
+    });
+    return encodedObject;
+  }
+
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+
+  return String(value);
+}
+
+function encodeFirestorePayload(payload: Record<string, unknown>): Record<string, EncodedFirestoreValue> {
+  const encoded = encodeFirestoreValue(payload, false);
+  return (encoded && typeof encoded === 'object' && !Array.isArray(encoded))
+    ? encoded as Record<string, EncodedFirestoreValue>
+    : {};
+}
+
+function decodeFirestoreValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(decodeFirestoreValue);
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  const asRecord = value as Record<string, unknown>;
+  if (
+    Object.keys(asRecord).length === 1
+    && NESTED_ARRAY_MARKER in asRecord
+    && Array.isArray(asRecord[NESTED_ARRAY_MARKER])
+  ) {
+    return (asRecord[NESTED_ARRAY_MARKER] as unknown[]).map(decodeFirestoreValue);
+  }
+
+  const decoded: Record<string, unknown> = {};
+  Object.entries(asRecord).forEach(([key, nested]) => {
+    decoded[key] = decodeFirestoreValue(nested);
+  });
+  return decoded;
+}
+
+function decodeFirestorePayload(payload: Record<string, unknown>): Record<string, unknown> {
+  const decoded = decodeFirestoreValue(payload);
+  return (decoded && typeof decoded === 'object' && !Array.isArray(decoded))
+    ? decoded as Record<string, unknown>
+    : {};
 }
 
 export function isOnlineSaveAvailable(): boolean {
@@ -107,6 +198,7 @@ export async function writeOnlineSave<TPayload extends Record<string, unknown>>(
     const safeSlot = sanitizeSaveSlot(saveSlot);
     const ref = doc(db, 'users', uid, 'saveSlots', safeSlot);
     const now = Date.now();
+    const safePayload = encodeFirestorePayload(payload);
 
     return runTransaction(db, async tx => {
       const snap = await tx.get(ref);
@@ -124,7 +216,7 @@ export async function writeOnlineSave<TPayload extends Record<string, unknown>>(
         updatedAt: now,
         schemaVersion: SAVE_SCHEMA_VERSION,
         saveSlot: safeSlot,
-        payload,
+        payload: safePayload,
       });
 
       return { ok: true, revision: nextRevision } as OnlineSaveWriteResult<TPayload>;

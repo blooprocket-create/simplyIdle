@@ -461,6 +461,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               style={styles.input}
               autoCapitalize="none"
               autoCorrect={false}
+              autoComplete={onlineAuthEnabled ? 'email' : 'username'}
               keyboardType={onlineAuthEnabled ? 'email-address' : 'default'}
               placeholder={identityPlaceholder}
               placeholderTextColor="#6D7A90"
@@ -479,6 +480,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               style={styles.input}
               secureTextEntry
               autoCapitalize="none"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               placeholder="Enter password"
               placeholderTextColor="#6D7A90"
               maxLength={PASSWORD_MAX_LENGTH}
@@ -494,6 +496,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   style={styles.input}
                   secureTextEntry
                   autoCapitalize="none"
+                  autoComplete="new-password"
                   placeholder="Repeat password"
                   placeholderTextColor="#6D7A90"
                   maxLength={PASSWORD_MAX_LENGTH}
