@@ -202,6 +202,13 @@ export const styles = StyleSheet.create({
     lineHeight: 16,
     marginBottom: 8,
   },
+  createErrorText: {
+    fontSize: 12,
+    color: '#FF9DAC',
+    fontWeight: '700',
+    lineHeight: 17,
+    marginBottom: 10,
+  },
   characterLoadingWrap: {
     flex: 1,
     paddingHorizontal: 24,

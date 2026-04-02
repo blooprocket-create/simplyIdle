@@ -71,6 +71,7 @@ import {
 } from './tabs';
 import { styles } from './GameScreen.styles';
 import { isCurrentUserAdmin } from '../services/adminAccess';
+import { normalizeCharacterNameForCompare, releaseCharacterName, reserveCharacterName } from '../services/characterNameRegistry';
 
 export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations';
 type HeroesSubTab = 'summon' | 'roster' | 'batch';
@@ -336,6 +337,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [tab, setTab] = useState<Tab>('warroom');
   const [rebirthOpen, setRebirthOpen] = useState(false);
   const [draftName, setDraftName] = useState('');
+  const [characterNameError, setCharacterNameError] = useState<string | null>(null);
+  const [characterCreatePending, setCharacterCreatePending] = useState(false);
   const [draftClass, setDraftClass] = useState<PlayerClass>('warrior');
   const [expandedHeroes, setExpandedHeroes] = useState<Set<string>>(new Set());
   const [recycleConfirmUid, setRecycleConfirmUid] = useState<string | null>(null);
@@ -1686,13 +1689,31 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   function openCharacterSlot(playerClass: PlayerClass) {
     debugLog('character', 'Open character slot', { playerClass });
     setDraftName('');
+    setCharacterNameError(null);
     setSelectedCharacterClass(playerClass);
   }
 
   async function deleteCharacterSlot(playerClass: PlayerClass) {
     debugLog('character', 'Delete character slot requested', { playerClass });
     const saveKey = getSaveStorageKey(getCharacterSaveSlot(accountName, playerClass));
+    const raw = await AsyncStorage.getItem(saveKey);
+    let removedCharacterName = '';
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as { playerName?: unknown; characterCreated?: unknown };
+        const candidateName = typeof parsed.playerName === 'string' ? parsed.playerName.trim().slice(0, 24) : '';
+        if (candidateName && parsed.characterCreated === true) {
+          removedCharacterName = candidateName;
+        }
+      } catch {
+        // Ignore malformed save data and continue deletion.
+      }
+    }
+
     await AsyncStorage.removeItem(saveKey);
+    if (removedCharacterName) {
+      await releaseCharacterName(removedCharacterName);
+    }
 
     const lastSlotKey = getLastCharacterSlotKey(accountName);
     const lastSelected = await AsyncStorage.getItem(lastSlotKey);
@@ -1746,7 +1767,45 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     debugLog('character', 'Return to character select');
     setSettingsOpen(false);
     setDraftName('');
+    setCharacterNameError(null);
     setSelectedCharacterClass(null);
+  }
+
+  async function handleCreateCharacter() {
+    const trimmedName = draftName.trim();
+    if (!trimmedName || characterCreatePending) return;
+
+    setCharacterNameError(null);
+    setCharacterCreatePending(true);
+
+    try {
+      const normalizedDraftName = normalizeCharacterNameForCompare(trimmedName);
+      const snapshots = await collectCharacterSnapshots();
+      const alreadyUsed = snapshots.some(snapshot => normalizeCharacterNameForCompare(snapshot.playerName) === normalizedDraftName);
+      if (alreadyUsed) {
+        setCharacterNameError('That character name is already taken. Pick another name.');
+        return;
+      }
+
+      const reserveResult = await reserveCharacterName(trimmedName, accountName);
+      if (!reserveResult.ok) {
+        if (reserveResult.error === 'taken') {
+          setCharacterNameError('That character name is already taken. Pick another name.');
+          return;
+        }
+        if (reserveResult.error === 'unavailable') {
+          setCharacterNameError('Could not verify name availability right now. Try again in a moment.');
+          return;
+        }
+        setCharacterNameError('Unable to reserve this character name. Please try another name.');
+        return;
+      }
+
+      debugLog('character', 'Create character requested', { draftClass, nameLength: trimmedName.length });
+      createCharacter(trimmedName, draftClass);
+    } finally {
+      setCharacterCreatePending(false);
+    }
   }
 
   const collectCharacterSnapshots = useCallback(async (): Promise<CharacterSnapshot[]> => {
@@ -2091,13 +2150,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           <Text style={styles.fieldLabel}>Hero Name</Text>
           <TextInput
             value={draftName}
-            onChangeText={setDraftName}
+            onChangeText={(value: string) => {
+              setDraftName(value);
+              if (characterNameError) {
+                setCharacterNameError(null);
+              }
+            }}
             style={styles.input}
             placeholder="Enter hero name"
             placeholderTextColor="#7575A8"
             maxLength={24}
           />
           <Text style={styles.createHint}>Name must be 1-24 characters. You can have one character for each class slot.</Text>
+          {!!characterNameError && <Text style={styles.createErrorText}>{characterNameError}</Text>}
 
           <Text style={styles.fieldLabel}>Class</Text>
           {selectedClassConfig && (
@@ -2109,14 +2174,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           )}
 
           <Pressable
-            style={[styles.startBtn, draftName.trim().length === 0 && styles.startBtnDisabled]}
-            disabled={draftName.trim().length === 0}
+            style={[styles.startBtn, (draftName.trim().length === 0 || characterCreatePending) && styles.startBtnDisabled]}
+            disabled={draftName.trim().length === 0 || characterCreatePending}
             onPress={() => {
-              debugLog('character', 'Create character requested', { draftClass, nameLength: draftName.trim().length });
-              createCharacter(draftName, draftClass);
+              void handleCreateCharacter();
             }}
           >
-            <Text style={styles.startBtnText}>Start Adventure</Text>
+            <Text style={styles.startBtnText}>{characterCreatePending ? 'Checking Name...' : 'Start Adventure'}</Text>
           </Pressable>
         </ScrollView>
       </SafeAreaView>
