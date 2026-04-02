@@ -1,4 +1,4 @@
-import { doc, getDoc, runTransaction } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, runTransaction } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseFirestore, isFirebaseConfigured } from './firebase';
 
 const SAVE_SCHEMA_VERSION = 1;
@@ -227,5 +227,20 @@ export async function writeOnlineSave<TPayload extends Record<string, unknown>>(
     });
   } catch (error) {
     return { ok: false, remote: null, errorCode: mapFirestoreErrorCode(error) };
+  }
+}
+
+export async function deleteOnlineSave(saveSlot: string): Promise<{ ok: boolean; errorCode?: OnlineSaveErrorCode }> {
+  const db = getFirebaseFirestore();
+  const uid = getCurrentUid();
+  if (!db || !uid) return { ok: false, errorCode: 'unavailable' };
+
+  try {
+    const safeSlot = sanitizeSaveSlot(saveSlot);
+    const ref = doc(db, 'users', uid, 'saveSlots', safeSlot);
+    await deleteDoc(ref);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, errorCode: mapFirestoreErrorCode(error) };
   }
 }

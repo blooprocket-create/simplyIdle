@@ -73,6 +73,7 @@ import { styles } from './GameScreen.styles';
 import { isCurrentUserAdmin } from '../services/adminAccess';
 import { normalizeCharacterNameForCompare, releaseCharacterName, reserveCharacterName } from '../services/characterNameRegistry';
 import { fetchCurrentUserRank, fetchLeaderboardTop, isLiveLeaderboardAvailable, submitLeaderboardScore } from '../services/leaderboard';
+import { deleteOnlineSave } from '../services/onlineSave';
 
 export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations';
 type HeroesSubTab = 'summon' | 'roster' | 'batch';
@@ -2075,7 +2076,33 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       return;
     }
 
-    setDevCommandOutput(`Unknown command: ${tokens[0]}. Supported: /sendMsg, /showOnlineusersAndCharacters`);
+    if (command === '/clearslot') {
+      // Usage: /clearslot <classId>
+      // Wipes BOTH local AsyncStorage AND Firestore for the current user's slot so deletion from Firestore console actually sticks.
+      const classArg = (tokens[1] ?? '').trim().toLowerCase() as PlayerClass;
+      const validClasses: PlayerClass[] = ['warrior', 'berserker', 'archer', 'mage', 'monk'];
+      if (!classArg || !validClasses.includes(classArg)) {
+        setDevCommandOutput(`Usage: /clearslot <classId>\nValid classes: ${validClasses.join(', ')}`);
+        return;
+      }
+
+      const targetSlot = getCharacterSaveSlot(accountName, classArg);
+      const targetKey = getSaveStorageKey(targetSlot);
+
+      const [, remoteResult] = await Promise.all([
+        AsyncStorage.removeItem(targetKey),
+        deleteOnlineSave(targetSlot),
+      ]);
+
+      if (remoteResult.ok) {
+        setDevCommandOutput(`Cleared local + Firestore save for ${accountName} / ${classArg}.\nReload the page to start fresh.`);
+      } else {
+        setDevCommandOutput(`Local save cleared. Firestore delete failed (${remoteResult.errorCode ?? 'unknown'}) — it may have already been empty.`);
+      }
+      return;
+    }
+
+    setDevCommandOutput(`Unknown command: ${tokens[0]}. Supported: /sendMsg, /showOnlineusersAndCharacters, /clearslot`);
   }, [accountName, appendMailboxMessages, collectCharacterSnapshots, devCommandInput, isAdmin, selectedCharacterClass, state.characterCreated, state.highestWaveReached, state.level, state.playerName]);
 
   useEffect(() => {
