@@ -788,13 +788,7 @@ function isPreferredUniqueBearer(candidate: HeroUnit, current: HeroUnit): boolea
   return candidate.uid.localeCompare(current.uid) < 0;
 }
 
-function getUniqueWeaponBearerUid(state: GameState, heroTemplateId: string): string | null {
-  const progress = state.heroUniqueGearByHeroId[heroTemplateId];
-  if (!progress || progress.rank <= 0 || !progress.equippedByUid) return null;
-
-  const bearer = state.heroRoster.find(hero => hero.uid === progress.equippedByUid && hero.id === heroTemplateId);
-  if (bearer) return bearer.uid;
-
+function getPreferredUniqueBearer(state: Pick<GameState, 'heroRoster'>, heroTemplateId: string): HeroUnit | null {
   let best: HeroUnit | null = null;
   for (const hero of state.heroRoster) {
     if (hero.id !== heroTemplateId) continue;
@@ -802,8 +796,33 @@ function getUniqueWeaponBearerUid(state: GameState, heroTemplateId: string): str
       best = hero;
     }
   }
+  return best;
+}
 
-  return best?.uid ?? null;
+function syncUniqueWeaponAssignmentForHero(state: GameState, heroTemplateId: string): GameState {
+  const progress = state.heroUniqueGearByHeroId[heroTemplateId];
+  if (!progress || progress.rank <= 0 || !progress.equippedByUid) return state;
+
+  const preferredBearer = getPreferredUniqueBearer(state, heroTemplateId);
+  if (!preferredBearer || preferredBearer.uid === progress.equippedByUid) return state;
+
+  return {
+    ...state,
+    heroUniqueGearByHeroId: {
+      ...state.heroUniqueGearByHeroId,
+      [heroTemplateId]: {
+        ...progress,
+        equippedByUid: preferredBearer.uid,
+      },
+    },
+  };
+}
+
+function getUniqueWeaponBearerUid(state: GameState, heroTemplateId: string): string | null {
+  const progress = state.heroUniqueGearByHeroId[heroTemplateId];
+  if (!progress || progress.rank <= 0 || !progress.equippedByUid) return null;
+
+  return getPreferredUniqueBearer(state, heroTemplateId)?.uid ?? null;
 }
 
 function getActiveUniqueSkillMultipliers(state: GameState): {
@@ -2072,20 +2091,10 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
       const rank = isRecord(raw)
         ? clampInt(raw.rank, 1, 10, 1)
         : clampInt(raw, 1, 10, 1);
-      const equippedByUid = isRecord(raw) && typeof raw.equippedByUid === 'string'
-        ? clampString(raw.equippedByUid, '', 128) || null
-        : isRecord(raw) && clampBoolean(raw.equipped, true)
-          ? heroRoster
-            .filter(hero => hero.id === heroId)
-            .sort((a, b) => {
-              const rarityDiff = rarityRank(b.rarity) - rarityRank(a.rarity);
-              if (rarityDiff !== 0) return rarityDiff;
-              if (b.level !== a.level) return b.level - a.level;
-              if (b.rank !== a.rank) return b.rank - a.rank;
-              if (b.teamBoost !== a.teamBoost) return b.teamBoost - a.teamBoost;
-              return a.uid.localeCompare(b.uid);
-            })[0]?.uid ?? null
-          : null;
+      const shouldBeEquipped = isRecord(raw)
+        ? (typeof raw.equippedByUid === 'string' ? raw.equippedByUid.length > 0 : clampBoolean(raw.equipped, true))
+        : true;
+      const equippedByUid = shouldBeEquipped ? getPreferredUniqueBearer({ heroRoster }, heroId)?.uid ?? null : null;
       heroUniqueGearByHeroId[heroId] = { rank, equippedByUid };
     }
   }
@@ -3245,6 +3254,7 @@ function reducer(state: GameState, action: Action): GameState {
         freeSummonCharges: canUseFree ? state.freeSummonCharges - 1 : state.freeSummonCharges,
         gachaPityCounter: roll.nextCounter,
       }));
+      nextState = syncUniqueWeaponAssignmentForHero(nextState, hero.id);
       nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.06);
       if (roll.pityTriggered) {
         nextState = queueReward(nextState, {
@@ -3304,6 +3314,9 @@ function reducer(state: GameState, action: Action): GameState {
         freeSummonCharges: state.freeSummonCharges - freeUses,
         gachaPityCounter: pityCounter,
       }));
+      for (const hero of summoned) {
+        nextState = syncUniqueWeaponAssignmentForHero(nextState, hero.id);
+      }
       for (const hero of summoned) {
         nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.08);
       }
@@ -3372,6 +3385,9 @@ function reducer(state: GameState, action: Action): GameState {
         freeSummonCharges: state.freeSummonCharges - freeUses + 1,
         gachaPityCounter: pityCounter,
       }));
+      for (const hero of summoned) {
+        nextState = syncUniqueWeaponAssignmentForHero(nextState, hero.id);
+      }
       for (const hero of summoned) {
         nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.12);
       }
