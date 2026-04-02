@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { customEvent, identifyDevice, vexo } from 'vexo-analytics';
+import { initFirebaseAnalytics, logFirebaseEvent } from './services/firebase';
 
 const TELEMETRY_KEY = 'simplyidle_telemetry_v1';
 const TELEMETRY_CAP = 800;
@@ -38,6 +39,9 @@ export function initTelemetry(): void {
     debugLog('telemetry', 'Vexo initialization failed');
     // Analytics must never block app startup.
   }
+
+  // Initialize Firebase Analytics in the background (web only, non-blocking).
+  void initFirebaseAnalytics();
 }
 
 export async function identifyTelemetryDevice(deviceId: string | null): Promise<void> {
@@ -65,6 +69,9 @@ export async function trackEvent(
     const next: TelemetryEvent = { name, ts: Date.now(), payload };
     const merged = [...events, next].slice(-TELEMETRY_CAP);
     await AsyncStorage.setItem(TELEMETRY_KEY, JSON.stringify(merged));
+
+    // Mirror to Firebase Analytics (web only, no-op if measurementId not set).
+    logFirebaseEvent(name, payload);
   } catch {
     debugLog('telemetry', 'trackEvent failed', { name });
     // Telemetry must never block gameplay.

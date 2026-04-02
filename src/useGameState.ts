@@ -5798,6 +5798,45 @@ export function useGameState(saveSlot: string = 'default') {
         throttleMs,
       );
     }
+
+    // Rich dedicated events for key conversion/economy actions.
+    if (action.type === 'CREATE_CHARACTER') {
+      void trackEvent('character_created', {
+        playerClass: action.playerClass,
+        saveSlot,
+      });
+    }
+
+    if (action.type === 'BUY_DIAMOND_SHOP_ITEM') {
+      const cost = DIAMOND_SHOP_COSTS[action.offerId];
+      void trackEvent('spend_diamonds', {
+        item_id: action.offerId,
+        diamonds_spent: cost,
+        diamonds_before: stateRef.current.diamonds,
+        wave: stateRef.current.wave,
+        level: stateRef.current.level,
+      });
+    }
+
+    if (action.type === 'SIMULATE_DOLLAR_PURCHASE') {
+      const pack = DOLLAR_SHOP_PACKS[action.offerId];
+      if (pack) {
+        void trackEvent('purchase', {
+          item_id: action.offerId,
+          value: pack.usdCents / 100,
+          currency: 'USD',
+          diamonds_received: pack.diamonds,
+        });
+      }
+    }
+
+    if (action.type === 'REBIRTH') {
+      void trackEvent('rebirth', {
+        prestige_count: stateRef.current.prestigeCount + 1,
+        wave: stateRef.current.wave,
+        level: stateRef.current.level,
+      });
+    }
   }, [saveSlot]);
 
   const persistSnapshot = useCallback(async (forceOnline = false) => {
