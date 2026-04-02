@@ -1071,8 +1071,9 @@ export function calculateShardReward(rarity: Rarity, level: number): number {
 
 const HERO_REBIRTH_REFERENCE_MULT = 1.15;
 const HERO_REBIRTH_SHARD_BASE_COST = 320;
-const HERO_REBIRTH_SHARD_COST_MULT = 3.2;
-const HERO_REBIRTH_SHARD_GROWTH_PER_REBIRTH = 0.42;
+const HERO_REBIRTH_SHARD_COST_MULT = 1.4;
+const HERO_REBIRTH_SHARD_GROWTH_PER_REBIRTH = 0.22;
+const HERO_REBIRTH_SHARD_LEVEL_REFERENCE = 80;
 const HERO_REBIRTH_ESSENCE_BASE_COST = 1;
 const HERO_REBIRTH_ESSENCE_STEP = 2;
 const HERO_REBIRTH_BOOST_GAIN_BASE = 0.12;
@@ -1097,7 +1098,7 @@ export function getHeroRebirthPlan(hero: HeroUnit): HeroRebirthPlan {
 
   const baseShardCost = Math.max(
     HERO_REBIRTH_SHARD_BASE_COST,
-    Math.floor(calculateShardReward(hero.rarity, hero.level) * HERO_REBIRTH_SHARD_COST_MULT),
+    Math.floor(calculateShardReward(hero.rarity, Math.min(hero.level, HERO_REBIRTH_SHARD_LEVEL_REFERENCE)) * HERO_REBIRTH_SHARD_COST_MULT),
   );
   const shardCost = Math.floor(baseShardCost * (1 + (estimatedRebirths * HERO_REBIRTH_SHARD_GROWTH_PER_REBIRTH)));
   const essenceCost = HERO_REBIRTH_ESSENCE_BASE_COST + Math.floor(estimatedRebirths / HERO_REBIRTH_ESSENCE_STEP);
