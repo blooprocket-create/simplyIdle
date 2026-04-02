@@ -1,4 +1,4 @@
-import { deleteDoc, doc, getDoc, runTransaction } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, runTransaction, setDoc } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseFirestore, isFirebaseConfigured } from './firebase';
 
 const SAVE_SCHEMA_VERSION = 1;
@@ -244,3 +244,45 @@ export async function deleteOnlineSave(saveSlot: string): Promise<{ ok: boolean;
     return { ok: false, errorCode: mapFirestoreErrorCode(error) };
   }
 }
+
+  /** Reads a specific user's save slot (used by admins for /sendMsg). */
+  export async function loadOnlineSaveForUid<TPayload extends Record<string, unknown>>(
+    uid: string,
+    saveSlotId: string,
+  ): Promise<OnlineSaveLoadResult<TPayload>> {
+    const db = getFirebaseFirestore();
+    if (!db) return { ok: false, errorCode: 'unavailable' };
+    try {
+      const ref = doc(db, 'users', uid, 'saveSlots', saveSlotId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return { ok: true, data: null };
+      return { ok: true, data: toEnvelope<TPayload>(snap.data()) };
+    } catch (error) {
+      return { ok: false, errorCode: mapFirestoreErrorCode(error) };
+    }
+  }
+
+  /** Overwrites a specific user's save slot (used by admins for /sendMsg mail injection). */
+  export async function writeOnlineSaveForUid<TPayload extends Record<string, unknown>>(
+    uid: string,
+    saveSlotId: string,
+    payload: TPayload,
+  ): Promise<{ ok: boolean; errorCode?: OnlineSaveErrorCode }> {
+    const db = getFirebaseFirestore();
+    if (!db) return { ok: false, errorCode: 'unavailable' };
+    try {
+      const ref = doc(db, 'users', uid, 'saveSlots', saveSlotId);
+      const safePayload = encodeFirestorePayload(payload as Record<string, unknown>);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return { ok: false, errorCode: 'invalid-slot' };
+      const existing = snap.data() as SaveDocRecord;
+      await setDoc(ref, {
+        ...existing,
+        updatedAt: Date.now(),
+        payload: safePayload,
+      });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, errorCode: mapFirestoreErrorCode(error) };
+    }
+  }

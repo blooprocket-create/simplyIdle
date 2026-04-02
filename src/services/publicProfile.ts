@@ -1,10 +1,8 @@
 import { doc, getDoc, runTransaction } from 'firebase/firestore';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirebaseAuth, getFirebaseFirestore } from './firebase';
 
 const PUBLIC_USERNAMES_COLLECTION = 'publicUsernames';
 const USER_PROFILES_COLLECTION = 'userProfiles';
-const PUBLIC_USERNAME_STORAGE_KEY = 'simplyIdle_publicUsername_v1';
 
 export const PUBLIC_USERNAME_MIN = 3;
 export const PUBLIC_USERNAME_MAX = 24;
@@ -66,7 +64,6 @@ export async function reservePublicUsername(
       tx.set(profileRef, { publicUsername: displayName.trim(), updatedAt: Date.now() }, { merge: true });
     });
 
-    await AsyncStorage.setItem(PUBLIC_USERNAME_STORAGE_KEY, displayName.trim());
     return { ok: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : '';
@@ -89,7 +86,6 @@ export async function loadPublicUsername(uid: string): Promise<string | null> {
     if (!snap.exists()) return null;
     const username = snap.data().publicUsername;
     if (typeof username !== 'string' || !username) return null;
-    await AsyncStorage.setItem(PUBLIC_USERNAME_STORAGE_KEY, username);
     return username;
   } catch {
     return null;
@@ -103,26 +99,4 @@ export async function refreshCurrentUserPublicUsername(): Promise<string | null>
   const uid = getFirebaseAuth()?.currentUser?.uid;
   if (!uid) return null;
   return loadPublicUsername(uid);
-}
-
-/**
- * Returns the locally-cached public username without hitting Firestore.
- */
-export async function getCachedPublicUsername(): Promise<string | null> {
-  try {
-    return await AsyncStorage.getItem(PUBLIC_USERNAME_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Removes the local public username cache. Call on logout.
- */
-export async function clearCachedPublicUsername(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(PUBLIC_USERNAME_STORAGE_KEY);
-  } catch {
-    // ignore
-  }
 }

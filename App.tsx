@@ -1,12 +1,10 @@
 import 'react-native-reanimated';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import GameScreen from './src/screens/GameScreen';
-import AuthScreen, { AUTH_STORAGE_KEYS, getValidStoredSession } from './src/screens/AuthScreen';
+import AuthScreen from './src/screens/AuthScreen';
 import { debugLog, identifyTelemetryDevice, initTelemetry, trackEvent, trackTelemetryHeartbeat } from './src/telemetry';
 import { getValidOnlineSession, isOnlineAuthAvailable, logoutOnline } from './src/services/onlineAuth';
-import { clearCachedPublicUsername } from './src/services/publicProfile';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -55,8 +53,6 @@ export default function App() {
         }
       }
 
-      const local = await getValidStoredSession();
-      setAccountName(local);
     })()
       .finally(() => setLoading(false));
   }, []);
@@ -94,8 +90,6 @@ export default function App() {
         if (isOnlineAuthAvailable()) {
           await logoutOnline();
         }
-        await clearCachedPublicUsername();
-        await AsyncStorage.removeItem(AUTH_STORAGE_KEYS.session);
         setAccountName(null);
       }}
     />

@@ -12,8 +12,6 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { debugLog, trackGameplayAction } from '../telemetry';
@@ -28,7 +26,6 @@ import {
 } from '../services/onlineAuth';
 import { getFirebaseAuth } from '../services/firebase';
 import {
-  getCachedPublicUsername,
   isPublicUsernameAvailable,
   loadPublicUsername,
   normalizePublicUsername,
@@ -52,73 +49,9 @@ interface NativeGoogleButtonProps {
   onBusyChange: (busy: boolean) => void;
 }
 
-interface AccountRecord {
-  username: string;
-  createdAt: number;
-  hashVersion: 1;
-  passwordHash: string;
-  passwordSalt: string;
-  password?: string;
-}
-
-const ACCOUNTS_KEY = 'idlerpg_accounts_v1';
-const SESSION_KEY = 'idlerpg_current_account_v1';
-const HASH_ROUNDS = 12000;
-const USERNAME_MIN_LENGTH = 3;
-const USERNAME_MAX_LENGTH = 24;
 const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_MAX_LENGTH = 64;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-async function randomSalt(): Promise<string> {
-  const bytes = await Crypto.getRandomBytesAsync(24);
-  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
-async function hashPassword(password: string, salt: string): Promise<string> {
-  let current = `${salt}:${password}`;
-  for (let i = 0; i < HASH_ROUNDS; i++) {
-    current = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, current);
-  }
-  return current;
-}
-
-async function verifyPassword(record: AccountRecord, password: string): Promise<boolean> {
-  if (record.passwordHash && record.passwordSalt) {
-    const digest = await hashPassword(password, record.passwordSalt);
-    return digest === record.passwordHash;
-  }
-
-  return !!record.password && record.password === password;
-}
-
-async function migrateLegacyRecord(record: AccountRecord): Promise<AccountRecord> {
-  if (record.passwordHash && record.passwordSalt) return record;
-  const salt = await randomSalt();
-  const passwordHash = await hashPassword(record.password ?? '', salt);
-  return {
-    ...record,
-    hashVersion: 1,
-    passwordHash,
-    passwordSalt: salt,
-    password: undefined,
-  };
-}
-
-async function loadAccounts(): Promise<AccountRecord[]> {
-  const raw = await AsyncStorage.getItem(ACCOUNTS_KEY);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw) as AccountRecord[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-async function saveAccounts(accounts: AccountRecord[]): Promise<void> {
-  await AsyncStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
-}
 
 function mapAuthError(error: unknown): string {
   const code = typeof error === 'object' && error && 'code' in error ? String((error as { code: unknown }).code) : '';
@@ -150,21 +83,7 @@ function mapAuthError(error: unknown): string {
 }
 
 export async function getValidStoredSession(): Promise<string | null> {
-  const rawSession = await AsyncStorage.getItem(SESSION_KEY);
-  if (!rawSession) return null;
-
-  const normalizedSession = rawSession.trim().toLowerCase();
-  if (!normalizedSession) {
-    await AsyncStorage.removeItem(SESSION_KEY);
-    return null;
-  }
-
-  const accounts = await loadAccounts();
-  if (accounts.some(account => account.username === normalizedSession)) {
-    return normalizedSession;
-  }
-
-  await AsyncStorage.removeItem(SESSION_KEY);
+  // Local account system removed. Session is managed by Firebase Auth only.
   return null;
 }
 
@@ -235,55 +154,27 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [pendingGoogleAccountName, setPendingGoogleAccountName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [knownUsernames, setKnownUsernames] = useState<string[]>([]);
   const onlineAuthEnabled = isOnlineAuthAvailable();
   const googleAuthEnabled = isGoogleAuthAvailable();
   const googleConfig = getGoogleAuthConfig();
   const hasNativeGoogleConfig = !!(googleConfig.expoClientId || googleConfig.androidClientId || googleConfig.iosClientId);
 
-  React.useEffect(() => {
-    let cancelled = false;
-    void loadAccounts().then(accounts => {
-      if (cancelled) return;
-      setKnownUsernames(accounts.map(account => account.username));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const cleanIdentifier = identifier.trim();
   const normalizedEmail = cleanIdentifier.toLowerCase();
-  const normalizedUsername = cleanIdentifier.toLowerCase();
-
-  const isUsernameTaken = !onlineAuthEnabled
-    && mode === 'register'
-    && normalizedUsername.length >= USERNAME_MIN_LENGTH
-    && knownUsernames.includes(normalizedUsername);
 
   const canSubmit = useMemo(() => {
     if (busy) return false;
-
-    if (onlineAuthEnabled) {
-      if (!EMAIL_REGEX.test(normalizedEmail)) return false;
-      if (password.length < PASSWORD_MIN_LENGTH) return false;
-      if (mode === 'register') {
-        if (password !== confirmPassword) return false;
-        if (validatePublicUsername(publicUsername) !== null) return false;
-      }
-      return true;
-    }
-
-    if (cleanIdentifier.length < USERNAME_MIN_LENGTH) return false;
+    if (!onlineAuthEnabled) return false;
+    if (!EMAIL_REGEX.test(normalizedEmail)) return false;
     if (password.length < PASSWORD_MIN_LENGTH) return false;
-    if (mode === 'register' && password !== confirmPassword) return false;
-    if (isUsernameTaken) return false;
+    if (mode === 'register') {
+      if (password !== confirmPassword) return false;
+      if (validatePublicUsername(publicUsername) !== null) return false;
+    }
     return true;
-  }, [busy, onlineAuthEnabled, normalizedEmail, password, mode, confirmPassword, cleanIdentifier, isUsernameTaken, publicUsername]);
+  }, [busy, onlineAuthEnabled, normalizedEmail, password, mode, confirmPassword, publicUsername]);
 
   async function completeOnlineLogin(accountName: string, provider: 'email' | 'google', authMode: 'login' | 'register') {
-    await AsyncStorage.setItem(SESSION_KEY, accountName);
-    // Refresh the public username cache in the background (non-blocking).
     const uid = getFirebaseAuth()?.currentUser?.uid;
     if (uid) {
       void loadPublicUsername(uid);
@@ -400,49 +291,6 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
         return;
       }
 
-      const accounts = await loadAccounts();
-      const existing = accounts.find(a => a.username === normalizedUsername);
-
-      if (mode === 'register') {
-        if (existing) {
-          setError('Username already exists. Try logging in.');
-          return;
-        }
-
-        const salt = await randomSalt();
-        const passwordHash = await hashPassword(password, salt);
-        const nextAccounts: AccountRecord[] = [
-          ...accounts,
-          {
-            username: normalizedUsername,
-            createdAt: Date.now(),
-            hashVersion: 1,
-            passwordHash,
-            passwordSalt: salt,
-          },
-        ];
-        await saveAccounts(nextAccounts);
-        setKnownUsernames(nextAccounts.map(account => account.username));
-        await AsyncStorage.setItem(SESSION_KEY, normalizedUsername);
-        void trackGameplayAction('auth_register_success', { username: normalizedUsername, provider: 'local' }, 0);
-        onAuthenticated(normalizedUsername);
-        return;
-      }
-
-      if (!existing || !(await verifyPassword(existing, password))) {
-        setError('Invalid username or password.');
-        return;
-      }
-
-      if (!existing.passwordHash || !existing.passwordSalt) {
-        const upgraded = await migrateLegacyRecord(existing);
-        const nextAccounts = accounts.map(a => a.username === normalizedUsername ? upgraded : a);
-        await saveAccounts(nextAccounts);
-      }
-
-      await AsyncStorage.setItem(SESSION_KEY, normalizedUsername);
-      void trackGameplayAction('auth_login_success', { username: normalizedUsername, provider: 'local' }, 0);
-      onAuthenticated(normalizedUsername);
     } catch (submitError) {
       setError(mapAuthError(submitError));
     } finally {
@@ -476,12 +324,12 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     }
   }
 
-  const identityLabel = onlineAuthEnabled ? 'Email' : 'Username';
-  const identityPlaceholder = onlineAuthEnabled ? 'commander@domain.com' : 'your_username';
+  const identityLabel = 'Email';
+  const identityPlaceholder = 'commander@domain.com';
   const submitLabel = busy ? 'Please wait...' : mode === 'login' ? 'Log In' : 'Create Account';
   const supportingNote = onlineAuthEnabled
-    ? 'Firebase auth is active. Use email/password or continue with Google.'
-    : 'Offline fallback mode is active. Accounts are stored only on this device.';
+    ? 'Sign in with your account to sync progress across devices.'
+    : 'Authentication not available. Please check your Firebase configuration.';
   const googleNote = Platform.OS === 'web'
     ? 'Google sign-in uses the Firebase web popup flow configured in Firebase.'
     : googleAuthEnabled
@@ -508,7 +356,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                 <Text style={styles.cardBody}>{supportingNote}</Text>
               </View>
               <View style={styles.statusPill}>
-                <Text style={styles.statusPillText}>{onlineAuthEnabled ? 'Firebase' : 'Local'}</Text>
+                <Text style={styles.statusPillText}>Firebase</Text>
               </View>
             </View>
 
@@ -600,17 +448,13 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               style={styles.input}
               autoCapitalize="none"
               autoCorrect={false}
-              autoComplete={onlineAuthEnabled ? 'email' : 'username'}
-              keyboardType={onlineAuthEnabled ? 'email-address' : 'default'}
+                autoComplete="email"
+                keyboardType="email-address"
               placeholder={identityPlaceholder}
               placeholderTextColor="#6D7A90"
-              maxLength={onlineAuthEnabled ? 120 : USERNAME_MAX_LENGTH}
+                maxLength={120}
             />
-            <Text style={[styles.helperText, isUsernameTaken && styles.helperTextError]}>
-              {onlineAuthEnabled
-                ? 'Use the same email whenever you log in or sign up.'
-                : `Username: ${USERNAME_MIN_LENGTH}-${USERNAME_MAX_LENGTH} characters.${isUsernameTaken ? ' This username is already taken.' : ''}`}
-            </Text>
+              <Text style={styles.helperText}>Use the same email whenever you log in or sign up.</Text>
 
             <Text style={styles.fieldLabel}>Password</Text>
             <TextInput
@@ -685,11 +529,6 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     </SafeAreaView>
   );
 }
-
-export const AUTH_STORAGE_KEYS = {
-  accounts: ACCOUNTS_KEY,
-  session: SESSION_KEY,
-};
 
 const styles = StyleSheet.create({
   safe: {

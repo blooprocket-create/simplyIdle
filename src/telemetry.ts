@@ -1,10 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { customEvent, identifyDevice, vexo } from 'vexo-analytics';
 import { initFirebaseAnalytics, logFirebaseEvent } from './services/firebase';
 
-const TELEMETRY_KEY = 'simplyidle_telemetry_v1';
-const TELEMETRY_CAP = 800;
 const VEXO_API_KEY = 'f974be1c-5121-4b5c-82f9-799a07387574';
 
 let vexoInitialized = false;
@@ -64,12 +61,6 @@ export async function trackEvent(
     debugLog('telemetry', 'trackEvent called', { name });
     customEvent(name, payload ?? {});
 
-    const raw = await AsyncStorage.getItem(TELEMETRY_KEY);
-    const events: TelemetryEvent[] = raw ? JSON.parse(raw) as TelemetryEvent[] : [];
-    const next: TelemetryEvent = { name, ts: Date.now(), payload };
-    const merged = [...events, next].slice(-TELEMETRY_CAP);
-    await AsyncStorage.setItem(TELEMETRY_KEY, JSON.stringify(merged));
-
     // Mirror to Firebase Analytics (web only, no-op if measurementId not set).
     logFirebaseEvent(name, payload);
   } catch {
@@ -80,8 +71,7 @@ export async function trackEvent(
 
 export async function getTelemetryEvents(): Promise<TelemetryEvent[]> {
   try {
-    const raw = await AsyncStorage.getItem(TELEMETRY_KEY);
-    return raw ? JSON.parse(raw) as TelemetryEvent[] : [];
+      return [];
   } catch {
     return [];
   }
@@ -89,7 +79,6 @@ export async function getTelemetryEvents(): Promise<TelemetryEvent[]> {
 
 export async function clearTelemetryEvents(): Promise<void> {
   try {
-    await AsyncStorage.removeItem(TELEMETRY_KEY);
     debugLog('telemetry', 'local telemetry cleared');
   } catch {
     // No-op.
@@ -99,14 +88,10 @@ export async function clearTelemetryEvents(): Promise<void> {
 export function getTelemetryDebugInfo(): {
   vexoInitialized: boolean;
   telemetryBootstrapSent: boolean;
-  localKey: string;
-  localCap: number;
 } {
   return {
     vexoInitialized,
     telemetryBootstrapSent,
-    localKey: TELEMETRY_KEY,
-    localCap: TELEMETRY_CAP,
   };
 }
 

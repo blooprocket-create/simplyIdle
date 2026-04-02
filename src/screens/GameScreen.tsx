@@ -17,8 +17,7 @@ import {
   useWindowDimensions,
   AppState,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ENABLE_SIMULATED_DOLLAR_PURCHASES, FACILITY_MAX_LEVEL, MINI_OPS_COOLDOWN_MS, getCharacterSaveSlot, getDpsBreakdown, getEquipmentCraftCost, getFacilityUpgradeCost, getHeroGoldLevelCost, getMaxHeatForLevel, getSaveStorageKey, useGameState } from '../useGameState';
+import { ENABLE_SIMULATED_DOLLAR_PURCHASES, FACILITY_MAX_LEVEL, MINI_OPS_COOLDOWN_MS, getCharacterSaveSlot, getDpsBreakdown, getEquipmentCraftCost, getFacilityUpgradeCost, getHeroGoldLevelCost, getMaxHeatForLevel, useGameState } from '../useGameState';
 import { debugLog, trackEvent, trackGameplayAction } from '../telemetry';
 import {
   ACHIEVEMENTS,
@@ -73,10 +72,10 @@ import { styles } from './GameScreen.styles';
 import { isCurrentUserAdmin } from '../services/adminAccess';
 import { normalizeCharacterNameForCompare, releaseCharacterName, reserveCharacterName } from '../services/characterNameRegistry';
 import { fetchCurrentUserRank, fetchLeaderboardTop, isLiveLeaderboardAvailable, submitLeaderboardScore } from '../services/leaderboard';
-import { deleteOnlineSave } from '../services/onlineSave';
-import { getCachedPublicUsername, refreshCurrentUserPublicUsername } from '../services/publicProfile';
+import { deleteOnlineSave, loadOnlineSave, loadOnlineSaveForUid, writeOnlineSaveForUid } from '../services/onlineSave';
+import { refreshCurrentUserPublicUsername } from '../services/publicProfile';
 import { getFirebaseAuth, getFirebaseFirestore } from '../services/firebase';
-import { collectionGroup, getDocs, getDoc, doc as firestoreDoc } from 'firebase/firestore';
+import { collectionGroup, getDocs, getDoc, doc as firestoreDoc, setDoc } from 'firebase/firestore';
 
 export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations';
 type HeroesSubTab = 'summon' | 'roster' | 'batch';
@@ -131,6 +130,8 @@ const ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
 type CharacterSnapshot = {
   account: string;
+  uid: string;
+  saveSlotId: string;
   classId: PlayerClass;
   playerName: string;
   level: number;
@@ -241,8 +242,27 @@ interface LiveLeaderboardRow {
   isYou: boolean;
 }
 
-function getLastCharacterSlotKey(accountName: string): string {
-  return `idlerpg_last_character_slot_v1_${accountName}`;
+async function loadLastCharacterSlot(uid: string): Promise<PlayerClass | null> {
+  const db = getFirebaseFirestore();
+  if (!db) return null;
+  try {
+    const snap = await getDoc(firestoreDoc(db, 'userPreferences', uid));
+    if (!snap.exists()) return null;
+    const val = snap.data()?.lastCharacterSlot;
+    return typeof val === 'string' ? val as PlayerClass : null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveLastCharacterSlot(uid: string, playerClass: PlayerClass | null): Promise<void> {
+  const db = getFirebaseFirestore();
+  if (!db) return;
+  try {
+    await setDoc(firestoreDoc(db, 'userPreferences', uid), { lastCharacterSlot: playerClass ?? null }, { merge: true });
+  } catch {
+    // non-critical; ignore
+  }
 }
 
 function getVipLevelFromPoints(points: number): number {
@@ -494,8 +514,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     async function loadCharacterSlots() {
       setSlotListLoading(true);
       const summaries = await Promise.all(CLASSES.map(async cls => {
-        const raw = await AsyncStorage.getItem(getSaveStorageKey(getCharacterSaveSlot(accountName, cls.id)));
-        if (!raw) {
+          const slotResult = await loadOnlineSave<Record<string, unknown>>(getCharacterSaveSlot(accountName, cls.id));
+          const parsed = slotResult.ok && slotResult.data ? slotResult.data.payload : null;
+          if (!parsed) {
           return {
             classId: cls.id,
             playerName: null,
@@ -506,16 +527,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           } satisfies CharacterSlotSummary;
         }
 
-        try {
-          const parsed = JSON.parse(raw) as {
-            playerName?: string;
-            level?: number;
-            highestWaveReached?: number;
-            wave?: number;
-            vipLevel?: number;
-            vipPoints?: number;
-            characterCreated?: boolean;
-          };
           const playerName = typeof parsed.playerName === 'string' ? parsed.playerName.trim().slice(0, 24) : '';
           const occupied = !!playerName && parsed.characterCreated === true;
           const parsedVipPoints = typeof parsed.vipPoints === 'number' && Number.isFinite(parsed.vipPoints)
@@ -536,25 +547,16 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             vipLevel: occupied ? parsedVipLevel : 0,
             occupied,
           } satisfies CharacterSlotSummary;
-        } catch {
-          return {
-            classId: cls.id,
-            playerName: null,
-            level: 1,
-            highestWaveReached: 1,
-            vipLevel: 0,
-            occupied: false,
-          } satisfies CharacterSlotSummary;
-        }
       }));
 
       if (cancelled) return;
       setSlotSummaries(summaries);
 
       const occupiedClasses = summaries.filter(slot => slot.occupied).map(slot => slot.classId);
-      const lastSelected = await AsyncStorage.getItem(getLastCharacterSlotKey(accountName));
-      const normalizedLastSelected = lastSelected && CLASSES.some(cls => cls.id === lastSelected)
-        ? lastSelected as PlayerClass
+        const uid = getFirebaseAuth()?.currentUser?.uid ?? '';
+        const lastSelected = uid ? await loadLastCharacterSlot(uid) : null;
+        const normalizedLastSelected = lastSelected && CLASSES.some(cls => cls.id === lastSelected)
+          ? lastSelected
         : null;
       setLastUsedCharacterClass(normalizedLastSelected);
       if (cancelled) return;
@@ -579,8 +581,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   useEffect(() => {
     if (!selectedCharacterClass) return;
     setLastUsedCharacterClass(selectedCharacterClass);
-    void AsyncStorage.setItem(getLastCharacterSlotKey(accountName), selectedCharacterClass);
-  }, [accountName, selectedCharacterClass]);
+      const uid = getFirebaseAuth()?.currentUser?.uid ?? '';
+      if (uid) void saveLastCharacterSlot(uid, selectedCharacterClass);
+    }, [accountName, selectedCharacterClass]);
 
   useEffect(() => {
     if (!selectedCharacterClass || !hydrated || !state.characterCreated) return;
@@ -1747,30 +1750,26 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   async function deleteCharacterSlot(playerClass: PlayerClass) {
     debugLog('character', 'Delete character slot requested', { playerClass });
-    const saveKey = getSaveStorageKey(getCharacterSaveSlot(accountName, playerClass));
-    const raw = await AsyncStorage.getItem(saveKey);
+      const saveSlot = getCharacterSaveSlot(accountName, playerClass);
+      const slotResult = await loadOnlineSave<Record<string, unknown>>(saveSlot);
     let removedCharacterName = '';
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw) as { playerName?: unknown; characterCreated?: unknown };
-        const candidateName = typeof parsed.playerName === 'string' ? parsed.playerName.trim().slice(0, 24) : '';
-        if (candidateName && parsed.characterCreated === true) {
+      if (slotResult.ok && slotResult.data) {
+        const p = slotResult.data.payload;
+        const candidateName = typeof p.playerName === 'string' ? p.playerName.trim().slice(0, 24) : '';
+        if (candidateName && p.characterCreated === true) {
           removedCharacterName = candidateName;
-        }
-      } catch {
-        // Ignore malformed save data and continue deletion.
       }
     }
 
-    await AsyncStorage.removeItem(saveKey);
+      await deleteOnlineSave(saveSlot);
     if (removedCharacterName) {
       await releaseCharacterName(removedCharacterName);
     }
 
-    const lastSlotKey = getLastCharacterSlotKey(accountName);
-    const lastSelected = await AsyncStorage.getItem(lastSlotKey);
-    if (lastSelected === playerClass) {
-      await AsyncStorage.removeItem(lastSlotKey);
+      const uid = getFirebaseAuth()?.currentUser?.uid ?? '';
+      const lastSelected = uid ? await loadLastCharacterSlot(uid) : null;
+      if (lastSelected === playerClass) {
+        if (uid) await saveLastCharacterSlot(uid, null);
       setLastUsedCharacterClass(null);
     }
 
@@ -1920,7 +1919,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         : (typeof data.updatedAt === 'number' ? (data.updatedAt as number) : 0);
       const isOnline = (now - lastActiveAt) <= ONLINE_WINDOW_MS;
 
-      snapshots.push({ account, classId: classId as PlayerClass, playerName, level, highestWaveReached, lastActiveAt, isOnline });
+      snapshots.push({ account, uid, saveSlotId: docSnap.id, classId: classId as PlayerClass, playerName, level, highestWaveReached, lastActiveAt, isOnline });
     }
 
     return snapshots.sort((a, b) => {
@@ -2007,30 +2006,27 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       });
 
       const appendMailToSnapshot = async (snapshot: CharacterSnapshot): Promise<SaveMailboxEntry | null> => {
-        const saveSlot = getCharacterSaveSlot(snapshot.account, snapshot.classId);
-        const saveKey = getSaveStorageKey(saveSlot);
-        const raw = await AsyncStorage.getItem(saveKey);
-        if (!raw) return null;
-
-        try {
-          const savePayload = JSON.parse(raw) as Record<string, unknown>;
-          const mailbox = Array.isArray(savePayload.mailbox)
-            ? savePayload.mailbox.filter(entry => !!entry && typeof entry === 'object') as SaveMailboxEntry[]
-            : [];
-          const outgoingMail = buildMail();
-          mailbox.push(outgoingMail);
-          savePayload.mailbox = mailbox.slice(-100);
-          await AsyncStorage.setItem(saveKey, JSON.stringify(savePayload));
-          return outgoingMail;
-        } catch {
-          return null;
-        }
+        const loadResult = await loadOnlineSaveForUid<Record<string, unknown>>(snapshot.uid, snapshot.saveSlotId);
+        if (!loadResult.ok || !loadResult.data) return null;
+        const savePayload = { ...loadResult.data.payload };
+        const mailbox = Array.isArray(savePayload.mailbox)
+          ? savePayload.mailbox.filter(entry => !!entry && typeof entry === 'object') as SaveMailboxEntry[]
+          : [];
+        const outgoingMail = buildMail();
+        mailbox.push(outgoingMail);
+        savePayload.mailbox = mailbox.slice(-100);
+        const writeResult = await writeOnlineSaveForUid(snapshot.uid, snapshot.saveSlotId, savePayload);
+        if (!writeResult.ok) return null;
+        return outgoingMail;
       };
 
       const snapshots = await collectCharacterSnapshots();
+      const currentUid = getFirebaseAuth()?.currentUser?.uid ?? '';
       const currentSnapshot = (state.characterCreated && selectedCharacterClass)
         ? {
-          account: accountName,
+          account: publicUsername || accountName,
+          uid: currentUid,
+          saveSlotId: getCharacterSaveSlot(accountName, selectedCharacterClass),
           classId: selectedCharacterClass,
           playerName: state.playerName,
           level: state.level,
@@ -2040,7 +2036,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         } as CharacterSnapshot
         : null;
 
-      const allSnapshots = currentSnapshot && !snapshots.some(snapshot => snapshot.account === currentSnapshot.account && snapshot.classId === currentSnapshot.classId)
+      const allSnapshots = currentSnapshot && !snapshots.some(snapshot => snapshot.uid === currentUid && snapshot.classId === currentSnapshot.classId)
         ? [currentSnapshot, ...snapshots]
         : snapshots;
 
@@ -2101,17 +2097,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       }
 
       const targetSlot = getCharacterSaveSlot(accountName, classArg);
-      const targetKey = getSaveStorageKey(targetSlot);
-
-      const [, remoteResult] = await Promise.all([
-        AsyncStorage.removeItem(targetKey),
-        deleteOnlineSave(targetSlot),
-      ]);
+      const remoteResult = await deleteOnlineSave(targetSlot);
 
       if (remoteResult.ok) {
-        setDevCommandOutput(`Cleared local + Firestore save for ${accountName} / ${classArg}.\nReload the page to start fresh.`);
+        setDevCommandOutput(`Cleared Firestore save for ${accountName} / ${classArg}.\nReload the page to start fresh.`);
       } else {
-        setDevCommandOutput(`Local save cleared. Firestore delete failed (${remoteResult.errorCode ?? 'unknown'}) — it may have already been empty.`);
+        setDevCommandOutput(`Firestore delete failed (${remoteResult.errorCode ?? 'unknown'}) — it may have already been empty.`);
       }
       return;
     }
@@ -2122,8 +2113,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const cached = await getCachedPublicUsername();
-      if (!cancelled && cached) setPublicUsername(cached);
       const fresh = await refreshCurrentUserPublicUsername();
       if (!cancelled && fresh) setPublicUsername(fresh);
     })();

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useCallback, useReducer, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   PARTY,
   SKILLS,
@@ -66,7 +65,6 @@ import { buildingCost, bulkCost } from './utils';
 import { debugLog, trackEvent, trackGameplayAction } from './telemetry';
 import { isOnlineSaveAvailable, loadOnlineSave, writeOnlineSave } from './services/onlineSave';
 
-const SAVE_KEY = 'idlerpg_save_v3';
 const TICK_MS = 100;
 const SAVE_INTERVAL_MS = 5000;
 const ONLINE_SAVE_INTERVAL_MS = 12000;
@@ -174,10 +172,6 @@ const ACTION_TELEMETRY_SAMPLE: Partial<Record<Action['type'], number>> = {
 
 export function getCharacterSaveSlot(accountName: string, playerClass: PlayerClass): string {
   return `${accountName}_${playerClass}`;
-}
-
-export function getSaveStorageKey(saveSlot: string): string {
-  return `${SAVE_KEY}_${saveSlot}`;
 }
 
 interface RewardPopup {
@@ -5748,7 +5742,6 @@ function serialize(state: GameState): SaveData {
 }
 
 export function useGameState(saveSlot: string = 'default') {
-  const saveKey = getSaveStorageKey(saveSlot);
   const onlineSlotEligible = !saveSlot.startsWith('__character_slot_preview__');
   const [state, rawDispatch] = useReducer(reducer, DEFAULT_STATE);
   const [hydrated, setHydrated] = useState(false);
@@ -5841,9 +5834,7 @@ export function useGameState(saveSlot: string = 'default') {
 
   const persistSnapshot = useCallback(async (forceOnline = false) => {
     const snapshot = serialize(stateRef.current);
-    await AsyncStorage.setItem(saveKey, JSON.stringify(snapshot));
-
-    if (!onlineSlotEligible || onlineSyncDisabledRef.current || !isOnlineSaveAvailable()) {
+      if (!onlineSlotEligible || onlineSyncDisabledRef.current || !isOnlineSaveAvailable()) {
       setOnlineSyncState('local-only');
       return;
     }
@@ -5894,11 +5885,11 @@ export function useGameState(saveSlot: string = 'default') {
       onlineSyncDisabledRef.current = true;
       setOnlineSyncState('local-only');
     }
-  }, [dispatch, onlineSlotEligible, saveKey, saveSlot]);
+  }, [dispatch, onlineSlotEligible, saveSlot]);
 
   useEffect(() => {
     setHydrated(false);
-    debugLog('save', 'Loading save slot', { saveSlot, saveKey });
+      debugLog('save', 'Loading save slot', { saveSlot });
     dispatch({ type: 'LOAD', payload: {} });
     sessionStartedRef.current = false;
     sessionStartedAtRef.current = 0;
@@ -5917,12 +5908,11 @@ export function useGameState(saveSlot: string = 'default') {
     let cancelled = false;
     void (async () => {
       const onlineAvailable = onlineSlotEligible && isOnlineSaveAvailable();
-      const [localRaw, remoteResult] = await Promise.all([
-        AsyncStorage.getItem(saveKey),
-        onlineAvailable
-          ? loadOnlineSave<Record<string, unknown>>(saveSlot)
-          : Promise.resolve({ ok: true, data: null } as const),
-      ]);
+        if (!onlineAvailable) {
+          debugLog('save', 'No online save available; using defaults', { saveSlot });
+          return;
+        }
+        const remoteResult = await loadOnlineSave<Record<string, unknown>>(saveSlot);
       if (cancelled) return;
 
       if (!remoteResult.ok) {
@@ -5932,68 +5922,32 @@ export function useGameState(saveSlot: string = 'default') {
         } else {
           setOnlineSyncState('error');
         }
+          return;
       }
 
       const remote = remoteResult.ok ? remoteResult.data : null;
 
-      let localData: SaveData | null = null;
-      if (localRaw) {
-        try {
-          localData = JSON.parse(localRaw) as SaveData;
-        } catch {
-          debugLog('save', 'Local save payload was corrupted; ignoring local save', { saveSlot });
-        }
-      }
-
-      if (!localData && !remote) {
+        if (!remote) {
         debugLog('save', 'No existing save found; using defaults', { saveSlot });
+          setOnlineSyncState('synced');
         return;
       }
 
-      const localUpdatedAt = localData?.lastActiveAt ?? 0;
-      const remoteUpdatedAt = remote?.updatedAt ?? 0;
-      const useRemote = !!remote && (!localData || remoteUpdatedAt >= localUpdatedAt);
-      const selectedPayload = (useRemote ? remote?.payload : localData) ?? {};
-
-      if (useRemote) {
-        onlineRevisionRef.current = remote?.revision ?? null;
-        setOnlineSyncState(onlineAvailable ? 'synced' : 'local-only');
-        setOnlineSyncAt(remote?.updatedAt ?? null);
+        onlineRevisionRef.current = remote.revision;
+        setOnlineSyncState('synced');
+        setOnlineSyncAt(remote.updatedAt);
         debugLog('save', 'Loaded cloud save', {
           saveSlot,
-          wave: (selectedPayload as Partial<SaveData>).wave,
-          level: (selectedPayload as Partial<SaveData>).level,
-          revision: remote?.revision ?? 0,
+          wave: (remote.payload as Partial<SaveData>).wave,
+          level: (remote.payload as Partial<SaveData>).level,
+          revision: remote.revision,
         });
-      } else {
-        onlineRevisionRef.current = remote?.revision ?? null;
-        setOnlineSyncState(onlineAvailable ? 'synced' : 'local-only');
-        setOnlineSyncAt(localData?.lastActiveAt ?? null);
-        debugLog('save', 'Loaded local save', {
-          saveSlot,
-          wave: localData?.wave,
-          level: localData?.level,
-        });
-      }
 
-      dispatch({ type: 'LOAD', payload: selectedPayload as Partial<SaveData> });
-      const elapsed = Date.now() - ((selectedPayload as Partial<SaveData>).lastActiveAt ?? Date.now());
+        dispatch({ type: 'LOAD', payload: remote.payload as Partial<SaveData> });
+        const elapsed = Date.now() - ((remote.payload as Partial<SaveData>).lastActiveAt ?? Date.now());
       dispatch({ type: 'APPLY_OFFLINE_PROGRESS', elapsedMs: elapsed });
       dispatch({ type: 'APPLY_DAILY_LOGIN', nowMs: Date.now() });
       dispatch({ type: 'APPLY_WEEKLY_ROLLOVER', nowMs: Date.now() });
-
-      // Backfill cloud if local won reconciliation.
-      if (!useRemote && onlineAvailable && localData) {
-        const backfill = await writeOnlineSave(saveSlot, localData as unknown as Record<string, unknown>, remote?.revision ?? 0);
-        if (backfill.ok) {
-          onlineRevisionRef.current = backfill.revision;
-          lastOnlineSaveRef.current = Date.now();
-          setOnlineSyncState('synced');
-          setOnlineSyncAt(Date.now());
-        } else {
-          setOnlineSyncState('error');
-        }
-      }
     })()
       .finally(() => {
         if (!cancelled) setHydrated(true);
@@ -6002,7 +5956,7 @@ export function useGameState(saveSlot: string = 'default') {
     return () => {
       cancelled = true;
     };
-  }, [onlineSlotEligible, saveKey, saveSlot]);
+    }, [onlineSlotEligible, saveSlot]);
 
   useEffect(() => {
     if (!state.characterCreated) return;
