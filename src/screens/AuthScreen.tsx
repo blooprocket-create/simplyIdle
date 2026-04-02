@@ -34,6 +34,14 @@ interface AuthScreenProps {
   onAuthenticated: (username: string) => void;
 }
 
+interface NativeGoogleButtonProps {
+  disabled: boolean;
+  googleConfig: ReturnType<typeof getGoogleAuthConfig>;
+  onSuccess: (accountName: string) => Promise<void>;
+  onError: (message: string) => void;
+  onBusyChange: (busy: boolean) => void;
+}
+
 interface AccountRecord {
   username: string;
   createdAt: number;
@@ -149,6 +157,63 @@ export async function getValidStoredSession(): Promise<string | null> {
   return null;
 }
 
+function NativeGoogleButton({
+  disabled,
+  googleConfig,
+  onSuccess,
+  onError,
+  onBusyChange,
+}: NativeGoogleButtonProps) {
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: googleConfig.expoClientId || googleConfig.androidClientId || googleConfig.iosClientId,
+    androidClientId: googleConfig.androidClientId || undefined,
+    iosClientId: googleConfig.iosClientId || undefined,
+    scopes: ['openid', 'profile', 'email'],
+    selectAccount: true,
+  });
+
+  React.useEffect(() => {
+    if (!response) return;
+
+    if (response.type !== 'success') {
+      if (response.type === 'error') {
+        onError('Google sign-in failed. Please try again.');
+      }
+      onBusyChange(false);
+      return;
+    }
+
+    void (async () => {
+      try {
+        const idToken = response.authentication?.idToken ?? response.params?.id_token;
+        const accessToken = response.authentication?.accessToken ?? response.params?.access_token;
+        const authenticatedName = await loginOnlineWithGoogleTokens(idToken, accessToken);
+        await onSuccess(authenticatedName);
+      } catch (error) {
+        onError(mapAuthError(error));
+      } finally {
+        onBusyChange(false);
+      }
+    })();
+  }, [onBusyChange, onError, onSuccess, response]);
+
+  return (
+    <Pressable
+      style={[styles.googleBtn, disabled && styles.buttonDisabled]}
+      disabled={disabled || !request}
+      onPress={async () => {
+        onBusyChange(true);
+        const result = await promptAsync();
+        if (result.type !== 'success') {
+          onBusyChange(false);
+        }
+      }}
+    >
+      <Text style={styles.googleBtnText}>Continue with Google</Text>
+    </Pressable>
+  );
+}
+
 export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [identifier, setIdentifier] = useState('');
@@ -160,15 +225,8 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const onlineAuthEnabled = isOnlineAuthAvailable();
   const googleAuthEnabled = isGoogleAuthAvailable();
   const googleConfig = getGoogleAuthConfig();
-
-  const [googleRequest, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
-    clientId: googleConfig.expoClientId || undefined,
-    androidClientId: googleConfig.androidClientId || undefined,
-    iosClientId: googleConfig.iosClientId || undefined,
-    webClientId: googleConfig.webClientId || undefined,
-    scopes: ['openid', 'profile', 'email'],
-    selectAccount: true,
-  });
+  const hasNativeGoogleConfig = !!(googleConfig.expoClientId || googleConfig.androidClientId || googleConfig.iosClientId);
+  const hasWebGoogleConfig = !!googleConfig.webClientId;
 
   React.useEffect(() => {
     let cancelled = false;
@@ -180,34 +238,6 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       cancelled = true;
     };
   }, []);
-
-  React.useEffect(() => {
-    if (Platform.OS === 'web') return;
-    if (!googleResponse) return;
-
-    if (googleResponse.type !== 'success') {
-      if (googleResponse.type === 'error') {
-        setError('Google sign-in failed. Please try again.');
-      }
-      setBusy(false);
-      return;
-    }
-
-    void (async () => {
-      try {
-        const idToken = googleResponse.authentication?.idToken ?? googleResponse.params?.id_token;
-        const accessToken = googleResponse.authentication?.accessToken ?? googleResponse.params?.access_token;
-        const authenticatedName = await loginOnlineWithGoogleTokens(idToken, accessToken);
-        await AsyncStorage.setItem(SESSION_KEY, authenticatedName);
-        void trackGameplayAction('auth_login_success', { username: authenticatedName, provider: 'google' }, 0);
-        onAuthenticated(authenticatedName);
-      } catch (nextError) {
-        setError(mapAuthError(nextError));
-      } finally {
-        setBusy(false);
-      }
-    })();
-  }, [googleResponse, onAuthenticated]);
 
   const cleanIdentifier = identifier.trim();
   const normalizedEmail = cleanIdentifier.toLowerCase();
@@ -321,20 +351,20 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
 
     try {
       if (Platform.OS === 'web') {
+        if (!hasWebGoogleConfig) {
+          throw new Error('Google web client ID is missing. Add EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID.');
+        }
         const authenticatedName = await loginOnlineWithGooglePopup();
         await completeOnlineLogin(authenticatedName, 'google', 'login');
         setBusy(false);
         return;
       }
 
-      if (!googleAuthEnabled || !googleRequest) {
+      if (!hasNativeGoogleConfig) {
         throw new Error('Google sign-in is not configured for this build. Add Google client IDs to Expo public env vars.');
       }
 
-      const result = await promptGoogleAsync();
-      if (result.type !== 'success') {
-        setBusy(false);
-      }
+      setBusy(false);
     } catch (googleError) {
       setError(mapAuthError(googleError));
       setBusy(false);
@@ -384,7 +414,9 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     ? 'Firebase auth is active. Use email/password or continue with Google.'
     : 'Offline fallback mode is active. Accounts are stored only on this device.';
   const googleNote = Platform.OS === 'web'
-    ? 'Google sign-in uses the Firebase web popup flow.'
+    ? hasWebGoogleConfig
+      ? 'Google sign-in uses the Firebase web popup flow.'
+      : 'Google web sign-in needs EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID.'
     : googleAuthEnabled
       ? 'Google sign-in is ready for this build.'
       : 'Google sign-in needs Expo Google client IDs in your public env vars for native builds.';
@@ -436,13 +468,25 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
 
             {onlineAuthEnabled && (
               <>
-                <Pressable
-                  style={[styles.googleBtn, (busy || !googleAuthEnabled) && styles.buttonDisabled]}
-                  disabled={busy || !googleAuthEnabled}
-                  onPress={handleGoogleContinue}
-                >
-                  {busy ? <ActivityIndicator color="#08131E" /> : <Text style={styles.googleBtnText}>Continue with Google</Text>}
-                </Pressable>
+                {Platform.OS === 'web' || !hasNativeGoogleConfig ? (
+                  <Pressable
+                    style={[styles.googleBtn, (busy || !(Platform.OS === 'web' ? hasWebGoogleConfig : hasNativeGoogleConfig)) && styles.buttonDisabled]}
+                    disabled={busy || !(Platform.OS === 'web' ? hasWebGoogleConfig : hasNativeGoogleConfig)}
+                    onPress={handleGoogleContinue}
+                  >
+                    {busy ? <ActivityIndicator color="#08131E" /> : <Text style={styles.googleBtnText}>Continue with Google</Text>}
+                  </Pressable>
+                ) : (
+                  <NativeGoogleButton
+                    disabled={busy}
+                    googleConfig={googleConfig}
+                    onBusyChange={setBusy}
+                    onError={setError}
+                    onSuccess={async (authenticatedName: string) => {
+                      await completeOnlineLogin(authenticatedName, 'google', 'login');
+                    }}
+                  />
+                )}
                 <Text style={styles.helperText}>{googleNote}</Text>
                 <View style={styles.dividerRow}>
                   <View style={styles.dividerLine} />
