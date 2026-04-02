@@ -5718,6 +5718,7 @@ function serialize(state: GameState): SaveData {
 
 export function useGameState(saveSlot: string = 'default') {
   const saveKey = getSaveStorageKey(saveSlot);
+  const onlineSlotEligible = !saveSlot.startsWith('__character_slot_preview__');
   const [state, rawDispatch] = useReducer(reducer, DEFAULT_STATE);
   const [hydrated, setHydrated] = useState(false);
   const [onlineSyncState, setOnlineSyncState] = useState<'local-only' | 'syncing' | 'synced' | 'conflict' | 'error'>('local-only');
@@ -5728,6 +5729,7 @@ export function useGameState(saveSlot: string = 'default') {
   const claimFingerprintRef = useRef('');
   const onlineRevisionRef = useRef<number | null>(null);
   const lastOnlineSaveRef = useRef(0);
+  const onlineSyncDisabledRef = useRef(false);
   const sessionStartedRef = useRef(false);
   const sessionStartedAtRef = useRef(0);
   const prevSummonsRef = useRef(0);
@@ -5771,7 +5773,7 @@ export function useGameState(saveSlot: string = 'default') {
     const snapshot = serialize(stateRef.current);
     await AsyncStorage.setItem(saveKey, JSON.stringify(snapshot));
 
-    if (!isOnlineSaveAvailable()) {
+    if (!onlineSlotEligible || onlineSyncDisabledRef.current || !isOnlineSaveAvailable()) {
       setOnlineSyncState('local-only');
       return;
     }
@@ -5791,6 +5793,11 @@ export function useGameState(saveSlot: string = 'default') {
 
     const remote = firstAttempt.remote;
     if (!remote) {
+      if (firstAttempt.errorCode === 'permission-denied' || firstAttempt.errorCode === 'invalid-slot') {
+        onlineSyncDisabledRef.current = true;
+        setOnlineSyncState('local-only');
+        return;
+      }
       setOnlineSyncState('error');
       return;
     }
@@ -5813,8 +5820,11 @@ export function useGameState(saveSlot: string = 'default') {
     } else if (retryAttempt.remote) {
       onlineRevisionRef.current = retryAttempt.remote.revision;
       setOnlineSyncState('error');
+    } else if (retryAttempt.errorCode === 'permission-denied' || retryAttempt.errorCode === 'invalid-slot') {
+      onlineSyncDisabledRef.current = true;
+      setOnlineSyncState('local-only');
     }
-  }, [dispatch, saveKey, saveSlot]);
+  }, [dispatch, onlineSlotEligible, saveKey, saveSlot]);
 
   useEffect(() => {
     setHydrated(false);
@@ -5827,7 +5837,8 @@ export function useGameState(saveSlot: string = 'default') {
     prevPrestigeRef.current = 0;
     onlineRevisionRef.current = null;
     lastOnlineSaveRef.current = 0;
-    setOnlineSyncState(isOnlineSaveAvailable() ? 'syncing' : 'local-only');
+    onlineSyncDisabledRef.current = false;
+    setOnlineSyncState(onlineSlotEligible && isOnlineSaveAvailable() ? 'syncing' : 'local-only');
     setOnlineSyncAt(null);
     claimFingerprintRef.current = '';
     lastTickRef.current = Date.now();
@@ -5835,14 +5846,25 @@ export function useGameState(saveSlot: string = 'default') {
 
     let cancelled = false;
     void (async () => {
-      const onlineAvailable = isOnlineSaveAvailable();
-      const [localRaw, remote] = await Promise.all([
+      const onlineAvailable = onlineSlotEligible && isOnlineSaveAvailable();
+      const [localRaw, remoteResult] = await Promise.all([
         AsyncStorage.getItem(saveKey),
         onlineAvailable
           ? loadOnlineSave<Record<string, unknown>>(saveSlot)
-          : Promise.resolve(null),
+          : Promise.resolve({ ok: true, data: null } as const),
       ]);
       if (cancelled) return;
+
+      if (!remoteResult.ok) {
+        if (remoteResult.errorCode === 'permission-denied' || remoteResult.errorCode === 'invalid-slot') {
+          onlineSyncDisabledRef.current = true;
+          setOnlineSyncState('local-only');
+        } else {
+          setOnlineSyncState('error');
+        }
+      }
+
+      const remote = remoteResult.ok ? remoteResult.data : null;
 
       let localData: SaveData | null = null;
       if (localRaw) {
@@ -5910,7 +5932,7 @@ export function useGameState(saveSlot: string = 'default') {
     return () => {
       cancelled = true;
     };
-  }, [saveKey]);
+  }, [onlineSlotEligible, saveKey, saveSlot]);
 
   useEffect(() => {
     if (!state.characterCreated) return;

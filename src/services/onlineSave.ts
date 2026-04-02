@@ -9,6 +9,8 @@ export interface OnlineSaveEnvelope<TPayload extends Record<string, unknown>> {
   payload: TPayload;
 }
 
+export type OnlineSaveErrorCode = 'permission-denied' | 'invalid-slot' | 'unavailable' | 'unknown';
+
 interface SaveDocRecord {
   revision: number;
   updatedAt: number;
@@ -19,10 +21,25 @@ interface SaveDocRecord {
 
 export type OnlineSaveWriteResult<TPayload extends Record<string, unknown>> =
   | { ok: true; revision: number }
-  | { ok: false; remote: OnlineSaveEnvelope<TPayload> | null };
+  | { ok: false; remote: OnlineSaveEnvelope<TPayload> | null; errorCode?: OnlineSaveErrorCode };
+
+export type OnlineSaveLoadResult<TPayload extends Record<string, unknown>> =
+  | { ok: true; data: OnlineSaveEnvelope<TPayload> | null }
+  | { ok: false; errorCode: OnlineSaveErrorCode };
 
 function sanitizeSaveSlot(saveSlot: string): string {
-  return saveSlot.trim().replace(/[/.#$\[\]]/g, '_').slice(0, 96) || 'default';
+  const sanitized = saveSlot.trim().replace(/[/.#$\[\]]/g, '_').slice(0, 96) || 'default';
+  if (/^__.*__$/.test(sanitized)) {
+    return `slot${sanitized.replace(/^_+|_+$/g, '')}`.slice(0, 96);
+  }
+  return sanitized;
+}
+
+function mapFirestoreErrorCode(error: unknown): OnlineSaveErrorCode {
+  const code = typeof error === 'object' && error && 'code' in error ? String((error as { code: unknown }).code) : '';
+  if (code.includes('permission-denied')) return 'permission-denied';
+  if (code.includes('invalid-argument')) return 'invalid-slot';
+  return 'unknown';
 }
 
 function getCurrentUid(): string | null {
@@ -59,16 +76,20 @@ export function isOnlineSaveAvailable(): boolean {
 
 export async function loadOnlineSave<TPayload extends Record<string, unknown>>(
   saveSlot: string,
-): Promise<OnlineSaveEnvelope<TPayload> | null> {
+): Promise<OnlineSaveLoadResult<TPayload>> {
   const db = getFirebaseFirestore();
   const uid = getCurrentUid();
-  if (!db || !uid) return null;
+  if (!db || !uid) return { ok: false, errorCode: 'unavailable' };
 
-  const safeSlot = sanitizeSaveSlot(saveSlot);
-  const ref = doc(db, 'users', uid, 'saveSlots', safeSlot);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) return null;
-  return toEnvelope<TPayload>(snap.data());
+  try {
+    const safeSlot = sanitizeSaveSlot(saveSlot);
+    const ref = doc(db, 'users', uid, 'saveSlots', safeSlot);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return { ok: true, data: null };
+    return { ok: true, data: toEnvelope<TPayload>(snap.data()) };
+  } catch (error) {
+    return { ok: false, errorCode: mapFirestoreErrorCode(error) };
+  }
 }
 
 export async function writeOnlineSave<TPayload extends Record<string, unknown>>(
@@ -79,32 +100,36 @@ export async function writeOnlineSave<TPayload extends Record<string, unknown>>(
   const db = getFirebaseFirestore();
   const uid = getCurrentUid();
   if (!db || !uid) {
-    return { ok: false, remote: null };
+    return { ok: false, remote: null, errorCode: 'unavailable' };
   }
 
-  const safeSlot = sanitizeSaveSlot(saveSlot);
-  const ref = doc(db, 'users', uid, 'saveSlots', safeSlot);
-  const now = Date.now();
+  try {
+    const safeSlot = sanitizeSaveSlot(saveSlot);
+    const ref = doc(db, 'users', uid, 'saveSlots', safeSlot);
+    const now = Date.now();
 
-  return runTransaction(db, async tx => {
-    const snap = await tx.get(ref);
-    const remote = snap.exists() ? toEnvelope<TPayload>(snap.data()) : null;
-    const remoteRevision = remote?.revision ?? 0;
-    const baseRevision = expectedRevision ?? remoteRevision;
+    return runTransaction(db, async tx => {
+      const snap = await tx.get(ref);
+      const remote = snap.exists() ? toEnvelope<TPayload>(snap.data()) : null;
+      const remoteRevision = remote?.revision ?? 0;
+      const baseRevision = expectedRevision ?? remoteRevision;
 
-    if (remoteRevision !== baseRevision) {
-      return { ok: false, remote } as OnlineSaveWriteResult<TPayload>;
-    }
+      if (remoteRevision !== baseRevision) {
+        return { ok: false, remote } as OnlineSaveWriteResult<TPayload>;
+      }
 
-    const nextRevision = remoteRevision + 1;
-    tx.set(ref, {
-      revision: nextRevision,
-      updatedAt: now,
-      schemaVersion: SAVE_SCHEMA_VERSION,
-      saveSlot: safeSlot,
-      payload,
+      const nextRevision = remoteRevision + 1;
+      tx.set(ref, {
+        revision: nextRevision,
+        updatedAt: now,
+        schemaVersion: SAVE_SCHEMA_VERSION,
+        saveSlot: safeSlot,
+        payload,
+      });
+
+      return { ok: true, revision: nextRevision } as OnlineSaveWriteResult<TPayload>;
     });
-
-    return { ok: true, revision: nextRevision } as OnlineSaveWriteResult<TPayload>;
-  });
+  } catch (error) {
+    return { ok: false, remote: null, errorCode: mapFirestoreErrorCode(error) };
+  }
 }

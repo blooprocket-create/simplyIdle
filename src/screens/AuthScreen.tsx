@@ -128,6 +128,8 @@ function mapAuthError(error: unknown): string {
       return 'Google sign-in was canceled.';
     case 'auth/account-exists-with-different-credential':
       return 'That email already exists with another sign-in method.';
+    case 'auth/unauthorized-domain':
+      return 'This web address is not allowed by Firebase Auth yet. Add the current site to Firebase Authentication > Settings > Authorized domains.';
     case 'auth/network-request-failed':
       return 'Network error. Check your connection and try again.';
     default:
