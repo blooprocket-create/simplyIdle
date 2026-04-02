@@ -61,6 +61,10 @@ import {
   getHeroUniqueSkillDescription,
   getHeroUniqueWeaponName,
   unlockLabel,
+  HERO_REBIRTH_REFERENCE_MULT,
+  HERO_REBIRTH_BOOST_GAIN_BASE,
+  HERO_REBIRTH_BOOST_GAIN_DECAY,
+  HERO_REBIRTH_BOOST_GAIN_FLOOR,
 } from './gameConfig';
 import { buildingCost, bulkCost } from './utils';
 import { debugLog, trackEvent, trackGameplayAction } from './telemetry';
@@ -2269,6 +2273,32 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     now,
   );
 
+  // Migration: Recalculate rebirth multipliers for heroes with old 12% bonus to new 75% bonus
+  const migratedHeroRoster = heroRoster.map(hero => {
+    if (!hero.rebirthStatMult || hero.rebirthStatMult <= 1) return hero;
+    
+    // Estimate how many rebirths they had with the old system (0.12 bonus base)
+    const estimatedRebirths = Math.max(
+      0,
+      Math.floor((Math.log(hero.rebirthStatMult) / Math.log(HERO_REBIRTH_REFERENCE_MULT)) + 1e-6)
+    );
+    
+    // Recalculate their stat mult with the new system (0.75 bonus base)
+    let newStatMult = 1;
+    for (let i = 0; i < estimatedRebirths; i++) {
+      const gainPct = Math.max(
+        HERO_REBIRTH_BOOST_GAIN_FLOOR,
+        HERO_REBIRTH_BOOST_GAIN_BASE * Math.pow(HERO_REBIRTH_BOOST_GAIN_DECAY, i)
+      );
+      newStatMult = newStatMult * (1 + gainPct);
+    }
+    
+    const finalStatMult = Number(newStatMult.toFixed(4));
+    if (finalStatMult === hero.rebirthStatMult) return hero;
+    
+    return { ...hero, rebirthStatMult: finalStatMult };
+  });
+
   return {
     playerName,
     playerClass,
@@ -2292,7 +2322,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     teamMaxHp,
     party,
     skills,
-    heroRoster,
+    heroRoster: migratedHeroRoster,
     activeTeamHeroIds,
     totalSummons: clampInt(payload.totalSummons, 0, SAFE_INTEGER_CAP, 0),
     firstSummonGiven: clampBoolean(payload.firstSummonGiven, false),
