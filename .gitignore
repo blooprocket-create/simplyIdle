@@ -42,3 +42,6 @@ yarn-error.*
 
 # Firebase admin credentials
 simplyidle-43c81-firebase-adminsdk-fbsvc-5dc5b32aa7.json
+
+# Local Firestore rules draft
+firestore.rules
