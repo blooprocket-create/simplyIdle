@@ -1943,17 +1943,35 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
     const tokens = rawCommand.split(/\s+/);
     const command = (tokens[0] ?? '').toLowerCase();
+    const currentUid = getFirebaseAuth()?.currentUser?.uid ?? '';
+    const currentSnapshot = (state.characterCreated && selectedCharacterClass)
+      ? {
+        account: publicUsername || accountName,
+        uid: currentUid,
+        saveSlotId: getCharacterSaveSlot(accountName, selectedCharacterClass),
+        classId: selectedCharacterClass,
+        playerName: state.playerName,
+        level: state.level,
+        highestWaveReached: state.highestWaveReached,
+        lastActiveAt: Date.now(),
+        isOnline: true,
+      } as CharacterSnapshot
+      : null;
 
     if (command === '/showonlineusersandcharacters') {
       const snapshots = await collectCharacterSnapshots();
-      if (snapshots.length === 0) {
-        setDevCommandOutput('No accounts or characters found.');
+      const allSnapshots = currentSnapshot && !snapshots.some(snapshot => snapshot.uid === currentUid && snapshot.classId === currentSnapshot.classId)
+        ? [currentSnapshot, ...snapshots]
+        : snapshots;
+
+      if (allSnapshots.length === 0) {
+        setDevCommandOutput('No characters found in Firestore, and no active local character is loaded.');
         return;
       }
 
-      const onlineCount = snapshots.filter(s => s.isOnline).length;
-      const lines = snapshots.map(snapshot => `${snapshot.isOnline ? 'ONLINE' : 'offline'} • ${snapshot.account} • ${snapshot.playerName} (${snapshot.classId}) • Lv ${snapshot.level} • Wave ${snapshot.highestWaveReached}`);
-      setDevCommandOutput(`Users+Characters (${onlineCount}/${snapshots.length} online)\n${lines.join('\n')}`);
+      const onlineCount = allSnapshots.filter(s => s.isOnline).length;
+      const lines = allSnapshots.map(snapshot => `${snapshot.isOnline ? 'ONLINE' : 'offline'} • ${snapshot.account} • ${snapshot.playerName} (${snapshot.classId}) • Lv ${snapshot.level} • Wave ${snapshot.highestWaveReached}`);
+      setDevCommandOutput(`Users+Characters (${onlineCount}/${allSnapshots.length} online)\n${lines.join('\n')}`);
       return;
     }
 
@@ -2021,21 +2039,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       };
 
       const snapshots = await collectCharacterSnapshots();
-      const currentUid = getFirebaseAuth()?.currentUser?.uid ?? '';
-      const currentSnapshot = (state.characterCreated && selectedCharacterClass)
-        ? {
-          account: publicUsername || accountName,
-          uid: currentUid,
-          saveSlotId: getCharacterSaveSlot(accountName, selectedCharacterClass),
-          classId: selectedCharacterClass,
-          playerName: state.playerName,
-          level: state.level,
-          highestWaveReached: state.highestWaveReached,
-          lastActiveAt: Date.now(),
-          isOnline: true,
-        } as CharacterSnapshot
-        : null;
-
       const allSnapshots = currentSnapshot && !snapshots.some(snapshot => snapshot.uid === currentUid && snapshot.classId === currentSnapshot.classId)
         ? [currentSnapshot, ...snapshots]
         : snapshots;
@@ -2053,12 +2056,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         const user = (userRaw ?? '').trim().toLowerCase();
         const char = (charRaw ?? '').trim().toLowerCase();
         targets = allSnapshots.filter(snapshot =>
-          snapshot.account === user
+          snapshot.account.trim().toLowerCase() === user
           && (snapshot.classId.toLowerCase() === char || snapshot.playerName.trim().toLowerCase() === char),
         );
       } else {
         const user = targetSpec.trim().toLowerCase();
-        targets = allSnapshots.filter(snapshot => snapshot.account === user);
+        targets = allSnapshots.filter(snapshot => snapshot.account.trim().toLowerCase() === user);
       }
 
       if (targets.length === 0) {
@@ -2088,7 +2091,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
     if (command === '/clearslot') {
       // Usage: /clearslot <classId>
-      // Wipes BOTH local AsyncStorage AND Firestore for the current user's slot so deletion from Firestore console actually sticks.
+      // Wipes the current user's Firestore save slot.
       const classArg = (tokens[1] ?? '').trim().toLowerCase() as PlayerClass;
       const validClasses: PlayerClass[] = ['warrior', 'berserker', 'archer', 'mage', 'monk'];
       if (!classArg || !validClasses.includes(classArg)) {
@@ -2108,7 +2111,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     }
 
     setDevCommandOutput(`Unknown command: ${tokens[0]}. Supported: /sendMsg, /showOnlineusersAndCharacters, /clearslot`);
-  }, [accountName, appendMailboxMessages, collectCharacterSnapshots, devCommandInput, isAdmin, selectedCharacterClass, state.characterCreated, state.highestWaveReached, state.level, state.playerName]);
+  }, [accountName, appendMailboxMessages, collectCharacterSnapshots, devCommandInput, isAdmin, publicUsername, selectedCharacterClass, state.characterCreated, state.highestWaveReached, state.level, state.playerName]);
 
   useEffect(() => {
     let cancelled = false;
