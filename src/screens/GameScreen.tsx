@@ -70,6 +70,7 @@ import {
   OperationsTabContent,
 } from './tabs';
 import { styles } from './GameScreen.styles';
+import { isCurrentUserAdmin } from '../services/adminAccess';
 
 export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations';
 type HeroesSubTab = 'summon' | 'roster' | 'batch';
@@ -340,6 +341,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [recycleConfirmUid, setRecycleConfirmUid] = useState<string | null>(null);
   const [smartCoolantConfirmOpen, setSmartCoolantConfirmOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminCheckPending, setAdminCheckPending] = useState(true);
   const [mailOpen, setMailOpen] = useState(false);
   const [selectedMailId, setSelectedMailId] = useState<string | null>(null);
   const [shopOpen, setShopOpen] = useState(false);
@@ -1808,6 +1811,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   }, []);
 
   const runDevCommand = useCallback(async () => {
+    if (!isAdmin) {
+      setDevCommandOutput('Admin access required.');
+      return;
+    }
+
     const rawCommand = devCommandInput.trim();
     if (!rawCommand) {
       setDevCommandOutput('Enter a command first.');
@@ -1963,7 +1971,27 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     }
 
     setDevCommandOutput(`Unknown command: ${tokens[0]}. Supported: /sendMsg, /showOnlineusersAndCharacters`);
-  }, [accountName, appendMailboxMessages, collectCharacterSnapshots, devCommandInput, selectedCharacterClass, state.characterCreated, state.highestWaveReached, state.level, state.playerName]);
+  }, [accountName, appendMailboxMessages, collectCharacterSnapshots, devCommandInput, isAdmin, selectedCharacterClass, state.characterCreated, state.highestWaveReached, state.level, state.playerName]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setAdminCheckPending(true);
+
+    void (async () => {
+      const allowed = await isCurrentUserAdmin();
+      if (cancelled) return;
+      setIsAdmin(allowed);
+      setAdminCheckPending(false);
+      if (!allowed) {
+        setDevCommandInput('');
+        setDevCommandOutput('');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accountName]);
 
   if (slotListLoading) {
     return (
@@ -3274,26 +3302,37 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 </Pressable>
               </View>
 
-              <View style={styles.settingsCard}>
-                <Text style={styles.settingsCardTitle}>Dev Mail Console</Text>
-                <Text style={styles.settingsLabel}>Commands: /sendMsg (sendAll|User|User+CharName) #subject# ##message## $shard X, $gold X, $diamond X, $tears X, $essence X</Text>
-                <Text style={styles.settingsLabel}>Commands: /showOnlineusersAndCharacters</Text>
-                <View style={styles.devCommandRow}>
-                  <TextInput
-                    style={styles.devCommandInput}
-                    placeholder="/sendMsg sendAll #WELCOME# ##message## $shard 100"
-                    placeholderTextColor="#7F9CB8"
-                    value={devCommandInput}
-                    onChangeText={setDevCommandInput}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  <Pressable style={styles.settingsCycleBtn} onPress={() => { void runDevCommand(); }}>
-                    <Text style={styles.settingsCycleBtnText}>Run</Text>
-                  </Pressable>
+              {isAdmin ? (
+                <View style={styles.settingsCard}>
+                  <Text style={styles.settingsCardTitle}>Dev Mail Console</Text>
+                  <Text style={styles.settingsLabel}>Commands: /sendMsg (sendAll|User|User+CharName) #subject# ##message## $shard X, $gold X, $diamond X, $tears X, $essence X</Text>
+                  <Text style={styles.settingsLabel}>Commands: /showOnlineusersAndCharacters</Text>
+                  <View style={styles.devCommandRow}>
+                    <TextInput
+                      style={styles.devCommandInput}
+                      placeholder="/sendMsg sendAll #WELCOME# ##message## $shard 100"
+                      placeholderTextColor="#7F9CB8"
+                      value={devCommandInput}
+                      onChangeText={setDevCommandInput}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    <Pressable style={styles.settingsCycleBtn} onPress={() => { void runDevCommand(); }}>
+                      <Text style={styles.settingsCycleBtnText}>Run</Text>
+                    </Pressable>
+                  </View>
+                  {!!devCommandOutput && <Text style={styles.devCommandOutput}>{devCommandOutput}</Text>}
                 </View>
-                {!!devCommandOutput && <Text style={styles.devCommandOutput}>{devCommandOutput}</Text>}
-              </View>
+              ) : (
+                <View style={styles.settingsCard}>
+                  <Text style={styles.settingsCardTitle}>Developer Tools</Text>
+                  <Text style={styles.settingsLabel}>
+                    {adminCheckPending
+                      ? 'Checking admin permissions...'
+                      : 'Developer console is restricted to admin accounts.'}
+                  </Text>
+                </View>
+              )}
 
               <View style={styles.settingsCard}>
                 <Text style={styles.settingsCardTitle}>Auto Potion</Text>
