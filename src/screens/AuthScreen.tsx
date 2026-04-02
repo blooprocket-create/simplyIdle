@@ -231,6 +231,8 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [publicUsername, setPublicUsername] = useState('');
+  const [googleNeedsUsername, setGoogleNeedsUsername] = useState(false);
+  const [pendingGoogleAccountName, setPendingGoogleAccountName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [knownUsernames, setKnownUsernames] = useState<string[]>([]);
@@ -292,6 +294,66 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       provider,
     }, 0);
     onAuthenticated(accountName);
+  }
+
+  async function continueGoogleAuth(authenticatedName: string) {
+    const uid = getFirebaseAuth()?.currentUser?.uid;
+    if (!uid) {
+      await completeOnlineLogin(authenticatedName, 'google', 'login');
+      return;
+    }
+
+    const existingPublic = await loadPublicUsername(uid);
+    if (existingPublic && existingPublic.trim()) {
+      await completeOnlineLogin(authenticatedName, 'google', 'login');
+      return;
+    }
+
+    setPendingGoogleAccountName(authenticatedName);
+    setGoogleNeedsUsername(true);
+    setPublicUsername('');
+    setError('Choose a public username to finish Google account setup. This name will be visible on leaderboards.');
+  }
+
+  async function handleCompleteGoogleUsername() {
+    if (!pendingGoogleAccountName) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      const formatError = validatePublicUsername(publicUsername);
+      if (formatError) {
+        setError(formatError);
+        return;
+      }
+
+      const available = await isPublicUsernameAvailable(publicUsername);
+      if (!available) {
+        setError('That username is already taken. Please choose another.');
+        return;
+      }
+
+      const uid = getFirebaseAuth()?.currentUser?.uid;
+      if (!uid) {
+        setError('Google session expired. Please continue with Google again.');
+        setGoogleNeedsUsername(false);
+        setPendingGoogleAccountName(null);
+        return;
+      }
+
+      const reservation = await reservePublicUsername(publicUsername.trim(), uid);
+      if (!reservation.ok) {
+        setError(reservation.error ?? 'Could not reserve username. Please try again.');
+        return;
+      }
+
+      setGoogleNeedsUsername(false);
+      const accountName = pendingGoogleAccountName;
+      setPendingGoogleAccountName(null);
+      await completeOnlineLogin(accountName, 'google', 'register');
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handleSubmit() {
@@ -389,7 +451,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   }
 
   async function handleGoogleContinue() {
-    if (busy || !onlineAuthEnabled) return;
+    if (busy || !onlineAuthEnabled || googleNeedsUsername) return;
 
     setBusy(true);
     setError(null);
@@ -398,7 +460,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     try {
       if (Platform.OS === 'web') {
         const authenticatedName = await loginOnlineWithGooglePopup();
-        await completeOnlineLogin(authenticatedName, 'google', 'login');
+        await continueGoogleAuth(authenticatedName);
         setBusy(false);
         return;
       }
@@ -477,24 +539,52 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               <>
                 {Platform.OS === 'web' || !hasNativeGoogleConfig ? (
                   <Pressable
-                    style={[styles.googleBtn, (busy || (Platform.OS !== 'web' && !hasNativeGoogleConfig)) && styles.buttonDisabled]}
-                    disabled={busy || (Platform.OS !== 'web' && !hasNativeGoogleConfig)}
+                    style={[styles.googleBtn, (busy || googleNeedsUsername || (Platform.OS !== 'web' && !hasNativeGoogleConfig)) && styles.buttonDisabled]}
+                    disabled={busy || googleNeedsUsername || (Platform.OS !== 'web' && !hasNativeGoogleConfig)}
                     onPress={handleGoogleContinue}
                   >
                     {busy ? <ActivityIndicator color="#08131E" /> : <Text style={styles.googleBtnText}>Continue with Google</Text>}
                   </Pressable>
                 ) : (
                   <NativeGoogleButton
-                    disabled={busy}
+                    disabled={busy || googleNeedsUsername}
                     googleConfig={googleConfig}
                     onBusyChange={setBusy}
                     onError={setError}
                     onSuccess={async (authenticatedName: string) => {
-                      await completeOnlineLogin(authenticatedName, 'google', 'login');
+                      await continueGoogleAuth(authenticatedName);
                     }}
                   />
                 )}
                 <Text style={styles.helperText}>{googleNote}</Text>
+                {googleNeedsUsername && (
+                  <>
+                    <Text style={styles.fieldLabel}>Choose Public Username</Text>
+                    <TextInput
+                      value={publicUsername}
+                      onChangeText={setPublicUsername}
+                      style={styles.input}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      autoComplete="username"
+                      placeholder="your_username"
+                      placeholderTextColor="#6D7A90"
+                      maxLength={PUBLIC_USERNAME_MAX}
+                    />
+                    <Text style={[styles.helperText, publicUsername.length > 0 && validatePublicUsername(publicUsername) !== null && styles.helperTextError]}>
+                      {publicUsername.length > 0 && validatePublicUsername(publicUsername)
+                        ? validatePublicUsername(publicUsername) ?? ''
+                        : `${PUBLIC_USERNAME_MIN}-${PUBLIC_USERNAME_MAX} characters. This name is your public identity online.`}
+                    </Text>
+                    <Pressable
+                      style={[styles.submitBtn, (busy || validatePublicUsername(publicUsername) !== null) && styles.buttonDisabled]}
+                      disabled={busy || validatePublicUsername(publicUsername) !== null}
+                      onPress={handleCompleteGoogleUsername}
+                    >
+                      {busy ? <ActivityIndicator color="#08131E" /> : <Text style={styles.submitBtnText}>Finish Google Signup</Text>}
+                    </Pressable>
+                  </>
+                )}
                 <View style={styles.dividerRow}>
                   <View style={styles.dividerLine} />
                   <Text style={styles.dividerText}>or use email</Text>
