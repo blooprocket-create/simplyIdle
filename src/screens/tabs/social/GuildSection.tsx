@@ -1,6 +1,5 @@
 import React from 'react';
-import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
-import { THEME } from '../../../theme';
+import { FlatList, Pressable, Text, View } from 'react-native';
 import {
   attackBoss,
   contributeToGuildEvent,
@@ -18,6 +17,7 @@ import {
   sendGuildChatMessage,
   leaveGuild,
 } from '../../../services/guild';
+import { SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
 
 type GuildSubTab = 'home' | 'boss' | 'events' | 'chat';
 
@@ -98,50 +98,42 @@ export function GuildSection({
 }: GuildSectionProps) {
   return (
     <>
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Guild Command</Text>
-        <Text style={styles.metaText}>Create Guild Cost: 2,500 Diamonds.</Text>
+      <SocialCard styles={styles} title="Guild Command" subtitle="Create Guild Cost: 2,500 Diamonds.">
         <Text style={styles.metaText}>Your Diamonds: {diamonds}</Text>
         {guildBusy && <Text style={styles.metaText}>Syncing guild actions...</Text>}
         {!!error && <Text style={styles.errorText}>{error}</Text>}
-      </View>
+      </SocialCard>
 
       {!myGuild && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Create Guild</Text>
-          <TextInput
+        <SocialCard styles={styles} title="Create Guild">
+          <SocialInput
+            styles={styles}
             value={guildNameInput}
             onChangeText={setGuildNameInput}
             placeholder="Guild Name"
-            placeholderTextColor={THEME.text.tertiary}
-            style={styles.input}
             editable={!guildBusy}
             maxLength={32}
           />
-          <TextInput
+          <SocialInput
+            styles={styles}
             value={guildTagInput}
             onChangeText={setGuildTagInput}
             placeholder="Tag (2-5 chars)"
-            placeholderTextColor={THEME.text.tertiary}
-            style={styles.input}
             editable={!guildBusy}
             autoCapitalize="characters"
             maxLength={5}
           />
-          <TextInput
+          <SocialInput
+            styles={styles}
             value={guildDescInput}
             onChangeText={setGuildDescInput}
             placeholder="Description"
-            placeholderTextColor={THEME.text.tertiary}
-            style={styles.input}
             editable={!guildBusy}
             maxLength={140}
           />
-          <Pressable
-            style={[
-              styles.sendBtn,
-              (guildBusy || diamonds < 2500 || !guildNameInput.trim() || !guildTagInput.trim()) && styles.sendBtnDisabled,
-            ]}
+          <SocialPrimaryButton
+            styles={styles}
+            label="Create Guild"
             disabled={guildBusy || diamonds < 2500 || !guildNameInput.trim() || !guildTagInput.trim()}
             onPress={async () => {
               if (!me.uid) return;
@@ -169,10 +161,8 @@ export function GuildSection({
                 setGuildBusy(false);
               }
             }}
-          >
-            <Text style={styles.sendBtnText}>Create Guild</Text>
-          </Pressable>
-        </View>
+          />
+        </SocialCard>
       )}
 
       {myGuild && (
@@ -443,9 +433,7 @@ export function GuildSection({
       )}
 
       {myGuild && guildSubTab === 'chat' && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Guild Chat</Text>
-          <Text style={styles.metaText}>Tactical channel for your guild.</Text>
+        <SocialCard styles={styles} title="Guild Chat" subtitle="Tactical channel for your guild.">
           <View style={[styles.card, styles.chatListCard]}>
             {guildChat.length === 0 && <Text style={styles.metaText}>No guild messages yet.</Text>}
             <FlatList
@@ -462,17 +450,17 @@ export function GuildSection({
               )}
             />
           </View>
-          <TextInput
+          <SocialInput
+            styles={styles}
             value={guildChatDraft}
             onChangeText={setGuildChatDraft}
             placeholder="Message guild..."
-            placeholderTextColor={THEME.text.tertiary}
-            style={styles.input}
             editable={!guildBusy}
             maxLength={300}
           />
-          <Pressable
-            style={[styles.sendBtn, (!guildChatDraft.trim() || guildBusy) && styles.sendBtnDisabled]}
+          <SocialPrimaryButton
+            styles={styles}
+            label="Send"
             disabled={!guildChatDraft.trim() || guildBusy}
             onPress={async () => {
               if (!me.uid) return;
@@ -488,21 +476,17 @@ export function GuildSection({
                 setGuildBusy(false);
               }
             }}
-          >
-            <Text style={styles.sendBtnText}>Send</Text>
-          </Pressable>
-        </View>
+          />
+        </SocialCard>
       )}
 
       {!myGuild && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Browse Guilds</Text>
-          <TextInput
+        <SocialCard styles={styles} title="Browse Guilds">
+          <SocialInput
+            styles={styles}
             value={guildSearchInput}
             onChangeText={setGuildSearchInput}
             placeholder="Search guilds"
-            placeholderTextColor={THEME.text.tertiary}
-            style={styles.input}
             editable={!guildBusy}
             maxLength={32}
           />
@@ -540,7 +524,7 @@ export function GuildSection({
               </Pressable>
             </View>
           ))}
-        </View>
+        </SocialCard>
       )}
     </>
   );

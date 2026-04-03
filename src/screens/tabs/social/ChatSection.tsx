@@ -1,7 +1,7 @@
 import React from 'react';
-import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
-import { THEME } from '../../../theme';
+import { FlatList, Pressable, Text, View } from 'react-native';
 import { GlobalChatMessage } from '../../../services/chat';
+import { SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
 
 interface ChatSectionProps {
   styles: any;
@@ -42,13 +42,11 @@ export function ChatSection({
 }: ChatSectionProps) {
   return (
     <>
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Global Chat</Text>
-        <Text style={styles.metaText}>Online now: {onlineCount} • Real-time feed</Text>
+      <SocialCard styles={styles} title="Global Chat" subtitle={`Online now: ${onlineCount} • Real-time feed`}>
         {mutedUntil && mutedUntil > Date.now() && (
           <Text style={styles.mutedText}>You are muted until {new Date(mutedUntil).toLocaleString()}.</Text>
         )}
-      </View>
+      </SocialCard>
 
       <View style={[styles.card, styles.chatListCard]}>
         {messages.length === 0 && <Text style={styles.metaText}>No messages yet. Start the conversation.</Text>}
@@ -91,26 +89,23 @@ export function ChatSection({
         />
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.metaText}>Message as {meDisplayName} (Lv.{meLevel})</Text>
-        <TextInput
+      <SocialCard styles={styles} subtitle={`Message as ${meDisplayName} (Lv.${meLevel})`}>
+        <SocialInput
+          styles={styles}
           value={draft}
           onChangeText={setDraft}
           placeholder="Say something..."
-          placeholderTextColor={THEME.text.tertiary}
-          style={styles.input}
           maxLength={500}
           editable={!sending && !(mutedUntil && mutedUntil > Date.now())}
         />
-        <Pressable
-          style={[styles.sendBtn, (sending || !draft.trim()) && styles.sendBtnDisabled]}
+        <SocialPrimaryButton
+          styles={styles}
+          label={sending ? 'Sending...' : 'Send'}
           onPress={() => void onSend()}
           disabled={sending || !draft.trim()}
-        >
-          <Text style={styles.sendBtnText}>{sending ? 'Sending...' : 'Send'}</Text>
-        </Pressable>
+        />
         {!!error && <Text style={styles.errorText}>{error}</Text>}
-      </View>
+      </SocialCard>
     </>
   );
 }

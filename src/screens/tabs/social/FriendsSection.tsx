@@ -1,8 +1,8 @@
 import React from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
-import { THEME } from '../../../theme';
+import { Pressable, Text, View } from 'react-native';
 import { GiftPreference } from '../../../gameConfig';
 import { FriendListEntry, PendingFriendRequest } from '../../../services/friends';
+import { SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
 
 interface FriendsSectionProps {
   styles: any;
@@ -45,9 +45,7 @@ export function FriendsSection({
 }: FriendsSectionProps) {
   return (
     <>
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>My Gift Preference</Text>
-        <Text style={styles.metaText}>Set what friends send you at daily reset.</Text>
+      <SocialCard styles={styles} title="My Gift Preference" subtitle="Set what friends send you at daily reset.">
         <View style={styles.prefRow}>
           {(['gold', 'shards', 'essence'] as GiftPreference[]).map(pref => (
             <Pressable
@@ -60,33 +58,28 @@ export function FriendsSection({
             </Pressable>
           ))}
         </View>
-      </View>
+      </SocialCard>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Add Friend</Text>
-        <Text style={styles.metaText}>Search by exact public username.</Text>
-        <TextInput
+      <SocialCard styles={styles} title="Add Friend" subtitle="Search by exact public username.">
+        <SocialInput
+          styles={styles}
           value={friendSearch}
           onChangeText={setFriendSearch}
           placeholder="Public username"
-          placeholderTextColor={THEME.text.tertiary}
-          style={styles.input}
           maxLength={24}
           editable={!friendsBusy}
           autoCapitalize="none"
         />
-        <Pressable
-          style={[styles.sendBtn, (!friendSearch.trim() || friendsBusy) && styles.sendBtnDisabled]}
+        <SocialPrimaryButton
+          styles={styles}
+          label="Send Request"
           onPress={() => void onSendRequest()}
           disabled={!friendSearch.trim() || friendsBusy}
-        >
-          <Text style={styles.sendBtnText}>Send Request</Text>
-        </Pressable>
-      </View>
+        />
+      </SocialCard>
 
       {pendingRequests.length > 0 && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Pending Requests ({pendingRequests.length})</Text>
+        <SocialCard styles={styles} title={`Pending Requests (${pendingRequests.length})`}>
           {pendingRequests.map(request => (
             <View key={request.fromUid} style={styles.friendRow}>
               <Text style={styles.friendName}>👤 {request.fromName}</Text>
@@ -100,17 +93,16 @@ export function FriendsSection({
               </View>
             </View>
           ))}
-        </View>
+        </SocialCard>
       )}
 
       {pendingRequests.length === 0 && (
-        <View style={styles.card}>
+        <SocialCard styles={styles}>
           <Text style={styles.metaText}>No pending requests right now.</Text>
-        </View>
+        </SocialCard>
       )}
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Friends ({friends.length})</Text>
+      <SocialCard styles={styles} title={`Friends (${friends.length})`}>
         {friends.length === 0 && <Text style={styles.metaText}>No friends yet. Add someone by public username.</Text>}
         {friends.map(friend => {
           const cooldownAt = giftCooldowns[friend.uid] ?? 0;
@@ -141,7 +133,7 @@ export function FriendsSection({
             </View>
           );
         })}
-      </View>
+      </SocialCard>
     </>
   );
 }
