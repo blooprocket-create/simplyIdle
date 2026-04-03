@@ -1341,6 +1341,24 @@ const styles = StyleSheet.create({
     padding: 8,
     paddingBottom: 12,
   },
+  chatDayDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginVertical: 8,
+  },
+  chatDayDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#2A445B',
+  },
+  chatDayDividerText: {
+    color: '#8EAFC7',
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
   chatComposerWrap: {
     borderTopWidth: 1,
     borderTopColor: '#2E4B63',
@@ -1442,6 +1460,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: '#121F2E',
   },
+  chatRowCompact: {
+    marginTop: -6,
+    paddingTop: 6,
+  },
   chatRowMine: {
     borderColor: '#7CC3FF',
     backgroundColor: '#1A2F45',
@@ -1463,6 +1485,12 @@ const styles = StyleSheet.create({
   chatTime: {
     color: '#87A6BF',
     fontSize: 11,
+  },
+  chatTimeCompact: {
+    color: '#7396B4',
+    fontSize: 10,
+    marginBottom: 3,
+    fontWeight: '700',
   },
   chatText: {
     color: '#D5E6F5',

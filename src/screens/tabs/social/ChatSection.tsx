@@ -1,7 +1,23 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import { GlobalChatMessage } from '../../../services/chat';
 import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
+
+type ChatListRow =
+  | { key: string; type: 'day'; label: string }
+  | { key: string; type: 'message'; showHeader: boolean; mine: boolean; compact: boolean; message: GlobalChatMessage };
+
+function dayKey(ts: number): string {
+  return new Date(ts).toISOString().slice(0, 10);
+}
+
+function formatDayLabel(ts: number): string {
+  const date = new Date(ts);
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  });
+}
 
 interface ChatSectionProps {
   styles: any;
@@ -44,7 +60,43 @@ export function ChatSection({
   meDisplayName,
   meLevel,
 }: ChatSectionProps) {
-  const listRef = useRef<FlatList<GlobalChatMessage> | null>(null);
+  const listRef = useRef<FlatList<ChatListRow> | null>(null);
+
+  const rows = useMemo<ChatListRow[]>(() => {
+    const nextRows: ChatListRow[] = [];
+    let previous: GlobalChatMessage | null = null;
+    let previousDay = '';
+
+    for (const message of messages) {
+      const currentDay = dayKey(message.sentAt);
+      if (currentDay !== previousDay) {
+        previousDay = currentDay;
+        nextRows.push({
+          key: `day_${currentDay}`,
+          type: 'day',
+          label: formatDayLabel(message.sentAt),
+        });
+      }
+
+      const sameSender = previous?.uid === message.uid;
+      const nearPrevious = previous ? message.sentAt - previous.sentAt <= 90_000 : false;
+      const sameDay = previous ? dayKey(previous.sentAt) === currentDay : false;
+      const showHeader = !(sameSender && nearPrevious && sameDay);
+
+      nextRows.push({
+        key: `msg_${message.id}`,
+        type: 'message',
+        showHeader,
+        mine: message.uid === meUid,
+        compact: !showHeader,
+        message,
+      });
+
+      previous = message;
+    }
+
+    return nextRows;
+  }, [messages, meUid]);
 
   const scrollToLatest = () => {
     requestAnimationFrame(() => {
@@ -53,9 +105,9 @@ export function ChatSection({
   };
 
   useEffect(() => {
-    if (!messages.length) return;
+    if (!rows.length) return;
     scrollToLatest();
-  }, [messages.length]);
+  }, [rows.length]);
 
   return (
     <>
@@ -79,44 +131,62 @@ export function ChatSection({
         <View style={styles.chatStreamArea}>
           <FlatList
             ref={listRef}
-            data={messages}
-            keyExtractor={item => item.id}
+            data={rows}
+            keyExtractor={item => item.key}
             style={styles.chatStreamList}
             contentContainerStyle={styles.chatStreamContent}
             keyboardShouldPersistTaps="handled"
             onContentSizeChange={scrollToLatest}
             onLayout={scrollToLatest}
             renderItem={({ item }) => {
-              const mine = item.uid === meUid;
+              if (item.type === 'day') {
+                return (
+                  <View style={styles.chatDayDividerRow}>
+                    <View style={styles.chatDayDividerLine} />
+                    <Text style={styles.chatDayDividerText}>{item.label}</Text>
+                    <View style={styles.chatDayDividerLine} />
+                  </View>
+                );
+              }
+
+              const { message } = item;
               return (
                 <Pressable
-                  style={[styles.chatRow, mine && styles.chatRowMine]}
+                  style={[
+                    styles.chatRow,
+                    item.mine && styles.chatRowMine,
+                    item.compact && styles.chatRowCompact,
+                  ]}
                   onPress={() => {
-                    if (mine) return;
-                    onOpenProfile(item.uid);
+                    if (item.mine) return;
+                    onOpenProfile(message.uid);
                   }}
                   onLongPress={() => {
-                    if (mine) return;
-                    onOpenUserMenu(item);
+                    if (item.mine) return;
+                    onOpenUserMenu(message);
                   }}
                   delayLongPress={200}
                 >
-                  <View style={styles.chatHeaderRow}>
-                    <Text style={styles.chatName} numberOfLines={1} ellipsizeMode="tail">
-                      {item.displayName} Lv.{item.level} VIP {item.vipLevel}{item.guildTag ? ` [${item.guildTag}]` : ''}
-                    </Text>
-                    <Text style={styles.chatTime}>{formatTime(item.sentAt)}</Text>
-                  </View>
-                  <Text style={styles.chatText}>{item.text}</Text>
-                  {isAdmin && !mine && (
+                  {item.showHeader ? (
+                    <View style={styles.chatHeaderRow}>
+                      <Text style={styles.chatName} numberOfLines={1} ellipsizeMode="tail">
+                        {message.displayName} Lv.{message.level} VIP {message.vipLevel}{message.guildTag ? ` [${message.guildTag}]` : ''}
+                      </Text>
+                      <Text style={styles.chatTime}>{formatTime(message.sentAt)}</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.chatTimeCompact}>{formatTime(message.sentAt)}</Text>
+                  )}
+                  <Text style={styles.chatText}>{message.text}</Text>
+                  {isAdmin && !item.mine && (
                     <View style={styles.muteActionsRow}>
-                      <Pressable style={styles.muteBtn} onPress={() => void onMute(item.uid, 60 * 60 * 1000, 'Muted by admin (1h)')}>
+                      <Pressable style={styles.muteBtn} onPress={() => void onMute(message.uid, 60 * 60 * 1000, 'Muted by admin (1h)')}>
                         <Text style={styles.muteBtnText}>Mute 1h</Text>
                       </Pressable>
-                      <Pressable style={styles.muteBtn} onPress={() => void onMute(item.uid, 24 * 60 * 60 * 1000, 'Muted by admin (24h)')}>
+                      <Pressable style={styles.muteBtn} onPress={() => void onMute(message.uid, 24 * 60 * 60 * 1000, 'Muted by admin (24h)')}>
                         <Text style={styles.muteBtnText}>Mute 24h</Text>
                       </Pressable>
-                      <Pressable style={[styles.muteBtn, styles.muteBtnPerm]} onPress={() => void onMute(item.uid, 0, 'Muted by admin (permanent)')}>
+                      <Pressable style={[styles.muteBtn, styles.muteBtnPerm]} onPress={() => void onMute(message.uid, 0, 'Muted by admin (permanent)')}>
                         <Text style={styles.muteBtnText}>Perm</Text>
                       </Pressable>
                     </View>
