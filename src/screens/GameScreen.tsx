@@ -3010,6 +3010,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             accountName,
             publicUsername,
             level: state.level,
+            diamonds: state.diamonds,
             isAdmin,
             onPendingRequestsCountChange: setSocialPendingCount,
           } as any)}

@@ -25,12 +25,24 @@ import {
   PendingFriendRequest,
 } from '../../services/friends';
 import { GiftPreference } from '../../gameConfig';
+import {
+  createGuild,
+  fetchGuildBrowse,
+  fetchGuildInfo,
+  fetchGuildMembers,
+  GuildBrowseRow,
+  GuildMember,
+  GuildSummary,
+  joinGuild,
+  leaveGuild,
+} from '../../services/guild';
 
 export interface SocialTabContentProps {
   tab: string;
   accountName: string;
   publicUsername: string;
   level: number;
+  diamonds: number;
   isAdmin: boolean;
   onPendingRequestsCountChange?: (count: number) => void;
 }
@@ -67,6 +79,7 @@ export function SocialTabContent({
   accountName,
   publicUsername,
   level,
+  diamonds,
   isAdmin,
   onPendingRequestsCountChange,
 }: SocialTabContentProps) {
@@ -84,6 +97,14 @@ export function SocialTabContent({
   const [mutedUntil, setMutedUntil] = useState<number | null>(null);
   const [lastSendAt, setLastSendAt] = useState(0);
   const [friendsBusy, setFriendsBusy] = useState(false);
+  const [guildBusy, setGuildBusy] = useState(false);
+  const [guildNameInput, setGuildNameInput] = useState('');
+  const [guildTagInput, setGuildTagInput] = useState('');
+  const [guildDescInput, setGuildDescInput] = useState('');
+  const [guildSearchInput, setGuildSearchInput] = useState('');
+  const [guildList, setGuildList] = useState<GuildBrowseRow[]>([]);
+  const [myGuild, setMyGuild] = useState<GuildSummary | null>(null);
+  const [guildMembers, setGuildMembers] = useState<GuildMember[]>([]);
 
   const me = useMemo(() => {
     const authUid = getFirebaseAuth()?.currentUser?.uid ?? '';
@@ -150,6 +171,35 @@ export function SocialTabContent({
     }, 20_000);
     return () => clearInterval(timer);
   }, [tab, subTab, me.uid]);
+
+  useEffect(() => {
+    if (tab !== 'social' || subTab !== 'guild' || !me.uid) return;
+
+    const refresh = async () => {
+      try {
+        const [guildInfo, browseRows] = await Promise.all([
+          fetchGuildInfo(me.uid),
+          fetchGuildBrowse(guildSearchInput),
+        ]);
+        setMyGuild(guildInfo);
+        setGuildList(browseRows);
+        if (guildInfo?.guildId) {
+          const members = await fetchGuildMembers(guildInfo.guildId);
+          setGuildMembers(members);
+        } else {
+          setGuildMembers([]);
+        }
+      } catch {
+        setError('Failed to load guild data.');
+      }
+    };
+
+    void refresh();
+    const timer = setInterval(() => {
+      void refresh();
+    }, 20_000);
+    return () => clearInterval(timer);
+  }, [guildSearchInput, me.uid, subTab, tab]);
 
   if (tab !== 'social') return null;
 
@@ -270,6 +320,22 @@ export function SocialTabContent({
       setError('Failed to update gift preference.');
     } finally {
       setFriendsBusy(false);
+    }
+  };
+
+  const refreshGuildData = async () => {
+    if (!me.uid) return;
+    const [guildInfo, browseRows] = await Promise.all([
+      fetchGuildInfo(me.uid),
+      fetchGuildBrowse(guildSearchInput),
+    ]);
+    setMyGuild(guildInfo);
+    setGuildList(browseRows);
+    if (guildInfo?.guildId) {
+      const members = await fetchGuildMembers(guildInfo.guildId);
+      setGuildMembers(members);
+    } else {
+      setGuildMembers([]);
     }
   };
 
@@ -453,9 +519,163 @@ export function SocialTabContent({
         <>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Guild Command</Text>
-            <Text style={styles.metaText}>Guild will live here as a Social sub-tab with Home, Boss, Events, Guild Chat, and Browse.</Text>
-            <Text style={styles.metaText}>Create Guild Cost: 2,500 Diamonds.</Text>
+            <Text style={styles.metaText}>Create Guild Cost: 2,500 Diamonds (UI-enforced for MVP).</Text>
+            <Text style={styles.metaText}>Your Diamonds: {diamonds}</Text>
+            {!!error && <Text style={styles.errorText}>{error}</Text>}
           </View>
+
+          {!myGuild && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Create Guild</Text>
+              <TextInput
+                value={guildNameInput}
+                onChangeText={setGuildNameInput}
+                placeholder="Guild Name"
+                placeholderTextColor={THEME.text.tertiary}
+                style={styles.input}
+                editable={!guildBusy}
+                maxLength={32}
+              />
+              <TextInput
+                value={guildTagInput}
+                onChangeText={setGuildTagInput}
+                placeholder="Tag (2-5 chars)"
+                placeholderTextColor={THEME.text.tertiary}
+                style={styles.input}
+                editable={!guildBusy}
+                autoCapitalize="characters"
+                maxLength={5}
+              />
+              <TextInput
+                value={guildDescInput}
+                onChangeText={setGuildDescInput}
+                placeholder="Description"
+                placeholderTextColor={THEME.text.tertiary}
+                style={styles.input}
+                editable={!guildBusy}
+                maxLength={140}
+              />
+              <Pressable
+                style={[
+                  styles.sendBtn,
+                  (guildBusy || diamonds < 2500 || !guildNameInput.trim() || !guildTagInput.trim()) && styles.sendBtnDisabled,
+                ]}
+                disabled={guildBusy || diamonds < 2500 || !guildNameInput.trim() || !guildTagInput.trim()}
+                onPress={async () => {
+                  if (!me.uid) return;
+                  setGuildBusy(true);
+                  setError(null);
+                  try {
+                    await createGuild({
+                      uid: me.uid,
+                      displayName: me.name,
+                      guildName: guildNameInput,
+                      guildTag: guildTagInput,
+                      description: guildDescInput,
+                      minLevelToJoin: 1,
+                      isPublic: true,
+                    });
+                    setGuildNameInput('');
+                    setGuildTagInput('');
+                    setGuildDescInput('');
+                    await refreshGuildData();
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : 'Failed to create guild.';
+                    setError(msg);
+                  } finally {
+                    setGuildBusy(false);
+                  }
+                }}
+              >
+                <Text style={styles.sendBtnText}>Create Guild</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {myGuild && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>My Guild: [{myGuild.tag}] {myGuild.name}</Text>
+              <Text style={styles.metaText}>{myGuild.description || 'No description set.'}</Text>
+              <Text style={styles.metaText}>Leader: {myGuild.leaderName} • Members: {myGuild.memberCount}/{myGuild.maxMembers}</Text>
+              <Text style={styles.metaText}>Min Join Level: {myGuild.minLevelToJoin} • Public: {myGuild.isPublic ? 'Yes' : 'No'}</Text>
+              {guildMembers.slice(0, 8).map(member => (
+                <Text key={member.uid} style={styles.metaText}>- {member.displayName} ({member.rank})</Text>
+              ))}
+              {myGuild.leaderId !== me.uid && (
+                <Pressable
+                  style={[styles.smallBtn, styles.smallBtnDanger]}
+                  disabled={guildBusy}
+                  onPress={async () => {
+                    if (!me.uid) return;
+                    setGuildBusy(true);
+                    setError(null);
+                    try {
+                      await leaveGuild({ uid: me.uid });
+                      await refreshGuildData();
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : 'Failed to leave guild.';
+                      setError(msg);
+                    } finally {
+                      setGuildBusy(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.smallBtnText}>Leave Guild</Text>
+                </Pressable>
+              )}
+              {myGuild.leaderId === me.uid && <Text style={styles.metaText}>Leader cannot leave yet (leadership transfer not built).</Text>}
+            </View>
+          )}
+
+          {!myGuild && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Browse Guilds</Text>
+              <TextInput
+                value={guildSearchInput}
+                onChangeText={setGuildSearchInput}
+                placeholder="Search guilds"
+                placeholderTextColor={THEME.text.tertiary}
+                style={styles.input}
+                editable={!guildBusy}
+                maxLength={32}
+              />
+              {guildList.length === 0 && <Text style={styles.metaText}>No guilds found.</Text>}
+              {guildList.map(row => (
+                <View key={row.guildId} style={styles.friendRow}>
+                  <View style={styles.friendMeta}>
+                    <Text style={styles.friendName}>[{row.tag}] {row.name}</Text>
+                    <Text style={styles.metaText}>Leader: {row.leaderName} • Members: {row.memberCount} • Lv.{row.level}</Text>
+                  </View>
+                  <Pressable
+                    style={styles.smallBtn}
+                    disabled={guildBusy || level < 1}
+                    onPress={async () => {
+                      if (!me.uid) return;
+                      setGuildBusy(true);
+                      setError(null);
+                      try {
+                        await joinGuild({
+                          uid: me.uid,
+                          displayName: me.name,
+                          guildId: row.guildId,
+                          playerLevel: me.level,
+                        });
+                        await refreshGuildData();
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : 'Failed to join guild.';
+                        setError(msg);
+                      } finally {
+                        setGuildBusy(false);
+                      }
+                    }}
+                  >
+                    <Text style={styles.smallBtnText}>Join</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          )}
+
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Planned Guild Events</Text>
             <Text style={styles.metaText}>- Guild Boss: shared HP target, rewards delivered to all participants by mail.</Text>
