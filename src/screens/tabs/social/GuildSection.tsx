@@ -8,7 +8,9 @@ import {
   GuildBossState,
   GuildBrowseRow,
   GuildChatMessage,
+  GuildEventContributor,
   GuildEventState,
+  fetchGuildEventContributors,
   GuildMember,
   GuildSummary,
   joinGuild,
@@ -138,6 +140,7 @@ export function GuildSection({
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [localBossCooldownUntil, setLocalBossCooldownUntil] = useState(0);
   const [eventCooldownUntilById, setEventCooldownUntilById] = useState<Record<string, number>>({});
+  const [eventContribByEventId, setEventContribByEventId] = useState<Record<string, GuildEventContributor[]>>({});
 
   useEffect(() => {
     const timer = setInterval(() => setNowMs(Date.now()), 1000);
@@ -147,6 +150,7 @@ export function GuildSection({
   useEffect(() => {
     setLocalBossCooldownUntil(0);
     setEventCooldownUntilById({});
+    setEventContribByEventId({});
   }, [myGuild?.guildId, me.uid]);
 
   useEffect(() => {
@@ -161,6 +165,36 @@ export function GuildSection({
       return next;
     });
   }, [guildEvents, nowMs]);
+
+  useEffect(() => {
+    if (guildSubTab !== 'events' || !me.uid || !myGuild) return;
+
+    const eventIds = guildEvents
+      .map(event => event.eventId)
+      .filter(id => !!id);
+
+    if (eventIds.length === 0) {
+      setEventContribByEventId({});
+      return;
+    }
+
+    let cancelled = false;
+    void Promise.all(eventIds.map(async eventId => {
+      const rows = await fetchGuildEventContributors(me.uid, eventId, 12).catch(() => []);
+      return { eventId, rows };
+    })).then(results => {
+      if (cancelled) return;
+      const next: Record<string, GuildEventContributor[]> = {};
+      for (const result of results) {
+        next[result.eventId] = result.rows;
+      }
+      setEventContribByEventId(next);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [guildEvents, guildSubTab, me.uid, myGuild]);
 
   const myGuildMember = useMemo(
     () => guildMembers.find(member => member.uid === me.uid) ?? null,
@@ -579,12 +613,28 @@ export function GuildSection({
             const pct = Math.min(100, Math.floor((total / Math.max(1, target)) * 100));
             const eventCooldownRemainingMs = Math.max(0, (eventCooldownUntilById[event.eventId] ?? 0) - nowMs);
             const canContribute = !guildBusy && event.status === 'active' && eventCooldownRemainingMs <= 0;
+            const contributors = eventContribByEventId[event.eventId] ?? [];
+            const topContributors = contributors.slice(0, 3);
+            const myContributionRow = contributors.find(row => row.uid === me.uid) ?? null;
             return (
               <View key={event.eventId} style={styles.friendRow}>
                 <View style={styles.friendMeta}>
                   <Text style={styles.friendName}>{isWar ? 'Warfront Assault' : 'Expedition'} • {event.status}</Text>
                   <Text style={styles.metaText}>Progress: {total.toLocaleString()} / {target.toLocaleString()} ({pct}%)</Text>
                   <Text style={styles.metaText}>Ends: {new Date(event.endsAt).toLocaleString()}</Text>
+                  {myContributionRow && (
+                    <Text style={styles.metaText}>Your total contribution: {formatCompactNumber(myContributionRow.totalContributed)}</Text>
+                  )}
+                  {topContributors.length > 0 && (
+                    <Text style={styles.metaText}>
+                      Top contributors: {topContributors
+                        .map((row, idx) => {
+                          const memberName = guildMembers.find(member => member.uid === row.uid)?.displayName ?? row.uid.slice(0, 8);
+                          return `#${idx + 1} ${memberName} ${formatCompactNumber(row.totalContributed)}`;
+                        })
+                        .join(' • ')}
+                    </Text>
+                  )}
                   {eventCooldownRemainingMs > 0 && (
                     <Text style={styles.metaText}>Your cooldown: {formatCooldownMinutesSeconds(eventCooldownRemainingMs)}</Text>
                   )}

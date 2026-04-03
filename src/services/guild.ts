@@ -62,6 +62,13 @@ export interface GuildEventState {
   details: Record<string, unknown>;
 }
 
+export interface GuildEventContributor {
+  uid: string;
+  totalContributed: number;
+  lastContribution: number;
+  lastContributedAt: number;
+}
+
 export interface GuildChatMessage {
   id: string;
   uid: string;
@@ -863,6 +870,31 @@ export async function fetchGuildEvents(uid: string): Promise<GuildEventState[]> 
       details: data.details && typeof data.details === 'object' ? data.details as Record<string, unknown> : {},
     } satisfies GuildEventState;
   }).sort((a, b) => b.startedAt - a.startedAt);
+}
+
+export async function fetchGuildEventContributors(uid: string, eventId: string, maxRows = 20): Promise<GuildEventContributor[]> {
+  const db = requireDb();
+  const guildId = await resolveGuildIdForUser(uid);
+  if (!guildId) return [];
+  const normalizedEventId = eventId.trim();
+  if (!normalizedEventId) return [];
+
+  const snap = await getDocs(query(
+    collection(db, GUILD_COLLECTION, guildId, 'events', normalizedEventId, 'contrib'),
+    limit(Math.max(1, Math.min(100, Math.floor(maxRows || 20)))),
+  ));
+
+  return snap.docs
+    .map(docSnap => {
+      const data = docSnap.data();
+      return {
+        uid: docSnap.id,
+        totalContributed: typeof data.totalContributed === 'number' ? data.totalContributed : 0,
+        lastContribution: typeof data.lastContribution === 'number' ? data.lastContribution : 0,
+        lastContributedAt: typeof data.lastContributedAt === 'number' ? data.lastContributedAt : 0,
+      } satisfies GuildEventContributor;
+    })
+    .sort((a, b) => b.totalContributed - a.totalContributed || b.lastContributedAt - a.lastContributedAt);
 }
 
 export async function contributeToGuildEvent(input: { uid: string; eventId: string; dps?: number; kills?: number }): Promise<GuildEventState> {
