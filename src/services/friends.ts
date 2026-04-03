@@ -47,6 +47,21 @@ async function fetchRecipientLevel(uid: string): Promise<number> {
   return Math.max(1, Math.floor(level));
 }
 
+async function fetchRecipientPeakProgress(uid: string): Promise<number> {
+  const db = getFirebaseFirestore();
+  if (!db) return 1;
+  const snap = await getDoc(doc(db, 'leaderboard_global_v1', uid));
+  if (!snap.exists()) return 1;
+  const data = snap.data();
+  const highestWaveReached = typeof data.highestWaveReached === 'number' ? data.highestWaveReached : 1;
+  return Math.max(1, Math.floor(highestWaveReached));
+}
+
+function progressToGiftScale(peakProgress: number): number {
+  const safeProgress = Math.max(1, Math.floor(peakProgress));
+  return Math.max(1, Math.floor(safeProgress / 10));
+}
+
 async function fetchPublicNameAndPreference(uid: string): Promise<{ displayName: string; giftPreference: GiftPreference }> {
   const db = getFirebaseFirestore();
   if (!db) return { displayName: 'Player', giftPreference: 'gold' };
@@ -71,14 +86,15 @@ async function fetchPublicNameAndPreference(uid: string): Promise<{ displayName:
   };
 }
 
-function buildGiftAttachment(preference: GiftPreference, receiverLevel: number): MailAttachmentShape {
+function buildGiftAttachment(preference: GiftPreference, receiverPeakProgress: number): MailAttachmentShape {
+  const giftScale = progressToGiftScale(receiverPeakProgress);
   if (preference === 'shards') {
-    return { shards: GIFT_AMOUNTS.shards(receiverLevel), gold: 0, diamonds: 0, tears: 0, essence: 0 };
+    return { shards: GIFT_AMOUNTS.shards(giftScale), gold: 0, diamonds: 0, tears: 0, essence: 0 };
   }
   if (preference === 'essence') {
-    return { shards: 0, gold: 0, diamonds: 0, tears: 0, essence: GIFT_AMOUNTS.essence(receiverLevel) };
+    return { shards: 0, gold: 0, diamonds: 0, tears: 0, essence: GIFT_AMOUNTS.essence(giftScale) };
   }
-  return { shards: 0, gold: GIFT_AMOUNTS.gold(receiverLevel), diamonds: 0, tears: 0, essence: 0 };
+  return { shards: 0, gold: GIFT_AMOUNTS.gold(giftScale), diamonds: 0, tears: 0, essence: 0 };
 }
 
 export async function setGiftPreference(uid: string, preference: GiftPreference): Promise<void> {
@@ -182,8 +198,8 @@ export async function sendGift(
   const db = getFirebaseFirestore();
   if (!db) return;
 
-  const receiverLevel = await fetchRecipientLevel(friendUid);
-  const attachment = buildGiftAttachment(friendPreference, receiverLevel);
+  const receiverPeakProgress = await fetchRecipientPeakProgress(friendUid);
+  const attachment = buildGiftAttachment(friendPreference, receiverPeakProgress);
   const now = Date.now();
   const cooldownId = `${senderUid}_${friendUid}`;
   const cooldownRef = doc(db, 'friends', senderUid, 'giftCooldowns', cooldownId);
