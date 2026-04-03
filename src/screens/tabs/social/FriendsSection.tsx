@@ -25,6 +25,7 @@ interface FriendsSectionProps {
   onSendDailyGift: (friend: FriendListEntry) => Promise<void>;
   onRemoveFriend: (friendUid: string) => Promise<void>;
   onRetryLoad: () => Promise<void>;
+  onViewProfile: (uid: string) => void;
 }
 
 export function FriendsSection({
@@ -48,6 +49,7 @@ export function FriendsSection({
   onSendDailyGift,
   onRemoveFriend,
   onRetryLoad,
+  onViewProfile,
 }: FriendsSectionProps) {
   const nowMs = Date.now();
 
@@ -104,6 +106,9 @@ export function FriendsSection({
             <View key={request.fromUid} style={styles.friendRow}>
               <Text style={styles.friendName}>👤 {request.fromName}</Text>
               <View style={styles.friendActions}>
+                <Pressable style={styles.smallBtn} onPress={() => onViewProfile(request.fromUid)} disabled={friendsBusy}>
+                  <Text style={styles.smallBtnText}>Profile</Text>
+                </Pressable>
                 <Pressable style={styles.smallBtn} onPress={() => void onAcceptRequest(request.fromUid)} disabled={friendsBusy}>
                   <Text style={styles.smallBtnText}>Accept</Text>
                 </Pressable>
@@ -151,6 +156,13 @@ export function FriendsSection({
             <View style={styles.friendActions}>
               <Pressable
                 style={styles.smallBtn}
+                onPress={() => onViewProfile(friend.uid)}
+                disabled={friendsBusy}
+              >
+                <Text style={styles.smallBtnText}>Profile</Text>
+              </Pressable>
+              <Pressable
+                style={styles.smallBtn}
                 onPress={() => void onSendDailyGift(friend)}
                 disabled={friendsBusy}
               >
@@ -182,6 +194,9 @@ export function FriendsSection({
               <Text style={styles.cooldownText}>Next gift in {timeUntilNextUtcMidnightLabel(nowMs)}</Text>
             </View>
             <View style={styles.friendActions}>
+              <Pressable style={styles.smallBtn} onPress={() => onViewProfile(friend.uid)} disabled={friendsBusy}>
+                <Text style={styles.smallBtnText}>Profile</Text>
+              </Pressable>
               <Pressable style={[styles.smallBtn, styles.sendBtnDisabled]} disabled>
                 <Text style={styles.smallBtnText}>Gifted</Text>
               </Pressable>

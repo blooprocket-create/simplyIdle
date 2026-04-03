@@ -102,6 +102,7 @@ interface GuildSectionProps {
   setConfirmKickMember: (member: GuildMember) => void;
   setConfirmTransferLeader: (member: GuildMember) => void;
   setConfirmDisbandGuild: (value: boolean) => void;
+  onViewProfile: (uid: string) => void;
 }
 
 export function GuildSection({
@@ -139,6 +140,7 @@ export function GuildSection({
   setConfirmKickMember,
   setConfirmTransferLeader,
   setConfirmDisbandGuild,
+  onViewProfile,
 }: GuildSectionProps) {
   const [pendingEventRestartType, setPendingEventRestartType] = useState<'war' | 'expedition' | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -558,6 +560,9 @@ export function GuildSection({
                   <Text style={styles.friendName}>#{index + 1} {member.displayName}</Text>
                   <Text style={styles.metaText}>{member.rank} • Boss Damage {formatCompactNumber(member.guildContribution)}</Text>
                 </View>
+                <Pressable style={styles.smallBtn} onPress={() => onViewProfile(member.uid)}>
+                  <Text style={styles.smallBtnText}>Profile</Text>
+                </Pressable>
               </View>
             ))}
           </SocialCard>
@@ -574,6 +579,13 @@ export function GuildSection({
                 </View>
                 {isLeader && member.uid !== me.uid && (
                   <View style={styles.friendActions}>
+                    <Pressable
+                      style={styles.smallBtn}
+                      disabled={guildBusy}
+                      onPress={() => onViewProfile(member.uid)}
+                    >
+                      <Text style={styles.smallBtnText}>Profile</Text>
+                    </Pressable>
                     <Pressable
                       style={styles.smallBtn}
                       disabled={guildBusy}
@@ -611,6 +623,13 @@ export function GuildSection({
                       onPress={() => setConfirmKickMember(member)}
                     >
                       <Text style={styles.smallBtnText}>Kick</Text>
+                    </Pressable>
+                  </View>
+                )}
+                {!isLeader && (
+                  <View style={styles.friendActions}>
+                    <Pressable style={styles.smallBtn} disabled={guildBusy} onPress={() => onViewProfile(member.uid)}>
+                      <Text style={styles.smallBtnText}>Profile</Text>
                     </Pressable>
                   </View>
                 )}

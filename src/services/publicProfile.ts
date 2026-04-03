@@ -1,11 +1,80 @@
-import { doc, getDoc, runTransaction } from 'firebase/firestore';
+import { collection, doc, getCountFromServer, getDoc, query, runTransaction, where } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseFirestore } from './firebase';
 
 const PUBLIC_USERNAMES_COLLECTION = 'publicUsernames';
 const USER_PROFILES_COLLECTION = 'userProfiles';
+const LEADERBOARD_COLLECTION = 'leaderboard_global_v1';
+const USER_GUILD_COLLECTION = 'userGuild';
 
 export const PUBLIC_USERNAME_MIN = 3;
 export const PUBLIC_USERNAME_MAX = 24;
+
+export interface PublicPlayerProfile {
+  uid: string;
+  publicUsername: string;
+  giftPreference: 'gold' | 'shards' | 'essence';
+  level: number;
+  vipLevel: number;
+  score: number;
+  highestWaveReached: number;
+  prestigeCount: number;
+  guildName: string | null;
+  guildRank: string | null;
+  leaderboardRank: number | null;
+}
+
+function normalizeGiftPreference(value: unknown): 'gold' | 'shards' | 'essence' {
+  if (value === 'shards' || value === 'essence') return value;
+  return 'gold';
+}
+
+export async function fetchPublicPlayerProfile(uid: string): Promise<PublicPlayerProfile | null> {
+  const db = getFirebaseFirestore();
+  if (!db || !uid) return null;
+
+  const [profileSnap, boardSnap, guildSnap] = await Promise.all([
+    getDoc(doc(db, USER_PROFILES_COLLECTION, uid)),
+    getDoc(doc(db, LEADERBOARD_COLLECTION, uid)),
+    getDoc(doc(db, USER_GUILD_COLLECTION, uid)),
+  ]);
+
+  const profileData = profileSnap.exists() ? profileSnap.data() : {};
+  const boardData = boardSnap.exists() ? boardSnap.data() : {};
+  const guildData = guildSnap.exists() ? guildSnap.data() : {};
+
+  const publicUsername = typeof profileData.publicUsername === 'string'
+    ? profileData.publicUsername
+    : typeof boardData.publicUsername === 'string'
+      ? boardData.publicUsername
+      : 'Player';
+
+  const score = typeof boardData.score === 'number' ? Math.max(0, Math.floor(boardData.score)) : 0;
+
+  let leaderboardRank: number | null = null;
+  try {
+    const higherScores = query(collection(db, LEADERBOARD_COLLECTION), where('score', '>', score));
+    const rankCountSnap = await getCountFromServer(higherScores);
+    leaderboardRank = rankCountSnap.data().count + 1;
+  } catch {
+    leaderboardRank = null;
+  }
+
+  return {
+    uid,
+    publicUsername,
+    giftPreference: normalizeGiftPreference(profileData.giftPreference),
+    level: typeof boardData.level === 'number' ? Math.max(1, Math.floor(boardData.level)) : 1,
+    vipLevel: typeof boardData.vipLevel === 'number' ? Math.max(0, Math.floor(boardData.vipLevel)) : 0,
+    score,
+    highestWaveReached: typeof boardData.highestWaveReached === 'number'
+      ? Math.max(0, Math.floor(boardData.highestWaveReached))
+      : 0,
+    prestigeCount: typeof boardData.prestigeCount === 'number' ? Math.max(0, Math.floor(boardData.prestigeCount)) : 0,
+    guildName: typeof guildData.guildName === 'string' ? guildData.guildName : null,
+    guildRank: typeof guildData.rank === 'string' ? guildData.rank : null,
+    leaderboardRank,
+  };
+}
 
 /**
  * Validates format only (not uniqueness).

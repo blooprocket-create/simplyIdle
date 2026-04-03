@@ -28,6 +28,7 @@ import {
   PendingFriendRequest,
 } from '../../services/friends';
 import { GiftPreference } from '../../gameConfig';
+import { fetchPublicPlayerProfile, PublicPlayerProfile } from '../../services/publicProfile';
 import {
   disbandGuild,
   fetchActiveBoss,
@@ -207,6 +208,11 @@ export function SocialTabContent({
   const [confirmKickMember, setConfirmKickMember] = useState<GuildMember | null>(null);
   const [confirmTransferLeader, setConfirmTransferLeader] = useState<GuildMember | null>(null);
   const [confirmDisbandGuild, setConfirmDisbandGuild] = useState(false);
+  const [activeProfileUid, setActiveProfileUid] = useState<string | null>(null);
+  const [activeProfile, setActiveProfile] = useState<PublicPlayerProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const profileCacheRef = useRef<Record<string, PublicPlayerProfile>>({});
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const sectionAnim = useRef(new Animated.Value(1)).current;
 
@@ -591,6 +597,43 @@ export function SocialTabContent({
     }
   };
 
+  const openProfileCard = async (uid: string) => {
+    if (!uid) return;
+    setActiveProfileUid(uid);
+    setProfileError(null);
+
+    const cached = profileCacheRef.current[uid];
+    if (cached) {
+      setActiveProfile(cached);
+      void trackEvent('social_profile_opened', { source: subTab, cached: true });
+      void fetchPublicPlayerProfile(uid)
+        .then(profile => {
+          if (!profile) return;
+          profileCacheRef.current[uid] = profile;
+          setActiveProfile(profile);
+        })
+        .catch(() => {});
+      return;
+    }
+
+    setActiveProfile(null);
+    setProfileLoading(true);
+    try {
+      const profile = await fetchPublicPlayerProfile(uid);
+      if (!profile) {
+        setProfileError('Profile unavailable right now.');
+        return;
+      }
+      profileCacheRef.current[uid] = profile;
+      setActiveProfile(profile);
+      void trackEvent('social_profile_opened', { source: subTab, cached: false });
+    } catch {
+      setProfileError('Failed to load player profile.');
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
   const handleTouchStart = (event: NativeSyntheticEvent<NativeTouchEvent>) => {
     touchStartRef.current = {
       x: event.nativeEvent.pageX,
@@ -728,6 +771,7 @@ export function SocialTabContent({
             onSendDailyGift={sendDailyGift}
             onRemoveFriend={removeFriendEntry}
             onRetryLoad={refreshFriendsData}
+            onViewProfile={uid => void openProfileCard(uid)}
           />
         )}
 
@@ -767,6 +811,7 @@ export function SocialTabContent({
             setConfirmKickMember={setConfirmKickMember}
             setConfirmTransferLeader={setConfirmTransferLeader}
             setConfirmDisbandGuild={setConfirmDisbandGuild}
+            onViewProfile={uid => void openProfileCard(uid)}
           />
         )}
       </Animated.View>
@@ -804,6 +849,87 @@ export function SocialTabContent({
             >
               <Text style={styles.sendBtnText}>{addFriendLabel}</Text>
             </Pressable>
+            {!!activeUserMenu?.uid && (
+              <Pressable
+                style={styles.smallBtn}
+                onPress={() => {
+                  void openProfileCard(activeUserMenu.uid);
+                  setActiveUserMenu(null);
+                }}
+              >
+                <Text style={styles.smallBtnText}>View Profile</Text>
+              </Pressable>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={!!activeProfileUid}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setActiveProfileUid(null);
+          setProfileLoading(false);
+          setProfileError(null);
+        }}
+      >
+        <Pressable
+          style={styles.userMenuBackdrop}
+          onPress={() => {
+            setActiveProfileUid(null);
+            setProfileLoading(false);
+            setProfileError(null);
+          }}
+        >
+          <Pressable style={styles.profileCard} onPress={() => {}}>
+            <Text style={styles.cardTitle}>Player Profile</Text>
+
+            {profileLoading && <Text style={styles.metaText}>Loading profile data...</Text>}
+            {!!profileError && <Text style={styles.errorText}>{profileError}</Text>}
+
+            {!profileLoading && !profileError && !!activeProfile && (
+              <>
+                <Text style={styles.profileName}>{activeProfile.publicUsername}</Text>
+                <View style={styles.metricGrid}>
+                  <View style={styles.metricChip}>
+                    <Text style={styles.metricLabel}>Level</Text>
+                    <Text style={styles.metricValue}>{activeProfile.level}</Text>
+                  </View>
+                  <View style={styles.metricChip}>
+                    <Text style={styles.metricLabel}>VIP</Text>
+                    <Text style={styles.metricValue}>{activeProfile.vipLevel}</Text>
+                  </View>
+                  <View style={styles.metricChip}>
+                    <Text style={styles.metricLabel}>Prestige</Text>
+                    <Text style={styles.metricValue}>{activeProfile.prestigeCount}</Text>
+                  </View>
+                  <View style={styles.metricChip}>
+                    <Text style={styles.metricLabel}>Rank</Text>
+                    <Text style={styles.metricValue}>{activeProfile.leaderboardRank ? `#${activeProfile.leaderboardRank}` : 'N/A'}</Text>
+                  </View>
+                </View>
+                <Text style={styles.metaText}>Wave Peak: {activeProfile.highestWaveReached.toLocaleString()}</Text>
+                <Text style={styles.metaText}>Score: {activeProfile.score.toLocaleString()}</Text>
+                <Text style={styles.metaText}>Gift Preference: {activeProfile.giftPreference}</Text>
+                <Text style={styles.metaText}>
+                  Guild: {activeProfile.guildName ? `${activeProfile.guildName}${activeProfile.guildRank ? ` (${activeProfile.guildRank})` : ''}` : 'No guild'}
+                </Text>
+              </>
+            )}
+
+            <View style={styles.confirmButtonRow}>
+              <Pressable
+                style={[styles.confirmBtn, styles.confirmBtnCancel]}
+                onPress={() => {
+                  setActiveProfileUid(null);
+                  setProfileLoading(false);
+                  setProfileError(null);
+                }}
+              >
+                <Text style={styles.confirmBtnText}>Close</Text>
+              </Pressable>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -1405,6 +1531,22 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     padding: 12,
     gap: 10,
+  },
+  profileCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#132133',
+    borderWidth: 1,
+    borderColor: '#35516A',
+    borderRadius: RADIUS.lg,
+    padding: 14,
+    gap: 10,
+  },
+  profileName: {
+    color: '#EAF6FF',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 0.2,
   },
   confirmBackdrop: {
     flex: 1,
