@@ -10,6 +10,20 @@ import {
 } from '../../services/chat';
 import { fetchOnlineCount } from '../../services/presence';
 import { getFirebaseAuth } from '../../services/firebase';
+import {
+  acceptFriendRequest,
+  declineFriendRequest,
+  fetchFriends,
+  fetchGiftCooldowns,
+  fetchPendingRequests,
+  fetchFriendProfile,
+  sendFriendRequest,
+  sendGift,
+  setGiftPreference,
+  FriendListEntry,
+  PendingFriendRequest,
+} from '../../services/friends';
+import { GiftPreference } from '../../gameConfig';
 
 export interface SocialTabContentProps {
   tab: string;
@@ -17,6 +31,7 @@ export interface SocialTabContentProps {
   publicUsername: string;
   level: number;
   isAdmin: boolean;
+  onPendingRequestsCountChange?: (count: number) => void;
 }
 
 type SocialSubTab = 'chat' | 'friends';
@@ -26,15 +41,39 @@ function formatTime(ts: number): string {
   return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
 }
 
-export function SocialTabContent({ tab, accountName, publicUsername, level, isAdmin }: SocialTabContentProps) {
+function giftIcon(pref: GiftPreference): string {
+  if (pref === 'shards') return '💎';
+  if (pref === 'essence') return '✨';
+  return '💰';
+}
+
+function isSameUtcDay(a: number, b: number): boolean {
+  if (!a || !b) return false;
+  return new Date(a).toISOString().slice(0, 10) === new Date(b).toISOString().slice(0, 10);
+}
+
+export function SocialTabContent({
+  tab,
+  accountName,
+  publicUsername,
+  level,
+  isAdmin,
+  onPendingRequestsCountChange,
+}: SocialTabContentProps) {
   const [subTab, setSubTab] = useState<SocialSubTab>('chat');
   const [onlineCount, setOnlineCount] = useState(0);
   const [messages, setMessages] = useState<GlobalChatMessage[]>([]);
   const [draft, setDraft] = useState('');
+  const [friendSearch, setFriendSearch] = useState('');
+  const [friends, setFriends] = useState<FriendListEntry[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<PendingFriendRequest[]>([]);
+  const [giftCooldowns, setGiftCooldowns] = useState<Record<string, number>>({});
+  const [myGiftPreference, setMyGiftPreference] = useState<GiftPreference>('gold');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mutedUntil, setMutedUntil] = useState<number | null>(null);
   const [lastSendAt, setLastSendAt] = useState(0);
+  const [friendsBusy, setFriendsBusy] = useState(false);
 
   const me = useMemo(() => {
     const authUid = getFirebaseAuth()?.currentUser?.uid ?? '';
@@ -71,6 +110,37 @@ export function SocialTabContent({ tab, accountName, publicUsername, level, isAd
     };
   }, [tab, me.uid]);
 
+  useEffect(() => {
+    onPendingRequestsCountChange?.(pendingRequests.length);
+  }, [onPendingRequestsCountChange, pendingRequests.length]);
+
+  useEffect(() => {
+    if (tab !== 'social' || subTab !== 'friends' || !me.uid) return;
+
+    const refresh = async () => {
+      try {
+        const [friendRows, pendingRows, cooldownRows, myProfile] = await Promise.all([
+          fetchFriends(me.uid),
+          fetchPendingRequests(me.uid),
+          fetchGiftCooldowns(me.uid),
+          fetchFriendProfile(me.uid),
+        ]);
+        setFriends(friendRows);
+        setPendingRequests(pendingRows);
+        setGiftCooldowns(cooldownRows);
+        if (myProfile?.giftPreference) setMyGiftPreference(myProfile.giftPreference);
+      } catch {
+        setError('Failed to load friends data.');
+      }
+    };
+
+    void refresh();
+    const timer = setInterval(() => {
+      void refresh();
+    }, 20_000);
+    return () => clearInterval(timer);
+  }, [tab, subTab, me.uid]);
+
   if (tab !== 'social') return null;
 
   const send = async () => {
@@ -105,6 +175,91 @@ export function SocialTabContent({ tab, accountName, publicUsername, level, isAd
       await muteUser(targetUid, me.uid, 60 * 60 * 1000, 'Muted by admin');
     } catch {
       setError('Failed to mute user.');
+    }
+  };
+
+  const refreshFriendsData = async () => {
+    if (!me.uid) return;
+    const [friendRows, pendingRows, cooldownRows] = await Promise.all([
+      fetchFriends(me.uid),
+      fetchPendingRequests(me.uid),
+      fetchGiftCooldowns(me.uid),
+    ]);
+    setFriends(friendRows);
+    setPendingRequests(pendingRows);
+    setGiftCooldowns(cooldownRows);
+  };
+
+  const sendRequest = async () => {
+    if (!me.uid || !friendSearch.trim() || friendsBusy) return;
+    setFriendsBusy(true);
+    setError(null);
+    try {
+      await sendFriendRequest(me.uid, me.name, friendSearch);
+      setFriendSearch('');
+      await refreshFriendsData();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to send friend request.';
+      setError(msg);
+    } finally {
+      setFriendsBusy(false);
+    }
+  };
+
+  const acceptRequest = async (fromUid: string) => {
+    if (!me.uid || friendsBusy) return;
+    setFriendsBusy(true);
+    setError(null);
+    try {
+      await acceptFriendRequest(me.uid, fromUid);
+      await refreshFriendsData();
+    } catch {
+      setError('Failed to accept request.');
+    } finally {
+      setFriendsBusy(false);
+    }
+  };
+
+  const declineRequest = async (fromUid: string) => {
+    if (!me.uid || friendsBusy) return;
+    setFriendsBusy(true);
+    setError(null);
+    try {
+      await declineFriendRequest(me.uid, fromUid);
+      await refreshFriendsData();
+    } catch {
+      setError('Failed to decline request.');
+    } finally {
+      setFriendsBusy(false);
+    }
+  };
+
+  const sendDailyGift = async (friend: FriendListEntry) => {
+    if (!me.uid || friendsBusy) return;
+    setFriendsBusy(true);
+    setError(null);
+    try {
+      await sendGift(me.uid, me.name, friend.uid, friend.giftPreference);
+      await refreshFriendsData();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to send gift.';
+      setError(msg);
+    } finally {
+      setFriendsBusy(false);
+    }
+  };
+
+  const updatePreference = async (preference: GiftPreference) => {
+    if (!me.uid || friendsBusy) return;
+    setFriendsBusy(true);
+    setError(null);
+    try {
+      await setGiftPreference(me.uid, preference);
+      setMyGiftPreference(preference);
+    } catch {
+      setError('Failed to update gift preference.');
+    } finally {
+      setFriendsBusy(false);
     }
   };
 
@@ -176,11 +331,87 @@ export function SocialTabContent({ tab, accountName, publicUsername, level, isAd
       )}
 
       {subTab === 'friends' && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Friends & Gifts</Text>
-          <Text style={styles.metaText}>Foundation services are now wired. UI actions for requests and gifting are next.</Text>
-          <Text style={styles.metaText}>Gift scaling now uses receiver level: Gold x1000, Shards x10, Essence x5.</Text>
-        </View>
+        <>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>My Gift Preference</Text>
+            <View style={styles.prefRow}>
+              {(['gold', 'shards', 'essence'] as GiftPreference[]).map(pref => (
+                <Pressable
+                  key={pref}
+                  style={[styles.prefBtn, myGiftPreference === pref && styles.prefBtnActive]}
+                  onPress={() => updatePreference(pref)}
+                  disabled={friendsBusy}
+                >
+                  <Text style={styles.prefBtnText}>{giftIcon(pref)} {pref}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Add Friend</Text>
+            <TextInput
+              value={friendSearch}
+              onChangeText={setFriendSearch}
+              placeholder="Public username"
+              placeholderTextColor={THEME.text.tertiary}
+              style={styles.input}
+              maxLength={24}
+              editable={!friendsBusy}
+              autoCapitalize="none"
+            />
+            <Pressable
+              style={[styles.sendBtn, (!friendSearch.trim() || friendsBusy) && styles.sendBtnDisabled]}
+              onPress={sendRequest}
+              disabled={!friendSearch.trim() || friendsBusy}
+            >
+              <Text style={styles.sendBtnText}>Send Request</Text>
+            </Pressable>
+          </View>
+
+          {pendingRequests.length > 0 && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Pending Requests ({pendingRequests.length})</Text>
+              {pendingRequests.map(request => (
+                <View key={request.fromUid} style={styles.friendRow}>
+                  <Text style={styles.friendName}>👤 {request.fromName}</Text>
+                  <View style={styles.friendActions}>
+                    <Pressable style={styles.smallBtn} onPress={() => acceptRequest(request.fromUid)} disabled={friendsBusy}>
+                      <Text style={styles.smallBtnText}>Accept</Text>
+                    </Pressable>
+                    <Pressable style={[styles.smallBtn, styles.smallBtnDanger]} onPress={() => declineRequest(request.fromUid)} disabled={friendsBusy}>
+                      <Text style={styles.smallBtnText}>Decline</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Friends ({friends.length})</Text>
+            {friends.length === 0 && <Text style={styles.metaText}>No friends yet. Add someone by public username.</Text>}
+            {friends.map(friend => {
+              const cooldownAt = giftCooldowns[friend.uid] ?? 0;
+              const giftedToday = isSameUtcDay(cooldownAt, Date.now());
+              return (
+                <View key={friend.uid} style={styles.friendRow}>
+                  <View style={styles.friendMeta}>
+                    <Text style={styles.friendName}>{friend.displayName}</Text>
+                    <Text style={styles.metaText}>Lv.{friend.level} • Wants {giftIcon(friend.giftPreference)} {friend.giftPreference}</Text>
+                  </View>
+                  <Pressable
+                    style={[styles.smallBtn, giftedToday && styles.sendBtnDisabled]}
+                    onPress={() => sendDailyGift(friend)}
+                    disabled={friendsBusy || giftedToday}
+                  >
+                    <Text style={styles.smallBtnText}>{giftedToday ? 'Gifted' : 'Gift'}</Text>
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+        </>
       )}
     </View>
   );
@@ -309,6 +540,70 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#FF8694',
+    fontSize: 12,
+  },
+  prefRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  prefBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: THEME.surface.border,
+    borderRadius: RADIUS.sm,
+    paddingVertical: 8,
+    alignItems: 'center',
+    backgroundColor: '#101726',
+  },
+  prefBtnActive: {
+    borderColor: THEME.status.info,
+    backgroundColor: '#1A2A40',
+  },
+  prefBtnText: {
+    color: THEME.text.primary,
+    fontWeight: '700',
+    fontSize: 12,
+    textTransform: 'capitalize',
+  },
+  friendRow: {
+    borderWidth: 1,
+    borderColor: THEME.surface.border,
+    borderRadius: RADIUS.sm,
+    padding: 8,
+    backgroundColor: '#111626',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    gap: 8,
+  },
+  friendMeta: {
+    flex: 1,
+  },
+  friendName: {
+    color: THEME.text.primary,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  friendActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  smallBtn: {
+    borderWidth: 1,
+    borderColor: THEME.status.info,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#15304A',
+  },
+  smallBtnDanger: {
+    borderColor: THEME.status.error,
+    backgroundColor: '#3A1520',
+  },
+  smallBtnText: {
+    color: THEME.text.primary,
+    fontWeight: '700',
     fontSize: 12,
   },
 });

@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase';
 
 export interface CloudMailMessage {
@@ -38,6 +38,18 @@ export async function claimCloudMail(uid: string, messageId: string): Promise<vo
   const db = getFirebaseFirestore();
   if (!db) return;
   await deleteDoc(doc(db, 'playerMail', uid, 'messages', messageId));
+}
+
+export async function fetchCloudMail(uid: string): Promise<CloudMailMessage[]> {
+  const db = getFirebaseFirestore();
+  if (!db || !uid) return [];
+
+  const q = query(
+    collection(db, 'playerMail', uid, 'messages'),
+    orderBy('sentAt', 'desc'),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(docSnap => toCloudMail(docSnap.id, docSnap.data() as Record<string, unknown>));
 }
 
 export function subscribeToCloudMail(

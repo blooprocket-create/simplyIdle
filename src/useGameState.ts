@@ -452,6 +452,7 @@ export interface GameState {
   damageReductionBuffMs: number;
   heroActiveCdMs: Record<string, number>;
   mailbox: MailMessage[];
+  giftPreference: 'gold' | 'shards' | 'essence';
 }
 
 const initialParty = (): Record<PartyId, number> =>
@@ -631,6 +632,7 @@ const DEFAULT_STATE: GameState = {
   damageReductionBuffMs: 0,
   heroActiveCdMs: {},
   mailbox: [],
+  giftPreference: 'gold',
 };
 
 function sumStats(a: StatBlock, b: StatBlock): StatBlock {
@@ -2564,6 +2566,9 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     damageReductionBuffMs: clampInt(payload.damageReductionBuffMs, 0, 600_000, 0),
     heroActiveCdMs,
     mailbox,
+    giftPreference: payload.giftPreference === 'shards' || payload.giftPreference === 'essence'
+      ? payload.giftPreference
+      : 'gold',
   };
 }
 
@@ -5618,6 +5623,7 @@ interface SaveData {
   damageReductionBuffMs: number;
   heroActiveCdMs: Record<string, number>;
   mailbox?: MailMessage[];
+  giftPreference?: 'gold' | 'shards' | 'essence';
 }
 
 function serialize(state: GameState): SaveData {
@@ -5738,6 +5744,7 @@ function serialize(state: GameState): SaveData {
     damageReductionBuffMs: state.damageReductionBuffMs,
     heroActiveCdMs: state.heroActiveCdMs,
     mailbox: state.mailbox,
+    giftPreference: state.giftPreference,
   };
 }
 

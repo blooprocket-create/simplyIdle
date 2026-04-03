@@ -75,7 +75,9 @@ import { normalizeCharacterNameForCompare, releaseCharacterName, reserveCharacte
 import { fetchCurrentUserRank, fetchLeaderboardTop, isLiveLeaderboardAvailable, submitLeaderboardScore } from '../services/leaderboard';
 import { deleteOnlineSave, loadOnlineSave, loadOnlineSaveForUid, writeOnlineSaveForUid } from '../services/onlineSave';
 import { refreshCurrentUserPublicUsername } from '../services/publicProfile';
-import { subscribeToCloudMail } from '../services/cloudMail';
+import { fetchCloudMail, subscribeToCloudMail } from '../services/cloudMail';
+import { subscribePendingRequestCount } from '../services/friends';
+import { writePresenceHeartbeat } from '../services/presence';
 import { getFirebaseAuth, getFirebaseFirestore } from '../services/firebase';
 import { collectionGroup, getDocs, getDoc, doc as firestoreDoc, setDoc } from 'firebase/firestore';
 
@@ -393,6 +395,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [liveLeaderboardRank, setLiveLeaderboardRank] = useState<number | null>(null);
   const [liveLeaderboardLoading, setLiveLeaderboardLoading] = useState(false);
   const [liveLeaderboardError, setLiveLeaderboardError] = useState<string | null>(null);
+  const [socialPendingCount, setSocialPendingCount] = useState(0);
   const [devCommandInput, setDevCommandInput] = useState('');
   const [devCommandOutput, setDevCommandOutput] = useState<string>('');
   const [chapterMapOpen, setChapterMapOpen] = useState(false);
@@ -1612,7 +1615,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       achievements: hasAchievementsNotification ? 1 : 0,
       equipment: hasEquipmentNotification ? 1 : 0,
       operations: operationsNotificationCount,
-      social: 0,
+      social: socialPendingCount,
     };
 
     return (
@@ -2224,6 +2227,18 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     const uid = getFirebaseAuth()?.currentUser?.uid;
     if (!uid) return;
 
+    void fetchCloudMail(uid).then(mails => {
+      const mapped = mails.map(mail => ({
+        id: mail.id,
+        subject: mail.subject,
+        message: mail.message,
+        from: mail.from,
+        sentAt: mail.sentAt,
+        attachments: mail.attachments,
+      }));
+      appendMailboxMessages(mapped);
+    }).catch(() => {});
+
     return subscribeToCloudMail(uid, mails => {
       const mapped = mails.map(mail => ({
         id: mail.id,
@@ -2236,6 +2251,21 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       appendMailboxMessages(mapped);
     });
   }, [appendMailboxMessages, state.characterCreated]);
+
+  useEffect(() => {
+    if (!state.characterCreated) return;
+    const uid = getFirebaseAuth()?.currentUser?.uid;
+    if (!uid) return;
+    return subscribePendingRequestCount(uid, setSocialPendingCount);
+  }, [state.characterCreated]);
+
+  useEffect(() => {
+    if (!state.characterCreated) return;
+    const uid = getFirebaseAuth()?.currentUser?.uid;
+    if (!uid) return;
+    const display = (publicUsername || state.playerName || accountName).trim() || accountName;
+    void writePresenceHeartbeat(uid, display, state.level);
+  }, [accountName, publicUsername, state.characterCreated, state.level, state.playerName]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2981,6 +3011,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             publicUsername,
             level: state.level,
             isAdmin,
+            onPendingRequestsCountChange: setSocialPendingCount,
           } as any)}
         />
       </ScrollView>
