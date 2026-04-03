@@ -1797,8 +1797,16 @@ function getScaledUsableExpGain(state: GameState, baseValue: number, itemType: '
 function getScaledUsableShardGain(state: GameState, baseValue: number, itemType: 'basic' | 'advanced'): number {
   const weekly = getCurrentWeeklyEvent(state);
   const scaledBase = Math.ceil(baseValue * getUsableProgressScale(state) * weekly.shardMultiplier);
-  const waveFloor = Math.ceil(calculateShardReward(Math.max(1, state.highestWaveReached)) * (itemType === 'advanced' ? 10 : 4));
-  return Math.max(scaledBase, waveFloor);
+  const syntheticHeroLevel = Math.max(1, Math.floor(state.level + Math.sqrt(Math.max(1, state.highestWaveReached))));
+  const waveFloor = Math.ceil(calculateShardReward('rare', syntheticHeroLevel) * (itemType === 'advanced' ? 2.5 : 1.2));
+
+  if (!Number.isFinite(scaledBase) && !Number.isFinite(waveFloor)) {
+    return 1;
+  }
+
+  const safeScaledBase = Number.isFinite(scaledBase) ? scaledBase : 0;
+  const safeWaveFloor = Number.isFinite(waveFloor) ? waveFloor : 0;
+  return Math.max(1, Math.floor(Math.max(safeScaledBase, safeWaveFloor)));
 }
 
 function getScaledUsableHeatReduction(state: GameState, baseValue: number, itemType: 'basic' | 'advanced'): number {
@@ -3792,10 +3800,12 @@ function reducer(state: GameState, action: Action): GameState {
 
       if (item.effect === 'gain_shards_flat') {
         const gainPerUse = getScaledUsableShardGain(nextState, item.value, item.itemType);
-        const gain = gainPerUse * requestedUses;
+        const rawGain = gainPerUse * requestedUses;
+        const gain = Number.isFinite(rawGain) ? Math.max(0, Math.floor(rawGain)) : 0;
+        const safeCurrentShards = Number.isFinite(nextState.heroShards) ? nextState.heroShards : 0;
         nextState = queueReward({
           ...nextState,
-          heroShards: nextState.heroShards + gain,
+          heroShards: safeCurrentShards + gain,
         }, {
           id: `use_${item.id}_${Date.now()}`,
           kind: 'shard',
