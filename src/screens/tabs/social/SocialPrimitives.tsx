@@ -27,7 +27,7 @@ export function SocialInput({ styles, ...props }: SocialInputProps) {
   return (
     <TextInput
       {...props}
-      style={styles.input}
+      style={[styles.input, props.style]}
       placeholderTextColor={props.placeholderTextColor ?? THEME.text.tertiary}
     />
   );

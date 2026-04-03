@@ -1319,6 +1319,43 @@ const styles = StyleSheet.create({
     maxHeight: 360,
     backgroundColor: '#0B1520',
   },
+  chatShell: {
+    minHeight: 430,
+    maxHeight: 560,
+    backgroundColor: '#0B1520',
+    padding: 10,
+  },
+  chatStreamArea: {
+    flex: 1,
+    minHeight: 220,
+    borderWidth: 1,
+    borderColor: '#284158',
+    borderRadius: RADIUS.md,
+    backgroundColor: '#0E1A28',
+    overflow: 'hidden',
+  },
+  chatStreamList: {
+    flex: 1,
+  },
+  chatStreamContent: {
+    padding: 8,
+    paddingBottom: 12,
+  },
+  chatComposerWrap: {
+    borderTopWidth: 1,
+    borderTopColor: '#2E4B63',
+    paddingTop: 8,
+    gap: 8,
+  },
+  chatComposerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  chatComposerInput: {
+    flex: 1,
+    minHeight: 40,
+  },
   cardTitle: {
     color: '#E8F3FF',
     fontSize: 16,
