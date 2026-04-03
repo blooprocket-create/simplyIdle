@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -9,6 +10,7 @@ import {
   query,
   runTransaction,
   setDoc,
+  writeBatch,
   where,
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase';
@@ -81,10 +83,12 @@ export interface GuildBrowseRow {
 const GUILD_COLLECTION = 'guilds';
 const GUILD_LOOKUP_COLLECTION = 'guildLookup';
 const USER_GUILD_COLLECTION = 'userGuild';
+const GUILD_CHAT_RATE_LIMIT_COLLECTION = 'guildChatRateLimit';
 const BOSS_ATTACK_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 const BOSS_DURATION_MS = 5 * 24 * 60 * 60 * 1000;
 const WAR_DURATION_MS = 48 * 60 * 60 * 1000;
 const EXPEDITION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+const GUILD_CHAT_COOLDOWN_MS = 3000;
 
 function requireDb() {
   const db = getFirebaseFirestore();
@@ -379,12 +383,222 @@ export async function leaveGuild(input: { uid: string }): Promise<void> {
 
 export async function kickMember(): Promise<never> {
   requireDb();
-  throw new Error('Guild member kick is not implemented yet.');
+  throw new Error('Use kickGuildMember with actor and target user ids.');
 }
 
 export async function promoteMember(): Promise<never> {
   requireDb();
-  throw new Error('Guild member promotion is not implemented yet.');
+  throw new Error('Use setMemberRank with actor and target user ids.');
+}
+
+export async function kickGuildMember(input: { actorUid: string; targetUid: string }): Promise<void> {
+  const db = requireDb();
+  const actorUid = input.actorUid.trim();
+  const targetUid = input.targetUid.trim();
+  if (!actorUid || !targetUid) throw new Error('Missing member kick parameters.');
+  if (actorUid === targetUid) throw new Error('Use leave to exit your own guild.');
+
+  const now = Date.now();
+  const actorMembershipRef = doc(db, USER_GUILD_COLLECTION, actorUid);
+  const targetMembershipRef = doc(db, USER_GUILD_COLLECTION, targetUid);
+
+  await runTransaction(db, async tx => {
+    const [actorMembershipSnap, targetMembershipSnap] = await Promise.all([
+      tx.get(actorMembershipRef),
+      tx.get(targetMembershipRef),
+    ]);
+    if (!actorMembershipSnap.exists()) throw new Error('You are not in a guild.');
+    if (!targetMembershipSnap.exists()) throw new Error('Target is not in a guild.');
+
+    const actorMembership = actorMembershipSnap.data();
+    const targetMembership = targetMembershipSnap.data();
+    const guildId = typeof actorMembership.guildId === 'string' ? actorMembership.guildId : '';
+    const actorRank = typeof actorMembership.rank === 'string' ? actorMembership.rank : 'member';
+    const targetGuildId = typeof targetMembership.guildId === 'string' ? targetMembership.guildId : '';
+    if (!guildId || guildId !== targetGuildId) throw new Error('Target is not in your guild.');
+    if (actorRank !== 'leader') throw new Error('Only leader can kick members.');
+
+    const guildRef = doc(db, GUILD_COLLECTION, guildId);
+    const targetMemberRef = doc(db, GUILD_COLLECTION, guildId, 'members', targetUid);
+    const guildSnap = await tx.get(guildRef);
+    if (!guildSnap.exists()) throw new Error('Guild not found.');
+    const guild = guildSnap.data();
+
+    const targetRank = typeof targetMembership.rank === 'string' ? targetMembership.rank : 'member';
+    if (targetRank === 'leader') throw new Error('Cannot kick the leader.');
+
+    const memberCount = typeof guild.memberCount === 'number' ? guild.memberCount : 1;
+    const nextCount = Math.max(1, memberCount - 1);
+    const normalizedName = typeof guild.normalizedName === 'string' ? guild.normalizedName : '';
+
+    tx.delete(targetMemberRef);
+    tx.delete(targetMembershipRef);
+    tx.set(guildRef, { memberCount: nextCount, updatedAt: now }, { merge: true });
+    if (normalizedName) {
+      tx.set(doc(db, GUILD_LOOKUP_COLLECTION, normalizedName), { memberCount: nextCount, updatedAt: now }, { merge: true });
+    }
+  });
+}
+
+export async function setMemberRank(input: { actorUid: string; targetUid: string; rank: 'officer' | 'member' }): Promise<void> {
+  const db = requireDb();
+  const actorUid = input.actorUid.trim();
+  const targetUid = input.targetUid.trim();
+  if (!actorUid || !targetUid) throw new Error('Missing rank parameters.');
+  if (actorUid === targetUid) throw new Error('Cannot change your own rank here.');
+
+  const actorMembershipRef = doc(db, USER_GUILD_COLLECTION, actorUid);
+  const targetMembershipRef = doc(db, USER_GUILD_COLLECTION, targetUid);
+
+  await runTransaction(db, async tx => {
+    const [actorMembershipSnap, targetMembershipSnap] = await Promise.all([
+      tx.get(actorMembershipRef),
+      tx.get(targetMembershipRef),
+    ]);
+    if (!actorMembershipSnap.exists()) throw new Error('You are not in a guild.');
+    if (!targetMembershipSnap.exists()) throw new Error('Target is not in a guild.');
+
+    const actorMembership = actorMembershipSnap.data();
+    const targetMembership = targetMembershipSnap.data();
+    const guildId = typeof actorMembership.guildId === 'string' ? actorMembership.guildId : '';
+    const actorRank = typeof actorMembership.rank === 'string' ? actorMembership.rank : 'member';
+    const targetGuildId = typeof targetMembership.guildId === 'string' ? targetMembership.guildId : '';
+    if (!guildId || guildId !== targetGuildId) throw new Error('Target is not in your guild.');
+    if (actorRank !== 'leader') throw new Error('Only leader can change member rank.');
+
+    const targetMemberRef = doc(db, GUILD_COLLECTION, guildId, 'members', targetUid);
+    const targetMemberSnap = await tx.get(targetMemberRef);
+    if (!targetMemberSnap.exists()) throw new Error('Target member not found.');
+
+    tx.set(targetMemberRef, { rank: input.rank }, { merge: true });
+    tx.set(targetMembershipRef, { rank: input.rank }, { merge: true });
+  });
+}
+
+export async function transferGuildLeadership(input: { actorUid: string; newLeaderUid: string }): Promise<void> {
+  const db = requireDb();
+  const actorUid = input.actorUid.trim();
+  const newLeaderUid = input.newLeaderUid.trim();
+  if (!actorUid || !newLeaderUid) throw new Error('Missing leadership transfer parameters.');
+  if (actorUid === newLeaderUid) throw new Error('You are already the leader.');
+  const now = Date.now();
+
+  const actorMembershipRef = doc(db, USER_GUILD_COLLECTION, actorUid);
+  const newLeaderMembershipRef = doc(db, USER_GUILD_COLLECTION, newLeaderUid);
+
+  await runTransaction(db, async tx => {
+    const [actorMembershipSnap, newLeaderMembershipSnap] = await Promise.all([
+      tx.get(actorMembershipRef),
+      tx.get(newLeaderMembershipRef),
+    ]);
+    if (!actorMembershipSnap.exists()) throw new Error('You are not in a guild.');
+    if (!newLeaderMembershipSnap.exists()) throw new Error('Target is not in a guild.');
+
+    const actorMembership = actorMembershipSnap.data();
+    const newLeaderMembership = newLeaderMembershipSnap.data();
+    const guildId = typeof actorMembership.guildId === 'string' ? actorMembership.guildId : '';
+    const actorRank = typeof actorMembership.rank === 'string' ? actorMembership.rank : 'member';
+    const newLeaderGuildId = typeof newLeaderMembership.guildId === 'string' ? newLeaderMembership.guildId : '';
+
+    if (!guildId || guildId !== newLeaderGuildId) throw new Error('Target is not in your guild.');
+    if (actorRank !== 'leader') throw new Error('Only current leader can transfer leadership.');
+
+    const guildRef = doc(db, GUILD_COLLECTION, guildId);
+    const actorMemberRef = doc(db, GUILD_COLLECTION, guildId, 'members', actorUid);
+    const newLeaderMemberRef = doc(db, GUILD_COLLECTION, guildId, 'members', newLeaderUid);
+
+    const [guildSnap, newLeaderMemberSnap] = await Promise.all([
+      tx.get(guildRef),
+      tx.get(newLeaderMemberRef),
+    ]);
+    if (!guildSnap.exists()) throw new Error('Guild not found.');
+    if (!newLeaderMemberSnap.exists()) throw new Error('Target member not found.');
+
+    const guild = guildSnap.data();
+    const normalizedName = typeof guild.normalizedName === 'string' ? guild.normalizedName : '';
+    const newLeaderMember = newLeaderMemberSnap.data();
+    const newLeaderName = typeof newLeaderMember.displayName === 'string' ? newLeaderMember.displayName : 'Leader';
+
+    tx.set(newLeaderMemberRef, { rank: 'leader' }, { merge: true });
+    tx.set(actorMemberRef, { rank: 'officer' }, { merge: true });
+    tx.set(newLeaderMembershipRef, { rank: 'leader' }, { merge: true });
+    tx.set(actorMembershipRef, { rank: 'officer' }, { merge: true });
+    tx.set(guildRef, {
+      leaderId: newLeaderUid,
+      leaderName: newLeaderName,
+      updatedAt: now,
+    }, { merge: true });
+
+    if (normalizedName) {
+      tx.set(doc(db, GUILD_LOOKUP_COLLECTION, normalizedName), {
+        leaderId: newLeaderUid,
+        leaderName: newLeaderName,
+        updatedAt: now,
+      }, { merge: true });
+    }
+  });
+}
+
+export async function disbandGuild(input: { actorUid: string }): Promise<void> {
+  const db = requireDb();
+  const actorUid = input.actorUid.trim();
+  if (!actorUid) throw new Error('Missing disband parameters.');
+
+  const actorMembershipSnap = await getDoc(doc(db, USER_GUILD_COLLECTION, actorUid));
+  if (!actorMembershipSnap.exists()) throw new Error('You are not in a guild.');
+  const membership = actorMembershipSnap.data();
+  const guildId = typeof membership.guildId === 'string' ? membership.guildId : '';
+  const rank = typeof membership.rank === 'string' ? membership.rank : 'member';
+  if (!guildId) throw new Error('Guild data invalid.');
+  if (rank !== 'leader') throw new Error('Only guild leader can disband.');
+
+  const guildRef = doc(db, GUILD_COLLECTION, guildId);
+  const guildSnap = await getDoc(guildRef);
+  if (!guildSnap.exists()) {
+    await deleteDoc(doc(db, USER_GUILD_COLLECTION, actorUid));
+    return;
+  }
+
+  const guild = guildSnap.data() as Record<string, unknown>;
+  const normalizedName = typeof guild.normalizedName === 'string' ? guild.normalizedName : '';
+  const [memberSnaps, eventSnaps, chatSnaps] = await Promise.all([
+    getDocs(collection(db, GUILD_COLLECTION, guildId, 'members')),
+    getDocs(collection(db, GUILD_COLLECTION, guildId, 'events')),
+    getDocs(query(collection(db, GUILD_COLLECTION, guildId, 'chat'), limit(300))),
+  ]);
+
+  const memberUids = memberSnaps.docs.map(s => s.id);
+  const chunkSize = 200;
+  for (let i = 0; i < memberUids.length; i += chunkSize) {
+    const batch = writeBatch(db);
+    const chunk = memberUids.slice(i, i + chunkSize);
+    chunk.forEach(uid => {
+      batch.delete(doc(db, USER_GUILD_COLLECTION, uid));
+      batch.delete(doc(db, GUILD_COLLECTION, guildId, 'members', uid));
+    });
+    await batch.commit();
+  }
+
+  for (let i = 0; i < eventSnaps.docs.length; i += chunkSize) {
+    const batch = writeBatch(db);
+    const chunk = eventSnaps.docs.slice(i, i + chunkSize);
+    chunk.forEach(eventDoc => batch.delete(eventDoc.ref));
+    await batch.commit();
+  }
+
+  for (let i = 0; i < chatSnaps.docs.length; i += chunkSize) {
+    const batch = writeBatch(db);
+    const chunk = chatSnaps.docs.slice(i, i + chunkSize);
+    chunk.forEach(chatDoc => batch.delete(chatDoc.ref));
+    await batch.commit();
+  }
+
+  const bossRef = doc(db, GUILD_COLLECTION, guildId, 'boss', 'active');
+  const finalBatch = writeBatch(db);
+  finalBatch.delete(bossRef);
+  if (normalizedName) finalBatch.delete(doc(db, GUILD_LOOKUP_COLLECTION, normalizedName));
+  finalBatch.delete(guildRef);
+  await finalBatch.commit();
 }
 
 export async function ensureActiveBoss(uid: string): Promise<GuildBossState> {
@@ -662,7 +876,7 @@ export async function contributeToGuildEvent(input: { uid: string; eventId: stri
   const eventRef = doc(db, GUILD_COLLECTION, guildId, 'events', input.eventId);
   const now = Date.now();
 
-  return runTransaction(db, async tx => {
+  const result = await runTransaction<{ event: GuildEventState; shouldReward: boolean; rewardAmount: number; guildId: string }>(db, async tx => {
     const eventSnap = await tx.get(eventRef);
     if (!eventSnap.exists()) throw new Error('Event not found.');
     const data = eventSnap.data();
@@ -687,22 +901,55 @@ export async function contributeToGuildEvent(input: { uid: string; eventId: stri
       nextDetails = { ...details, totalKills, targetKills };
     }
 
+    const rewardAlreadySent = typeof data.rewardSentAt === 'number' && data.rewardSentAt > 0;
+    const shouldReward = status === 'completed' && !rewardAlreadySent;
     tx.set(eventRef, {
       status,
       details: nextDetails,
       updatedAt: now,
       completedAt: status === 'completed' ? now : null,
+      rewardSentAt: shouldReward ? now : data.rewardSentAt ?? null,
     }, { merge: true });
 
     return {
-      eventId: input.eventId,
-      type: data.type === 'war' ? 'war' : 'expedition',
-      status,
-      startedAt: typeof data.startedAt === 'number' ? data.startedAt : now,
-      endsAt: typeof data.endsAt === 'number' ? data.endsAt : now,
-      details: nextDetails,
+      event: {
+        eventId: input.eventId,
+        type: data.type === 'war' ? 'war' : 'expedition',
+        status,
+        startedAt: typeof data.startedAt === 'number' ? data.startedAt : now,
+        endsAt: typeof data.endsAt === 'number' ? data.endsAt : now,
+        details: nextDetails,
+      },
+      shouldReward,
+      rewardAmount: data.type === 'war' ? 200 : 120,
+      guildId,
     };
   });
+
+  if (result.shouldReward) {
+    const members = await getDocs(query(collection(db, GUILD_COLLECTION, result.guildId, 'members'), limit(200)));
+    await Promise.all(members.docs.map(async member => {
+      const memberUid = member.id;
+      const mailRef = doc(db, 'playerMail', memberUid, 'messages', `guild_event_${result.event.eventId}_${memberUid}`);
+      await setDoc(mailRef, {
+        subject: `Guild ${result.event.type === 'war' ? 'War' : 'Expedition'} Complete`,
+        message: `Your guild completed the ${result.event.type} event. Rewards enclosed.`,
+        from: 'Guild Command',
+        sentAt: now,
+        kind: 'guild_reward',
+        guildId: result.guildId,
+        attachments: {
+          shards: result.rewardAmount,
+          gold: result.rewardAmount * 1000,
+          diamonds: 0,
+          tears: Math.max(1, Math.floor(result.rewardAmount / 60)),
+          essence: Math.max(1, Math.floor(result.rewardAmount / 5)),
+        },
+      }, { merge: true });
+    }));
+  }
+
+  return result.event;
 }
 
 export async function sendGuildChatMessage(input: { uid: string; displayName: string; text: string }): Promise<void> {
@@ -713,12 +960,25 @@ export async function sendGuildChatMessage(input: { uid: string; displayName: st
   const text = sanitizeMessage(input.text);
   if (!text) return;
 
+  const rateRef = doc(db, GUILD_CHAT_RATE_LIMIT_COLLECTION, input.uid);
   const chatRef = doc(collection(db, GUILD_COLLECTION, guildId, 'chat'));
-  await setDoc(chatRef, {
-    uid: input.uid,
-    displayName: input.displayName.trim().slice(0, 24) || 'Member',
-    text,
-    sentAt: now,
+  await runTransaction(db, async tx => {
+    const rateSnap = await tx.get(rateRef);
+    if (rateSnap.exists()) {
+      const rateData = rateSnap.data();
+      const lastSentAt = typeof rateData.lastSentAt === 'number' ? rateData.lastSentAt : 0;
+      if (now - lastSentAt < GUILD_CHAT_COOLDOWN_MS) {
+        throw new Error('Guild chat cooldown active. Please wait a moment.');
+      }
+    }
+
+    tx.set(rateRef, { uid: input.uid, lastSentAt: now, updatedAt: now }, { merge: true });
+    tx.set(chatRef, {
+      uid: input.uid,
+      displayName: input.displayName.trim().slice(0, 24) || 'Member',
+      text,
+      sentAt: now,
+    });
   });
 }
 

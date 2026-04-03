@@ -29,6 +29,7 @@ import {
   attackBoss,
   contributeToGuildEvent,
   createGuild,
+  disbandGuild,
   ensureActiveBoss,
   fetchActiveBoss,
   fetchGuildBrowse,
@@ -43,10 +44,13 @@ import {
   GuildMember,
   GuildSummary,
   joinGuild,
+  kickGuildMember,
   leaveGuild,
   sendGuildChatMessage,
+  setMemberRank,
   startEvent,
   subscribeGuildChat,
+  transferGuildLeadership,
 } from '../../services/guild';
 
 export interface SocialTabContentProps {
@@ -672,8 +676,81 @@ export function SocialTabContent({
               <Text style={styles.metaText}>{myGuild.description || 'No description set.'}</Text>
               <Text style={styles.metaText}>Leader: {myGuild.leaderName} • Members: {myGuild.memberCount}/{myGuild.maxMembers}</Text>
               <Text style={styles.metaText}>Min Join Level: {myGuild.minLevelToJoin} • Public: {myGuild.isPublic ? 'Yes' : 'No'}</Text>
-              {guildMembers.slice(0, 10).map(member => (
-                <Text key={member.uid} style={styles.metaText}>- {member.displayName} ({member.rank})</Text>
+              {guildMembers.slice(0, 12).map(member => (
+                <View key={member.uid} style={styles.friendRow}>
+                  <View style={styles.friendMeta}>
+                    <Text style={styles.friendName}>{member.displayName}</Text>
+                    <Text style={styles.metaText}>{member.rank} • Contribution {Math.floor(member.guildContribution).toLocaleString()}</Text>
+                  </View>
+                  {myGuild.leaderId === me.uid && member.uid !== me.uid && (
+                    <View style={styles.friendActions}>
+                      <Pressable
+                        style={styles.smallBtn}
+                        disabled={guildBusy}
+                        onPress={async () => {
+                          if (!me.uid) return;
+                          setGuildBusy(true);
+                          setError(null);
+                          try {
+                            await setMemberRank({
+                              actorUid: me.uid,
+                              targetUid: member.uid,
+                              rank: member.rank === 'officer' ? 'member' : 'officer',
+                            });
+                            await refreshGuildData();
+                          } catch (err) {
+                            const msg = err instanceof Error ? err.message : 'Failed to update member rank.';
+                            setError(msg);
+                          } finally {
+                            setGuildBusy(false);
+                          }
+                        }}
+                      >
+                        <Text style={styles.smallBtnText}>{member.rank === 'officer' ? 'Demote' : 'Promote'}</Text>
+                      </Pressable>
+                      <Pressable
+                        style={styles.smallBtn}
+                        disabled={guildBusy}
+                        onPress={async () => {
+                          if (!me.uid) return;
+                          setGuildBusy(true);
+                          setError(null);
+                          try {
+                            await transferGuildLeadership({ actorUid: me.uid, newLeaderUid: member.uid });
+                            await refreshGuildData();
+                          } catch (err) {
+                            const msg = err instanceof Error ? err.message : 'Failed to transfer leadership.';
+                            setError(msg);
+                          } finally {
+                            setGuildBusy(false);
+                          }
+                        }}
+                      >
+                        <Text style={styles.smallBtnText}>Leader</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[styles.smallBtn, styles.smallBtnDanger]}
+                        disabled={guildBusy}
+                        onPress={async () => {
+                          if (!me.uid) return;
+                          setGuildBusy(true);
+                          setError(null);
+                          try {
+                            await kickGuildMember({ actorUid: me.uid, targetUid: member.uid });
+                            await refreshGuildData();
+                          } catch (err) {
+                            const msg = err instanceof Error ? err.message : 'Failed to kick member.';
+                            setError(msg);
+                          } finally {
+                            setGuildBusy(false);
+                          }
+                        }}
+                      >
+                        <Text style={styles.smallBtnText}>Kick</Text>
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
               ))}
               {myGuild.leaderId !== me.uid && (
                 <Pressable
@@ -697,7 +774,31 @@ export function SocialTabContent({
                   <Text style={styles.smallBtnText}>Leave Guild</Text>
                 </Pressable>
               )}
-              {myGuild.leaderId === me.uid && <Text style={styles.metaText}>Leader leave is blocked until transfer/disband is implemented.</Text>}
+              {myGuild.leaderId === me.uid && (
+                <>
+                  <Text style={styles.metaText}>Leaders can transfer leadership to another member, or disband the guild.</Text>
+                  <Pressable
+                    style={[styles.smallBtn, styles.smallBtnDanger]}
+                    disabled={guildBusy}
+                    onPress={async () => {
+                      if (!me.uid) return;
+                      setGuildBusy(true);
+                      setError(null);
+                      try {
+                        await disbandGuild({ actorUid: me.uid });
+                        await refreshGuildData();
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : 'Failed to disband guild.';
+                        setError(msg);
+                      } finally {
+                        setGuildBusy(false);
+                      }
+                    }}
+                  >
+                    <Text style={styles.smallBtnText}>Disband Guild</Text>
+                  </Pressable>
+                </>
+              )}
             </View>
           )}
 
