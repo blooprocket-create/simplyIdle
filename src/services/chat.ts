@@ -189,9 +189,65 @@ export function subscribeToChat(onMessages: (messages: GlobalChatMessage[]) => v
   const db = getFirebaseFirestore();
   if (!db) return () => {};
 
+  const viewerUid = getFirebaseAuth()?.currentUser?.uid ?? '';
+  const identityByUid = new Map<string, { level: number; vipLevel: number; guildTag: string }>();
+  const reactionsByMessageId = new Map<string, ChatReactionSummary>();
+  const reactionUnsubByMessageId = new Map<string, () => void>();
+  let baseRows: GlobalChatMessage[] = [];
+  let disposed = false;
+
+  const emitRows = () => {
+    if (disposed) return;
+    const rows = baseRows.map(row => {
+      const identity = identityByUid.get(row.uid);
+      const reaction = reactionsByMessageId.get(row.id);
+      return {
+        ...row,
+        level: identity ? identity.level : row.level,
+        vipLevel: identity ? identity.vipLevel : row.vipLevel,
+        guildTag: identity ? identity.guildTag : row.guildTag,
+        reactions: reaction ? reaction.counts : row.reactions,
+        myReaction: reaction ? reaction.mine : row.myReaction,
+      };
+    });
+    onMessages(rows);
+  };
+
+  const ensureReactionListeners = (messageIds: Set<string>) => {
+    for (const [messageId, unsub] of reactionUnsubByMessageId.entries()) {
+      if (messageIds.has(messageId)) continue;
+      unsub();
+      reactionUnsubByMessageId.delete(messageId);
+      reactionsByMessageId.delete(messageId);
+    }
+
+    for (const messageId of messageIds) {
+      if (reactionUnsubByMessageId.has(messageId)) continue;
+      const unsub = onSnapshot(
+        collection(db, CHAT_COLLECTION, messageId, CHAT_REACTIONS_COLLECTION),
+        reactionSnap => {
+          const counts: Record<string, number> = {};
+          let mine: string | null = null;
+
+          reactionSnap.docs.forEach(reactionDoc => {
+            const data = reactionDoc.data() as { emoji?: unknown };
+            const reactionEmoji = typeof data.emoji === 'string' ? data.emoji : '';
+            if (!reactionEmoji || !ALLOWED_REACTIONS.has(reactionEmoji)) return;
+            counts[reactionEmoji] = (counts[reactionEmoji] ?? 0) + 1;
+            if (reactionDoc.id === viewerUid) mine = reactionEmoji;
+          });
+
+          reactionsByMessageId.set(messageId, { counts, mine });
+          emitRows();
+        },
+      );
+      reactionUnsubByMessageId.set(messageId, unsub);
+    }
+  };
+
   const q = query(collection(db, CHAT_COLLECTION), orderBy('sentAt', 'desc'), limit(50));
-  return onSnapshot(q, snap => {
-    const baseRows = snap.docs
+  const chatUnsub = onSnapshot(q, snap => {
+    baseRows = snap.docs
       .map(docSnap => {
         const data = docSnap.data();
         return {
@@ -210,32 +266,32 @@ export function subscribeToChat(onMessages: (messages: GlobalChatMessage[]) => v
       .filter(row => !!row.uid && !!row.text)
       .sort((a, b) => a.sentAt - b.sentAt);
 
-    const uniqueUids = [...new Set(baseRows.map(r => r.uid))];
-    void (async () => {
-      const viewerUid = getFirebaseAuth()?.currentUser?.uid ?? '';
-      const identityPairs = await Promise.all(uniqueUids.map(async uid => [uid, await resolveChatIdentity(uid)] as const));
-      const identityByUid = new Map(identityPairs);
-      const reactionPairs = await Promise.all(baseRows.map(async row => [row.id, await fetchChatReactionSummaryForMessage(row.id, viewerUid)] as const));
-      const reactionsByMessageId = new Map(reactionPairs);
+    const messageIds = new Set(baseRows.map(row => row.id));
+    ensureReactionListeners(messageIds);
 
-      const rows = baseRows.map(row => {
-        const identity = identityByUid.get(row.uid);
-        const reaction = reactionsByMessageId.get(row.id);
-        return {
-          ...row,
-          level: identity ? identity.level : row.level,
-          vipLevel: identity ? identity.vipLevel : row.vipLevel,
-          guildTag: identity ? identity.guildTag : row.guildTag,
-          reactions: reaction ? reaction.counts : {},
-          myReaction: reaction ? reaction.mine : null,
-        };
-      });
+    const missingUids = [...new Set(baseRows.map(row => row.uid))].filter(uid => !identityByUid.has(uid));
+    if (missingUids.length > 0) {
+      void Promise.all(missingUids.map(async uid => [uid, await resolveChatIdentity(uid)] as const))
+        .then(identityPairs => {
+          if (disposed) return;
+          identityPairs.forEach(([uid, identity]) => identityByUid.set(uid, identity));
+          emitRows();
+        })
+        .catch(() => {
+          emitRows();
+        });
+    }
 
-      onMessages(rows);
-    })().catch(() => {
-      onMessages(baseRows);
-    });
+    emitRows();
   });
+
+  return () => {
+    disposed = true;
+    chatUnsub();
+    reactionUnsubByMessageId.forEach(unsub => unsub());
+    reactionUnsubByMessageId.clear();
+    reactionsByMessageId.clear();
+  };
 }
 
 export async function toggleChatReaction(uid: string, messageId: string, emoji: string): Promise<ChatReactionSummary> {
