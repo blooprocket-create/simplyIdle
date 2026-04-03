@@ -34,16 +34,23 @@ export async function fetchPublicPlayerProfile(uid: string): Promise<PublicPlaye
   const db = getFirebaseFirestore();
   if (!db || !uid) return null;
 
-  const [profileSnap, boardSnap, guildSnap, friendCountSnap] = await Promise.all([
-    getDoc(doc(db, USER_PROFILES_COLLECTION, uid)),
-    getDoc(doc(db, LEADERBOARD_COLLECTION, uid)),
-    getDoc(doc(db, USER_GUILD_COLLECTION, uid)),
-    getCountFromServer(query(collection(db, 'friends', uid, 'list'))),
+  const [profileSnap, boardSnap, guildSnap] = await Promise.all([
+    getDoc(doc(db, USER_PROFILES_COLLECTION, uid)).catch(() => null),
+    getDoc(doc(db, LEADERBOARD_COLLECTION, uid)).catch(() => null),
+    getDoc(doc(db, USER_GUILD_COLLECTION, uid)).catch(() => null),
   ]);
 
-  const profileData = profileSnap.exists() ? profileSnap.data() : {};
-  const boardData = boardSnap.exists() ? boardSnap.data() : {};
-  const guildData = guildSnap.exists() ? guildSnap.data() : {};
+  let friendCount = 0;
+  try {
+    const friendCountSnap = await getCountFromServer(query(collection(db, 'friends', uid, 'list')));
+    friendCount = friendCountSnap.data().count;
+  } catch {
+    friendCount = 0;
+  }
+
+  const profileData = profileSnap && profileSnap.exists() ? profileSnap.data() : {};
+  const boardData = boardSnap && boardSnap.exists() ? boardSnap.data() : {};
+  const guildData = guildSnap && guildSnap.exists() ? guildSnap.data() : {};
 
   const publicUsername = typeof profileData.publicUsername === 'string'
     ? profileData.publicUsername
@@ -92,7 +99,7 @@ export async function fetchPublicPlayerProfile(uid: string): Promise<PublicPlaye
     guildName: typeof guildData.guildName === 'string' ? guildData.guildName : null,
     guildRank: typeof guildData.rank === 'string' ? guildData.rank : null,
     leaderboardRank,
-    friendCount: friendCountSnap.data().count,
+    friendCount,
     guildContribution,
   };
 }

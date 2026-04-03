@@ -1325,6 +1325,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#0B1520',
     padding: 10,
   },
+  chatChannelRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 2,
+  },
+  chatChannelChip: {
+    borderWidth: 1,
+    borderColor: '#2F4C64',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: '#0E1F2E',
+  },
+  chatChannelChipActive: {
+    borderColor: '#7EC8FF',
+    backgroundColor: '#1A3550',
+  },
+  chatChannelChipText: {
+    color: '#98BCD8',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  chatChannelChipTextActive: {
+    color: '#EAF7FF',
+  },
   chatStreamArea: {
     flex: 1,
     minHeight: 220,
@@ -1364,6 +1389,22 @@ const styles = StyleSheet.create({
     borderTopColor: '#2E4B63',
     paddingTop: 8,
     gap: 8,
+  },
+  chatJumpToLatestBtn: {
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: '#6EB7EA',
+    backgroundColor: '#16344B',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginTop: 6,
+  },
+  chatJumpToLatestText: {
+    color: '#DDF3FF',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   chatComposerRow: {
     flexDirection: 'row',

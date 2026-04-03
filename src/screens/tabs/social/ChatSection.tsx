@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import { GlobalChatMessage } from '../../../services/chat';
 import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
@@ -61,6 +61,9 @@ export function ChatSection({
   meLevel,
 }: ChatSectionProps) {
   const listRef = useRef<FlatList<ChatListRow> | null>(null);
+  const prevMessageCountRef = useRef(messages.length);
+  const [isNearBottom, setIsNearBottom] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const rows = useMemo<ChatListRow[]>(() => {
     const nextRows: ChatListRow[] = [];
@@ -98,16 +101,37 @@ export function ChatSection({
     return nextRows;
   }, [messages, meUid]);
 
-  const scrollToLatest = () => {
+  const scrollToLatest = (animated = true) => {
     requestAnimationFrame(() => {
-      listRef.current?.scrollToEnd({ animated: true });
+      listRef.current?.scrollToEnd({ animated });
     });
+  };
+
+  const handleScroll = (event: any) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const distanceFromBottom = contentSize.height - (layoutMeasurement.height + contentOffset.y);
+    const nearBottom = distanceFromBottom <= 40;
+    setIsNearBottom(nearBottom);
+    if (nearBottom && unreadCount > 0) {
+      setUnreadCount(0);
+    }
   };
 
   useEffect(() => {
     if (!rows.length) return;
-    scrollToLatest();
-  }, [rows.length]);
+    const previous = prevMessageCountRef.current;
+    const next = messages.length;
+    const appended = Math.max(0, next - previous);
+
+    if (appended > 0 && !isNearBottom) {
+      setUnreadCount(count => count + appended);
+    } else {
+      scrollToLatest(next > previous);
+      setUnreadCount(0);
+    }
+
+    prevMessageCountRef.current = next;
+  }, [isNearBottom, messages.length, rows.length]);
 
   return (
     <>
@@ -119,6 +143,18 @@ export function ChatSection({
       </SocialCard>
 
       <View style={[styles.card, styles.chatShell]}>
+        <View style={styles.chatChannelRow}>
+          <View style={[styles.chatChannelChip, styles.chatChannelChipActive]}>
+            <Text style={[styles.chatChannelChipText, styles.chatChannelChipTextActive]}>Global</Text>
+          </View>
+          <View style={styles.chatChannelChip}>
+            <Text style={styles.chatChannelChipText}>Guild</Text>
+          </View>
+          <View style={styles.chatChannelChip}>
+            <Text style={styles.chatChannelChipText}>Party</Text>
+          </View>
+        </View>
+
         <SocialAsyncState
           styles={styles}
           isLoading={isLoading}
@@ -136,8 +172,14 @@ export function ChatSection({
             style={styles.chatStreamList}
             contentContainerStyle={styles.chatStreamContent}
             keyboardShouldPersistTaps="handled"
-            onContentSizeChange={scrollToLatest}
-            onLayout={scrollToLatest}
+            onContentSizeChange={() => {
+              if (isNearBottom) scrollToLatest(false);
+            }}
+            onLayout={() => {
+              scrollToLatest(false);
+            }}
+            onScroll={handleScroll}
+            scrollEventThrottle={32}
             renderItem={({ item }) => {
               if (item.type === 'day') {
                 return (
@@ -196,6 +238,15 @@ export function ChatSection({
             }}
           />
         </View>
+
+        {!isNearBottom && unreadCount > 0 && (
+          <Pressable style={styles.chatJumpToLatestBtn} onPress={() => {
+            setUnreadCount(0);
+            scrollToLatest();
+          }}>
+            <Text style={styles.chatJumpToLatestText}>New {unreadCount} • Jump to Latest</Text>
+          </Pressable>
+        )}
 
         <View style={styles.chatComposerWrap}>
           <Text style={styles.metaText}>Message as {meDisplayName} (Lv.{meLevel})</Text>
