@@ -52,6 +52,7 @@ import {
   getRankUpShardCost,
   getUsableItem,
   Rarity,
+  expForLevel,
 } from '../gameConfig';
 import { getHeroPortraitSource } from '../heroPortraits';
 import { fmt } from '../utils';
@@ -829,6 +830,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const vipPoints = Math.max(0, state.vipPoints ?? 0);
   const vipCurrentThreshold = VIP_LEVEL_THRESHOLDS[vipLevel] ?? 0;
   const vipNextThreshold = vipLevel >= 10 ? vipCurrentThreshold : (VIP_LEVEL_THRESHOLDS[vipLevel + 1] ?? vipCurrentThreshold + 1);
+  const requiredExp = Math.max(1, expForLevel(state.level));
+  const currentExp = Math.max(0, Math.min(state.exp, requiredExp));
   const vipProgressPct = vipLevel >= 10
     ? 100
     : Math.max(0, Math.min(100, ((vipPoints - vipCurrentThreshold) / Math.max(1, vipNextThreshold - vipCurrentThreshold)) * 100));
@@ -2614,6 +2617,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         playerName={state.playerName}
         playerVipStatus={vipLevel >= 10 ? `VIP ${vipLevel} (MAX)` : `VIP ${vipLevel} (${fmt(vipPoints)}/${fmt(vipNextThreshold)})`}
         playerClass={`${stats.className} • Lv ${state.level}`}
+        playerExpStatus={`EXP ${fmt(currentExp)}/${fmt(requiredExp)}`}
         onlineSyncState={onlineSyncState}
         onlineSyncAt={onlineSyncAt}
         gold={state.gold}

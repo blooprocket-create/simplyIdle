@@ -7,6 +7,7 @@ interface GameHeaderProps {
   playerName: string;
   playerVipStatus: string;
   playerClass: string;
+  playerExpStatus: string;
   onlineSyncState: 'local-only' | 'syncing' | 'synced' | 'conflict' | 'error';
   onlineSyncAt: number | null;
   gold: number;
@@ -24,6 +25,7 @@ export default function GameHeader({
   playerName,
   playerVipStatus,
   playerClass,
+  playerExpStatus,
   onlineSyncState,
   onlineSyncAt,
   gold,
@@ -76,6 +78,7 @@ export default function GameHeader({
           </Text>
         </View>
         <Text style={styles.playerClass}>{playerClass}</Text>
+        <Text style={styles.playerExpStatus} numberOfLines={1}>{playerExpStatus}</Text>
         <Text style={[styles.syncStatus, { color: syncMeta.color }]} numberOfLines={1}>
           {syncMeta.label}
         </Text>
@@ -236,6 +239,12 @@ const styles = StyleSheet.create({
     color: THEME.text.tertiary,
     fontWeight: '600',
     marginTop: 2,
+  },
+  playerExpStatus: {
+    fontSize: 8,
+    color: '#9BC8FF',
+    fontWeight: '700',
+    marginTop: 1,
   },
   syncStatus: {
     fontSize: 8,
