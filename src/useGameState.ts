@@ -2027,6 +2027,46 @@ function clampFloat(value: unknown, min: number, max: number, fallback: number):
   return Math.min(max, Math.max(min, value));
 }
 
+function sanitizeRuntimeEconomyState(state: GameState): GameState {
+  const safeGold = clampInt(state.gold, 0, SAFE_INTEGER_CAP, 0);
+  const safeDiamonds = clampInt(state.diamonds, 0, SAFE_INTEGER_CAP, 0);
+  const safeTotalGold = Math.max(safeGold, clampInt(state.totalGold, 0, SAFE_INTEGER_CAP, safeGold));
+  const safeLevel = clampInt(state.level, 1, MAX_SAVE_PLAYER_LEVEL, 1);
+  const safeExp = clampInt(state.exp, 0, Math.max(0, expForLevel(safeLevel) - 1), 0);
+  const safeTotalExp = Math.max(safeExp, clampInt(state.totalExp, 0, SAFE_INTEGER_CAP, safeExp));
+  const safeBossTears = clampInt(state.bossTears, 0, SAFE_INTEGER_CAP, 0);
+  const safeHeroShards = clampInt(state.heroShards, 0, SAFE_INTEGER_CAP, 0);
+  const safeEssence = clampInt(state.essence, 0, SAFE_INTEGER_CAP, 0);
+  const safeScrap = clampInt(state.equipmentScrap, 0, SAFE_INTEGER_CAP, 0);
+
+  if (
+    safeGold === state.gold
+    && safeDiamonds === state.diamonds
+    && safeTotalGold === state.totalGold
+    && safeExp === state.exp
+    && safeTotalExp === state.totalExp
+    && safeBossTears === state.bossTears
+    && safeHeroShards === state.heroShards
+    && safeEssence === state.essence
+    && safeScrap === state.equipmentScrap
+  ) {
+    return state;
+  }
+
+  return {
+    ...state,
+    gold: safeGold,
+    diamonds: safeDiamonds,
+    totalGold: safeTotalGold,
+    exp: safeExp,
+    totalExp: safeTotalExp,
+    bossTears: safeBossTears,
+    heroShards: safeHeroShards,
+    essence: safeEssence,
+    equipmentScrap: safeScrap,
+  };
+}
+
 function clampBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
@@ -3228,6 +3268,7 @@ type Action =
   | { type: 'LOAD'; payload: Partial<SaveData> };
 
 function reducer(state: GameState, action: Action): GameState {
+  state = sanitizeRuntimeEconomyState(state);
   switch (action.type) {
     case 'CREATE_CHARACTER': {
       if (state.characterCreated) return state;
