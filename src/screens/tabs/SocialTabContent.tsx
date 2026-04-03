@@ -17,6 +17,7 @@ import {
   fetchGiftCooldowns,
   fetchPendingRequests,
   fetchFriendProfile,
+  removeFriend,
   sendFriendRequest,
   sendGift,
   setGiftPreference,
@@ -34,7 +35,7 @@ export interface SocialTabContentProps {
   onPendingRequestsCountChange?: (count: number) => void;
 }
 
-type SocialSubTab = 'chat' | 'friends';
+type SocialSubTab = 'chat' | 'friends' | 'guild';
 
 function formatTime(ts: number): string {
   const date = new Date(ts);
@@ -50,6 +51,15 @@ function giftIcon(pref: GiftPreference): string {
 function isSameUtcDay(a: number, b: number): boolean {
   if (!a || !b) return false;
   return new Date(a).toISOString().slice(0, 10) === new Date(b).toISOString().slice(0, 10);
+}
+
+function timeUntilNextUtcMidnightLabel(nowMs: number): string {
+  const now = new Date(nowMs);
+  const nextMidnightUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0);
+  const diffMs = Math.max(0, nextMidnightUtc - nowMs);
+  const hours = Math.floor(diffMs / 3_600_000);
+  const minutes = Math.floor((diffMs % 3_600_000) / 60_000);
+  return `${hours}h ${minutes}m`;
 }
 
 export function SocialTabContent({
@@ -272,6 +282,9 @@ export function SocialTabContent({
         <Pressable style={[styles.subTabBtn, subTab === 'friends' && styles.subTabBtnActive]} onPress={() => setSubTab('friends')}>
           <Text style={[styles.subTabText, subTab === 'friends' && styles.subTabTextActive]}>Friends</Text>
         </Pressable>
+        <Pressable style={[styles.subTabBtn, subTab === 'guild' && styles.subTabBtnActive]} onPress={() => setSubTab('guild')}>
+          <Text style={[styles.subTabText, subTab === 'guild' && styles.subTabTextActive]}>Guild</Text>
+        </Pressable>
       </View>
 
       {subTab === 'chat' && (
@@ -399,17 +412,55 @@ export function SocialTabContent({
                   <View style={styles.friendMeta}>
                     <Text style={styles.friendName}>{friend.displayName}</Text>
                     <Text style={styles.metaText}>Lv.{friend.level} • Wants {giftIcon(friend.giftPreference)} {friend.giftPreference}</Text>
+                    {giftedToday && <Text style={styles.cooldownText}>Next gift in {timeUntilNextUtcMidnightLabel(Date.now())}</Text>}
                   </View>
-                  <Pressable
-                    style={[styles.smallBtn, giftedToday && styles.sendBtnDisabled]}
-                    onPress={() => sendDailyGift(friend)}
-                    disabled={friendsBusy || giftedToday}
-                  >
-                    <Text style={styles.smallBtnText}>{giftedToday ? 'Gifted' : 'Gift'}</Text>
-                  </Pressable>
+                  <View style={styles.friendActions}>
+                    <Pressable
+                      style={[styles.smallBtn, giftedToday && styles.sendBtnDisabled]}
+                      onPress={() => sendDailyGift(friend)}
+                      disabled={friendsBusy || giftedToday}
+                    >
+                      <Text style={styles.smallBtnText}>{giftedToday ? 'Gifted' : 'Gift'}</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.smallBtn, styles.smallBtnDanger]}
+                      onPress={async () => {
+                        if (friendsBusy || !me.uid) return;
+                        setFriendsBusy(true);
+                        setError(null);
+                        try {
+                          await removeFriend(me.uid, friend.uid);
+                          await refreshFriendsData();
+                        } catch {
+                          setError('Failed to remove friend.');
+                        } finally {
+                          setFriendsBusy(false);
+                        }
+                      }}
+                      disabled={friendsBusy}
+                    >
+                      <Text style={styles.smallBtnText}>Remove</Text>
+                    </Pressable>
+                  </View>
                 </View>
               );
             })}
+          </View>
+        </>
+      )}
+
+      {subTab === 'guild' && (
+        <>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Guild Command</Text>
+            <Text style={styles.metaText}>Guild will live here as a Social sub-tab with Home, Boss, Events, Guild Chat, and Browse.</Text>
+            <Text style={styles.metaText}>Create Guild Cost: 2,500 Diamonds.</Text>
+          </View>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Planned Guild Events</Text>
+            <Text style={styles.metaText}>- Guild Boss: shared HP target, rewards delivered to all participants by mail.</Text>
+            <Text style={styles.metaText}>- Guild War: 48-hour DPS race against rival guilds.</Text>
+            <Text style={styles.metaText}>- Guild Expedition: week-long cooperative milestone campaign.</Text>
           </View>
         </>
       )}
@@ -465,6 +516,11 @@ const styles = StyleSheet.create({
   metaText: {
     color: THEME.text.tertiary,
     fontSize: 12,
+  },
+  cooldownText: {
+    color: '#9ED4FF',
+    fontSize: 11,
+    marginTop: 3,
   },
   mutedText: {
     color: '#F9D66D',

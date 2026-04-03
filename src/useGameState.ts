@@ -64,6 +64,8 @@ import {
 import { buildingCost, bulkCost } from './utils';
 import { debugLog, trackEvent, trackGameplayAction } from './telemetry';
 import { isOnlineSaveAvailable, loadOnlineSave, writeOnlineSave } from './services/onlineSave';
+import { claimCloudMail, fetchCloudMail } from './services/cloudMail';
+import { getFirebaseAuth } from './services/firebase';
 
 const TICK_MS = 100;
 const SAVE_INTERVAL_MS = 5000;
@@ -5952,8 +5954,42 @@ export function useGameState(saveSlot: string = 'default') {
           revision: remote.revision,
         });
 
-        dispatch({ type: 'LOAD', payload: remote.payload as Partial<SaveData> });
-        const elapsed = Date.now() - ((remote.payload as Partial<SaveData>).lastActiveAt ?? Date.now());
+        let payloadWithCloudMail = remote.payload as Partial<SaveData>;
+        const uid = getFirebaseAuth()?.currentUser?.uid;
+        if (uid) {
+          try {
+            const cloudMails = await fetchCloudMail(uid);
+            if (cloudMails.length > 0) {
+              const existingMailbox = Array.isArray((payloadWithCloudMail as { mailbox?: MailMessage[] }).mailbox)
+                ? (payloadWithCloudMail as { mailbox?: MailMessage[] }).mailbox ?? []
+                : [];
+              const seenIds = new Set(existingMailbox.map(mail => mail.id));
+              const newMails: MailMessage[] = cloudMails
+                .filter(mail => !seenIds.has(mail.id))
+                .map(mail => ({
+                  id: mail.id,
+                  subject: mail.subject,
+                  message: mail.message,
+                  from: mail.from,
+                  sentAt: mail.sentAt,
+                  attachments: mail.attachments,
+                }));
+              if (newMails.length > 0) {
+                payloadWithCloudMail = {
+                  ...payloadWithCloudMail,
+                  mailbox: [...newMails, ...existingMailbox].slice(0, 100),
+                };
+              }
+
+              await Promise.all(cloudMails.map(mail => claimCloudMail(uid, mail.id).catch(() => {})));
+            }
+          } catch {
+            // Non-fatal. The real-time cloud mail listener in GameScreen will still surface messages.
+          }
+        }
+
+        dispatch({ type: 'LOAD', payload: payloadWithCloudMail });
+        const elapsed = Date.now() - (payloadWithCloudMail.lastActiveAt ?? Date.now());
       dispatch({ type: 'APPLY_OFFLINE_PROGRESS', elapsedMs: elapsed });
       dispatch({ type: 'APPLY_DAILY_LOGIN', nowMs: Date.now() });
       dispatch({ type: 'APPLY_WEEKLY_ROLLOVER', nowMs: Date.now() });
