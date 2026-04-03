@@ -1785,13 +1785,27 @@ function getUsableProgressScale(state: GameState): number {
 function getScaledUsableGoldGain(state: GameState, baseValue: number, itemType: 'basic' | 'advanced'): number {
   const scaledBase = Math.ceil(baseValue * getUsableProgressScale(state) * getVipGoldMultiplier(state));
   const waveFloor = Math.ceil(getMonsterGold(Math.max(1, state.highestWaveReached)) * (itemType === 'advanced' ? 8 : 3));
-  return Math.max(scaledBase, waveFloor);
+
+  if (!Number.isFinite(scaledBase) && !Number.isFinite(waveFloor)) {
+    return 1;
+  }
+
+  const safeScaledBase = Number.isFinite(scaledBase) ? scaledBase : 0;
+  const safeWaveFloor = Number.isFinite(waveFloor) ? waveFloor : 0;
+  return Math.max(1, Math.floor(Math.max(safeScaledBase, safeWaveFloor)));
 }
 
 function getScaledUsableExpGain(state: GameState, baseValue: number, itemType: 'basic' | 'advanced'): number {
   const scaledBase = Math.ceil(baseValue * getUsableProgressScale(state) * getAchievementBonusMultiplier(state) * getVipExpMultiplier(state));
   const waveFloor = Math.ceil(getMonsterExp(Math.max(1, state.highestWaveReached)) * (itemType === 'advanced' ? 6 : 2));
-  return Math.max(scaledBase, waveFloor);
+
+  if (!Number.isFinite(scaledBase) && !Number.isFinite(waveFloor)) {
+    return 1;
+  }
+
+  const safeScaledBase = Number.isFinite(scaledBase) ? scaledBase : 0;
+  const safeWaveFloor = Number.isFinite(waveFloor) ? waveFloor : 0;
+  return Math.max(1, Math.floor(Math.max(safeScaledBase, safeWaveFloor)));
 }
 
 function getScaledUsableShardGain(state: GameState, baseValue: number, itemType: 'basic' | 'advanced'): number {
@@ -3767,11 +3781,14 @@ function reducer(state: GameState, action: Action): GameState {
 
       if (item.effect === 'gain_gold_flat') {
         const gainPerUse = getScaledUsableGoldGain(nextState, item.value, item.itemType);
-        const gain = gainPerUse * requestedUses;
+        const rawGain = gainPerUse * requestedUses;
+        const gain = Number.isFinite(rawGain) ? Math.max(0, Math.floor(rawGain)) : 0;
+        const safeCurrentGold = Number.isFinite(nextState.gold) ? nextState.gold : 0;
+        const safeTotalGold = Number.isFinite(nextState.totalGold) ? nextState.totalGold : 0;
         nextState = queueReward({
           ...nextState,
-          gold: nextState.gold + gain,
-          totalGold: nextState.totalGold + gain,
+          gold: safeCurrentGold + gain,
+          totalGold: safeTotalGold + gain,
         }, {
           id: `use_${item.id}_${Date.now()}`,
           kind: 'gold',
@@ -3782,12 +3799,15 @@ function reducer(state: GameState, action: Action): GameState {
 
       if (item.effect === 'gain_exp_flat') {
         const gainPerUse = getScaledUsableExpGain(nextState, item.value, item.itemType);
-        const gain = gainPerUse * requestedUses;
-        const lvl = processLevelUp(nextState.exp + gain, nextState.level);
+        const rawGain = gainPerUse * requestedUses;
+        const gain = Number.isFinite(rawGain) ? Math.max(0, Math.floor(rawGain)) : 0;
+        const safeCurrentExp = Number.isFinite(nextState.exp) ? nextState.exp : 0;
+        const safeTotalExp = Number.isFinite(nextState.totalExp) ? nextState.totalExp : 0;
+        const lvl = processLevelUp(safeCurrentExp + gain, nextState.level);
         nextState = queueReward({
           ...nextState,
           exp: lvl.exp,
-          totalExp: nextState.totalExp + gain,
+          totalExp: safeTotalExp + gain,
           level: lvl.level,
           unspentStatPoints: nextState.unspentStatPoints + lvl.gainedLevels * STAT_POINTS_PER_LEVEL,
         }, {
