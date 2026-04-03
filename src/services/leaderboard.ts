@@ -38,6 +38,11 @@ function clampScore(value: number): number {
   return Math.max(0, Math.floor(value));
 }
 
+function clampLevel(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.max(1, Math.floor(value));
+}
+
 function isEntry(value: unknown): value is LeaderboardEntry {
   if (!value || typeof value !== 'object') return false;
   const entry = value as Partial<LeaderboardEntry>;
@@ -80,7 +85,7 @@ export async function submitLeaderboardScore(input: SubmitLeaderboardScoreInput)
       accountName: input.accountName.trim().toLowerCase().slice(0, 48),
       publicUsername: input.publicUsername.trim().slice(0, 24) || 'Commander',
       score,
-      level: clampScore(input.level),
+      level: clampLevel(input.level),
       highestWaveReached: clampScore(input.highestWaveReached),
       prestigeCount: clampScore(input.prestigeCount),
       updatedAt: now,

@@ -332,11 +332,6 @@ export async function joinGuild(input: {
 
     const nextCount = memberCount + 1;
     tx.set(guildRef, { memberCount: nextCount, updatedAt: now }, { merge: true });
-
-    const normalizedName = typeof guild.normalizedName === 'string' ? guild.normalizedName : '';
-    if (normalizedName) {
-      tx.set(doc(db, GUILD_LOOKUP_COLLECTION, normalizedName), { memberCount: nextCount, updatedAt: now }, { merge: true });
-    }
   });
 }
 
