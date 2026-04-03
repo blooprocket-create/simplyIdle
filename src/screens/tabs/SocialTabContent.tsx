@@ -44,6 +44,7 @@ import {
   GuildMember,
   GuildSummary,
   kickGuildMember,
+  sendGuildChatMessage,
   subscribeGuildChat,
   subscribeGuildMembership,
   transferGuildLeadership,
@@ -406,10 +407,10 @@ export function SocialTabContent({
   }, [guildSearchInput, me.uid, myGuild, subTab, tab]);
 
   useEffect(() => {
-    if (tab !== 'social' || subTab !== 'guild' || !me.uid || !myGuild?.guildId) return;
+    if (tab !== 'social' || !me.uid || !myGuild?.guildId) return;
     const stop = subscribeGuildChat(me.uid, setGuildChat);
     return stop;
-  }, [me.uid, myGuild?.guildId, subTab, tab]);
+  }, [me.uid, myGuild?.guildId, tab]);
 
   useEffect(() => {
     if (!me.uid || !activeUserMenu?.uid) {
@@ -462,6 +463,27 @@ export function SocialTabContent({
       void trackEvent('social_chat_send_failed', { reason: msg.slice(0, 80) });
     } finally {
       setSending(false);
+    }
+  };
+
+  const sendGuildFromChat = async () => {
+    if (!me.uid || !myGuild?.guildId || guildBusy || !guildChatDraft.trim()) return;
+    setGuildBusy(true);
+    setGuildError(null);
+    try {
+      await sendGuildChatMessage({
+        uid: me.uid,
+        displayName: me.name,
+        text: guildChatDraft,
+      });
+      setGuildChatDraft('');
+      void trackEvent('social_guild_chat_send_success');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to send guild chat.';
+      setGuildError(msg);
+      void trackEvent('social_guild_chat_send_failed', { reason: msg.slice(0, 80) });
+    } finally {
+      setGuildBusy(false);
     }
   };
 
@@ -763,15 +785,22 @@ export function SocialTabContent({
             onlineCount={onlineCount}
             mutedUntil={mutedUntil}
             messages={messages}
+            guildMessages={guildChat}
+            hasGuild={!!myGuild?.guildId}
             meUid={me.uid}
             isAdmin={isAdmin}
             sending={sending}
+            guildSending={guildBusy}
             draft={draft}
             setDraft={setDraft}
+            guildDraft={guildChatDraft}
+            setGuildDraft={setGuildChatDraft}
             isLoading={isChatLoading}
             error={chatError}
+            guildError={guildError}
             formatTime={formatTime}
             onSend={send}
+            onSendGuild={sendGuildFromChat}
             onOpenUserMenu={setActiveUserMenu}
             onOpenProfile={uid => void openProfileCard(uid, 'chat_row_tap')}
             onMute={muteWithDuration}

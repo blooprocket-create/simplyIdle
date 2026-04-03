@@ -1,11 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import { GlobalChatMessage } from '../../../services/chat';
+import { GuildChatMessage } from '../../../services/guild';
 import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
 
 type ChatListRow =
   | { key: string; type: 'day'; label: string }
-  | { key: string; type: 'message'; showHeader: boolean; mine: boolean; compact: boolean; message: GlobalChatMessage };
+  | { key: string; type: 'message'; showHeader: boolean; mine: boolean; compact: boolean; source: 'global' | 'guild'; message: ChatRenderMessage };
+
+interface ChatRenderMessage {
+  id: string;
+  uid: string;
+  displayName: string;
+  level?: number;
+  vipLevel?: number;
+  guildTag?: string;
+  text: string;
+  sentAt: number;
+}
 
 function dayKey(ts: number): string {
   return new Date(ts).toISOString().slice(0, 10);
@@ -24,15 +36,22 @@ interface ChatSectionProps {
   onlineCount: number;
   mutedUntil: number | null;
   messages: GlobalChatMessage[];
+  guildMessages: GuildChatMessage[];
+  hasGuild: boolean;
   isLoading: boolean;
   meUid: string;
   isAdmin: boolean;
   sending: boolean;
+  guildSending: boolean;
   draft: string;
   setDraft: (value: string) => void;
+  guildDraft: string;
+  setGuildDraft: (value: string) => void;
   error: string | null;
+  guildError: string | null;
   formatTime: (ts: number) => string;
   onSend: () => Promise<void>;
+  onSendGuild: () => Promise<void>;
   onOpenUserMenu: (item: GlobalChatMessage) => void;
   onOpenProfile: (uid: string) => void;
   onMute: (targetUid: string, durationMs: number, reason: string) => Promise<void>;
@@ -45,32 +64,67 @@ export function ChatSection({
   onlineCount,
   mutedUntil,
   messages,
+  guildMessages,
+  hasGuild,
   isLoading,
   meUid,
   isAdmin,
   sending,
+  guildSending,
   draft,
   setDraft,
+  guildDraft,
+  setGuildDraft,
   error,
+  guildError,
   formatTime,
   onSend,
+  onSendGuild,
   onOpenUserMenu,
   onOpenProfile,
   onMute,
   meDisplayName,
   meLevel,
 }: ChatSectionProps) {
+  const [activeChannel, setActiveChannel] = useState<'global' | 'guild' | 'party'>('global');
   const listRef = useRef<FlatList<ChatListRow> | null>(null);
-  const prevMessageCountRef = useRef(messages.length);
+  const prevCountByChannelRef = useRef<{ global: number; guild: number; party: number }>({
+    global: messages.length,
+    guild: guildMessages.length,
+    party: 0,
+  });
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  const activeSourceMessages = useMemo<ChatRenderMessage[]>(() => {
+    if (activeChannel === 'guild') {
+      return guildMessages.map(message => ({
+        id: message.id,
+        uid: message.uid,
+        displayName: message.displayName,
+        text: message.text,
+        sentAt: message.sentAt,
+      }));
+    }
+    if (activeChannel === 'party') return [];
+    return messages.map(message => ({
+      id: message.id,
+      uid: message.uid,
+      displayName: message.displayName,
+      level: message.level,
+      vipLevel: message.vipLevel,
+      guildTag: message.guildTag,
+      text: message.text,
+      sentAt: message.sentAt,
+    }));
+  }, [activeChannel, guildMessages, messages]);
+
   const rows = useMemo<ChatListRow[]>(() => {
     const nextRows: ChatListRow[] = [];
-    let previous: GlobalChatMessage | null = null;
+    let previous: ChatRenderMessage | null = null;
     let previousDay = '';
 
-    for (const message of messages) {
+    for (const message of activeSourceMessages) {
       const currentDay = dayKey(message.sentAt);
       if (currentDay !== previousDay) {
         previousDay = currentDay;
@@ -92,6 +146,7 @@ export function ChatSection({
         showHeader,
         mine: message.uid === meUid,
         compact: !showHeader,
+        source: activeChannel === 'guild' ? 'guild' : 'global',
         message,
       });
 
@@ -99,7 +154,7 @@ export function ChatSection({
     }
 
     return nextRows;
-  }, [messages, meUid]);
+  }, [activeChannel, activeSourceMessages, meUid]);
 
   const scrollToLatest = (animated = true) => {
     requestAnimationFrame(() => {
@@ -119,8 +174,8 @@ export function ChatSection({
 
   useEffect(() => {
     if (!rows.length) return;
-    const previous = prevMessageCountRef.current;
-    const next = messages.length;
+    const previous = prevCountByChannelRef.current[activeChannel];
+    const next = activeSourceMessages.length;
     const appended = Math.max(0, next - previous);
 
     if (appended > 0 && !isNearBottom) {
@@ -130,8 +185,29 @@ export function ChatSection({
       setUnreadCount(0);
     }
 
-    prevMessageCountRef.current = next;
-  }, [isNearBottom, messages.length, rows.length]);
+    prevCountByChannelRef.current[activeChannel] = next;
+  }, [activeChannel, activeSourceMessages.length, isNearBottom, rows.length]);
+
+  useEffect(() => {
+    setUnreadCount(0);
+    setIsNearBottom(true);
+    scrollToLatest(false);
+  }, [activeChannel]);
+
+  const activeDraft = activeChannel === 'guild' ? guildDraft : draft;
+  const setActiveDraft = activeChannel === 'guild' ? setGuildDraft : setDraft;
+  const activeSending = activeChannel === 'guild' ? guildSending : sending;
+  const activeError = activeChannel === 'guild' ? guildError : error;
+
+  const sendActiveMessage = () => {
+    if (activeChannel === 'guild') {
+      if (!hasGuild) return;
+      void onSendGuild();
+      return;
+    }
+    if (activeChannel === 'party') return;
+    void onSend();
+  };
 
   return (
     <>
@@ -144,23 +220,40 @@ export function ChatSection({
 
       <View style={[styles.card, styles.chatShell]}>
         <View style={styles.chatChannelRow}>
-          <View style={[styles.chatChannelChip, styles.chatChannelChipActive]}>
-            <Text style={[styles.chatChannelChipText, styles.chatChannelChipTextActive]}>Global</Text>
-          </View>
-          <View style={styles.chatChannelChip}>
-            <Text style={styles.chatChannelChipText}>Guild</Text>
-          </View>
-          <View style={styles.chatChannelChip}>
-            <Text style={styles.chatChannelChipText}>Party</Text>
-          </View>
+          <Pressable
+            style={[styles.chatChannelChip, activeChannel === 'global' && styles.chatChannelChipActive]}
+            onPress={() => setActiveChannel('global')}
+          >
+            <Text style={[styles.chatChannelChipText, activeChannel === 'global' && styles.chatChannelChipTextActive]}>Global</Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.chatChannelChip,
+              activeChannel === 'guild' && styles.chatChannelChipActive,
+              !hasGuild && styles.sendBtnDisabled,
+            ]}
+            onPress={() => {
+              if (!hasGuild) return;
+              setActiveChannel('guild');
+            }}
+          >
+            <Text style={[styles.chatChannelChipText, activeChannel === 'guild' && styles.chatChannelChipTextActive]}>Guild</Text>
+          </Pressable>
+          <Pressable style={[styles.chatChannelChip, styles.sendBtnDisabled]} disabled>
+            <Text style={styles.chatChannelChipText}>Party (Soon)</Text>
+          </Pressable>
         </View>
 
         <SocialAsyncState
           styles={styles}
           isLoading={isLoading}
-          isEmpty={messages.length === 0}
-          emptyTitle="No Messages Yet"
-          emptySubtitle="Start the conversation and rally your alliance."
+          isEmpty={activeSourceMessages.length === 0}
+          emptyTitle={activeChannel === 'guild' ? 'No Guild Messages Yet' : 'No Messages Yet'}
+          emptySubtitle={
+            activeChannel === 'guild'
+              ? (hasGuild ? 'Kick off the strategy in guild channel.' : 'Join a guild to unlock guild chat channel.')
+              : 'Start the conversation and rally your alliance.'
+          }
           variant="inline"
         />
 
@@ -212,7 +305,9 @@ export function ChatSection({
                   {item.showHeader ? (
                     <View style={styles.chatHeaderRow}>
                       <Text style={styles.chatName} numberOfLines={1} ellipsizeMode="tail">
-                        {message.displayName} Lv.{message.level} VIP {message.vipLevel}{message.guildTag ? ` [${message.guildTag}]` : ''}
+                        {item.source === 'global'
+                          ? `${message.displayName} Lv.${message.level ?? 1} VIP ${message.vipLevel ?? 0}${message.guildTag ? ` [${message.guildTag}]` : ''}`
+                          : `${message.displayName} [Guild]`}
                       </Text>
                       <Text style={styles.chatTime}>{formatTime(message.sentAt)}</Text>
                     </View>
@@ -220,7 +315,7 @@ export function ChatSection({
                     <Text style={styles.chatTimeCompact}>{formatTime(message.sentAt)}</Text>
                   )}
                   <Text style={styles.chatText}>{message.text}</Text>
-                  {isAdmin && !item.mine && (
+                  {isAdmin && !item.mine && item.source === 'global' && (
                     <View style={styles.muteActionsRow}>
                       <Pressable style={styles.muteBtn} onPress={() => void onMute(message.uid, 60 * 60 * 1000, 'Muted by admin (1h)')}>
                         <Text style={styles.muteBtnText}>Mute 1h</Text>
@@ -249,25 +344,32 @@ export function ChatSection({
         )}
 
         <View style={styles.chatComposerWrap}>
-          <Text style={styles.metaText}>Message as {meDisplayName} (Lv.{meLevel})</Text>
+          <Text style={styles.metaText}>
+            {activeChannel === 'guild'
+              ? `Guild channel as ${meDisplayName}`
+              : `Message as ${meDisplayName} (Lv.${meLevel})`}
+          </Text>
           <View style={styles.chatComposerRow}>
             <SocialInput
               styles={styles}
               style={styles.chatComposerInput}
-              value={draft}
-              onChangeText={setDraft}
-              placeholder="Type a message..."
-              maxLength={500}
-              editable={!sending && !(mutedUntil && mutedUntil > Date.now())}
+              value={activeDraft}
+              onChangeText={setActiveDraft}
+              placeholder={activeChannel === 'guild' ? 'Message guild...' : 'Type a message...'}
+              maxLength={activeChannel === 'guild' ? 300 : 500}
+              editable={activeChannel === 'guild'
+                ? hasGuild && !guildSending
+                : !sending && !(mutedUntil && mutedUntil > Date.now())
+              }
             />
             <SocialPrimaryButton
               styles={styles}
-              label={sending ? '...' : 'Send'}
-              onPress={() => void onSend()}
-              disabled={sending || !draft.trim()}
+              label={activeSending ? '...' : 'Send'}
+              onPress={sendActiveMessage}
+              disabled={activeSending || !activeDraft.trim() || (activeChannel === 'guild' && !hasGuild) || activeChannel === 'party'}
             />
           </View>
-          <SocialAsyncState styles={styles} error={error} variant="inline" />
+          <SocialAsyncState styles={styles} error={activeError} variant="inline" />
         </View>
       </View>
     </>
