@@ -12,6 +12,15 @@ import {
 import { getFirebaseAuth, getFirebaseFirestore, isFirebaseConfigured } from './firebase';
 
 const LEADERBOARD_COLLECTION = 'leaderboard_global_v1';
+const MIN_SUBMIT_INTERVAL_MS = 12_000;
+
+interface SubmitGuardState {
+  inFlight: boolean;
+  lastAttemptAt: number;
+  lastScoreSeen: number;
+}
+
+const submitGuardByUid = new Map<string, SubmitGuardState>();
 
 export interface LeaderboardEntry {
   uid: string;
@@ -76,26 +85,57 @@ export async function submitLeaderboardScore(input: SubmitLeaderboardScoreInput)
   const now = Date.now();
   const score = clampScore(input.score);
 
-  await runTransaction(db, async tx => {
-    const snap = await tx.get(ref);
-    const remoteData = snap.exists() ? snap.data() : null;
-    const remoteScore = remoteData && typeof remoteData.score === 'number' ? clampScore(remoteData.score) : 0;
-    const remoteVipLevel = remoteData && typeof remoteData.vipLevel === 'number' ? Math.max(0, Math.floor(remoteData.vipLevel)) : 0;
-    const nextScore = Math.max(remoteScore, score);
-    const nextVipLevel = Math.max(remoteVipLevel, Math.max(0, Math.floor(input.vipLevel || 0)));
+  const guard = submitGuardByUid.get(uid) ?? {
+    inFlight: false,
+    lastAttemptAt: 0,
+    lastScoreSeen: 0,
+  };
 
-    tx.set(ref, {
-      uid,
-      accountName: input.accountName.trim().toLowerCase().slice(0, 48),
-      publicUsername: input.publicUsername.trim().slice(0, 24) || 'Commander',
-      score: nextScore,
-      level: clampLevel(input.level),
-      vipLevel: nextVipLevel,
-      highestWaveReached: clampScore(input.highestWaveReached),
-      prestigeCount: clampScore(input.prestigeCount),
-      updatedAt: now,
+  if (guard.inFlight) return;
+  if (now - guard.lastAttemptAt < MIN_SUBMIT_INTERVAL_MS && score <= guard.lastScoreSeen) {
+    return;
+  }
+
+  guard.inFlight = true;
+  guard.lastAttemptAt = now;
+  guard.lastScoreSeen = Math.max(guard.lastScoreSeen, score);
+  submitGuardByUid.set(uid, guard);
+
+  try {
+    await runTransaction(db, async tx => {
+      const snap = await tx.get(ref);
+      const remoteData = snap.exists() ? snap.data() : null;
+      const remoteScore = remoteData && typeof remoteData.score === 'number' ? clampScore(remoteData.score) : 0;
+      const remoteVipLevel = remoteData && typeof remoteData.vipLevel === 'number' ? Math.max(0, Math.floor(remoteData.vipLevel)) : 0;
+      const nextScore = Math.max(remoteScore, score);
+      const nextVipLevel = Math.max(remoteVipLevel, Math.max(0, Math.floor(input.vipLevel || 0)));
+
+      tx.set(ref, {
+        uid,
+        accountName: input.accountName.trim().toLowerCase().slice(0, 48),
+        publicUsername: input.publicUsername.trim().slice(0, 24) || 'Commander',
+        score: nextScore,
+        level: clampLevel(input.level),
+        vipLevel: nextVipLevel,
+        highestWaveReached: clampScore(input.highestWaveReached),
+        prestigeCount: clampScore(input.prestigeCount),
+        updatedAt: now,
+      });
     });
-  });
+  } catch (error) {
+    const code = typeof error === 'object' && error && 'code' in error ? String((error as { code: unknown }).code) : '';
+    if (code.includes('failed-precondition') || code.includes('aborted')) {
+      // Firestore transaction retries can emit transient precondition errors under contention.
+      return;
+    }
+    throw error;
+  } finally {
+    const current = submitGuardByUid.get(uid);
+    if (current) {
+      current.inFlight = false;
+      submitGuardByUid.set(uid, current);
+    }
+  }
 }
 
 export async function fetchLeaderboardTop(maxRows = 25): Promise<LeaderboardEntry[]> {
