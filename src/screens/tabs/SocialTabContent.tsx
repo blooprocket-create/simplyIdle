@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { THEME, RADIUS } from '../../theme';
 import {
   GlobalChatMessage,
@@ -13,10 +13,12 @@ import { getFirebaseAuth } from '../../services/firebase';
 import {
   acceptFriendRequest,
   declineFriendRequest,
+  fetchFriendRelationshipStatus,
   fetchFriends,
   fetchGiftCooldowns,
   fetchPendingRequests,
   fetchFriendProfile,
+  FriendRelationshipStatus,
   removeFriend,
   sendFriendRequest,
   sendGift,
@@ -58,6 +60,7 @@ export interface SocialTabContentProps {
   accountName: string;
   publicUsername: string;
   level: number;
+  vipLevel: number;
   diamonds: number;
   saveSlotId: string;
   isAdmin: boolean;
@@ -73,7 +76,7 @@ function formatTime(ts: number): string {
 }
 
 function giftIcon(pref: GiftPreference): string {
-  if (pref === 'shards') return '💎';
+  if (pref === 'shards') return '💠';
   if (pref === 'essence') return '✨';
   return '💰';
 }
@@ -97,6 +100,7 @@ export function SocialTabContent({
   accountName,
   publicUsername,
   level,
+  vipLevel,
   diamonds,
   saveSlotId,
   isAdmin,
@@ -129,6 +133,8 @@ export function SocialTabContent({
   const [guildEvents, setGuildEvents] = useState<GuildEventState[]>([]);
   const [guildChat, setGuildChat] = useState<GuildChatMessage[]>([]);
   const [guildChatDraft, setGuildChatDraft] = useState('');
+  const [activeUserMenu, setActiveUserMenu] = useState<GlobalChatMessage | null>(null);
+  const [activeUserRelationship, setActiveUserRelationship] = useState<FriendRelationshipStatus>('none');
 
   const me = useMemo(() => {
     const authUid = getFirebaseAuth()?.currentUser?.uid ?? '';
@@ -136,8 +142,9 @@ export function SocialTabContent({
       uid: authUid,
       name: (publicUsername || accountName).trim() || 'Player',
       level: Math.max(1, Math.floor(level || 1)),
+      vipLevel: Math.max(0, Math.floor(vipLevel || 0)),
     };
-  }, [accountName, publicUsername, level]);
+  }, [accountName, publicUsername, level, vipLevel]);
 
   useEffect(() => {
     if (tab !== 'social') return;
@@ -240,6 +247,17 @@ export function SocialTabContent({
     return stop;
   }, [me.uid, myGuild?.guildId, subTab, tab]);
 
+  useEffect(() => {
+    if (!me.uid || !activeUserMenu?.uid) {
+      setActiveUserRelationship('none');
+      return;
+    }
+
+    void fetchFriendRelationshipStatus(me.uid, activeUserMenu.uid)
+      .then(setActiveUserRelationship)
+      .catch(() => setActiveUserRelationship('none'));
+  }, [activeUserMenu?.uid, me.uid]);
+
   if (tab !== 'social') return null;
 
   const send = async () => {
@@ -257,7 +275,7 @@ export function SocialTabContent({
     setError(null);
     setSending(true);
     try {
-      await sendChatMessage(me.uid, me.name, me.level, draft);
+      await sendChatMessage(me.uid, me.name, me.level, draft, me.vipLevel);
       setDraft('');
       setLastSendAt(now);
     } catch (err) {
@@ -389,6 +407,20 @@ export function SocialTabContent({
     }
   };
 
+  const addFriendLabel = activeUserRelationship === 'friends'
+    ? 'Already Friends'
+    : activeUserRelationship === 'outgoing'
+      ? 'Request Sent'
+      : activeUserRelationship === 'incoming'
+        ? 'Incoming Request'
+        : 'Add Friend';
+
+  const canAddFriendFromMenu =
+    !!activeUserMenu
+    && activeUserMenu.uid !== me.uid
+    && activeUserRelationship === 'none'
+    && !friendsBusy;
+
   return (
     <View style={styles.root}>
       <View style={styles.subTabRow}>
@@ -420,9 +452,17 @@ export function SocialTabContent({
               renderItem={({ item }) => {
                 const mine = item.uid === me.uid;
                 return (
-                  <View style={[styles.chatRow, mine && styles.chatRowMine]}>
+                  <Pressable
+                    style={[styles.chatRow, mine && styles.chatRowMine]}
+                    onPress={() => {
+                      if (mine) return;
+                      setActiveUserMenu(item);
+                    }}
+                  >
                     <View style={styles.chatHeaderRow}>
-                      <Text style={styles.chatName}>{item.displayName} Lv.{item.level}</Text>
+                      <Text style={styles.chatName}>
+                        {item.displayName} Lv.{item.level} VIP {item.vipLevel}{item.guildTag ? ` [${item.guildTag}]` : ''}
+                      </Text>
                       <Text style={styles.chatTime}>{formatTime(item.sentAt)}</Text>
                     </View>
                     <Text style={styles.chatText}>{item.text}</Text>
@@ -439,7 +479,7 @@ export function SocialTabContent({
                         </Pressable>
                       </View>
                     )}
-                  </View>
+                  </Pressable>
                 );
               }}
             />
@@ -1056,6 +1096,43 @@ export function SocialTabContent({
 
         </>
       )}
+
+      <Modal
+        visible={!!activeUserMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActiveUserMenu(null)}
+      >
+        <Pressable style={styles.userMenuBackdrop} onPress={() => setActiveUserMenu(null)}>
+          <Pressable style={styles.userMenuCard} onPress={() => {}}>
+            <Text style={styles.cardTitle}>{activeUserMenu?.displayName ?? 'Player'}</Text>
+            <Text style={styles.metaText}>
+              Lv.{activeUserMenu?.level ?? 1} VIP {activeUserMenu?.vipLevel ?? 0}{activeUserMenu?.guildTag ? ` • Guild [${activeUserMenu.guildTag}]` : ''}
+            </Text>
+            <Pressable
+              style={[styles.sendBtn, !canAddFriendFromMenu && styles.sendBtnDisabled]}
+              onPress={async () => {
+                if (!me.uid || !activeUserMenu?.displayName || !canAddFriendFromMenu) return;
+                setFriendsBusy(true);
+                setError(null);
+                try {
+                  await sendFriendRequest(me.uid, me.name, activeUserMenu.displayName);
+                  setActiveUserRelationship('outgoing');
+                } catch (err) {
+                  const msg = err instanceof Error ? err.message : 'Failed to send friend request.';
+                  setError(msg);
+                } finally {
+                  setFriendsBusy(false);
+                  setActiveUserMenu(null);
+                }
+              }}
+              disabled={!canAddFriendFromMenu}
+            >
+              <Text style={styles.sendBtnText}>{addFriendLabel}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -1261,5 +1338,22 @@ const styles = StyleSheet.create({
     color: THEME.text.primary,
     fontWeight: '700',
     fontSize: 12,
+  },
+  userMenuBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(4, 8, 16, 0.62)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  userMenuCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#121A2A',
+    borderWidth: 1,
+    borderColor: THEME.surface.border,
+    borderRadius: RADIUS.md,
+    padding: 12,
+    gap: 10,
   },
 });

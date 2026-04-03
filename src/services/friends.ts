@@ -22,6 +22,8 @@ export interface GiftCooldownEntry {
   lastGiftSentAt: number;
 }
 
+export type FriendRelationshipStatus = 'self' | 'friends' | 'outgoing' | 'incoming' | 'none';
+
 interface MailAttachmentShape {
   shards: number;
   gold: number;
@@ -144,6 +146,23 @@ export async function fetchGiftCooldowns(uid: string): Promise<Record<string, nu
     result[friendUid] = typeof data.lastGiftSentAt === 'number' ? data.lastGiftSentAt : 0;
   });
   return result;
+}
+
+export async function fetchFriendRelationshipStatus(uid: string, targetUid: string): Promise<FriendRelationshipStatus> {
+  const db = getFirebaseFirestore();
+  if (!db || !uid || !targetUid) return 'none';
+  if (uid === targetUid) return 'self';
+
+  const [friendSnap, outgoingSnap, incomingSnap] = await Promise.all([
+    getDoc(doc(db, 'friends', uid, 'list', targetUid)),
+    getDoc(doc(db, 'friends', uid, 'outgoing', targetUid)),
+    getDoc(doc(db, 'friends', uid, 'requests', targetUid)),
+  ]);
+
+  if (friendSnap.exists()) return 'friends';
+  if (outgoingSnap.exists()) return 'outgoing';
+  if (incomingSnap.exists()) return 'incoming';
+  return 'none';
 }
 
 export function subscribePendingRequestCount(uid: string, onCount: (count: number) => void): () => void {
