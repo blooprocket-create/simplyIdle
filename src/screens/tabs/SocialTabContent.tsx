@@ -424,13 +424,44 @@ export function SocialTabContent({
     && activeUserRelationship === 'none'
     && !friendsBusy;
 
+  const socialPulse = mutedUntil && mutedUntil > Date.now()
+    ? 'Muted'
+    : sending || friendsBusy || guildBusy
+      ? 'Syncing'
+      : 'Live';
+
+  const activeGuildLabel = myGuild ? `[${myGuild.tag}] ${myGuild.name}` : 'No Guild';
+
   return (
     <View style={styles.root}>
+      <View style={styles.heroCard}>
+        <View style={styles.heroTitleRow}>
+          <Text style={styles.heroTitle}>Social Nexus</Text>
+          <Text style={styles.heroPulse}>{socialPulse}</Text>
+        </View>
+        <Text style={styles.heroSubtitle}>Build alliances, coordinate your guild, and stay visible in global chat.</Text>
+        <View style={styles.heroMetaRow}>
+          <View style={styles.heroChip}>
+            <Text style={styles.heroChipLabel}>Online</Text>
+            <Text style={styles.heroChipValue}>{onlineCount}</Text>
+          </View>
+          <View style={styles.heroChip}>
+            <Text style={styles.heroChipLabel}>Requests</Text>
+            <Text style={styles.heroChipValue}>{pendingRequests.length}</Text>
+          </View>
+          <View style={styles.heroChipWide}>
+            <Text style={styles.heroChipLabel}>Guild</Text>
+            <Text style={styles.heroChipValue}>{activeGuildLabel}</Text>
+          </View>
+        </View>
+      </View>
+
       <View style={styles.subTabRow}>
         <Pressable style={[styles.subTabBtn, subTab === 'chat' && styles.subTabBtnActive]} onPress={() => setSubTab('chat')}>
           <Text style={[styles.subTabText, subTab === 'chat' && styles.subTabTextActive]}>Chat</Text>
         </Pressable>
         <Pressable style={[styles.subTabBtn, subTab === 'friends' && styles.subTabBtnActive]} onPress={() => setSubTab('friends')}>
+          {!!pendingRequests.length && <View style={styles.subTabDot} />}
           <Text style={[styles.subTabText, subTab === 'friends' && styles.subTabTextActive]}>Friends</Text>
         </Pressable>
         <Pressable style={[styles.subTabBtn, subTab === 'guild' && styles.subTabBtnActive]} onPress={() => setSubTab('guild')}>
@@ -442,13 +473,14 @@ export function SocialTabContent({
         <>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Global Chat</Text>
-            <Text style={styles.metaText}>Online now: {onlineCount}</Text>
+            <Text style={styles.metaText}>Online now: {onlineCount} • Real-time feed</Text>
             {mutedUntil && mutedUntil > Date.now() && (
               <Text style={styles.mutedText}>You are muted until {new Date(mutedUntil).toLocaleString()}.</Text>
             )}
           </View>
 
           <View style={[styles.card, styles.chatListCard]}>
+            {messages.length === 0 && <Text style={styles.metaText}>No messages yet. Start the conversation.</Text>}
             <FlatList
               data={messages}
               keyExtractor={item => item.id}
@@ -489,6 +521,7 @@ export function SocialTabContent({
           </View>
 
           <View style={styles.card}>
+            <Text style={styles.metaText}>Message as {me.name} (Lv.{me.level})</Text>
             <TextInput
               value={draft}
               onChangeText={setDraft}
@@ -514,6 +547,7 @@ export function SocialTabContent({
         <>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>My Gift Preference</Text>
+            <Text style={styles.metaText}>Set what friends send you at daily reset.</Text>
             <View style={styles.prefRow}>
               {(['gold', 'shards', 'essence'] as GiftPreference[]).map(pref => (
                 <Pressable
@@ -530,6 +564,7 @@ export function SocialTabContent({
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Add Friend</Text>
+            <Text style={styles.metaText}>Search by exact public username.</Text>
             <TextInput
               value={friendSearch}
               onChangeText={setFriendSearch}
@@ -565,6 +600,12 @@ export function SocialTabContent({
                   </View>
                 </View>
               ))}
+            </View>
+          )}
+
+          {pendingRequests.length === 0 && (
+            <View style={styles.card}>
+              <Text style={styles.metaText}>No pending requests right now.</Text>
             </View>
           )}
 
@@ -622,6 +663,7 @@ export function SocialTabContent({
             <Text style={styles.cardTitle}>Guild Command</Text>
             <Text style={styles.metaText}>Create Guild Cost: 2,500 Diamonds.</Text>
             <Text style={styles.metaText}>Your Diamonds: {diamonds}</Text>
+            {guildBusy && <Text style={styles.metaText}>Syncing guild actions...</Text>}
             {!!error && <Text style={styles.errorText}>{error}</Text>}
           </View>
 
@@ -716,6 +758,7 @@ export function SocialTabContent({
 
           {myGuild && guildSubTab === 'home' && (
             <View style={styles.card}>
+              <Text style={styles.metaText}>Guild profile and members</Text>
               <Text style={styles.metaText}>{myGuild.description || 'No description set.'}</Text>
               <Text style={styles.metaText}>Leader: {myGuild.leaderName} • Members: {myGuild.memberCount}/{myGuild.maxMembers}</Text>
               <Text style={styles.metaText}>Min Join Level: {myGuild.minLevelToJoin} • Public: {myGuild.isPublic ? 'Yes' : 'No'}</Text>
@@ -871,6 +914,7 @@ export function SocialTabContent({
           {myGuild && guildSubTab === 'events' && (
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Guild Events</Text>
+              <Text style={styles.metaText}>Coordinate and contribute before event timers expire.</Text>
               {myGuild.leaderId === me.uid && (
                 <View style={styles.friendActions}>
                   <Pressable
@@ -962,7 +1006,9 @@ export function SocialTabContent({
           {myGuild && guildSubTab === 'chat' && (
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Guild Chat</Text>
+              <Text style={styles.metaText}>Tactical channel for your guild.</Text>
               <View style={[styles.card, styles.chatListCard]}>
+                {guildChat.length === 0 && <Text style={styles.metaText}>No guild messages yet.</Text>}
                 <FlatList
                   data={guildChat}
                   keyExtractor={item => item.id}
@@ -1244,53 +1290,141 @@ const styles = StyleSheet.create({
   root: {
     gap: 12,
   },
+  heroCard: {
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: '#2A5A84',
+    backgroundColor: '#0E1A2A',
+    padding: 14,
+    gap: 10,
+  },
+  heroTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  heroTitle: {
+    color: '#E9F4FF',
+    fontSize: 17,
+    fontWeight: '900',
+    letterSpacing: 0.2,
+  },
+  heroPulse: {
+    color: '#A4FFD6',
+    backgroundColor: 'rgba(40, 140, 105, 0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(125, 234, 188, 0.45)',
+    borderRadius: 999,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    overflow: 'hidden',
+  },
+  heroSubtitle: {
+    color: '#9EC1DE',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  heroMetaRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  heroChip: {
+    minWidth: 88,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: '#33526D',
+    backgroundColor: '#142436',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 2,
+  },
+  heroChipWide: {
+    flex: 1,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: '#33526D',
+    backgroundColor: '#142436',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 2,
+  },
+  heroChipLabel: {
+    color: '#9CB9D1',
+    fontSize: 10,
+    textTransform: 'uppercase',
+    fontWeight: '700',
+  },
+  heroChipValue: {
+    color: '#F1FAFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
   subTabRow: {
     flexDirection: 'row',
     gap: 8,
   },
   subTabBtn: {
+    position: 'relative',
     flex: 1,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: THEME.surface.border,
-    paddingVertical: 8,
+    borderColor: '#314B63',
+    paddingVertical: 9,
     alignItems: 'center',
-    backgroundColor: THEME.bg.tertiary,
+    backgroundColor: '#101D2B',
   },
   subTabBtnActive: {
-    borderColor: THEME.status.info,
-    backgroundColor: '#132235',
+    borderColor: '#83D0FF',
+    backgroundColor: '#17314A',
+    shadowColor: '#56B4FF',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  subTabDot: {
+    position: 'absolute',
+    top: 5,
+    right: 7,
+    width: 7,
+    height: 7,
+    borderRadius: 99,
+    backgroundColor: '#FF5A7A',
   },
   subTabText: {
-    color: THEME.text.secondary,
+    color: '#AFC3D6',
     fontWeight: '700',
+    fontSize: 12,
   },
   subTabTextActive: {
-    color: THEME.text.primary,
+    color: '#F2FAFF',
   },
   card: {
-    backgroundColor: THEME.bg.tertiary,
+    backgroundColor: '#111D2A',
     borderWidth: 1,
-    borderColor: THEME.surface.border,
-    borderRadius: RADIUS.md,
+    borderColor: '#2B4258',
+    borderRadius: RADIUS.lg,
     padding: 12,
-    gap: 8,
+    gap: 10,
   },
   chatListCard: {
     minHeight: 260,
-    maxHeight: 340,
+    maxHeight: 360,
+    backgroundColor: '#0B1520',
   },
   cardTitle: {
-    color: THEME.text.primary,
+    color: '#E8F3FF',
     fontSize: 16,
     fontWeight: '800',
+    letterSpacing: 0.2,
   },
   metaText: {
-    color: THEME.text.tertiary,
+    color: '#9AB4CA',
     fontSize: 12,
   },
   cooldownText: {
-    color: '#9ED4FF',
+    color: '#9DD8FF',
     fontSize: 11,
     marginTop: 3,
   },
@@ -1301,33 +1435,36 @@ const styles = StyleSheet.create({
   },
   chatRow: {
     borderWidth: 1,
-    borderColor: THEME.surface.border,
-    borderRadius: RADIUS.sm,
-    padding: 8,
-    marginBottom: 8,
-    backgroundColor: '#111626',
+    borderColor: '#2A415A',
+    borderRadius: RADIUS.md,
+    padding: 10,
+    marginBottom: 10,
+    backgroundColor: '#121F2E',
   },
   chatRowMine: {
-    borderColor: THEME.status.info,
-    backgroundColor: '#18253A',
+    borderColor: '#7CC3FF',
+    backgroundColor: '#1A2F45',
   },
   chatHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 5,
+    gap: 8,
   },
   chatName: {
-    color: THEME.text.primary,
+    flex: 1,
+    color: '#EAF6FF',
     fontWeight: '700',
     fontSize: 12,
   },
   chatTime: {
-    color: THEME.text.tertiary,
+    color: '#87A6BF',
     fontSize: 11,
   },
   chatText: {
-    color: THEME.text.primary,
+    color: '#D5E6F5',
     fontSize: 13,
+    lineHeight: 19,
   },
   muteBtn: {
     alignSelf: 'flex-start',
@@ -1353,26 +1490,29 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: THEME.surface.border,
-    borderRadius: RADIUS.sm,
-    backgroundColor: '#0E1422',
-    color: THEME.text.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    borderColor: '#33506A',
+    borderRadius: RADIUS.md,
+    backgroundColor: '#091320',
+    color: '#E8F5FF',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   sendBtn: {
     alignSelf: 'flex-end',
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: THEME.status.success,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 15,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: '#67E6B6',
+    backgroundColor: '#79F0C6',
   },
   sendBtnDisabled: {
     opacity: 0.5,
   },
   sendBtnText: {
-    color: '#051018',
+    color: '#053024',
     fontWeight: '800',
+    fontSize: 12,
   },
   errorText: {
     color: '#FF8694',
@@ -1385,28 +1525,28 @@ const styles = StyleSheet.create({
   prefBtn: {
     flex: 1,
     borderWidth: 1,
-    borderColor: THEME.surface.border,
-    borderRadius: RADIUS.sm,
+    borderColor: '#304960',
+    borderRadius: RADIUS.md,
     paddingVertical: 8,
     alignItems: 'center',
-    backgroundColor: '#101726',
+    backgroundColor: '#0E1A29',
   },
   prefBtnActive: {
-    borderColor: THEME.status.info,
-    backgroundColor: '#1A2A40',
+    borderColor: '#8CCBFF',
+    backgroundColor: '#1C3550',
   },
   prefBtnText: {
-    color: THEME.text.primary,
+    color: '#DCEEFF',
     fontWeight: '700',
     fontSize: 12,
     textTransform: 'capitalize',
   },
   friendRow: {
     borderWidth: 1,
-    borderColor: THEME.surface.border,
-    borderRadius: RADIUS.sm,
-    padding: 8,
-    backgroundColor: '#111626',
+    borderColor: '#2F465D',
+    borderRadius: RADIUS.md,
+    padding: 9,
+    backgroundColor: '#122133',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1417,7 +1557,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   friendName: {
-    color: THEME.text.primary,
+    color: '#E8F5FF',
     fontWeight: '700',
     fontSize: 13,
   },
@@ -1427,18 +1567,18 @@ const styles = StyleSheet.create({
   },
   smallBtn: {
     borderWidth: 1,
-    borderColor: THEME.status.info,
-    borderRadius: RADIUS.sm,
+    borderColor: '#7EC8FF',
+    borderRadius: RADIUS.md,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#15304A',
+    backgroundColor: '#1B3C5C',
   },
   smallBtnDanger: {
-    borderColor: THEME.status.error,
-    backgroundColor: '#3A1520',
+    borderColor: '#FF7A90',
+    backgroundColor: '#4D2230',
   },
   smallBtnText: {
-    color: THEME.text.primary,
+    color: '#F2FAFF',
     fontWeight: '700',
     fontSize: 12,
   },
@@ -1452,10 +1592,10 @@ const styles = StyleSheet.create({
   userMenuCard: {
     width: '100%',
     maxWidth: 360,
-    backgroundColor: '#121A2A',
+    backgroundColor: '#132133',
     borderWidth: 1,
-    borderColor: THEME.surface.border,
-    borderRadius: RADIUS.md,
+    borderColor: '#35516A',
+    borderRadius: RADIUS.lg,
     padding: 12,
     gap: 10,
   },
@@ -1469,10 +1609,10 @@ const styles = StyleSheet.create({
   confirmCard: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: '#121A2A',
+    backgroundColor: '#132133',
     borderWidth: 1,
-    borderColor: THEME.surface.border,
-    borderRadius: RADIUS.md,
+    borderColor: '#35516A',
+    borderRadius: RADIUS.lg,
     padding: 16,
     gap: 12,
   },
@@ -1487,7 +1627,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   confirmText: {
-    color: THEME.text.secondary,
+    color: '#C8DAEA',
     fontSize: 14,
   },
   confirmWarning: {
@@ -1507,8 +1647,8 @@ const styles = StyleSheet.create({
   },
   confirmBtnCancel: {
     borderWidth: 1,
-    borderColor: THEME.surface.border,
-    backgroundColor: '#151D2A',
+    borderColor: '#46627B',
+    backgroundColor: '#1A2A3D',
   },
   confirmBtnDanger: {
     backgroundColor: THEME.status.error,
