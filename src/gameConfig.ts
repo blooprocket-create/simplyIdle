@@ -11,6 +11,14 @@ export type PlayerClass =
 
 export type GameTab = 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment';
 
+export type GiftPreference = 'gold' | 'shards' | 'essence';
+
+export const GIFT_AMOUNTS = {
+  gold: (level: number) => Math.max(1, Math.floor(level)) * 1000,
+  shards: (level: number) => Math.max(1, Math.floor(level)) * 10,
+  essence: (level: number) => Math.max(1, Math.floor(level)) * 5,
+} as const;
+
 export type StatKey = 'strength' | 'vitality' | 'agility' | 'intelligence' | 'spirit';
 
 export interface StatBlock {

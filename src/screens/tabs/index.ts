@@ -21,3 +21,6 @@ export type { AchievementsTabContentProps } from './AchievementsTabContent';
 
 export { OperationsTabContent } from './OperationsTabContent';
 export type { OperationsTabContentProps } from './OperationsTabContent';
+
+export { SocialTabContent } from './SocialTabContent';
+export type { SocialTabContentProps } from './SocialTabContent';

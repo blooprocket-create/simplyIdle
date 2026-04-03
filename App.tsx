@@ -5,6 +5,8 @@ import GameScreen from './src/screens/GameScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import { debugLog, identifyTelemetryDevice, initTelemetry, trackEvent, trackTelemetryHeartbeat } from './src/telemetry';
 import { getValidOnlineSession, isOnlineAuthAvailable, logoutOnline } from './src/services/onlineAuth';
+import { getFirebaseAuth } from './src/services/firebase';
+import { markPresenceOffline, startPresenceHeartbeat } from './src/services/presence';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -71,6 +73,18 @@ export default function App() {
     void identifyTelemetryDevice(accountName);
   }, [accountName]);
 
+  useEffect(() => {
+    if (!accountName) return;
+    const uid = getFirebaseAuth()?.currentUser?.uid;
+    if (!uid) return;
+
+    const stop = startPresenceHeartbeat(uid, accountName, 1);
+    return () => {
+      stop();
+      void markPresenceOffline(uid);
+    };
+  }, [accountName]);
+
   if (loading) {
     return (
       <View style={styles.loadingWrap}>
@@ -87,6 +101,10 @@ export default function App() {
     <GameScreen
       accountName={accountName}
       onLogout={async () => {
+        const uid = getFirebaseAuth()?.currentUser?.uid;
+        if (uid) {
+          await markPresenceOffline(uid);
+        }
         if (isOnlineAuthAvailable()) {
           await logoutOnline();
         }

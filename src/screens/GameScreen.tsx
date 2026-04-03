@@ -67,6 +67,7 @@ import {
   EquipmentTabContent,
   AchievementsTabContent,
   OperationsTabContent,
+  SocialTabContent,
 } from './tabs';
 import { styles } from './GameScreen.styles';
 import { isCurrentUserAdmin } from '../services/adminAccess';
@@ -74,10 +75,11 @@ import { normalizeCharacterNameForCompare, releaseCharacterName, reserveCharacte
 import { fetchCurrentUserRank, fetchLeaderboardTop, isLiveLeaderboardAvailable, submitLeaderboardScore } from '../services/leaderboard';
 import { deleteOnlineSave, loadOnlineSave, loadOnlineSaveForUid, writeOnlineSaveForUid } from '../services/onlineSave';
 import { refreshCurrentUserPublicUsername } from '../services/publicProfile';
+import { subscribeToCloudMail } from '../services/cloudMail';
 import { getFirebaseAuth, getFirebaseFirestore } from '../services/firebase';
 import { collectionGroup, getDocs, getDoc, doc as firestoreDoc, setDoc } from 'firebase/firestore';
 
-export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations';
+export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations' | 'social';
 type HeroesSubTab = 'summon' | 'roster' | 'batch';
 type EquipmentSubTab = 'inventory' | 'craft' | 'forge';
 type AchievementsSubTab = 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex';
@@ -1610,6 +1612,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       achievements: hasAchievementsNotification ? 1 : 0,
       equipment: hasEquipmentNotification ? 1 : 0,
       operations: operationsNotificationCount,
+      social: 0,
     };
 
     return (
@@ -1661,6 +1664,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             accountName,
             publicUsername: publicUsername || accountName,
             score: playerBoardScore,
+            level: state.level,
             highestWaveReached: state.highestWaveReached,
             prestigeCount: state.prestigeCount,
           });
@@ -2214,6 +2218,24 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     })();
     return () => { cancelled = true; };
   }, [accountName]);
+
+  useEffect(() => {
+    if (!state.characterCreated) return;
+    const uid = getFirebaseAuth()?.currentUser?.uid;
+    if (!uid) return;
+
+    return subscribeToCloudMail(uid, mails => {
+      const mapped = mails.map(mail => ({
+        id: mail.id,
+        subject: mail.subject,
+        message: mail.message,
+        from: mail.from,
+        sentAt: mail.sentAt,
+        attachments: mail.attachments,
+      }));
+      appendMailboxMessages(mapped);
+    });
+  }, [appendMailboxMessages, state.characterCreated]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2949,6 +2971,16 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             completeExpedition,
             refreshExpeditionContracts,
             renderSubTabBar,
+          } as any)}
+        />
+
+        <SocialTabContent
+          {...({
+            tab,
+            accountName,
+            publicUsername,
+            level: state.level,
+            isAdmin,
           } as any)}
         />
       </ScrollView>

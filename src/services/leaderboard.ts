@@ -18,6 +18,7 @@ export interface LeaderboardEntry {
   accountName: string;
   publicUsername: string;
   score: number;
+  level: number;
   highestWaveReached: number;
   prestigeCount: number;
   updatedAt: number;
@@ -27,6 +28,7 @@ export interface SubmitLeaderboardScoreInput {
   accountName: string;
   publicUsername: string;
   score: number;
+  level: number;
   highestWaveReached: number;
   prestigeCount: number;
 }
@@ -44,6 +46,7 @@ function isEntry(value: unknown): value is LeaderboardEntry {
     && typeof entry.accountName === 'string'
     && typeof entry.publicUsername === 'string'
     && typeof entry.score === 'number'
+    && typeof entry.level === 'number'
     && typeof entry.highestWaveReached === 'number'
     && typeof entry.prestigeCount === 'number'
     && typeof entry.updatedAt === 'number'
@@ -77,6 +80,7 @@ export async function submitLeaderboardScore(input: SubmitLeaderboardScoreInput)
       accountName: input.accountName.trim().toLowerCase().slice(0, 48),
       publicUsername: input.publicUsername.trim().slice(0, 24) || 'Commander',
       score,
+      level: clampScore(input.level),
       highestWaveReached: clampScore(input.highestWaveReached),
       prestigeCount: clampScore(input.prestigeCount),
       updatedAt: now,
