@@ -75,6 +75,18 @@ function parsePositiveInt(raw: string): number {
   return Math.max(0, Math.floor(parsed));
 }
 
+function getEventLifecycleLabel(event: GuildEventState, progressPct: number, nowMs: number): string {
+  if (event.status === 'completed') return 'Completed - Rewards Distributed';
+  if (event.status === 'expired') return 'Expired - Awaiting Relaunch';
+
+  const remainingMs = Math.max(0, event.endsAt - nowMs);
+  if (remainingMs <= 0) return 'Time Window Closed';
+  if (progressPct >= 90) return 'Final Push';
+  if (progressPct >= 50) return 'Operations Ongoing';
+  if (progressPct >= 15) return 'Opening Momentum';
+  return 'Deployment Phase';
+}
+
 interface GuildSectionProps {
   styles: any;
   me: {
@@ -158,6 +170,7 @@ export function GuildSection({
   const [treasuryAmountInput, setTreasuryAmountInput] = useState('50000');
   const [treasuryReasonInput, setTreasuryReasonInput] = useState('');
   const [treasuryLoading, setTreasuryLoading] = useState(false);
+  const [eventLastContributionById, setEventLastContributionById] = useState<Record<string, { amount: number; at: number }>>({});
   const treasuryEnabled = isGuildTreasuryEnabled();
 
   useEffect(() => {
@@ -169,6 +182,7 @@ export function GuildSection({
     setLocalBossCooldownUntil(0);
     setEventCooldownUntilById({});
     setEventContribByEventId({});
+    setEventLastContributionById({});
     setDescriptionDraft(myGuild?.description ?? '');
     setIsEditingDescription(false);
   }, [myGuild?.guildId, me.uid]);
@@ -935,9 +949,11 @@ export function GuildSection({
             const total = Number(event.details[isWar ? 'totalDamage' : 'totalKills'] ?? 0);
             const target = Number(event.details[isWar ? 'targetDamage' : 'targetKills'] ?? 1);
             const pct = Math.min(100, Math.floor((total / Math.max(1, target)) * 100));
+            const lifecycleLabel = getEventLifecycleLabel(event, pct, nowMs);
             const contributors = eventContribByEventId[event.eventId] ?? [];
             const contributorsLoaded = eventContribByEventId[event.eventId] !== undefined;
             const myContributionRow = contributors.find(row => row.uid === me.uid) ?? null;
+            const localContribution = eventLastContributionById[event.eventId] ?? null;
             const persistedCooldownUntil = (myContributionRow?.lastContributedAt ?? 0) + EVENT_CONTRIBUTION_COOLDOWN_MS;
             const localCooldownUntil = eventCooldownUntilById[event.eventId] ?? 0;
             const eventCooldownRemainingMs = Math.max(0, Math.max(persistedCooldownUntil, localCooldownUntil) - nowMs);
@@ -947,6 +963,7 @@ export function GuildSection({
               <View key={event.eventId} style={styles.friendRow}>
                 <View style={styles.friendMeta}>
                   <Text style={styles.friendName}>{isWar ? 'Warfront Assault' : 'Expedition'} • {event.status}</Text>
+                  <Text style={styles.metaText}>Lifecycle: {lifecycleLabel}</Text>
                   <Text style={styles.metaText}>Progress: {total.toLocaleString()} / {target.toLocaleString()} ({pct}%)</Text>
                   <SocialProgressBar
                     styles={styles}
@@ -957,6 +974,11 @@ export function GuildSection({
                   <Text style={styles.metaText}>Ends: {new Date(event.endsAt).toLocaleString()}</Text>
                   {myContributionRow && (
                     <Text style={styles.metaText}>Your total contribution: {formatCompactNumber(myContributionRow.totalContributed)}</Text>
+                  )}
+                  {localContribution && (
+                    <Text style={styles.metaText}>
+                      Last contribution: +{formatCompactNumber(localContribution.amount)} at {new Date(localContribution.at).toLocaleTimeString()}
+                    </Text>
                   )}
                   {topContributors.length > 0 && (
                     <Text style={styles.metaText}>
@@ -986,6 +1008,9 @@ export function GuildSection({
                     if (!me.uid) return;
                     setGuildBusy(true);
                     setError(null);
+                    const contributionAmount = isWar
+                      ? Math.max(1, Math.floor(me.level * 10_000_000)) * 30
+                      : Math.max(1, Math.floor(me.level * 12));
                     try {
                       await contributeToGuildEvent({
                         uid: me.uid,
@@ -996,6 +1021,13 @@ export function GuildSection({
                       setEventCooldownUntilById(prev => ({
                         ...prev,
                         [event.eventId]: Date.now() + EVENT_CONTRIBUTION_COOLDOWN_MS,
+                      }));
+                      setEventLastContributionById(prev => ({
+                        ...prev,
+                        [event.eventId]: {
+                          amount: contributionAmount,
+                          at: Date.now(),
+                        },
                       }));
                       await refreshGuildData();
                     } catch (err) {
