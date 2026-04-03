@@ -109,6 +109,11 @@ export interface GuildTreasuryEntry {
   createdAt: number;
 }
 
+export interface GuildTreasuryTransactionResult {
+  treasury: GuildTreasuryState;
+  playerGold: number;
+}
+
 const GUILD_COLLECTION = 'guilds';
 const GUILD_LOOKUP_COLLECTION = 'guildLookup';
 const USER_GUILD_COLLECTION = 'userGuild';
@@ -216,6 +221,25 @@ function parseGuildTreasuryState(data: Record<string, unknown>): GuildTreasurySt
     updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : 0,
     updatedByUid: typeof data.updatedByUid === 'string' ? data.updatedByUid : '',
   };
+}
+
+function readGoldFromSavePayload(payload: Record<string, unknown>): number {
+  const value = payload.gold;
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.floor(value));
+}
+
+export async function fetchPlayerTreasuryGold(uid: string, saveSlotId: string): Promise<number> {
+  const db = requireDb();
+  const cleanUid = uid.trim();
+  const cleanSlot = saveSlotId.trim();
+  if (!cleanUid || !cleanSlot) throw new Error('Missing treasury wallet parameters.');
+
+  const saveRef = doc(db, 'users', cleanUid, 'saveSlots', cleanSlot);
+  const snap = await getDoc(saveRef);
+  if (!snap.exists()) return 0;
+  const saveData = snap.data() as { payload?: Record<string, unknown> };
+  return readGoldFromSavePayload((saveData.payload ?? {}) as Record<string, unknown>);
 }
 
 export async function createGuild(input: {
@@ -1309,17 +1333,20 @@ export async function fetchGuildTreasuryLedger(uid: string, maxRows = 25): Promi
 
 export async function transactGuildTreasury(input: {
   uid: string;
+  saveSlotId: string;
   displayName: string;
   type: 'deposit' | 'withdrawal';
   amount: number;
   reason?: string;
-}): Promise<GuildTreasuryState> {
+}): Promise<GuildTreasuryTransactionResult> {
   if (!guildTreasuryEnabled()) {
     throw new Error('Guild treasury is disabled for this rollout.');
   }
   const db = requireDb();
   const uid = input.uid.trim();
+  const saveSlotId = input.saveSlotId.trim();
   if (!uid) throw new Error('Missing user id.');
+  if (!saveSlotId) throw new Error('Missing save slot id.');
 
   const membership = await resolveGuildMembershipForUser(uid);
   if (!membership) throw new Error('You are not in a guild.');
@@ -1332,9 +1359,27 @@ export async function transactGuildTreasury(input: {
 
   const stateRef = doc(db, GUILD_COLLECTION, membership.guildId, GUILD_TREASURY_STATE_COLLECTION, 'active');
   const ledgerRef = doc(collection(db, GUILD_COLLECTION, membership.guildId, GUILD_TREASURY_LEDGER_COLLECTION));
+  const saveRef = doc(db, 'users', uid, 'saveSlots', saveSlotId);
 
   return runTransaction(db, async tx => {
-    const stateSnap = await tx.get(stateRef);
+    const [stateSnap, saveSnap] = await Promise.all([
+      tx.get(stateRef),
+      tx.get(saveRef),
+    ]);
+
+    if (!saveSnap.exists()) {
+      throw new Error('Active save slot not found.');
+    }
+
+    const saveData = saveSnap.data() as {
+      revision?: unknown;
+      payload?: Record<string, unknown>;
+      schemaVersion?: unknown;
+      saveSlot?: unknown;
+    };
+    const savePayload = (saveData.payload ?? {}) as Record<string, unknown>;
+    const currentPlayerGold = readGoldFromSavePayload(savePayload);
+
     const state = stateSnap.exists()
       ? parseGuildTreasuryState(stateSnap.data() as Record<string, unknown>)
       : {
@@ -1364,7 +1409,15 @@ export async function transactGuildTreasury(input: {
       if (currentDailyWithdrawn + amount > cap) {
         throw new Error(`Daily withdrawal cap exceeded (${cap.toLocaleString()}).`);
       }
+    } else {
+      if (currentPlayerGold < amount) {
+        throw new Error('Not enough gold to deposit that amount.');
+      }
     }
+
+    const nextPlayerGold = input.type === 'deposit'
+      ? currentPlayerGold - amount
+      : currentPlayerGold + amount;
 
     const nextState: GuildTreasuryState = input.type === 'deposit'
       ? {
@@ -1386,6 +1439,18 @@ export async function transactGuildTreasury(input: {
         updatedByUid: uid,
       };
 
+    const nextRevision = typeof saveData.revision === 'number' ? saveData.revision + 1 : 1;
+    tx.set(saveRef, {
+      revision: nextRevision,
+      updatedAt: now,
+      schemaVersion: typeof saveData.schemaVersion === 'number' ? saveData.schemaVersion : 1,
+      saveSlot: typeof saveData.saveSlot === 'string' ? saveData.saveSlot : saveSlotId,
+      payload: {
+        ...savePayload,
+        gold: nextPlayerGold,
+      },
+    });
+
     tx.set(stateRef, nextState, { merge: true });
     tx.set(ledgerRef, {
       type: input.type,
@@ -1397,7 +1462,10 @@ export async function transactGuildTreasury(input: {
       createdAt: now,
     });
 
-    return nextState;
+    return {
+      treasury: nextState,
+      playerGold: nextPlayerGold,
+    };
   });
 }
 

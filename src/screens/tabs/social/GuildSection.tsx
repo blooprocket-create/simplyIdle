@@ -12,6 +12,7 @@ import {
   fetchGuildEventContributors,
   GuildMember,
   GuildSummary,
+  fetchPlayerTreasuryGold,
   joinGuild,
   isGuildTreasuryEnabled,
   setMemberRank,
@@ -170,6 +171,7 @@ export function GuildSection({
   const [treasuryAmountInput, setTreasuryAmountInput] = useState('50000');
   const [treasuryReasonInput, setTreasuryReasonInput] = useState('');
   const [treasuryLoading, setTreasuryLoading] = useState(false);
+  const [walletGold, setWalletGold] = useState(0);
   const [eventLastContributionById, setEventLastContributionById] = useState<Record<string, { amount: number; at: number }>>({});
   const treasuryEnabled = isGuildTreasuryEnabled();
 
@@ -183,6 +185,7 @@ export function GuildSection({
     setEventCooldownUntilById({});
     setEventContribByEventId({});
     setEventLastContributionById({});
+    setWalletGold(0);
     setDescriptionDraft(myGuild?.description ?? '');
     setIsEditingDescription(false);
   }, [myGuild?.guildId, me.uid]);
@@ -251,10 +254,12 @@ export function GuildSection({
       void Promise.all([
         fetchGuildTreasuryState(me.uid),
         fetchGuildTreasuryLedger(me.uid, 18),
-      ]).then(([state, ledger]) => {
+        fetchPlayerTreasuryGold(me.uid, saveSlotId),
+      ]).then(([state, ledger, gold]) => {
         if (cancelled) return;
         setTreasuryState(state);
         setTreasuryLedger(ledger);
+        setWalletGold(gold);
       }).catch(err => {
         if (cancelled) return;
         const msg = err instanceof Error ? err.message : 'Failed to load guild treasury.';
@@ -263,10 +268,13 @@ export function GuildSection({
         if (!cancelled) setTreasuryLoading(false);
       });
     } else {
-      void fetchGuildTreasuryState(me.uid)
-        .then(state => {
+      void Promise.all([
+        fetchGuildTreasuryState(me.uid),
+        fetchPlayerTreasuryGold(me.uid, saveSlotId),
+      ]).then(([state, gold]) => {
           if (cancelled) return;
           setTreasuryState(state);
+          setWalletGold(gold);
         })
         .catch(err => {
           if (cancelled) return;
@@ -278,7 +286,7 @@ export function GuildSection({
     return () => {
       cancelled = true;
     };
-  }, [guildSubTab, me.uid, myGuild, setError, treasuryEnabled]);
+  }, [guildSubTab, me.uid, myGuild, saveSlotId, setError, treasuryEnabled]);
 
   const myGuildMember = useMemo(
     () => guildMembers.find(member => member.uid === me.uid) ?? null,
@@ -1087,6 +1095,10 @@ export function GuildSection({
                   <Text style={styles.metricLabel}>Daily Outflow</Text>
                   <Text style={styles.metricValue}>{(treasuryState?.dailyWithdrawn ?? 0).toLocaleString()}</Text>
                 </View>
+                <View style={styles.metricChip}>
+                  <Text style={styles.metricLabel}>Your Gold</Text>
+                  <Text style={styles.metricValue}>{walletGold.toLocaleString()}</Text>
+                </View>
               </View>
 
               <SocialInput
@@ -1125,14 +1137,16 @@ export function GuildSection({
                     setGuildBusy(true);
                     setError(null);
                     try {
-                      const nextState = await transactGuildTreasury({
+                      const result = await transactGuildTreasury({
                         uid: me.uid,
+                        saveSlotId,
                         displayName: me.name,
                         type: 'deposit',
                         amount,
                         reason: treasuryReasonInput,
                       });
-                      setTreasuryState(nextState);
+                      setTreasuryState(result.treasury);
+                      setWalletGold(result.playerGold);
                       const nextLedger = await fetchGuildTreasuryLedger(me.uid, 18);
                       setTreasuryLedger(nextLedger);
                       setTreasuryReasonInput('');
@@ -1164,14 +1178,16 @@ export function GuildSection({
                     setGuildBusy(true);
                     setError(null);
                     try {
-                      const nextState = await transactGuildTreasury({
+                      const result = await transactGuildTreasury({
                         uid: me.uid,
+                        saveSlotId,
                         displayName: me.name,
                         type: 'withdrawal',
                         amount,
                         reason: treasuryReasonInput,
                       });
-                      setTreasuryState(nextState);
+                      setTreasuryState(result.treasury);
+                      setWalletGold(result.playerGold);
                       const nextLedger = await fetchGuildTreasuryLedger(me.uid, 18);
                       setTreasuryLedger(nextLedger);
                       setTreasuryReasonInput('');
