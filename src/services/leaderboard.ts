@@ -54,6 +54,7 @@ function isEntry(value: unknown): value is LeaderboardEntry {
     && typeof entry.publicUsername === 'string'
     && typeof entry.score === 'number'
     && typeof entry.level === 'number'
+    && (typeof entry.vipLevel === 'number' || typeof entry.vipLevel === 'undefined')
     && typeof entry.highestWaveReached === 'number'
     && typeof entry.prestigeCount === 'number'
     && typeof entry.updatedAt === 'number'
@@ -77,18 +78,19 @@ export async function submitLeaderboardScore(input: SubmitLeaderboardScoreInput)
 
   await runTransaction(db, async tx => {
     const snap = await tx.get(ref);
-    const remoteScore = snap.exists() && typeof snap.data().score === 'number' ? clampScore(snap.data().score) : 0;
-    if (remoteScore > score) {
-      return;
-    }
+    const remoteData = snap.exists() ? snap.data() : null;
+    const remoteScore = remoteData && typeof remoteData.score === 'number' ? clampScore(remoteData.score) : 0;
+    const remoteVipLevel = remoteData && typeof remoteData.vipLevel === 'number' ? Math.max(0, Math.floor(remoteData.vipLevel)) : 0;
+    const nextScore = Math.max(remoteScore, score);
+    const nextVipLevel = Math.max(remoteVipLevel, Math.max(0, Math.floor(input.vipLevel || 0)));
 
     tx.set(ref, {
       uid,
       accountName: input.accountName.trim().toLowerCase().slice(0, 48),
       publicUsername: input.publicUsername.trim().slice(0, 24) || 'Commander',
-      score,
+      score: nextScore,
       level: clampLevel(input.level),
-      vipLevel: Math.max(0, Math.floor(input.vipLevel || 0)),
+      vipLevel: nextVipLevel,
       highestWaveReached: clampScore(input.highestWaveReached),
       prestigeCount: clampScore(input.prestigeCount),
       updatedAt: now,
@@ -103,7 +105,20 @@ export async function fetchLeaderboardTop(maxRows = 25): Promise<LeaderboardEntr
   const q = query(collection(db, LEADERBOARD_COLLECTION), orderBy('score', 'desc'), limit(maxRows));
   const snap = await getDocs(q);
   return snap.docs
-    .map(docSnap => docSnap.data())
+    .map(docSnap => {
+      const row = docSnap.data() as Partial<LeaderboardEntry>;
+      return {
+        uid: row.uid ?? '',
+        accountName: row.accountName ?? 'player',
+        publicUsername: row.publicUsername ?? row.accountName ?? 'Commander',
+        score: clampScore(typeof row.score === 'number' ? row.score : 0),
+        level: clampLevel(typeof row.level === 'number' ? row.level : 1),
+        vipLevel: typeof row.vipLevel === 'number' ? Math.max(0, Math.floor(row.vipLevel)) : 0,
+        highestWaveReached: clampScore(typeof row.highestWaveReached === 'number' ? row.highestWaveReached : 0),
+        prestigeCount: clampScore(typeof row.prestigeCount === 'number' ? row.prestigeCount : 0),
+        updatedAt: clampScore(typeof row.updatedAt === 'number' ? row.updatedAt : 0),
+      } satisfies LeaderboardEntry;
+    })
     .filter(isEntry)
     .sort((a, b) => b.score - a.score);
 }
