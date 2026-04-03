@@ -43,6 +43,7 @@ export interface SocialTabContentProps {
   publicUsername: string;
   level: number;
   diamonds: number;
+  saveSlotId: string;
   isAdmin: boolean;
   onPendingRequestsCountChange?: (count: number) => void;
 }
@@ -80,6 +81,7 @@ export function SocialTabContent({
   publicUsername,
   level,
   diamonds,
+  saveSlotId,
   isAdmin,
   onPendingRequestsCountChange,
 }: SocialTabContentProps) {
@@ -229,10 +231,10 @@ export function SocialTabContent({
     }
   };
 
-  const muteForOneHour = async (targetUid: string) => {
+  const muteWithDuration = async (targetUid: string, durationMs: number, reason: string) => {
     if (!isAdmin || !me.uid || !targetUid || targetUid === me.uid) return;
     try {
-      await muteUser(targetUid, me.uid, 60 * 60 * 1000, 'Muted by admin');
+      await muteUser(targetUid, me.uid, durationMs, reason);
     } catch {
       setError('Failed to mute user.');
     }
@@ -377,9 +379,17 @@ export function SocialTabContent({
                     </View>
                     <Text style={styles.chatText}>{item.text}</Text>
                     {isAdmin && !mine && (
-                      <Pressable style={styles.muteBtn} onPress={() => muteForOneHour(item.uid)}>
-                        <Text style={styles.muteBtnText}>Mute 1h</Text>
-                      </Pressable>
+                      <View style={styles.muteActionsRow}>
+                        <Pressable style={styles.muteBtn} onPress={() => muteWithDuration(item.uid, 60 * 60 * 1000, 'Muted by admin (1h)')}>
+                          <Text style={styles.muteBtnText}>Mute 1h</Text>
+                        </Pressable>
+                        <Pressable style={styles.muteBtn} onPress={() => muteWithDuration(item.uid, 24 * 60 * 60 * 1000, 'Muted by admin (24h)')}>
+                          <Text style={styles.muteBtnText}>Mute 24h</Text>
+                        </Pressable>
+                        <Pressable style={[styles.muteBtn, styles.muteBtnPerm]} onPress={() => muteWithDuration(item.uid, 0, 'Muted by admin (permanent)')}>
+                          <Text style={styles.muteBtnText}>Perm</Text>
+                        </Pressable>
+                      </View>
                     )}
                   </View>
                 );
@@ -569,6 +579,7 @@ export function SocialTabContent({
                     await createGuild({
                       uid: me.uid,
                       displayName: me.name,
+                      saveSlotId,
                       guildName: guildNameInput,
                       guildTag: guildTagInput,
                       description: guildDescInput,
@@ -785,6 +796,14 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  muteActionsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 6,
+  },
+  muteBtnPerm: {
+    borderColor: '#FFA23D',
   },
   muteBtnText: {
     color: '#FF96A3',

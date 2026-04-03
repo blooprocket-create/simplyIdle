@@ -3011,6 +3011,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             publicUsername,
             level: state.level,
             diamonds: state.diamonds,
+            saveSlotId: selectedCharacterClass ? getCharacterSaveSlot(accountName, selectedCharacterClass) : '',
             isAdmin,
             onPendingRequestsCountChange: setSocialPendingCount,
           } as any)}

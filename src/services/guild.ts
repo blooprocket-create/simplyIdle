@@ -102,6 +102,7 @@ function parseGuildSummary(guildId: string, data: Record<string, unknown>): Guil
 export async function createGuild(input: {
   uid: string;
   displayName: string;
+  saveSlotId: string;
   guildName: string;
   guildTag: string;
   description?: string;
@@ -111,12 +112,15 @@ export async function createGuild(input: {
   const db = requireDb();
   const uid = input.uid.trim();
   const displayName = input.displayName.trim().slice(0, 24) || 'Leader';
+  const saveSlotId = input.saveSlotId.trim();
   const name = input.guildName.trim().slice(0, 32);
   const normalizedName = normalizeGuildName(name);
   const tag = normalizeGuildTag(input.guildTag);
   const now = Date.now();
+  const CREATE_GUILD_DIAMOND_COST = 2500;
 
   if (!uid) throw new Error('Missing user id.');
+  if (!saveSlotId) throw new Error('Missing save slot id.');
   if (name.length < 3) throw new Error('Guild name must be at least 3 characters.');
   if (tag.length < 2) throw new Error('Guild tag must be 2 to 5 characters.');
 
@@ -125,11 +129,13 @@ export async function createGuild(input: {
   const lookupRef = doc(db, GUILD_LOOKUP_COLLECTION, normalizedName);
   const userGuildRef = doc(db, USER_GUILD_COLLECTION, uid);
   const memberRef = doc(db, GUILD_COLLECTION, guildId, 'members', uid);
+  const saveRef = doc(db, 'users', uid, 'saveSlots', saveSlotId);
 
   await runTransaction(db, async tx => {
-    const [existingMembership, existingName] = await Promise.all([
+    const [existingMembership, existingName, saveSnap] = await Promise.all([
       tx.get(userGuildRef),
       tx.get(lookupRef),
+      tx.get(saveRef),
     ]);
 
     if (existingMembership.exists()) {
@@ -138,9 +144,32 @@ export async function createGuild(input: {
     if (existingName.exists()) {
       throw new Error('Guild name is already taken.');
     }
+    if (!saveSnap.exists()) {
+      throw new Error('Save slot not found.');
+    }
+
+    const saveData = saveSnap.data() as { revision?: unknown; payload?: Record<string, unknown>; schemaVersion?: unknown; saveSlot?: unknown };
+    const payload = (saveData.payload ?? {}) as Record<string, unknown>;
+    const currentDiamonds = typeof payload.diamonds === 'number' ? payload.diamonds : 0;
+    if (currentDiamonds < CREATE_GUILD_DIAMOND_COST) {
+      throw new Error('Not enough diamonds. Requires 2500.');
+    }
+    const nextRevision = typeof saveData.revision === 'number' ? saveData.revision + 1 : 1;
+
+    tx.set(saveRef, {
+      revision: nextRevision,
+      updatedAt: now,
+      schemaVersion: typeof saveData.schemaVersion === 'number' ? saveData.schemaVersion : 1,
+      saveSlot: typeof saveData.saveSlot === 'string' ? saveData.saveSlot : saveSlotId,
+      payload: {
+        ...payload,
+        diamonds: Math.max(0, Math.floor(currentDiamonds - CREATE_GUILD_DIAMOND_COST)),
+      },
+    });
 
     tx.set(guildRef, {
       name,
+      normalizedName,
       tag,
       description: (input.description ?? '').trim().slice(0, 140),
       leaderId: uid,
@@ -158,6 +187,7 @@ export async function createGuild(input: {
     tx.set(lookupRef, {
       guildId,
       displayName: name,
+      normalizedName,
       tag,
       memberCount: 1,
       leaderId: uid,
@@ -251,10 +281,13 @@ export async function joinGuild(input: {
       joinedAt: now,
     });
 
-    tx.set(guildRef, {
-      memberCount: memberCount + 1,
-      updatedAt: now,
-    }, { merge: true });
+    const nextCount = memberCount + 1;
+    tx.set(guildRef, { memberCount: nextCount, updatedAt: now }, { merge: true });
+
+    const normalizedName = typeof guild.normalizedName === 'string' ? guild.normalizedName : '';
+    if (normalizedName) {
+      tx.set(doc(db, GUILD_LOOKUP_COLLECTION, normalizedName), { memberCount: nextCount, updatedAt: now }, { merge: true });
+    }
   });
 }
 
@@ -289,10 +322,13 @@ export async function leaveGuild(input: { uid: string }): Promise<void> {
     const memberCount = typeof guild.memberCount === 'number' ? guild.memberCount : 1;
     tx.delete(memberRef);
     tx.delete(userGuildRef);
-    tx.set(guildRef, {
-      memberCount: Math.max(1, memberCount - 1),
-      updatedAt: now,
-    }, { merge: true });
+    const nextCount = Math.max(1, memberCount - 1);
+    tx.set(guildRef, { memberCount: nextCount, updatedAt: now }, { merge: true });
+
+    const normalizedName = typeof guild.normalizedName === 'string' ? guild.normalizedName : '';
+    if (normalizedName) {
+      tx.set(doc(db, GUILD_LOOKUP_COLLECTION, normalizedName), { memberCount: nextCount, updatedAt: now }, { merge: true });
+    }
   });
 }
 
@@ -360,8 +396,8 @@ export async function fetchGuildBrowse(searchTerm = ''): Promise<GuildBrowseRow[
   const q = normalized
     ? query(
       collection(db, GUILD_LOOKUP_COLLECTION),
-      where('displayName', '>=', normalized),
-      where('displayName', '<=', `${normalized}\uf8ff`),
+      where('normalizedName', '>=', normalized),
+      where('normalizedName', '<=', `${normalized}\uf8ff`),
       limit(20),
     )
     : query(collection(db, GUILD_LOOKUP_COLLECTION), orderBy('memberCount', 'desc'), limit(30));
