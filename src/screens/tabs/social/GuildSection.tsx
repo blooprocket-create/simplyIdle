@@ -1,0 +1,547 @@
+import React from 'react';
+import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import { THEME } from '../../../theme';
+import {
+  attackBoss,
+  contributeToGuildEvent,
+  createGuild,
+  ensureActiveBoss,
+  GuildBossState,
+  GuildBrowseRow,
+  GuildChatMessage,
+  GuildEventState,
+  GuildMember,
+  GuildSummary,
+  joinGuild,
+  setMemberRank,
+  startEvent,
+  sendGuildChatMessage,
+  leaveGuild,
+} from '../../../services/guild';
+
+type GuildSubTab = 'home' | 'boss' | 'events' | 'chat';
+
+interface GuildSectionProps {
+  styles: any;
+  me: {
+    uid: string;
+    name: string;
+    level: number;
+  };
+  diamonds: number;
+  saveSlotId: string;
+  level: number;
+  error: string | null;
+  guildBusy: boolean;
+  guildNameInput: string;
+  setGuildNameInput: (value: string) => void;
+  guildTagInput: string;
+  setGuildTagInput: (value: string) => void;
+  guildDescInput: string;
+  setGuildDescInput: (value: string) => void;
+  guildSearchInput: string;
+  setGuildSearchInput: (value: string) => void;
+  guildSubTab: GuildSubTab;
+  setGuildSubTab: (tab: GuildSubTab) => void;
+  guildList: GuildBrowseRow[];
+  myGuild: GuildSummary | null;
+  guildMembers: GuildMember[];
+  guildBoss: GuildBossState | null;
+  setGuildBoss: (boss: GuildBossState | null) => void;
+  guildEvents: GuildEventState[];
+  guildChat: GuildChatMessage[];
+  guildChatDraft: string;
+  setGuildChatDraft: (value: string) => void;
+  setError: (value: string | null) => void;
+  setGuildBusy: (value: boolean) => void;
+  refreshGuildData: () => Promise<void>;
+  formatTime: (ts: number) => string;
+  setConfirmKickMember: (member: GuildMember) => void;
+  setConfirmTransferLeader: (member: GuildMember) => void;
+  setConfirmDisbandGuild: (value: boolean) => void;
+}
+
+export function GuildSection({
+  styles,
+  me,
+  diamonds,
+  saveSlotId,
+  level,
+  error,
+  guildBusy,
+  guildNameInput,
+  setGuildNameInput,
+  guildTagInput,
+  setGuildTagInput,
+  guildDescInput,
+  setGuildDescInput,
+  guildSearchInput,
+  setGuildSearchInput,
+  guildSubTab,
+  setGuildSubTab,
+  guildList,
+  myGuild,
+  guildMembers,
+  guildBoss,
+  setGuildBoss,
+  guildEvents,
+  guildChat,
+  guildChatDraft,
+  setGuildChatDraft,
+  setError,
+  setGuildBusy,
+  refreshGuildData,
+  formatTime,
+  setConfirmKickMember,
+  setConfirmTransferLeader,
+  setConfirmDisbandGuild,
+}: GuildSectionProps) {
+  return (
+    <>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Guild Command</Text>
+        <Text style={styles.metaText}>Create Guild Cost: 2,500 Diamonds.</Text>
+        <Text style={styles.metaText}>Your Diamonds: {diamonds}</Text>
+        {guildBusy && <Text style={styles.metaText}>Syncing guild actions...</Text>}
+        {!!error && <Text style={styles.errorText}>{error}</Text>}
+      </View>
+
+      {!myGuild && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Create Guild</Text>
+          <TextInput
+            value={guildNameInput}
+            onChangeText={setGuildNameInput}
+            placeholder="Guild Name"
+            placeholderTextColor={THEME.text.tertiary}
+            style={styles.input}
+            editable={!guildBusy}
+            maxLength={32}
+          />
+          <TextInput
+            value={guildTagInput}
+            onChangeText={setGuildTagInput}
+            placeholder="Tag (2-5 chars)"
+            placeholderTextColor={THEME.text.tertiary}
+            style={styles.input}
+            editable={!guildBusy}
+            autoCapitalize="characters"
+            maxLength={5}
+          />
+          <TextInput
+            value={guildDescInput}
+            onChangeText={setGuildDescInput}
+            placeholder="Description"
+            placeholderTextColor={THEME.text.tertiary}
+            style={styles.input}
+            editable={!guildBusy}
+            maxLength={140}
+          />
+          <Pressable
+            style={[
+              styles.sendBtn,
+              (guildBusy || diamonds < 2500 || !guildNameInput.trim() || !guildTagInput.trim()) && styles.sendBtnDisabled,
+            ]}
+            disabled={guildBusy || diamonds < 2500 || !guildNameInput.trim() || !guildTagInput.trim()}
+            onPress={async () => {
+              if (!me.uid) return;
+              setGuildBusy(true);
+              setError(null);
+              try {
+                await createGuild({
+                  uid: me.uid,
+                  displayName: me.name,
+                  saveSlotId,
+                  guildName: guildNameInput,
+                  guildTag: guildTagInput,
+                  description: guildDescInput,
+                  minLevelToJoin: 1,
+                  isPublic: true,
+                });
+                setGuildNameInput('');
+                setGuildTagInput('');
+                setGuildDescInput('');
+                await refreshGuildData();
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : 'Failed to create guild.';
+                setError(msg);
+              } finally {
+                setGuildBusy(false);
+              }
+            }}
+          >
+            <Text style={styles.sendBtnText}>Create Guild</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {myGuild && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>My Guild: [{myGuild.tag}] {myGuild.name}</Text>
+          <View style={styles.prefRow}>
+            <Pressable style={[styles.prefBtn, guildSubTab === 'home' && styles.prefBtnActive]} onPress={() => setGuildSubTab('home')}>
+              <Text style={styles.prefBtnText}>Home</Text>
+            </Pressable>
+            <Pressable style={[styles.prefBtn, guildSubTab === 'boss' && styles.prefBtnActive]} onPress={() => setGuildSubTab('boss')}>
+              <Text style={styles.prefBtnText}>Boss</Text>
+            </Pressable>
+            <Pressable style={[styles.prefBtn, guildSubTab === 'events' && styles.prefBtnActive]} onPress={() => setGuildSubTab('events')}>
+              <Text style={styles.prefBtnText}>Events</Text>
+            </Pressable>
+            <Pressable style={[styles.prefBtn, guildSubTab === 'chat' && styles.prefBtnActive]} onPress={() => setGuildSubTab('chat')}>
+              <Text style={styles.prefBtnText}>Chat</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {myGuild && guildSubTab === 'home' && (
+        <View style={styles.card}>
+          <Text style={styles.metaText}>Guild profile and members</Text>
+          <Text style={styles.metaText}>{myGuild.description || 'No description set.'}</Text>
+          <Text style={styles.metaText}>Leader: {myGuild.leaderName} • Members: {myGuild.memberCount}/{myGuild.maxMembers}</Text>
+          <Text style={styles.metaText}>Min Join Level: {myGuild.minLevelToJoin} • Public: {myGuild.isPublic ? 'Yes' : 'No'}</Text>
+          {guildMembers.slice(0, 12).map(member => (
+            <View key={member.uid} style={styles.friendRow}>
+              <View style={styles.friendMeta}>
+                <Text style={styles.friendName}>{member.displayName}</Text>
+                <Text style={styles.metaText}>{member.rank} • Contribution {Math.floor(member.guildContribution).toLocaleString()}</Text>
+              </View>
+              {myGuild.leaderId === me.uid && member.uid !== me.uid && (
+                <View style={styles.friendActions}>
+                  <Pressable
+                    style={styles.smallBtn}
+                    disabled={guildBusy}
+                    onPress={async () => {
+                      if (!me.uid) return;
+                      setGuildBusy(true);
+                      setError(null);
+                      try {
+                        await setMemberRank({
+                          actorUid: me.uid,
+                          targetUid: member.uid,
+                          rank: member.rank === 'officer' ? 'member' : 'officer',
+                        });
+                        await refreshGuildData();
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : 'Failed to update member rank.';
+                        setError(msg);
+                      } finally {
+                        setGuildBusy(false);
+                      }
+                    }}
+                  >
+                    <Text style={styles.smallBtnText}>{member.rank === 'officer' ? 'Demote' : 'Promote'}</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.smallBtn}
+                    disabled={guildBusy}
+                    onPress={() => setConfirmTransferLeader(member)}
+                  >
+                    <Text style={styles.smallBtnText}>Leader</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.smallBtn, styles.smallBtnDanger]}
+                    disabled={guildBusy}
+                    onPress={() => setConfirmKickMember(member)}
+                  >
+                    <Text style={styles.smallBtnText}>Kick</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          ))}
+          {myGuild.leaderId !== me.uid && (
+            <Pressable
+              style={[styles.smallBtn, styles.smallBtnDanger]}
+              disabled={guildBusy}
+              onPress={async () => {
+                if (!me.uid) return;
+                setGuildBusy(true);
+                setError(null);
+                try {
+                  await leaveGuild({ uid: me.uid });
+                  await refreshGuildData();
+                } catch (err) {
+                  const msg = err instanceof Error ? err.message : 'Failed to leave guild.';
+                  setError(msg);
+                } finally {
+                  setGuildBusy(false);
+                }
+              }}
+            >
+              <Text style={styles.smallBtnText}>Leave Guild</Text>
+            </Pressable>
+          )}
+          {myGuild.leaderId === me.uid && (
+            <>
+              <Text style={styles.metaText}>Leaders can transfer leadership to another member, or disband the guild.</Text>
+              <Pressable
+                style={[styles.smallBtn, styles.smallBtnDanger]}
+                disabled={guildBusy}
+                onPress={() => setConfirmDisbandGuild(true)}
+              >
+                <Text style={styles.smallBtnText}>Disband Guild</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+      )}
+
+      {myGuild && guildSubTab === 'boss' && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Guild Boss</Text>
+          {!guildBoss && <Text style={styles.metaText}>No active boss right now.</Text>}
+          {guildBoss && (
+            <>
+              <Text style={styles.metaText}>{guildBoss.name} • Tier {guildBoss.tier}</Text>
+              <Text style={styles.metaText}>HP: {Math.floor(guildBoss.currentHp).toLocaleString()} / {Math.floor(guildBoss.maxHp).toLocaleString()}</Text>
+              <Text style={styles.metaText}>Status: {guildBoss.status} • Expires: {new Date(guildBoss.expiresAt).toLocaleString()}</Text>
+              <Text style={styles.metaText}>Participants: {guildBoss.participantUids.length}</Text>
+            </>
+          )}
+          <View style={styles.friendActions}>
+            <Pressable
+              style={styles.smallBtn}
+              disabled={guildBusy}
+              onPress={async () => {
+                if (!me.uid) return;
+                setGuildBusy(true);
+                setError(null);
+                try {
+                  const boss = await ensureActiveBoss(me.uid);
+                  setGuildBoss(boss);
+                } catch (err) {
+                  const msg = err instanceof Error ? err.message : 'Failed to start boss.';
+                  setError(msg);
+                } finally {
+                  setGuildBusy(false);
+                }
+              }}
+            >
+              <Text style={styles.smallBtnText}>Summon / Refresh</Text>
+            </Pressable>
+            <Pressable
+              style={styles.smallBtn}
+              disabled={guildBusy || !guildBoss || guildBoss.status !== 'active'}
+              onPress={async () => {
+                if (!me.uid) return;
+                setGuildBusy(true);
+                setError(null);
+                try {
+                  const result = await attackBoss({
+                    uid: me.uid,
+                    displayName: me.name,
+                    dps: Math.max(1, Math.floor(me.level * 10_000_000)),
+                  });
+                  setGuildBoss(result.boss);
+                  if (result.rewardGranted) setError('Boss defeated. Guild rewards sent by mail.');
+                } catch (err) {
+                  const msg = err instanceof Error ? err.message : 'Failed to attack boss.';
+                  setError(msg);
+                } finally {
+                  setGuildBusy(false);
+                }
+              }}
+            >
+              <Text style={styles.smallBtnText}>Attack (4h cd)</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {myGuild && guildSubTab === 'events' && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Guild Events</Text>
+          <Text style={styles.metaText}>Coordinate and contribute before event timers expire.</Text>
+          {myGuild.leaderId === me.uid && (
+            <View style={styles.friendActions}>
+              <Pressable
+                style={styles.smallBtn}
+                disabled={guildBusy}
+                onPress={async () => {
+                  if (!me.uid) return;
+                  setGuildBusy(true);
+                  setError(null);
+                  try {
+                    await startEvent({ uid: me.uid, type: 'war' });
+                    await refreshGuildData();
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : 'Failed to start war.';
+                    setError(msg);
+                  } finally {
+                    setGuildBusy(false);
+                  }
+                }}
+              >
+                <Text style={styles.smallBtnText}>Start War</Text>
+              </Pressable>
+              <Pressable
+                style={styles.smallBtn}
+                disabled={guildBusy}
+                onPress={async () => {
+                  if (!me.uid) return;
+                  setGuildBusy(true);
+                  setError(null);
+                  try {
+                    await startEvent({ uid: me.uid, type: 'expedition' });
+                    await refreshGuildData();
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : 'Failed to start expedition.';
+                    setError(msg);
+                  } finally {
+                    setGuildBusy(false);
+                  }
+                }}
+              >
+                <Text style={styles.smallBtnText}>Start Expedition</Text>
+              </Pressable>
+            </View>
+          )}
+          {guildEvents.length === 0 && <Text style={styles.metaText}>No guild events yet.</Text>}
+          {guildEvents.map(event => {
+            const isWar = event.type === 'war';
+            const total = Number(event.details[isWar ? 'totalDamage' : 'totalKills'] ?? 0);
+            const target = Number(event.details[isWar ? 'targetDamage' : 'targetKills'] ?? 1);
+            const pct = Math.min(100, Math.floor((total / Math.max(1, target)) * 100));
+            return (
+              <View key={event.eventId} style={styles.friendRow}>
+                <View style={styles.friendMeta}>
+                  <Text style={styles.friendName}>{isWar ? 'Warfront Assault' : 'Expedition'} • {event.status}</Text>
+                  <Text style={styles.metaText}>Progress: {total.toLocaleString()} / {target.toLocaleString()} ({pct}%)</Text>
+                  <Text style={styles.metaText}>Ends: {new Date(event.endsAt).toLocaleString()}</Text>
+                </View>
+                <Pressable
+                  style={styles.smallBtn}
+                  disabled={guildBusy || event.status !== 'active'}
+                  onPress={async () => {
+                    if (!me.uid) return;
+                    setGuildBusy(true);
+                    setError(null);
+                    try {
+                      await contributeToGuildEvent({
+                        uid: me.uid,
+                        eventId: event.eventId,
+                        dps: isWar ? Math.max(1, Math.floor(me.level * 10_000_000)) : undefined,
+                        kills: isWar ? undefined : Math.max(1, Math.floor(me.level * 12)),
+                      });
+                      await refreshGuildData();
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : 'Contribution failed.';
+                      setError(msg);
+                    } finally {
+                      setGuildBusy(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.smallBtnText}>Contribute</Text>
+                </Pressable>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      {myGuild && guildSubTab === 'chat' && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Guild Chat</Text>
+          <Text style={styles.metaText}>Tactical channel for your guild.</Text>
+          <View style={[styles.card, styles.chatListCard]}>
+            {guildChat.length === 0 && <Text style={styles.metaText}>No guild messages yet.</Text>}
+            <FlatList
+              data={guildChat}
+              keyExtractor={item => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.chatRow}>
+                  <View style={styles.chatHeaderRow}>
+                    <Text style={styles.chatName}>{item.displayName}</Text>
+                    <Text style={styles.chatTime}>{formatTime(item.sentAt)}</Text>
+                  </View>
+                  <Text style={styles.chatText}>{item.text}</Text>
+                </View>
+              )}
+            />
+          </View>
+          <TextInput
+            value={guildChatDraft}
+            onChangeText={setGuildChatDraft}
+            placeholder="Message guild..."
+            placeholderTextColor={THEME.text.tertiary}
+            style={styles.input}
+            editable={!guildBusy}
+            maxLength={300}
+          />
+          <Pressable
+            style={[styles.sendBtn, (!guildChatDraft.trim() || guildBusy) && styles.sendBtnDisabled]}
+            disabled={!guildChatDraft.trim() || guildBusy}
+            onPress={async () => {
+              if (!me.uid) return;
+              setGuildBusy(true);
+              setError(null);
+              try {
+                await sendGuildChatMessage({ uid: me.uid, displayName: me.name, text: guildChatDraft });
+                setGuildChatDraft('');
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : 'Failed to send guild chat.';
+                setError(msg);
+              } finally {
+                setGuildBusy(false);
+              }
+            }}
+          >
+            <Text style={styles.sendBtnText}>Send</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {!myGuild && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Browse Guilds</Text>
+          <TextInput
+            value={guildSearchInput}
+            onChangeText={setGuildSearchInput}
+            placeholder="Search guilds"
+            placeholderTextColor={THEME.text.tertiary}
+            style={styles.input}
+            editable={!guildBusy}
+            maxLength={32}
+          />
+          {guildList.length === 0 && <Text style={styles.metaText}>No guilds found.</Text>}
+          {guildList.map(row => (
+            <View key={row.guildId} style={styles.friendRow}>
+              <View style={styles.friendMeta}>
+                <Text style={styles.friendName}>[{row.tag}] {row.name}</Text>
+                <Text style={styles.metaText}>Leader: {row.leaderName} • Members: {row.memberCount} • Lv.{row.level}</Text>
+              </View>
+              <Pressable
+                style={styles.smallBtn}
+                disabled={guildBusy || level < 1}
+                onPress={async () => {
+                  if (!me.uid) return;
+                  setGuildBusy(true);
+                  setError(null);
+                  try {
+                    await joinGuild({
+                      uid: me.uid,
+                      displayName: me.name,
+                      guildId: row.guildId,
+                      playerLevel: me.level,
+                    });
+                    await refreshGuildData();
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : 'Failed to join guild.';
+                    setError(msg);
+                  } finally {
+                    setGuildBusy(false);
+                  }
+                }}
+              >
+                <Text style={styles.smallBtnText}>Join</Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      )}
+    </>
+  );
+}
