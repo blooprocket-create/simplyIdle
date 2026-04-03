@@ -169,6 +169,18 @@ function shiftSocialTab(current: SocialSubTab, direction: -1 | 1): SocialSubTab 
   return SOCIAL_TABS[nextIndex];
 }
 
+function buildProfileHighlights(profile: PublicPlayerProfile): string[] {
+  const highlights: string[] = [];
+  if (profile.vipLevel >= 10) highlights.push('Elite Patron');
+  if (profile.vipLevel >= 1 && profile.vipLevel < 10) highlights.push('VIP Member');
+  if (profile.prestigeCount >= 25) highlights.push('Legacy Commander');
+  if (profile.highestWaveReached >= 2500) highlights.push('Wavebreaker');
+  if (profile.leaderboardRank !== null && profile.leaderboardRank <= 100) highlights.push('Top 100');
+  if (profile.guildRank === 'leader') highlights.push('Guild Leader');
+  if (profile.guildRank === 'officer') highlights.push('Guild Officer');
+  return highlights.slice(0, 4);
+}
+
 export function SocialTabContent({
   tab,
   accountName,
@@ -212,6 +224,8 @@ export function SocialTabContent({
   const [activeProfile, setActiveProfile] = useState<PublicPlayerProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileRelationship, setProfileRelationship] = useState<FriendRelationshipStatus>('none');
+  const [profileActionBusy, setProfileActionBusy] = useState(false);
   const profileCacheRef = useRef<Record<string, PublicPlayerProfile>>({});
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const sectionAnim = useRef(new Animated.Value(1)).current;
@@ -402,6 +416,17 @@ export function SocialTabContent({
       .then(setActiveUserRelationship)
       .catch(() => setActiveUserRelationship('none'));
   }, [activeUserMenu?.uid, me.uid]);
+
+  useEffect(() => {
+    if (!me.uid || !activeProfileUid) {
+      setProfileRelationship('none');
+      return;
+    }
+
+    void fetchFriendRelationshipStatus(me.uid, activeProfileUid)
+      .then(setProfileRelationship)
+      .catch(() => setProfileRelationship('none'));
+  }, [activeProfileUid, me.uid]);
 
   if (tab !== 'social') return null;
 
@@ -743,6 +768,7 @@ export function SocialTabContent({
             formatTime={formatTime}
             onSend={send}
             onOpenUserMenu={setActiveUserMenu}
+            onOpenProfile={uid => void openProfileCard(uid)}
             onMute={muteWithDuration}
             meDisplayName={me.name}
             meLevel={me.level}
@@ -872,6 +898,7 @@ export function SocialTabContent({
           setActiveProfileUid(null);
           setProfileLoading(false);
           setProfileError(null);
+          setProfileActionBusy(false);
         }}
       >
         <Pressable
@@ -880,6 +907,7 @@ export function SocialTabContent({
             setActiveProfileUid(null);
             setProfileLoading(false);
             setProfileError(null);
+            setProfileActionBusy(false);
           }}
         >
           <Pressable style={styles.profileCard} onPress={() => {}}>
@@ -891,6 +919,13 @@ export function SocialTabContent({
             {!profileLoading && !profileError && !!activeProfile && (
               <>
                 <Text style={styles.profileName}>{activeProfile.publicUsername}</Text>
+                {buildProfileHighlights(activeProfile).length > 0 && (
+                  <View style={styles.profileTagRow}>
+                    {buildProfileHighlights(activeProfile).map(tag => (
+                      <Text key={tag} style={styles.profileTag}>{tag}</Text>
+                    ))}
+                  </View>
+                )}
                 <View style={styles.metricGrid}>
                   <View style={styles.metricChip}>
                     <Text style={styles.metricLabel}>Level</Text>
@@ -915,6 +950,49 @@ export function SocialTabContent({
                 <Text style={styles.metaText}>
                   Guild: {activeProfile.guildName ? `${activeProfile.guildName}${activeProfile.guildRank ? ` (${activeProfile.guildRank})` : ''}` : 'No guild'}
                 </Text>
+
+                <View style={styles.friendActions}>
+                  <Pressable
+                    style={[
+                      styles.smallBtn,
+                      (profileRelationship !== 'none' || profileActionBusy || activeProfile.uid === me.uid) && styles.sendBtnDisabled,
+                    ]}
+                    disabled={profileRelationship !== 'none' || profileActionBusy || activeProfile.uid === me.uid}
+                    onPress={async () => {
+                      if (!me.uid || !activeProfile || profileRelationship !== 'none') return;
+                      setProfileActionBusy(true);
+                      try {
+                        await sendFriendRequest(me.uid, me.name, activeProfile.publicUsername);
+                        setProfileRelationship('outgoing');
+                        void trackEvent('social_profile_friend_request_sent');
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : 'Failed to send friend request.';
+                        setProfileError(msg);
+                        void trackEvent('social_profile_friend_request_failed', { reason: msg.slice(0, 80) });
+                      } finally {
+                        setProfileActionBusy(false);
+                      }
+                    }}
+                  >
+                    <Text style={styles.smallBtnText}>
+                      {profileActionBusy
+                        ? 'Sending...'
+                        : profileRelationship === 'self'
+                          ? 'You'
+                          : profileRelationship === 'friends'
+                            ? 'Friends'
+                            : profileRelationship === 'outgoing'
+                              ? 'Request Sent'
+                              : profileRelationship === 'incoming'
+                                ? 'Incoming Request'
+                                : 'Add Friend'}
+                    </Text>
+                  </Pressable>
+
+                  <Pressable style={[styles.smallBtn, styles.sendBtnDisabled]} disabled>
+                    <Text style={styles.smallBtnText}>Guild Invite (Soon)</Text>
+                  </Pressable>
+                </View>
               </>
             )}
 
@@ -925,6 +1003,7 @@ export function SocialTabContent({
                   setActiveProfileUid(null);
                   setProfileLoading(false);
                   setProfileError(null);
+                  setProfileActionBusy(false);
                 }}
               >
                 <Text style={styles.confirmBtnText}>Close</Text>
@@ -1547,6 +1626,23 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: 0.2,
+  },
+  profileTagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  profileTag: {
+    color: '#DDF5FF',
+    borderWidth: 1,
+    borderColor: '#4B7695',
+    borderRadius: 999,
+    backgroundColor: '#17334A',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    fontSize: 10,
+    fontWeight: '800',
+    overflow: 'hidden',
   },
   confirmBackdrop: {
     flex: 1,

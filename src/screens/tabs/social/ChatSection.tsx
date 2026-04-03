@@ -18,6 +18,7 @@ interface ChatSectionProps {
   formatTime: (ts: number) => string;
   onSend: () => Promise<void>;
   onOpenUserMenu: (item: GlobalChatMessage) => void;
+  onOpenProfile: (uid: string) => void;
   onMute: (targetUid: string, durationMs: number, reason: string) => Promise<void>;
   meDisplayName: string;
   meLevel: number;
@@ -38,6 +39,7 @@ export function ChatSection({
   formatTime,
   onSend,
   onOpenUserMenu,
+  onOpenProfile,
   onMute,
   meDisplayName,
   meLevel,
@@ -69,8 +71,13 @@ export function ChatSection({
                 style={[styles.chatRow, mine && styles.chatRowMine]}
                 onPress={() => {
                   if (mine) return;
+                  onOpenProfile(item.uid);
+                }}
+                onLongPress={() => {
+                  if (mine) return;
                   onOpenUserMenu(item);
                 }}
+                delayLongPress={200}
               >
                 <View style={styles.chatHeaderRow}>
                   <Text style={styles.chatName} numberOfLines={1} ellipsizeMode="tail">
