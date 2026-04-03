@@ -26,15 +26,27 @@ import {
 } from '../../services/friends';
 import { GiftPreference } from '../../gameConfig';
 import {
+  attackBoss,
+  contributeToGuildEvent,
   createGuild,
+  ensureActiveBoss,
+  fetchActiveBoss,
   fetchGuildBrowse,
+  fetchGuildChat,
+  fetchGuildEvents,
   fetchGuildInfo,
   fetchGuildMembers,
+  GuildBossState,
   GuildBrowseRow,
+  GuildChatMessage,
+  GuildEventState,
   GuildMember,
   GuildSummary,
   joinGuild,
   leaveGuild,
+  sendGuildChatMessage,
+  startEvent,
+  subscribeGuildChat,
 } from '../../services/guild';
 
 export interface SocialTabContentProps {
@@ -49,6 +61,7 @@ export interface SocialTabContentProps {
 }
 
 type SocialSubTab = 'chat' | 'friends' | 'guild';
+type GuildSubTab = 'home' | 'boss' | 'events' | 'chat';
 
 function formatTime(ts: number): string {
   const date = new Date(ts);
@@ -107,6 +120,11 @@ export function SocialTabContent({
   const [guildList, setGuildList] = useState<GuildBrowseRow[]>([]);
   const [myGuild, setMyGuild] = useState<GuildSummary | null>(null);
   const [guildMembers, setGuildMembers] = useState<GuildMember[]>([]);
+  const [guildSubTab, setGuildSubTab] = useState<GuildSubTab>('home');
+  const [guildBoss, setGuildBoss] = useState<GuildBossState | null>(null);
+  const [guildEvents, setGuildEvents] = useState<GuildEventState[]>([]);
+  const [guildChat, setGuildChat] = useState<GuildChatMessage[]>([]);
+  const [guildChatDraft, setGuildChatDraft] = useState('');
 
   const me = useMemo(() => {
     const authUid = getFirebaseAuth()?.currentUser?.uid ?? '';
@@ -186,10 +204,19 @@ export function SocialTabContent({
         setMyGuild(guildInfo);
         setGuildList(browseRows);
         if (guildInfo?.guildId) {
-          const members = await fetchGuildMembers(guildInfo.guildId);
+          const [members, boss, events] = await Promise.all([
+            fetchGuildMembers(guildInfo.guildId),
+            fetchActiveBoss(me.uid),
+            fetchGuildEvents(me.uid),
+          ]);
           setGuildMembers(members);
+          setGuildBoss(boss);
+          setGuildEvents(events);
         } else {
           setGuildMembers([]);
+          setGuildBoss(null);
+          setGuildEvents([]);
+          setGuildChat([]);
         }
       } catch {
         setError('Failed to load guild data.');
@@ -202,6 +229,12 @@ export function SocialTabContent({
     }, 20_000);
     return () => clearInterval(timer);
   }, [guildSearchInput, me.uid, subTab, tab]);
+
+  useEffect(() => {
+    if (tab !== 'social' || subTab !== 'guild' || !me.uid || !myGuild?.guildId) return;
+    const stop = subscribeGuildChat(me.uid, setGuildChat);
+    return stop;
+  }, [me.uid, myGuild?.guildId, subTab, tab]);
 
   if (tab !== 'social') return null;
 
@@ -334,10 +367,21 @@ export function SocialTabContent({
     setMyGuild(guildInfo);
     setGuildList(browseRows);
     if (guildInfo?.guildId) {
-      const members = await fetchGuildMembers(guildInfo.guildId);
+      const [members, boss, events, chatRows] = await Promise.all([
+        fetchGuildMembers(guildInfo.guildId),
+        fetchActiveBoss(me.uid),
+        fetchGuildEvents(me.uid),
+        fetchGuildChat(me.uid),
+      ]);
       setGuildMembers(members);
+      setGuildBoss(boss);
+      setGuildEvents(events);
+      setGuildChat(chatRows);
     } else {
       setGuildMembers([]);
+      setGuildBoss(null);
+      setGuildEvents([]);
+      setGuildChat([]);
     }
   };
 
@@ -529,7 +573,7 @@ export function SocialTabContent({
         <>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Guild Command</Text>
-            <Text style={styles.metaText}>Create Guild Cost: 2,500 Diamonds (UI-enforced for MVP).</Text>
+            <Text style={styles.metaText}>Create Guild Cost: 2,500 Diamonds.</Text>
             <Text style={styles.metaText}>Your Diamonds: {diamonds}</Text>
             {!!error && <Text style={styles.errorText}>{error}</Text>}
           </View>
@@ -606,10 +650,29 @@ export function SocialTabContent({
           {myGuild && (
             <View style={styles.card}>
               <Text style={styles.cardTitle}>My Guild: [{myGuild.tag}] {myGuild.name}</Text>
+              <View style={styles.prefRow}>
+                <Pressable style={[styles.prefBtn, guildSubTab === 'home' && styles.prefBtnActive]} onPress={() => setGuildSubTab('home')}>
+                  <Text style={styles.prefBtnText}>Home</Text>
+                </Pressable>
+                <Pressable style={[styles.prefBtn, guildSubTab === 'boss' && styles.prefBtnActive]} onPress={() => setGuildSubTab('boss')}>
+                  <Text style={styles.prefBtnText}>Boss</Text>
+                </Pressable>
+                <Pressable style={[styles.prefBtn, guildSubTab === 'events' && styles.prefBtnActive]} onPress={() => setGuildSubTab('events')}>
+                  <Text style={styles.prefBtnText}>Events</Text>
+                </Pressable>
+                <Pressable style={[styles.prefBtn, guildSubTab === 'chat' && styles.prefBtnActive]} onPress={() => setGuildSubTab('chat')}>
+                  <Text style={styles.prefBtnText}>Chat</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {myGuild && guildSubTab === 'home' && (
+            <View style={styles.card}>
               <Text style={styles.metaText}>{myGuild.description || 'No description set.'}</Text>
               <Text style={styles.metaText}>Leader: {myGuild.leaderName} • Members: {myGuild.memberCount}/{myGuild.maxMembers}</Text>
               <Text style={styles.metaText}>Min Join Level: {myGuild.minLevelToJoin} • Public: {myGuild.isPublic ? 'Yes' : 'No'}</Text>
-              {guildMembers.slice(0, 8).map(member => (
+              {guildMembers.slice(0, 10).map(member => (
                 <Text key={member.uid} style={styles.metaText}>- {member.displayName} ({member.rank})</Text>
               ))}
               {myGuild.leaderId !== me.uid && (
@@ -634,7 +697,210 @@ export function SocialTabContent({
                   <Text style={styles.smallBtnText}>Leave Guild</Text>
                 </Pressable>
               )}
-              {myGuild.leaderId === me.uid && <Text style={styles.metaText}>Leader cannot leave yet (leadership transfer not built).</Text>}
+              {myGuild.leaderId === me.uid && <Text style={styles.metaText}>Leader leave is blocked until transfer/disband is implemented.</Text>}
+            </View>
+          )}
+
+          {myGuild && guildSubTab === 'boss' && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Guild Boss</Text>
+              {!guildBoss && <Text style={styles.metaText}>No active boss right now.</Text>}
+              {guildBoss && (
+                <>
+                  <Text style={styles.metaText}>{guildBoss.name} • Tier {guildBoss.tier}</Text>
+                  <Text style={styles.metaText}>HP: {Math.floor(guildBoss.currentHp).toLocaleString()} / {Math.floor(guildBoss.maxHp).toLocaleString()}</Text>
+                  <Text style={styles.metaText}>Status: {guildBoss.status} • Expires: {new Date(guildBoss.expiresAt).toLocaleString()}</Text>
+                  <Text style={styles.metaText}>Participants: {guildBoss.participantUids.length}</Text>
+                </>
+              )}
+              <View style={styles.friendActions}>
+                <Pressable
+                  style={styles.smallBtn}
+                  disabled={guildBusy}
+                  onPress={async () => {
+                    if (!me.uid) return;
+                    setGuildBusy(true);
+                    setError(null);
+                    try {
+                      const boss = await ensureActiveBoss(me.uid);
+                      setGuildBoss(boss);
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : 'Failed to start boss.';
+                      setError(msg);
+                    } finally {
+                      setGuildBusy(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.smallBtnText}>Summon / Refresh</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.smallBtn}
+                  disabled={guildBusy || !guildBoss || guildBoss.status !== 'active'}
+                  onPress={async () => {
+                    if (!me.uid) return;
+                    setGuildBusy(true);
+                    setError(null);
+                    try {
+                      const result = await attackBoss({
+                        uid: me.uid,
+                        displayName: me.name,
+                        dps: Math.max(1, Math.floor(me.level * 10_000_000)),
+                      });
+                      setGuildBoss(result.boss);
+                      if (result.rewardGranted) setError('Boss defeated. Guild rewards sent by mail.');
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : 'Failed to attack boss.';
+                      setError(msg);
+                    } finally {
+                      setGuildBusy(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.smallBtnText}>Attack (4h cd)</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {myGuild && guildSubTab === 'events' && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Guild Events</Text>
+              {myGuild.leaderId === me.uid && (
+                <View style={styles.friendActions}>
+                  <Pressable
+                    style={styles.smallBtn}
+                    disabled={guildBusy}
+                    onPress={async () => {
+                      if (!me.uid) return;
+                      setGuildBusy(true);
+                      setError(null);
+                      try {
+                        await startEvent({ uid: me.uid, type: 'war' });
+                        await refreshGuildData();
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : 'Failed to start war.';
+                        setError(msg);
+                      } finally {
+                        setGuildBusy(false);
+                      }
+                    }}
+                  >
+                    <Text style={styles.smallBtnText}>Start War</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.smallBtn}
+                    disabled={guildBusy}
+                    onPress={async () => {
+                      if (!me.uid) return;
+                      setGuildBusy(true);
+                      setError(null);
+                      try {
+                        await startEvent({ uid: me.uid, type: 'expedition' });
+                        await refreshGuildData();
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : 'Failed to start expedition.';
+                        setError(msg);
+                      } finally {
+                        setGuildBusy(false);
+                      }
+                    }}
+                  >
+                    <Text style={styles.smallBtnText}>Start Expedition</Text>
+                  </Pressable>
+                </View>
+              )}
+              {guildEvents.length === 0 && <Text style={styles.metaText}>No guild events yet.</Text>}
+              {guildEvents.map(event => {
+                const isWar = event.type === 'war';
+                const total = Number(event.details[isWar ? 'totalDamage' : 'totalKills'] ?? 0);
+                const target = Number(event.details[isWar ? 'targetDamage' : 'targetKills'] ?? 1);
+                const pct = Math.min(100, Math.floor((total / Math.max(1, target)) * 100));
+                return (
+                  <View key={event.eventId} style={styles.friendRow}>
+                    <View style={styles.friendMeta}>
+                      <Text style={styles.friendName}>{isWar ? 'Warfront Assault' : 'Expedition'} • {event.status}</Text>
+                      <Text style={styles.metaText}>Progress: {total.toLocaleString()} / {target.toLocaleString()} ({pct}%)</Text>
+                      <Text style={styles.metaText}>Ends: {new Date(event.endsAt).toLocaleString()}</Text>
+                    </View>
+                    <Pressable
+                      style={styles.smallBtn}
+                      disabled={guildBusy || event.status !== 'active'}
+                      onPress={async () => {
+                        if (!me.uid) return;
+                        setGuildBusy(true);
+                        setError(null);
+                        try {
+                          await contributeToGuildEvent({
+                            uid: me.uid,
+                            eventId: event.eventId,
+                            dps: isWar ? Math.max(1, Math.floor(me.level * 10_000_000)) : undefined,
+                            kills: isWar ? undefined : Math.max(1, Math.floor(me.level * 12)),
+                          });
+                          await refreshGuildData();
+                        } catch (err) {
+                          const msg = err instanceof Error ? err.message : 'Contribution failed.';
+                          setError(msg);
+                        } finally {
+                          setGuildBusy(false);
+                        }
+                      }}
+                    >
+                      <Text style={styles.smallBtnText}>Contribute</Text>
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {myGuild && guildSubTab === 'chat' && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Guild Chat</Text>
+              <View style={[styles.card, styles.chatListCard]}>
+                <FlatList
+                  data={guildChat}
+                  keyExtractor={item => item.id}
+                  renderItem={({ item }) => (
+                    <View style={styles.chatRow}>
+                      <View style={styles.chatHeaderRow}>
+                        <Text style={styles.chatName}>{item.displayName}</Text>
+                        <Text style={styles.chatTime}>{formatTime(item.sentAt)}</Text>
+                      </View>
+                      <Text style={styles.chatText}>{item.text}</Text>
+                    </View>
+                  )}
+                />
+              </View>
+              <TextInput
+                value={guildChatDraft}
+                onChangeText={setGuildChatDraft}
+                placeholder="Message guild..."
+                placeholderTextColor={THEME.text.tertiary}
+                style={styles.input}
+                editable={!guildBusy}
+                maxLength={300}
+              />
+              <Pressable
+                style={[styles.sendBtn, (!guildChatDraft.trim() || guildBusy) && styles.sendBtnDisabled]}
+                disabled={!guildChatDraft.trim() || guildBusy}
+                onPress={async () => {
+                  if (!me.uid) return;
+                  setGuildBusy(true);
+                  setError(null);
+                  try {
+                    await sendGuildChatMessage({ uid: me.uid, displayName: me.name, text: guildChatDraft });
+                    setGuildChatDraft('');
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : 'Failed to send guild chat.';
+                    setError(msg);
+                  } finally {
+                    setGuildBusy(false);
+                  }
+                }}
+              >
+                <Text style={styles.sendBtnText}>Send</Text>
+              </Pressable>
             </View>
           )}
 
@@ -687,12 +953,6 @@ export function SocialTabContent({
             </View>
           )}
 
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Planned Guild Events</Text>
-            <Text style={styles.metaText}>- Guild Boss: shared HP target, rewards delivered to all participants by mail.</Text>
-            <Text style={styles.metaText}>- Guild War: 48-hour DPS race against rival guilds.</Text>
-            <Text style={styles.metaText}>- Guild Expedition: week-long cooperative milestone campaign.</Text>
-          </View>
         </>
       )}
     </View>

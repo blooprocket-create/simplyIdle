@@ -4,9 +4,11 @@ import {
   getDoc,
   getDocs,
   limit,
+  onSnapshot,
   orderBy,
   query,
   runTransaction,
+  setDoc,
   where,
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase';
@@ -49,6 +51,23 @@ export interface GuildBossState {
   participantUids: string[];
 }
 
+export interface GuildEventState {
+  eventId: string;
+  type: 'war' | 'expedition';
+  status: 'active' | 'completed' | 'expired';
+  startedAt: number;
+  endsAt: number;
+  details: Record<string, unknown>;
+}
+
+export interface GuildChatMessage {
+  id: string;
+  uid: string;
+  displayName: string;
+  text: string;
+  sentAt: number;
+}
+
 export interface GuildBrowseRow {
   guildId: string;
   name: string;
@@ -62,6 +81,10 @@ export interface GuildBrowseRow {
 const GUILD_COLLECTION = 'guilds';
 const GUILD_LOOKUP_COLLECTION = 'guildLookup';
 const USER_GUILD_COLLECTION = 'userGuild';
+const BOSS_ATTACK_COOLDOWN_MS = 4 * 60 * 60 * 1000;
+const BOSS_DURATION_MS = 5 * 24 * 60 * 60 * 1000;
+const WAR_DURATION_MS = 48 * 60 * 60 * 1000;
+const EXPEDITION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 
 function requireDb() {
   const db = getFirebaseFirestore();
@@ -97,6 +120,28 @@ function parseGuildSummary(guildId: string, data: Record<string, unknown>): Guil
     minLevelToJoin: typeof data.minLevelToJoin === 'number' ? data.minLevelToJoin : 1,
     createdAt: typeof data.createdAt === 'number' ? data.createdAt : Date.now(),
   };
+}
+
+function bossHpForTier(tier: number): number {
+  return Math.max(1, Math.floor(Math.max(1, tier) * 500_000_000_000));
+}
+
+function sanitizeMessage(text: string): string {
+  return text.replace(/\s+/g, ' ').trim().slice(0, 300);
+}
+
+function pickBossName(tier: number): string {
+  if (tier >= 10) return 'Eternal Colossus';
+  if (tier >= 5) return 'Storm Tyrant';
+  return 'Ashen Behemoth';
+}
+
+async function resolveGuildIdForUser(uid: string): Promise<string | null> {
+  const db = requireDb();
+  const snap = await getDoc(doc(db, USER_GUILD_COLLECTION, uid));
+  if (!snap.exists()) return null;
+  const data = snap.data();
+  return typeof data.guildId === 'string' ? data.guildId : null;
 }
 
 export async function createGuild(input: {
@@ -342,9 +387,164 @@ export async function promoteMember(): Promise<never> {
   throw new Error('Guild member promotion is not implemented yet.');
 }
 
-export async function attackBoss(): Promise<never> {
-  requireDb();
-  throw new Error('Guild boss attack is not implemented yet.');
+export async function ensureActiveBoss(uid: string): Promise<GuildBossState> {
+  const db = requireDb();
+  const guildId = await resolveGuildIdForUser(uid);
+  if (!guildId) throw new Error('You are not in a guild.');
+
+  const guildRef = doc(db, GUILD_COLLECTION, guildId);
+  const bossRef = doc(db, GUILD_COLLECTION, guildId, 'boss', 'active');
+  const now = Date.now();
+
+  return runTransaction(db, async tx => {
+    const [guildSnap, bossSnap] = await Promise.all([tx.get(guildRef), tx.get(bossRef)]);
+    if (!guildSnap.exists()) throw new Error('Guild not found.');
+
+    const guild = guildSnap.data();
+    const tier = Math.max(1, Math.floor((typeof guild.level === 'number' ? guild.level : 1)));
+    const maxHp = bossHpForTier(tier);
+
+    if (bossSnap.exists()) {
+      const bossData = bossSnap.data();
+      const status = (bossData.status === 'defeated' || bossData.status === 'expired') ? bossData.status : 'active';
+      const expiresAt = typeof bossData.expiresAt === 'number' ? bossData.expiresAt : now;
+      if (status === 'active' && expiresAt > now) {
+        return {
+          bossId: 'active',
+          name: typeof bossData.name === 'string' ? bossData.name : pickBossName(tier),
+          tier: typeof bossData.tier === 'number' ? bossData.tier : tier,
+          maxHp: typeof bossData.maxHp === 'number' ? bossData.maxHp : maxHp,
+          currentHp: typeof bossData.currentHp === 'number' ? bossData.currentHp : maxHp,
+          status: 'active',
+          startedAt: typeof bossData.startedAt === 'number' ? bossData.startedAt : now,
+          expiresAt,
+          participantUids: Array.isArray(bossData.participantUids) ? bossData.participantUids.filter(v => typeof v === 'string') as string[] : [],
+        };
+      }
+    }
+
+    const nextBoss: GuildBossState = {
+      bossId: 'active',
+      name: pickBossName(tier),
+      tier,
+      maxHp,
+      currentHp: maxHp,
+      status: 'active',
+      startedAt: now,
+      expiresAt: now + BOSS_DURATION_MS,
+      participantUids: [],
+    };
+
+    tx.set(bossRef, {
+      ...nextBoss,
+      updatedAt: now,
+    });
+
+    return nextBoss;
+  });
+}
+
+export async function attackBoss(input: { uid: string; displayName: string; dps: number }): Promise<{ dealt: number; boss: GuildBossState; rewardGranted: boolean }> {
+  const db = requireDb();
+  const guildId = await resolveGuildIdForUser(input.uid);
+  if (!guildId) throw new Error('You are not in a guild.');
+
+  const now = Date.now();
+  const memberRef = doc(db, GUILD_COLLECTION, guildId, 'members', input.uid);
+  const bossRef = doc(db, GUILD_COLLECTION, guildId, 'boss', 'active');
+  const safeDps = Math.max(1, Math.floor(input.dps || 1));
+  const strikeDamage = safeDps * 30;
+
+  const txResult = await runTransaction<{ dealt: number; rewardGranted: boolean; rewardAmount: number; boss: GuildBossState }>(db, async tx => {
+    const [memberSnap, bossSnap] = await Promise.all([tx.get(memberRef), tx.get(bossRef)]);
+    if (!memberSnap.exists()) throw new Error('Guild membership not found.');
+    if (!bossSnap.exists()) throw new Error('No active boss.');
+
+    const memberData = memberSnap.data();
+    const bossData = bossSnap.data();
+    const bossStatus = bossData.status === 'defeated' || bossData.status === 'expired' ? bossData.status : 'active';
+    const expiresAt = typeof bossData.expiresAt === 'number' ? bossData.expiresAt : 0;
+
+    if (bossStatus !== 'active' || expiresAt <= now) {
+      throw new Error('Boss is not active.');
+    }
+
+    const lastAttackAt = typeof memberData.lastBossAttackAt === 'number' ? memberData.lastBossAttackAt : 0;
+    if (now - lastAttackAt < BOSS_ATTACK_COOLDOWN_MS) {
+      const minutesLeft = Math.ceil((BOSS_ATTACK_COOLDOWN_MS - (now - lastAttackAt)) / 60_000);
+      throw new Error(`Attack cooldown active (${minutesLeft}m remaining).`);
+    }
+
+    const currentHp = Math.max(0, typeof bossData.currentHp === 'number' ? bossData.currentHp : 0);
+    const maxHp = Math.max(1, typeof bossData.maxHp === 'number' ? bossData.maxHp : 1);
+    const nextHp = Math.max(0, currentHp - strikeDamage);
+    const participantUids = Array.isArray(bossData.participantUids)
+      ? [...new Set((bossData.participantUids as unknown[]).filter(v => typeof v === 'string') as string[]) ]
+      : [];
+    if (!participantUids.includes(input.uid)) participantUids.push(input.uid);
+
+    tx.set(memberRef, {
+      lastBossAttackAt: now,
+      guildContribution: (typeof memberData.guildContribution === 'number' ? memberData.guildContribution : 0) + strikeDamage,
+      displayName: input.displayName.trim().slice(0, 24) || memberData.displayName || 'Member',
+    }, { merge: true });
+
+    const defeated = nextHp <= 0;
+    tx.set(bossRef, {
+      currentHp: nextHp,
+      status: defeated ? 'defeated' : 'active',
+      participantUids,
+      defeatedAt: defeated ? now : null,
+      updatedAt: now,
+    }, { merge: true });
+
+    return {
+      dealt: Math.min(strikeDamage, currentHp),
+      rewardGranted: defeated,
+      rewardAmount: Math.max(100, Math.floor(maxHp / 5_000_000_000)),
+      boss: {
+        bossId: 'active',
+        name: typeof bossData.name === 'string' ? bossData.name : 'Guild Boss',
+        tier: typeof bossData.tier === 'number' ? bossData.tier : 1,
+        maxHp,
+        currentHp: nextHp,
+        status: defeated ? 'defeated' : 'active',
+        startedAt: typeof bossData.startedAt === 'number' ? bossData.startedAt : now,
+        expiresAt,
+        participantUids,
+      },
+    };
+  });
+
+  if (txResult.rewardGranted) {
+    const membersCol = collection(db, GUILD_COLLECTION, guildId, 'members');
+    const memberSnaps = await getDocs(query(membersCol, limit(200)));
+    await Promise.all(memberSnaps.docs.map(async memberSnap => {
+      const memberUid = memberSnap.id;
+      const mailRef = doc(db, 'playerMail', memberUid, 'messages', `guild_boss_${guildId}_${now}_${memberUid.slice(0, 6)}`);
+      await setDoc(mailRef, {
+        subject: 'Guild Boss Defeated',
+        message: `Your guild defeated ${txResult.boss.name}!`,
+        from: 'Guild Command',
+        sentAt: now,
+        kind: 'guild_reward',
+        guildId,
+        attachments: {
+          shards: txResult.rewardAmount,
+          gold: txResult.rewardAmount * 1000,
+          diamonds: 0,
+          tears: Math.max(1, Math.floor(txResult.rewardAmount / 50)),
+          essence: Math.max(1, Math.floor(txResult.rewardAmount / 4)),
+        },
+      });
+    }));
+  }
+
+  return {
+    dealt: txResult.dealt,
+    rewardGranted: txResult.rewardGranted,
+    boss: txResult.boss,
+  };
 }
 
 export async function fetchGuildInfo(uid: string): Promise<GuildSummary | null> {
@@ -379,14 +579,195 @@ export async function fetchGuildMembers(guildId: string): Promise<GuildMember[]>
   });
 }
 
-export async function fetchActiveBoss(): Promise<GuildBossState | null> {
-  requireDb();
-  return null;
+export async function fetchActiveBoss(uid: string): Promise<GuildBossState | null> {
+  const db = requireDb();
+  const guildId = await resolveGuildIdForUser(uid);
+  if (!guildId) return null;
+  const bossSnap = await getDoc(doc(db, GUILD_COLLECTION, guildId, 'boss', 'active'));
+  if (!bossSnap.exists()) return null;
+  const data = bossSnap.data();
+  return {
+    bossId: 'active',
+    name: typeof data.name === 'string' ? data.name : 'Guild Boss',
+    tier: typeof data.tier === 'number' ? data.tier : 1,
+    maxHp: typeof data.maxHp === 'number' ? data.maxHp : 1,
+    currentHp: typeof data.currentHp === 'number' ? data.currentHp : 1,
+    status: data.status === 'defeated' || data.status === 'expired' ? data.status : 'active',
+    startedAt: typeof data.startedAt === 'number' ? data.startedAt : 0,
+    expiresAt: typeof data.expiresAt === 'number' ? data.expiresAt : 0,
+    participantUids: Array.isArray(data.participantUids) ? data.participantUids.filter(v => typeof v === 'string') as string[] : [],
+  };
 }
 
-export async function startEvent(): Promise<never> {
-  requireDb();
-  throw new Error('Guild event start is not implemented yet.');
+export async function startEvent(input: { uid: string; type: 'war' | 'expedition' }): Promise<GuildEventState> {
+  const db = requireDb();
+  const guildId = await resolveGuildIdForUser(input.uid);
+  if (!guildId) throw new Error('You are not in a guild.');
+  const guildSnap = await getDoc(doc(db, GUILD_COLLECTION, guildId));
+  if (!guildSnap.exists()) throw new Error('Guild not found.');
+  const guild = guildSnap.data();
+  if (guild.leaderId !== input.uid) throw new Error('Only guild leader can start events.');
+
+  const now = Date.now();
+  const eventId = `${input.type}_active`;
+  const endsAt = now + (input.type === 'war' ? WAR_DURATION_MS : EXPEDITION_DURATION_MS);
+  const eventRef = doc(db, GUILD_COLLECTION, guildId, 'events', eventId);
+
+  const details = input.type === 'war'
+    ? { totalDamage: 0, targetDamage: 2_000_000_000_000 }
+    : { totalKills: 0, targetKills: 250_000 };
+
+  await setDoc(eventRef, {
+    eventId,
+    type: input.type,
+    status: 'active',
+    startedAt: now,
+    endsAt,
+    details,
+    updatedAt: now,
+  }, { merge: true });
+
+  return {
+    eventId,
+    type: input.type,
+    status: 'active',
+    startedAt: now,
+    endsAt,
+    details,
+  };
+}
+
+export async function fetchGuildEvents(uid: string): Promise<GuildEventState[]> {
+  const db = requireDb();
+  const guildId = await resolveGuildIdForUser(uid);
+  if (!guildId) return [];
+  const snap = await getDocs(collection(db, GUILD_COLLECTION, guildId, 'events'));
+  return snap.docs.map(docSnap => {
+    const data = docSnap.data();
+    return {
+      eventId: typeof data.eventId === 'string' ? data.eventId : docSnap.id,
+      type: data.type === 'war' ? 'war' : 'expedition',
+      status: data.status === 'completed' || data.status === 'expired' ? data.status : 'active',
+      startedAt: typeof data.startedAt === 'number' ? data.startedAt : 0,
+      endsAt: typeof data.endsAt === 'number' ? data.endsAt : 0,
+      details: data.details && typeof data.details === 'object' ? data.details as Record<string, unknown> : {},
+    } satisfies GuildEventState;
+  }).sort((a, b) => b.startedAt - a.startedAt);
+}
+
+export async function contributeToGuildEvent(input: { uid: string; eventId: string; dps?: number; kills?: number }): Promise<GuildEventState> {
+  const db = requireDb();
+  const guildId = await resolveGuildIdForUser(input.uid);
+  if (!guildId) throw new Error('You are not in a guild.');
+  const eventRef = doc(db, GUILD_COLLECTION, guildId, 'events', input.eventId);
+  const now = Date.now();
+
+  return runTransaction(db, async tx => {
+    const eventSnap = await tx.get(eventRef);
+    if (!eventSnap.exists()) throw new Error('Event not found.');
+    const data = eventSnap.data();
+    if (data.status !== 'active') throw new Error('Event is not active.');
+    if (typeof data.endsAt === 'number' && data.endsAt <= now) throw new Error('Event expired.');
+
+    const details = (data.details && typeof data.details === 'object' ? data.details : {}) as Record<string, unknown>;
+    let nextDetails: Record<string, unknown> = { ...details };
+    let status: 'active' | 'completed' = 'active';
+
+    if (data.type === 'war') {
+      const dealt = Math.max(0, Math.floor((input.dps ?? 0) * 30));
+      const totalDamage = (typeof details.totalDamage === 'number' ? details.totalDamage : 0) + dealt;
+      const targetDamage = typeof details.targetDamage === 'number' ? details.targetDamage : 2_000_000_000_000;
+      status = totalDamage >= targetDamage ? 'completed' : 'active';
+      nextDetails = { ...details, totalDamage, targetDamage };
+    } else {
+      const kills = Math.max(0, Math.floor(input.kills ?? 0));
+      const totalKills = (typeof details.totalKills === 'number' ? details.totalKills : 0) + kills;
+      const targetKills = typeof details.targetKills === 'number' ? details.targetKills : 250_000;
+      status = totalKills >= targetKills ? 'completed' : 'active';
+      nextDetails = { ...details, totalKills, targetKills };
+    }
+
+    tx.set(eventRef, {
+      status,
+      details: nextDetails,
+      updatedAt: now,
+      completedAt: status === 'completed' ? now : null,
+    }, { merge: true });
+
+    return {
+      eventId: input.eventId,
+      type: data.type === 'war' ? 'war' : 'expedition',
+      status,
+      startedAt: typeof data.startedAt === 'number' ? data.startedAt : now,
+      endsAt: typeof data.endsAt === 'number' ? data.endsAt : now,
+      details: nextDetails,
+    };
+  });
+}
+
+export async function sendGuildChatMessage(input: { uid: string; displayName: string; text: string }): Promise<void> {
+  const db = requireDb();
+  const guildId = await resolveGuildIdForUser(input.uid);
+  if (!guildId) throw new Error('You are not in a guild.');
+  const now = Date.now();
+  const text = sanitizeMessage(input.text);
+  if (!text) return;
+
+  const chatRef = doc(collection(db, GUILD_COLLECTION, guildId, 'chat'));
+  await setDoc(chatRef, {
+    uid: input.uid,
+    displayName: input.displayName.trim().slice(0, 24) || 'Member',
+    text,
+    sentAt: now,
+  });
+}
+
+export async function fetchGuildChat(uid: string, maxRows = 60): Promise<GuildChatMessage[]> {
+  const db = requireDb();
+  const guildId = await resolveGuildIdForUser(uid);
+  if (!guildId) return [];
+  const snap = await getDocs(query(collection(db, GUILD_COLLECTION, guildId, 'chat'), orderBy('sentAt', 'desc'), limit(maxRows)));
+  return snap.docs.map(docSnap => {
+    const data = docSnap.data();
+    return {
+      id: docSnap.id,
+      uid: typeof data.uid === 'string' ? data.uid : '',
+      displayName: typeof data.displayName === 'string' ? data.displayName : 'Member',
+      text: typeof data.text === 'string' ? data.text : '',
+      sentAt: typeof data.sentAt === 'number' ? data.sentAt : 0,
+    } satisfies GuildChatMessage;
+  }).filter(r => !!r.uid && !!r.text).sort((a, b) => a.sentAt - b.sentAt);
+}
+
+export function subscribeGuildChat(uid: string, onMessages: (messages: GuildChatMessage[]) => void): () => void {
+  const db = requireDb();
+  const stopNoop = () => {};
+  if (!uid) return stopNoop;
+
+  let unsub: (() => void) | null = null;
+  void resolveGuildIdForUser(uid).then(guildId => {
+    if (!guildId) return;
+    unsub = onSnapshot(
+      query(collection(db, GUILD_COLLECTION, guildId, 'chat'), orderBy('sentAt', 'desc'), limit(60)),
+      snap => {
+        const rows = snap.docs.map(docSnap => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            uid: typeof data.uid === 'string' ? data.uid : '',
+            displayName: typeof data.displayName === 'string' ? data.displayName : 'Member',
+            text: typeof data.text === 'string' ? data.text : '',
+            sentAt: typeof data.sentAt === 'number' ? data.sentAt : 0,
+          } satisfies GuildChatMessage;
+        }).filter(r => !!r.uid && !!r.text).sort((a, b) => a.sentAt - b.sentAt);
+        onMessages(rows);
+      },
+    );
+  }).catch(() => {});
+
+  return () => {
+    if (unsub) unsub();
+  };
 }
 
 export async function fetchGuildBrowse(searchTerm = ''): Promise<GuildBrowseRow[]> {
