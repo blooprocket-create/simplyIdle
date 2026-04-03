@@ -138,6 +138,7 @@ export function GuildSection({
   setConfirmTransferLeader,
   setConfirmDisbandGuild,
 }: GuildSectionProps) {
+  const [pendingEventRestartType, setPendingEventRestartType] = useState<'war' | 'expedition' | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [localBossCooldownUntil, setLocalBossCooldownUntil] = useState(0);
   const [eventCooldownUntilById, setEventCooldownUntilById] = useState<Record<string, number>>({});
@@ -233,6 +234,16 @@ export function GuildSection({
     [guildEvents],
   );
 
+  const activeWarEvent = useMemo(
+    () => guildEvents.find(event => event.type === 'war' && event.status === 'active') ?? null,
+    [guildEvents],
+  );
+
+  const activeExpeditionEvent = useMemo(
+    () => guildEvents.find(event => event.type === 'expedition' && event.status === 'active') ?? null,
+    [guildEvents],
+  );
+
   const recentCompletedEvents = useMemo(
     () => guildEvents.filter(event => event.status === 'completed').slice(0, 3),
     [guildEvents],
@@ -279,6 +290,22 @@ export function GuildSection({
     && !!myGuild
     && isEditingDescription
     && descriptionDraft.trim().slice(0, 140) !== (myGuild.description || '');
+
+  const startGuildEvent = async (type: 'war' | 'expedition', forceRestart = false) => {
+    if (!me.uid) return;
+    setGuildBusy(true);
+    setError(null);
+    try {
+      await startEvent({ uid: me.uid, type, forceRestart });
+      setPendingEventRestartType(null);
+      await refreshGuildData();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : `Failed to start ${type}.`;
+      setError(msg);
+    } finally {
+      setGuildBusy(false);
+    }
+  };
 
   return (
     <>
@@ -682,22 +709,15 @@ export function GuildSection({
                 pressed && isLeader && !guildBusy && styles.smallBtnPressed,
               ]}
               disabled={!isLeader || guildBusy}
-              onPress={async () => {
-                if (!me.uid) return;
-                setGuildBusy(true);
-                setError(null);
-                try {
-                  await startEvent({ uid: me.uid, type: 'war' });
-                  await refreshGuildData();
-                } catch (err) {
-                  const msg = err instanceof Error ? err.message : 'Failed to start war.';
-                  setError(msg);
-                } finally {
-                  setGuildBusy(false);
+              onPress={() => {
+                if (activeWarEvent) {
+                  setPendingEventRestartType('war');
+                  return;
                 }
+                void startGuildEvent('war', false);
               }}
             >
-              <Text style={styles.smallBtnText}>Start War</Text>
+              <Text style={styles.smallBtnText}>{activeWarEvent ? 'Restart War' : 'Start War'}</Text>
             </Pressable>
             <Pressable
               style={({ pressed }) => [
@@ -706,26 +726,72 @@ export function GuildSection({
                 pressed && isLeader && !guildBusy && styles.smallBtnPressed,
               ]}
               disabled={!isLeader || guildBusy}
-              onPress={async () => {
-                if (!me.uid) return;
-                setGuildBusy(true);
-                setError(null);
-                try {
-                  await startEvent({ uid: me.uid, type: 'expedition' });
-                  await refreshGuildData();
-                } catch (err) {
-                  const msg = err instanceof Error ? err.message : 'Failed to start expedition.';
-                  setError(msg);
-                } finally {
-                  setGuildBusy(false);
+              onPress={() => {
+                if (activeExpeditionEvent) {
+                  setPendingEventRestartType('expedition');
+                  return;
                 }
+                void startGuildEvent('expedition', false);
               }}
             >
-              <Text style={styles.smallBtnText}>Start Expedition</Text>
+              <Text style={styles.smallBtnText}>{activeExpeditionEvent ? 'Restart Expedition' : 'Start Expedition'}</Text>
             </Pressable>
           </View>
           {!isLeader && (
             <Text style={styles.metaText}>Only guild leader can launch new events in the current ruleset.</Text>
+          )}
+          {!!pendingEventRestartType && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Forfeit Current Progress?</Text>
+              <Text style={styles.metaText}>
+                {pendingEventRestartType === 'war'
+                  ? 'Restarting Warfront will reset current war progress and start over.'
+                  : 'Restarting Expedition will reset current expedition progress and start over.'}
+              </Text>
+              <Text style={styles.metaText}>
+                {pendingEventRestartType === 'war'
+                  ? (() => {
+                    const total = Number(activeWarEvent?.details.totalDamage ?? 0);
+                    const target = Number(activeWarEvent?.details.targetDamage ?? 1);
+                    const pct = Math.min(100, Math.floor((total / Math.max(1, target)) * 100));
+                    return `Current progress: ${total.toLocaleString()} / ${target.toLocaleString()} (${pct}%)`;
+                  })()
+                  : (() => {
+                    const total = Number(activeExpeditionEvent?.details.totalKills ?? 0);
+                    const target = Number(activeExpeditionEvent?.details.targetKills ?? 1);
+                    const pct = Math.min(100, Math.floor((total / Math.max(1, target)) * 100));
+                    return `Current progress: ${total.toLocaleString()} / ${target.toLocaleString()} (${pct}%)`;
+                  })()}
+              </Text>
+              <View style={styles.friendActions}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.smallBtn,
+                    guildBusy && styles.sendBtnDisabled,
+                    pressed && !guildBusy && styles.smallBtnPressed,
+                  ]}
+                  disabled={guildBusy}
+                  onPress={() => setPendingEventRestartType(null)}
+                >
+                  <Text style={styles.smallBtnText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.smallBtn,
+                    styles.smallBtnDanger,
+                    guildBusy && styles.sendBtnDisabled,
+                    pressed && !guildBusy && styles.smallBtnPressed,
+                  ]}
+                  disabled={guildBusy}
+                  onPress={() => {
+                    if (!pendingEventRestartType) return;
+                    void startGuildEvent(pendingEventRestartType, true);
+                  }}
+                >
+                  <Text style={styles.smallBtnText}>Forfeit & Restart</Text>
+                </Pressable>
+              </View>
+            </View>
           )}
           {guildEvents.length === 0 && <Text style={styles.metaText}>No guild events yet.</Text>}
           {guildEvents.map(event => {

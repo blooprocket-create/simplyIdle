@@ -843,7 +843,7 @@ export async function fetchActiveBoss(uid: string): Promise<GuildBossState | nul
   };
 }
 
-export async function startEvent(input: { uid: string; type: 'war' | 'expedition' }): Promise<GuildEventState> {
+export async function startEvent(input: { uid: string; type: 'war' | 'expedition'; forceRestart?: boolean }): Promise<GuildEventState> {
   const db = requireDb();
   const guildId = await resolveGuildIdForUser(input.uid);
   if (!guildId) throw new Error('You are not in a guild.');
@@ -856,6 +856,15 @@ export async function startEvent(input: { uid: string; type: 'war' | 'expedition
   const eventId = `${input.type}_active`;
   const endsAt = now + (input.type === 'war' ? WAR_DURATION_MS : EXPEDITION_DURATION_MS);
   const eventRef = doc(db, GUILD_COLLECTION, guildId, 'events', eventId);
+
+  const existingEventSnap = await getDoc(eventRef);
+  if (existingEventSnap.exists()) {
+    const existing = existingEventSnap.data();
+    const isActive = existing.status === 'active' && typeof existing.endsAt === 'number' && existing.endsAt > now;
+    if (isActive && !input.forceRestart) {
+      throw new Error(`Active ${input.type} event in progress. Restarting will forfeit current progress.`);
+    }
+  }
 
   const details = input.type === 'war'
     ? { totalDamage: 0, targetDamage: 2_000_000_000_000 }
