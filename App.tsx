@@ -102,12 +102,28 @@ export default function App() {
       accountName={accountName}
       onLogout={async () => {
         const uid = getFirebaseAuth()?.currentUser?.uid;
-        if (uid) {
-          await markPresenceOffline(uid);
+        try {
+          if (uid) {
+            await markPresenceOffline(uid);
+          }
+        } catch (error) {
+          debugLog('auth', 'Presence offline write failed during logout', {
+            uid,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
-        if (isOnlineAuthAvailable()) {
-          await logoutOnline();
+
+        try {
+          if (isOnlineAuthAvailable()) {
+            await logoutOnline();
+          }
+        } catch (error) {
+          debugLog('auth', 'Firebase sign-out failed', {
+            uid,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
+
         setAccountName(null);
       }}
     />
