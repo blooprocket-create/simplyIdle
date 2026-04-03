@@ -302,6 +302,18 @@ export function GuildSection({
       ? TREASURY_DAILY_WITHDRAW_CAP_OFFICER
       : 0;
   const treasuryRemainingWithdrawToday = Math.max(0, treasuryDailyCap - (treasuryState?.dailyWithdrawn ?? 0));
+  const treasuryAmountParsed = parsePositiveInt(treasuryAmountInput);
+  const treasuryBalance = treasuryState?.balance ?? 0;
+  const canDepositTreasury = !guildBusy
+    && !treasuryLoading
+    && treasuryAmountParsed > 0
+    && walletGold >= treasuryAmountParsed;
+  const canWithdrawTreasury = canWithdrawFromTreasury
+    && !guildBusy
+    && !treasuryLoading
+    && treasuryAmountParsed > 0
+    && treasuryBalance >= treasuryAmountParsed
+    && treasuryRemainingWithdrawToday >= treasuryAmountParsed;
   const roleLabel = isLeader ? 'Leader' : isOfficer ? 'Officer' : 'Member';
 
   const persistedBossCooldownUntil = (myGuildMember?.lastBossAttackAt ?? 0) + BOSS_ATTACK_COOLDOWN_MS;
@@ -1123,13 +1135,13 @@ export function GuildSection({
                 <Pressable
                   style={({ pressed }) => [
                     styles.smallBtn,
-                    (guildBusy || treasuryLoading || parsePositiveInt(treasuryAmountInput) <= 0) && styles.sendBtnDisabled,
-                    pressed && !guildBusy && !treasuryLoading && parsePositiveInt(treasuryAmountInput) > 0 && styles.smallBtnPressed,
+                    !canDepositTreasury && styles.sendBtnDisabled,
+                    pressed && canDepositTreasury && styles.smallBtnPressed,
                   ]}
-                  disabled={guildBusy || treasuryLoading || parsePositiveInt(treasuryAmountInput) <= 0}
+                  disabled={!canDepositTreasury}
                   onPress={async () => {
                     if (!me.uid) return;
-                    const amount = parsePositiveInt(treasuryAmountInput);
+                    const amount = treasuryAmountParsed;
                     if (amount <= 0) {
                       setError('Enter a valid treasury amount.');
                       return;
@@ -1164,13 +1176,13 @@ export function GuildSection({
                 <Pressable
                   style={({ pressed }) => [
                     styles.smallBtn,
-                    (!canWithdrawFromTreasury || guildBusy || treasuryLoading || parsePositiveInt(treasuryAmountInput) <= 0) && styles.sendBtnDisabled,
-                    pressed && canWithdrawFromTreasury && !guildBusy && !treasuryLoading && parsePositiveInt(treasuryAmountInput) > 0 && styles.smallBtnPressed,
+                    !canWithdrawTreasury && styles.sendBtnDisabled,
+                    pressed && canWithdrawTreasury && styles.smallBtnPressed,
                   ]}
-                  disabled={!canWithdrawFromTreasury || guildBusy || treasuryLoading || parsePositiveInt(treasuryAmountInput) <= 0}
+                  disabled={!canWithdrawTreasury}
                   onPress={async () => {
                     if (!me.uid) return;
-                    const amount = parsePositiveInt(treasuryAmountInput);
+                    const amount = treasuryAmountParsed;
                     if (amount <= 0) {
                       setError('Enter a valid treasury amount.');
                       return;
@@ -1209,6 +1221,20 @@ export function GuildSection({
               {canWithdrawFromTreasury && (
                 <Text style={styles.metaText}>
                   Daily withdrawal cap: {treasuryDailyCap.toLocaleString()} • Remaining today: {treasuryRemainingWithdrawToday.toLocaleString()}
+                </Text>
+              )}
+              {treasuryAmountParsed <= 0 && (
+                <Text style={styles.metaText}>Enter a positive amount to enable treasury actions.</Text>
+              )}
+              {treasuryAmountParsed > 0 && walletGold < treasuryAmountParsed && (
+                <Text style={styles.metaText}>Insufficient gold for deposit. You have {walletGold.toLocaleString()}.</Text>
+              )}
+              {treasuryAmountParsed > 0 && treasuryBalance < treasuryAmountParsed && (
+                <Text style={styles.metaText}>Treasury balance is too low for that withdrawal.</Text>
+              )}
+              {treasuryAmountParsed > 0 && canWithdrawFromTreasury && treasuryRemainingWithdrawToday < treasuryAmountParsed && (
+                <Text style={styles.metaText}>
+                  Withdrawal exceeds remaining daily cap by {(treasuryAmountParsed - treasuryRemainingWithdrawToday).toLocaleString()}.
                 </Text>
               )}
             </SocialCard>
