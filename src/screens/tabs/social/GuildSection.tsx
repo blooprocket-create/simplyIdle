@@ -225,24 +225,41 @@ export function GuildSection({
   }, [guildEvents, guildSubTab, me.uid, myGuild]);
 
   useEffect(() => {
-    if (!myGuild || guildSubTab !== 'treasury' || !me.uid || !treasuryEnabled) return;
+    if (!myGuild || !me.uid || !treasuryEnabled) return;
+    const shouldLoadState = guildSubTab === 'treasury' || guildSubTab === 'home';
+    if (!shouldLoadState) return;
+
     let cancelled = false;
-    setTreasuryLoading(true);
     setError(null);
-    void Promise.all([
-      fetchGuildTreasuryState(me.uid),
-      fetchGuildTreasuryLedger(me.uid, 18),
-    ]).then(([state, ledger]) => {
-      if (cancelled) return;
-      setTreasuryState(state);
-      setTreasuryLedger(ledger);
-    }).catch(err => {
-      if (cancelled) return;
-      const msg = err instanceof Error ? err.message : 'Failed to load guild treasury.';
-      setError(msg);
-    }).finally(() => {
-      if (!cancelled) setTreasuryLoading(false);
-    });
+
+    if (guildSubTab === 'treasury') {
+      setTreasuryLoading(true);
+      void Promise.all([
+        fetchGuildTreasuryState(me.uid),
+        fetchGuildTreasuryLedger(me.uid, 18),
+      ]).then(([state, ledger]) => {
+        if (cancelled) return;
+        setTreasuryState(state);
+        setTreasuryLedger(ledger);
+      }).catch(err => {
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : 'Failed to load guild treasury.';
+        setError(msg);
+      }).finally(() => {
+        if (!cancelled) setTreasuryLoading(false);
+      });
+    } else {
+      void fetchGuildTreasuryState(me.uid)
+        .then(state => {
+          if (cancelled) return;
+          setTreasuryState(state);
+        })
+        .catch(err => {
+          if (cancelled) return;
+          const msg = err instanceof Error ? err.message : 'Failed to load guild treasury.';
+          setError(msg);
+        });
+    }
 
     return () => {
       cancelled = true;
@@ -491,6 +508,12 @@ export function GuildSection({
                 <Text style={styles.metricLabel}>Boss Damage Pool</Text>
                 <Text style={styles.metricValue}>{formatCompactNumber(totalBossDamage)}</Text>
               </View>
+              {treasuryEnabled && (
+                <View style={styles.metricChip}>
+                  <Text style={styles.metricLabel}>Treasury</Text>
+                  <Text style={styles.metricValue}>{formatCompactNumber(treasuryState?.balance ?? 0)}</Text>
+                </View>
+              )}
             </View>
           </SocialCard>
 

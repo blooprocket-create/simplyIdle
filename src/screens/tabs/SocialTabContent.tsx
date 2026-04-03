@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Animated, Modal, NativeSyntheticEvent, NativeTouchEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { THEME, RADIUS } from '../../theme';
 import {
+  ChatReactionSummary,
   GlobalChatMessage,
+  fetchChatReactionSummaryForMessage,
   isUserMuted,
   muteUser,
   sendChatMessage,
@@ -491,7 +493,20 @@ export function SocialTabContent({
   const toggleReaction = async (messageId: string, emoji: string) => {
     if (!me.uid) return;
     try {
-      await toggleChatReaction(me.uid, messageId, emoji);
+      const summary = await toggleChatReaction(me.uid, messageId, emoji);
+      const resolvedSummary: ChatReactionSummary = summary?.counts
+        ? summary
+        : await fetchChatReactionSummaryForMessage(messageId, me.uid);
+
+      setMessages(current => current.map(message => {
+        if (message.id !== messageId) return message;
+        return {
+          ...message,
+          reactions: resolvedSummary.counts,
+          myReaction: resolvedSummary.mine,
+        };
+      }));
+      setChatError(null);
       void trackEvent('social_chat_reaction_toggled', { emoji });
     } catch {
       setChatError('Failed to react to message.');

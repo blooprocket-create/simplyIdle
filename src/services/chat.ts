@@ -42,12 +42,12 @@ export interface ChatMuteRecord {
   updatedAt: number;
 }
 
-interface ChatReactionSummary {
+export interface ChatReactionSummary {
   counts: Record<string, number>;
   mine: string | null;
 }
 
-async function fetchChatReactionSummary(messageId: string, viewerUid: string): Promise<ChatReactionSummary> {
+export async function fetchChatReactionSummaryForMessage(messageId: string, viewerUid: string): Promise<ChatReactionSummary> {
   const db = getFirebaseFirestore();
   if (!db || !messageId) return { counts: {}, mine: null };
 
@@ -215,7 +215,7 @@ export function subscribeToChat(onMessages: (messages: GlobalChatMessage[]) => v
       const viewerUid = getFirebaseAuth()?.currentUser?.uid ?? '';
       const identityPairs = await Promise.all(uniqueUids.map(async uid => [uid, await resolveChatIdentity(uid)] as const));
       const identityByUid = new Map(identityPairs);
-      const reactionPairs = await Promise.all(baseRows.map(async row => [row.id, await fetchChatReactionSummary(row.id, viewerUid)] as const));
+      const reactionPairs = await Promise.all(baseRows.map(async row => [row.id, await fetchChatReactionSummaryForMessage(row.id, viewerUid)] as const));
       const reactionsByMessageId = new Map(reactionPairs);
 
       const rows = baseRows.map(row => {
@@ -238,10 +238,11 @@ export function subscribeToChat(onMessages: (messages: GlobalChatMessage[]) => v
   });
 }
 
-export async function toggleChatReaction(uid: string, messageId: string, emoji: string): Promise<void> {
+export async function toggleChatReaction(uid: string, messageId: string, emoji: string): Promise<ChatReactionSummary> {
   const db = getFirebaseFirestore();
-  if (!db || !uid || !messageId) return;
-  if (!ALLOWED_REACTIONS.has(emoji)) return;
+  if (!db || !uid || !messageId || !ALLOWED_REACTIONS.has(emoji)) {
+    return { counts: {}, mine: null };
+  }
 
   const reactionRef = doc(db, CHAT_COLLECTION, messageId, CHAT_REACTIONS_COLLECTION, uid);
   await runTransaction(db, async tx => {
@@ -268,6 +269,8 @@ export async function toggleChatReaction(uid: string, messageId: string, emoji: 
       updatedAt: Date.now(),
     }, { merge: true });
   });
+
+  return fetchChatReactionSummaryForMessage(messageId, uid);
 }
 
 export async function muteUser(targetUid: string, mutedByUid: string, durationMs: number, reason: string): Promise<void> {
