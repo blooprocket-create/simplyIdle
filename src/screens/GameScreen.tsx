@@ -1654,6 +1654,41 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   }, [eventsOpen, liveLeaderboardRank, playerBoardScore]);
 
   useEffect(() => {
+    if (!state.characterCreated) return;
+    if (!isLiveLeaderboardAvailable()) return;
+
+    const submit = async () => {
+      try {
+        await submitLeaderboardScore({
+          accountName,
+          publicUsername: publicUsername || accountName,
+          score: playerBoardScore,
+          level: state.level,
+          highestWaveReached: state.highestWaveReached,
+          prestigeCount: state.prestigeCount,
+        });
+      } catch {
+        // Non-blocking background sync.
+      }
+    };
+
+    void submit();
+    const timer = setInterval(() => {
+      void submit();
+    }, 45_000);
+
+    return () => clearInterval(timer);
+  }, [
+    state.characterCreated,
+    accountName,
+    publicUsername,
+    playerBoardScore,
+    state.level,
+    state.highestWaveReached,
+    state.prestigeCount,
+  ]);
+
+  useEffect(() => {
     if (!eventsOpen || !state.characterCreated) return;
 
     let cancelled = false;

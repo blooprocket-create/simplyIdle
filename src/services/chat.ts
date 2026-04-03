@@ -36,6 +36,35 @@ export interface ChatMuteRecord {
   updatedAt: number;
 }
 
+async function resolveChatIdentity(uid: string): Promise<{ vipLevel: number; guildTag: string }> {
+  const db = getFirebaseFirestore();
+  if (!db || !uid) return { vipLevel: 0, guildTag: '' };
+
+  const [leaderboardSnap, membershipSnap] = await Promise.all([
+    getDoc(doc(db, 'leaderboard_global_v1', uid)),
+    getDoc(doc(db, 'userGuild', uid)),
+  ]);
+
+  const vipLevel = leaderboardSnap.exists() && typeof leaderboardSnap.data().level === 'number'
+    ? Math.max(0, Math.floor(leaderboardSnap.data().level))
+    : 0;
+
+  let guildTag = '';
+  if (membershipSnap.exists()) {
+    const membershipData = membershipSnap.data() as { guildId?: unknown };
+    const guildId = typeof membershipData.guildId === 'string' ? membershipData.guildId : '';
+    if (guildId) {
+      const guildSnap = await getDoc(doc(db, 'guilds', guildId));
+      if (guildSnap.exists()) {
+        const guildData = guildSnap.data() as { tag?: unknown };
+        guildTag = typeof guildData.tag === 'string' ? guildData.tag.trim().slice(0, 5) : '';
+      }
+    }
+  }
+
+  return { vipLevel, guildTag };
+}
+
 async function resolveGuildTag(uid: string): Promise<string> {
   const db = getFirebaseFirestore();
   if (!db || !uid) return '';
@@ -129,7 +158,7 @@ export function subscribeToChat(onMessages: (messages: GlobalChatMessage[]) => v
 
   const q = query(collection(db, CHAT_COLLECTION), orderBy('sentAt', 'desc'), limit(50));
   return onSnapshot(q, snap => {
-    const rows = snap.docs
+    const baseRows = snap.docs
       .map(docSnap => {
         const data = docSnap.data();
         return {
@@ -146,7 +175,24 @@ export function subscribeToChat(onMessages: (messages: GlobalChatMessage[]) => v
       .filter(row => !!row.uid && !!row.text)
       .sort((a, b) => a.sentAt - b.sentAt);
 
-    onMessages(rows);
+    const uniqueUids = [...new Set(baseRows.map(r => r.uid))];
+    void (async () => {
+      const identityPairs = await Promise.all(uniqueUids.map(async uid => [uid, await resolveChatIdentity(uid)] as const));
+      const identityByUid = new Map(identityPairs);
+
+      const rows = baseRows.map(row => {
+        const identity = identityByUid.get(row.uid);
+        return {
+          ...row,
+          vipLevel: identity ? identity.vipLevel : row.vipLevel,
+          guildTag: identity ? identity.guildTag : row.guildTag,
+        };
+      });
+
+      onMessages(rows);
+    })().catch(() => {
+      onMessages(baseRows);
+    });
   });
 }
 

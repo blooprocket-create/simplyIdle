@@ -89,6 +89,7 @@ const BOSS_DURATION_MS = 5 * 24 * 60 * 60 * 1000;
 const WAR_DURATION_MS = 48 * 60 * 60 * 1000;
 const EXPEDITION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const GUILD_CHAT_COOLDOWN_MS = 3000;
+const EVENT_CONTRIBUTION_COOLDOWN_MS = 5 * 60 * 1000;
 
 function requireDb() {
   const db = getFirebaseFirestore();
@@ -869,31 +870,47 @@ export async function contributeToGuildEvent(input: { uid: string; eventId: stri
   const guildId = await resolveGuildIdForUser(input.uid);
   if (!guildId) throw new Error('You are not in a guild.');
   const eventRef = doc(db, GUILD_COLLECTION, guildId, 'events', input.eventId);
+  const contribRef = doc(db, GUILD_COLLECTION, guildId, 'events', input.eventId, 'contrib', input.uid);
   const now = Date.now();
 
   const result = await runTransaction<{ event: GuildEventState; shouldReward: boolean; rewardAmount: number; guildId: string }>(db, async tx => {
-    const eventSnap = await tx.get(eventRef);
+    const [eventSnap, contribSnap] = await Promise.all([tx.get(eventRef), tx.get(contribRef)]);
     if (!eventSnap.exists()) throw new Error('Event not found.');
     const data = eventSnap.data();
     if (data.status !== 'active') throw new Error('Event is not active.');
     if (typeof data.endsAt === 'number' && data.endsAt <= now) throw new Error('Event expired.');
 
+    const lastContributedAt = contribSnap.exists() && typeof contribSnap.data().lastContributedAt === 'number'
+      ? contribSnap.data().lastContributedAt
+      : 0;
+    if (now - lastContributedAt < EVENT_CONTRIBUTION_COOLDOWN_MS) {
+      const secondsLeft = Math.ceil((EVENT_CONTRIBUTION_COOLDOWN_MS - (now - lastContributedAt)) / 1000);
+      throw new Error(`Contribution cooldown active (${secondsLeft}s remaining).`);
+    }
+
     const details = (data.details && typeof data.details === 'object' ? data.details : {}) as Record<string, unknown>;
     let nextDetails: Record<string, unknown> = { ...details };
     let status: 'active' | 'completed' = 'active';
+    let rawContribution = 0;
 
     if (data.type === 'war') {
       const dealt = Math.max(0, Math.floor((input.dps ?? 0) * 30));
+      rawContribution = dealt;
       const totalDamage = (typeof details.totalDamage === 'number' ? details.totalDamage : 0) + dealt;
       const targetDamage = typeof details.targetDamage === 'number' ? details.targetDamage : 2_000_000_000_000;
       status = totalDamage >= targetDamage ? 'completed' : 'active';
       nextDetails = { ...details, totalDamage, targetDamage };
     } else {
       const kills = Math.max(0, Math.floor(input.kills ?? 0));
+      rawContribution = kills;
       const totalKills = (typeof details.totalKills === 'number' ? details.totalKills : 0) + kills;
       const targetKills = typeof details.targetKills === 'number' ? details.targetKills : 250_000;
       status = totalKills >= targetKills ? 'completed' : 'active';
       nextDetails = { ...details, totalKills, targetKills };
+    }
+
+    if (rawContribution <= 0) {
+      throw new Error('Contribution amount is too low.');
     }
 
     const rewardAlreadySent = typeof data.rewardSentAt === 'number' && data.rewardSentAt > 0;
@@ -904,6 +921,14 @@ export async function contributeToGuildEvent(input: { uid: string; eventId: stri
       updatedAt: now,
       completedAt: status === 'completed' ? now : null,
       rewardSentAt: shouldReward ? now : data.rewardSentAt ?? null,
+    }, { merge: true });
+
+    tx.set(contribRef, {
+      uid: input.uid,
+      totalContributed: (contribSnap.exists() && typeof contribSnap.data().totalContributed === 'number' ? contribSnap.data().totalContributed : 0) + rawContribution,
+      lastContribution: rawContribution,
+      lastContributedAt: now,
+      updatedAt: now,
     }, { merge: true });
 
     return {
