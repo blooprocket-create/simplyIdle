@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Animated, Modal, NativeSyntheticEvent, NativeTouchEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { THEME, RADIUS } from '../../theme';
 import {
@@ -23,6 +23,7 @@ import {
   sendFriendRequest,
   sendGift,
   setGiftPreference,
+  subscribeFriendsRealtime,
   FriendListEntry,
   PendingFriendRequest,
 } from '../../services/friends';
@@ -43,8 +44,10 @@ import {
   GuildSummary,
   kickGuildMember,
   subscribeGuildChat,
+  subscribeGuildMembership,
   transferGuildLeadership,
 } from '../../services/guild';
+import { trackEvent } from '../../telemetry';
 import { ChatSection } from './social/ChatSection';
 import { FriendsSection } from './social/FriendsSection';
 import { GuildSection } from './social/GuildSection';
@@ -64,6 +67,74 @@ export interface SocialTabContentProps {
 type SocialSubTab = 'chat' | 'friends' | 'guild';
 type GuildSubTab = 'home' | 'boss' | 'events' | 'chat';
 const SOCIAL_TABS: SocialSubTab[] = ['chat', 'friends', 'guild'];
+
+interface SocialUiState {
+  sending: boolean;
+  friendsBusy: boolean;
+  guildBusy: boolean;
+  chatError: string | null;
+  friendsError: string | null;
+  guildError: string | null;
+  lastSendAt: number;
+  chatLoadedOnce: boolean;
+  friendsLoadedOnce: boolean;
+  guildLoadedOnce: boolean;
+}
+
+type SocialUiAction =
+  | { type: 'setSending'; value: boolean }
+  | { type: 'setFriendsBusy'; value: boolean }
+  | { type: 'setGuildBusy'; value: boolean }
+  | { type: 'setChatError'; value: string | null }
+  | { type: 'setFriendsError'; value: string | null }
+  | { type: 'setGuildError'; value: string | null }
+  | { type: 'setLastSendAt'; value: number }
+  | { type: 'setChatLoadedOnce'; value: boolean }
+  | { type: 'setFriendsLoadedOnce'; value: boolean }
+  | { type: 'setGuildLoadedOnce'; value: boolean }
+  | { type: 'clearErrors' };
+
+const initialSocialUiState: SocialUiState = {
+  sending: false,
+  friendsBusy: false,
+  guildBusy: false,
+  chatError: null,
+  friendsError: null,
+  guildError: null,
+  lastSendAt: 0,
+  chatLoadedOnce: false,
+  friendsLoadedOnce: false,
+  guildLoadedOnce: false,
+};
+
+function socialUiReducer(state: SocialUiState, action: SocialUiAction): SocialUiState {
+  switch (action.type) {
+    case 'setSending':
+      return { ...state, sending: action.value };
+    case 'setFriendsBusy':
+      return { ...state, friendsBusy: action.value };
+    case 'setGuildBusy':
+      return { ...state, guildBusy: action.value };
+    case 'setChatError':
+      return { ...state, chatError: action.value };
+    case 'setFriendsError':
+      return { ...state, friendsError: action.value };
+    case 'setGuildError':
+      return { ...state, guildError: action.value };
+    case 'setLastSendAt':
+      return { ...state, lastSendAt: action.value };
+    case 'setChatLoadedOnce':
+      return { ...state, chatLoadedOnce: action.value };
+    case 'setFriendsLoadedOnce':
+      return { ...state, friendsLoadedOnce: action.value };
+    case 'setGuildLoadedOnce':
+      return { ...state, guildLoadedOnce: action.value };
+    case 'clearErrors':
+      return { ...state, chatError: null, friendsError: null, guildError: null };
+    default:
+      return state;
+  }
+}
 
 function formatTime(ts: number): string {
   const date = new Date(ts);
@@ -117,14 +188,8 @@ export function SocialTabContent({
   const [pendingRequests, setPendingRequests] = useState<PendingFriendRequest[]>([]);
   const [giftCooldowns, setGiftCooldowns] = useState<Record<string, number>>({});
   const [myGiftPreference, setMyGiftPreference] = useState<GiftPreference>('gold');
-  const [sending, setSending] = useState(false);
-  const [chatError, setChatError] = useState<string | null>(null);
-  const [friendsError, setFriendsError] = useState<string | null>(null);
-  const [guildError, setGuildError] = useState<string | null>(null);
+  const [uiState, dispatchUi] = useReducer(socialUiReducer, initialSocialUiState);
   const [mutedUntil, setMutedUntil] = useState<number | null>(null);
-  const [lastSendAt, setLastSendAt] = useState(0);
-  const [friendsBusy, setFriendsBusy] = useState(false);
-  const [guildBusy, setGuildBusy] = useState(false);
   const [guildNameInput, setGuildNameInput] = useState('');
   const [guildTagInput, setGuildTagInput] = useState('');
   const [guildDescInput, setGuildDescInput] = useState('');
@@ -142,11 +207,32 @@ export function SocialTabContent({
   const [confirmKickMember, setConfirmKickMember] = useState<GuildMember | null>(null);
   const [confirmTransferLeader, setConfirmTransferLeader] = useState<GuildMember | null>(null);
   const [confirmDisbandGuild, setConfirmDisbandGuild] = useState(false);
-  const [chatLoadedOnce, setChatLoadedOnce] = useState(false);
-  const [friendsLoadedOnce, setFriendsLoadedOnce] = useState(false);
-  const [guildLoadedOnce, setGuildLoadedOnce] = useState(false);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const sectionAnim = useRef(new Animated.Value(1)).current;
+
+  const {
+    sending,
+    friendsBusy,
+    guildBusy,
+    chatError,
+    friendsError,
+    guildError,
+    lastSendAt,
+    chatLoadedOnce,
+    friendsLoadedOnce,
+    guildLoadedOnce,
+  } = uiState;
+
+  const setSending = (value: boolean) => dispatchUi({ type: 'setSending', value });
+  const setFriendsBusy = (value: boolean) => dispatchUi({ type: 'setFriendsBusy', value });
+  const setGuildBusy = (value: boolean) => dispatchUi({ type: 'setGuildBusy', value });
+  const setChatError = (value: string | null) => dispatchUi({ type: 'setChatError', value });
+  const setFriendsError = (value: string | null) => dispatchUi({ type: 'setFriendsError', value });
+  const setGuildError = (value: string | null) => dispatchUi({ type: 'setGuildError', value });
+  const setLastSendAt = (value: number) => dispatchUi({ type: 'setLastSendAt', value });
+  const setChatLoadedOnce = (value: boolean) => dispatchUi({ type: 'setChatLoadedOnce', value });
+  const setFriendsLoadedOnce = (value: boolean) => dispatchUi({ type: 'setFriendsLoadedOnce', value });
+  const setGuildLoadedOnce = (value: boolean) => dispatchUi({ type: 'setGuildLoadedOnce', value });
 
   const me = useMemo(() => {
     const authUid = getFirebaseAuth()?.currentUser?.uid ?? '';
@@ -194,21 +280,17 @@ export function SocialTabContent({
       return;
     }
 
-    let cancelled = false;
-    const refreshMembership = () => {
-      void fetchGuildInfo(me.uid)
-        .then(guildInfo => {
-          if (!cancelled) setMyGuild(guildInfo);
-        })
-        .catch(() => {});
-    };
+    const stopMembership = subscribeGuildMembership(
+      me.uid,
+      guildInfo => {
+        setMyGuild(guildInfo);
+      },
+      () => {
+        setGuildError('Guild membership sync failed.');
+      },
+    );
 
-    refreshMembership();
-    const timer = setInterval(refreshMembership, 30_000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
+    return stopMembership;
   }, [tab, me.uid]);
 
   useEffect(() => {
@@ -216,9 +298,11 @@ export function SocialTabContent({
   }, [onPendingRequestsCountChange, pendingRequests.length]);
 
   useEffect(() => {
-    setChatError(null);
-    setFriendsError(null);
-    setGuildError(null);
+    dispatchUi({ type: 'clearErrors' });
+    void trackEvent('social_tab_changed', {
+      tab: subTab,
+      mode: 'social',
+    });
   }, [subTab]);
 
   useEffect(() => {
@@ -233,31 +317,29 @@ export function SocialTabContent({
   useEffect(() => {
     if (tab !== 'social' || subTab !== 'friends' || !me.uid) return;
 
-    const refresh = async () => {
-      try {
-        const [friendRows, pendingRows, cooldownRows, myProfile] = await Promise.all([
-          fetchFriends(me.uid),
-          fetchPendingRequests(me.uid),
-          fetchGiftCooldowns(me.uid),
-          fetchFriendProfile(me.uid),
-        ]);
-        setFriends(friendRows);
-        setPendingRequests(pendingRows);
-        setGiftCooldowns(cooldownRows);
-        if (myProfile?.giftPreference) setMyGiftPreference(myProfile.giftPreference);
+    const stopRealtime = subscribeFriendsRealtime(
+      me.uid,
+      snapshot => {
+        setFriends(snapshot.friends);
+        setPendingRequests(snapshot.pendingRequests);
+        setGiftCooldowns(snapshot.giftCooldowns);
+        if (snapshot.profile?.giftPreference) setMyGiftPreference(snapshot.profile.giftPreference);
         setFriendsLoadedOnce(true);
-      } catch {
+      },
+      () => {
         setFriendsError('Failed to load friends data.');
-      } finally {
         setFriendsLoadedOnce(true);
-      }
-    };
+      },
+    );
 
-    void refresh();
-    const timer = setInterval(() => {
-      void refresh();
-    }, 20_000);
-    return () => clearInterval(timer);
+    const fallbackTimer = setInterval(() => {
+      void refreshFriendsData();
+    }, 90_000);
+
+    return () => {
+      stopRealtime();
+      clearInterval(fallbackTimer);
+    };
   }, [tab, subTab, me.uid]);
 
   useEffect(() => {
@@ -265,11 +347,8 @@ export function SocialTabContent({
 
     const refresh = async () => {
       try {
-        const [guildInfo, browseRows] = await Promise.all([
-          fetchGuildInfo(me.uid),
-          fetchGuildBrowse(guildSearchInput),
-        ]);
-        setMyGuild(guildInfo);
+        const guildInfo = myGuild;
+        const browseRows = await fetchGuildBrowse(guildSearchInput);
         setGuildList(browseRows);
         if (guildInfo?.guildId) {
           const [members, boss, events] = await Promise.all([
@@ -297,9 +376,9 @@ export function SocialTabContent({
     void refresh();
     const timer = setInterval(() => {
       void refresh();
-    }, 20_000);
+    }, 60_000);
     return () => clearInterval(timer);
-  }, [guildSearchInput, me.uid, subTab, tab]);
+  }, [guildSearchInput, me.uid, myGuild, subTab, tab]);
 
   useEffect(() => {
     if (tab !== 'social' || subTab !== 'guild' || !me.uid || !myGuild?.guildId) return;
@@ -325,10 +404,12 @@ export function SocialTabContent({
     const now = Date.now();
     if (now - lastSendAt < 3_000) {
       setChatError('Slow down: chat has a 3-second cooldown.');
+      void trackEvent('social_chat_send_blocked', { reason: 'cooldown' });
       return;
     }
     if (mutedUntil && mutedUntil > now) {
       setChatError('You are muted right now.');
+      void trackEvent('social_chat_send_blocked', { reason: 'muted' });
       return;
     }
 
@@ -338,9 +419,11 @@ export function SocialTabContent({
       await sendChatMessage(me.uid, me.name, me.level, draft, me.vipLevel);
       setDraft('');
       setLastSendAt(now);
+      void trackEvent('social_chat_send_success', { hasGuild: !!myGuild?.guildId });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to send message.';
       setChatError(msg);
+      void trackEvent('social_chat_send_failed', { reason: msg.slice(0, 80) });
     } finally {
       setSending(false);
     }
@@ -375,9 +458,11 @@ export function SocialTabContent({
       await sendFriendRequest(me.uid, me.name, friendSearch);
       setFriendSearch('');
       await refreshFriendsData();
+      void trackEvent('social_friend_request_sent');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to send friend request.';
       setFriendsError(msg);
+      void trackEvent('social_friend_request_failed', { reason: msg.slice(0, 80) });
     } finally {
       setFriendsBusy(false);
     }
@@ -418,9 +503,11 @@ export function SocialTabContent({
     try {
       await sendGift(me.uid, me.name, friend.uid, friend.giftPreference);
       await refreshFriendsData();
+      void trackEvent('social_gift_sent', { preference: friend.giftPreference });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to send gift.';
       setFriendsError(msg);
+      void trackEvent('social_gift_failed', { reason: msg.slice(0, 80) });
     } finally {
       setFriendsBusy(false);
     }
@@ -465,6 +552,7 @@ export function SocialTabContent({
       setGuildEvents([]);
       setGuildChat([]);
     }
+    void trackEvent('social_guild_refresh_success', { inGuild: !!guildInfo?.guildId });
   };
 
   const addFriendLabel = activeUserRelationship === 'friends'

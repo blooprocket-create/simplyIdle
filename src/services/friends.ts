@@ -24,6 +24,13 @@ export interface GiftCooldownEntry {
 
 export type FriendRelationshipStatus = 'self' | 'friends' | 'outgoing' | 'incoming' | 'none';
 
+export interface FriendsRealtimeSnapshot {
+  friends: FriendListEntry[];
+  pendingRequests: PendingFriendRequest[];
+  giftCooldowns: Record<string, number>;
+  profile: { displayName: string; giftPreference: GiftPreference } | null;
+}
+
 interface MailAttachmentShape {
   shards: number;
   gold: number;
@@ -187,6 +194,66 @@ export function subscribePendingRequestCount(uid: string, onCount: (count: numbe
   return onSnapshot(collection(db, 'friends', uid, 'requests'), snap => {
     onCount(snap.size);
   });
+}
+
+export function subscribeFriendsRealtime(
+  uid: string,
+  onSnapshotData: (snapshot: FriendsRealtimeSnapshot) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  const db = getFirebaseFirestore();
+  if (!db || !uid) return () => {};
+
+  let active = true;
+  let inflight = false;
+
+  const publishSnapshot = async () => {
+    if (!active || inflight) return;
+    inflight = true;
+    try {
+      const [friends, pendingRequests, giftCooldowns, profile] = await Promise.all([
+        fetchFriends(uid),
+        fetchPendingRequests(uid),
+        fetchGiftCooldowns(uid),
+        fetchFriendProfile(uid),
+      ]);
+      if (!active) return;
+      onSnapshotData({
+        friends,
+        pendingRequests,
+        giftCooldowns,
+        profile,
+      });
+    } catch (err) {
+      if (!active) return;
+      if (onError && err instanceof Error) {
+        onError(err);
+      } else if (onError) {
+        onError(new Error('Friends realtime sync failed.'));
+      }
+    } finally {
+      inflight = false;
+    }
+  };
+
+  const unsubscribers = [
+    onSnapshot(collection(db, 'friends', uid, 'list'), () => {
+      void publishSnapshot();
+    }),
+    onSnapshot(collection(db, 'friends', uid, 'requests'), () => {
+      void publishSnapshot();
+    }),
+    onSnapshot(collection(db, 'friends', uid, 'giftCooldowns'), () => {
+      void publishSnapshot();
+    }),
+  ];
+
+  void publishSnapshot();
+
+  return () => {
+    active = false;
+    unsubscribers.forEach(unsub => unsub());
+  };
 }
 
 export async function sendGift(

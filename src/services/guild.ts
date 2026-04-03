@@ -777,6 +777,41 @@ export async function fetchGuildInfo(uid: string): Promise<GuildSummary | null> 
   return parseGuildSummary(guildId, guildSnap.data() as Record<string, unknown>);
 }
 
+export function subscribeGuildMembership(
+  uid: string,
+  onGuildChange: (guild: GuildSummary | null) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  const db = getFirebaseFirestore();
+  if (!db || !uid) return () => {};
+
+  let active = true;
+  const unsubscribe = onSnapshot(
+    doc(db, USER_GUILD_COLLECTION, uid),
+    () => {
+      void fetchGuildInfo(uid)
+        .then(guild => {
+          if (!active) return;
+          onGuildChange(guild);
+        })
+        .catch(err => {
+          if (!active || !onError) return;
+          if (err instanceof Error) onError(err);
+          else onError(new Error('Guild membership sync failed.'));
+        });
+    },
+    err => {
+      if (!active || !onError) return;
+      onError(err instanceof Error ? err : new Error('Guild membership listener failed.'));
+    },
+  );
+
+  return () => {
+    active = false;
+    unsubscribe();
+  };
+}
+
 export async function updateGuildDescription(input: { uid: string; description: string }): Promise<void> {
   const db = requireDb();
   const actorUid = input.uid.trim();
