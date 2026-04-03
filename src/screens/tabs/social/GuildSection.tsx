@@ -101,7 +101,7 @@ interface GuildSectionProps {
   };
   diamonds: number;
   saveSlotId: string;
-  level: number;
+  peakProgress: number;
   error: string | null;
   isLoading: boolean;
   guildBusy: boolean;
@@ -135,7 +135,7 @@ export function GuildSection({
   me,
   diamonds,
   saveSlotId,
-  level,
+  peakProgress,
   error,
   isLoading,
   guildBusy,
@@ -197,7 +197,7 @@ export function GuildSection({
     setWalletGold(0);
     setDescriptionDraft(myGuild?.description ?? '');
     setIsEditingDescription(false);
-    setJoinLevelDraft(`${myGuild?.minLevelToJoin ?? 1}`);
+    setJoinLevelDraft(`${myGuild?.minPeakProgressToJoin ?? 1}`);
     setIsPublicDraft(myGuild?.isPublic !== false);
     setIsEditingGuildSettings(false);
     setPendingInvites([]);
@@ -209,7 +209,7 @@ export function GuildSection({
       return;
     }
     setDescriptionDraft(myGuild.description || '');
-    setJoinLevelDraft(`${Math.max(1, myGuild.minLevelToJoin || 1)}`);
+    setJoinLevelDraft(`${Math.max(1, myGuild.minPeakProgressToJoin || 1)}`);
     setIsPublicDraft(myGuild.isPublic !== false);
   }, [myGuild?.description, myGuild?.guildId]);
 
@@ -429,13 +429,13 @@ export function GuildSection({
     && !!myGuild
     && isEditingDescription
     && descriptionDraft.trim().slice(0, 140) !== (myGuild.description || '');
-  const joinLevelParsed = Math.max(1, Math.min(999, parsePositiveInt(joinLevelDraft) || 1));
+  const joinLevelParsed = Math.max(1, Math.min(999_999, parsePositiveInt(joinLevelDraft) || 1));
   const canSaveGuildSettings = isLeader
     && !guildBusy
     && !!myGuild
     && isEditingGuildSettings
     && (
-      joinLevelParsed !== Math.max(1, myGuild.minLevelToJoin || 1)
+      joinLevelParsed !== Math.max(1, myGuild.minPeakProgressToJoin || 1)
       || isPublicDraft !== (myGuild.isPublic !== false)
     );
 
@@ -477,7 +477,7 @@ export function GuildSection({
                 <View key={invite.id} style={styles.friendRow}>
                   <View style={styles.friendMeta}>
                     <Text style={styles.friendName}>[{invite.guildTag}] {invite.guildName}</Text>
-                    <Text style={styles.metaText}>From {invite.inviterName} • Min Lv {invite.minLevelToJoin}</Text>
+                    <Text style={styles.metaText}>From {invite.inviterName} • Min Peak W{invite.minPeakProgressToJoin}</Text>
                   </View>
                   <View style={styles.friendActions}>
                     <Pressable
@@ -497,7 +497,7 @@ export function GuildSection({
                             inviteId: invite.id,
                             action: 'accept',
                             displayName: me.name,
-                            playerLevel: level,
+                            playerPeakProgress: peakProgress,
                           });
                           await refreshGuildData();
                         } catch (err) {
@@ -527,7 +527,7 @@ export function GuildSection({
                             inviteId: invite.id,
                             action: 'decline',
                             displayName: me.name,
-                            playerLevel: level,
+                            playerPeakProgress: peakProgress,
                           });
                           setPendingInvites(current => current.filter(row => row.id !== invite.id));
                         } catch (err) {
@@ -587,7 +587,7 @@ export function GuildSection({
                   guildName: guildNameInput,
                   guildTag: guildTagInput,
                   description: guildDescInput,
-                  minLevelToJoin: 1,
+                  minPeakProgressToJoin: 1,
                   isPublic: true,
                 });
                 setGuildNameInput('');
@@ -762,7 +762,7 @@ export function GuildSection({
             )}
 
             <Text style={styles.metaText}>Leader: {myGuild.leaderName} • Members: {myGuild.memberCount}/{myGuild.maxMembers}</Text>
-            <Text style={styles.metaText}>Min Join Level: {myGuild.minLevelToJoin} • Public: {myGuild.isPublic ? 'Yes' : 'No'}</Text>
+            <Text style={styles.metaText}>Min Peak Progress: W{myGuild.minPeakProgressToJoin} • Public: {myGuild.isPublic ? 'Yes' : 'No'}</Text>
             {!isEditingGuildSettings && isLeader && (
               <View style={styles.friendActions}>
                 <Pressable
@@ -773,7 +773,7 @@ export function GuildSection({
                   ]}
                   disabled={guildBusy}
                   onPress={() => {
-                    setJoinLevelDraft(`${Math.max(1, myGuild.minLevelToJoin || 1)}`);
+                    setJoinLevelDraft(`${Math.max(1, myGuild.minPeakProgressToJoin || 1)}`);
                     setIsPublicDraft(myGuild.isPublic !== false);
                     setIsEditingGuildSettings(true);
                   }}
@@ -788,7 +788,7 @@ export function GuildSection({
                   styles={styles}
                   value={joinLevelDraft}
                   onChangeText={setJoinLevelDraft}
-                  placeholder="Min Join Level"
+                  placeholder="Min Peak Progress (Wave)"
                   editable={!guildBusy}
                   maxLength={3}
                   keyboardType="number-pad"
@@ -828,7 +828,7 @@ export function GuildSection({
                     ]}
                     disabled={guildBusy}
                     onPress={() => {
-                      setJoinLevelDraft(`${Math.max(1, myGuild.minLevelToJoin || 1)}`);
+                      setJoinLevelDraft(`${Math.max(1, myGuild.minPeakProgressToJoin || 1)}`);
                       setIsPublicDraft(myGuild.isPublic !== false);
                       setIsEditingGuildSettings(false);
                     }}
@@ -849,7 +849,7 @@ export function GuildSection({
                       try {
                         await updateGuildSettings({
                           uid: me.uid,
-                          minLevelToJoin: joinLevelParsed,
+                          minPeakProgressToJoin: joinLevelParsed,
                           isPublic: isPublicDraft,
                         });
                         setIsEditingGuildSettings(false);
@@ -1531,7 +1531,7 @@ export function GuildSection({
                       uid: me.uid,
                       displayName: me.name,
                       guildId: row.guildId,
-                      playerLevel: me.level,
+                      playerPeakProgress: peakProgress,
                     });
                     await refreshGuildData();
                   } catch (err) {

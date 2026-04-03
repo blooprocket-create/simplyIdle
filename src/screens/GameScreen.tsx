@@ -3108,6 +3108,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             accountName,
             publicUsername,
             level: state.level,
+            highestWaveReached: state.highestWaveReached,
             vipLevel: state.vipLevel,
             diamonds: state.diamonds,
             saveSlotId: selectedCharacterClass ? getCharacterSaveSlot(accountName, selectedCharacterClass) : '',

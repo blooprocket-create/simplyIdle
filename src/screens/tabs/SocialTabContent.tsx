@@ -63,6 +63,7 @@ export interface SocialTabContentProps {
   accountName: string;
   publicUsername: string;
   level: number;
+  highestWaveReached: number;
   vipLevel: number;
   diamonds: number;
   saveSlotId: string;
@@ -196,6 +197,7 @@ export function SocialTabContent({
   accountName,
   publicUsername,
   level,
+  highestWaveReached,
   vipLevel,
   diamonds,
   saveSlotId,
@@ -871,7 +873,7 @@ export function SocialTabContent({
             me={{ uid: me.uid, name: me.name, level: me.level }}
             diamonds={diamonds}
             saveSlotId={saveSlotId}
-            level={level}
+            peakProgress={Math.max(1, Math.floor(highestWaveReached || 1))}
             error={guildError}
             isLoading={isGuildLoading}
             guildBusy={guildBusy}

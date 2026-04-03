@@ -29,7 +29,7 @@ export interface GuildSummary {
   memberCount: number;
   maxMembers: number;
   isPublic: boolean;
-  minLevelToJoin: number;
+  minPeakProgressToJoin: number;
   createdAt: number;
 }
 
@@ -139,7 +139,7 @@ export interface GuildInvite {
   inviterUid: string;
   inviterName: string;
   invitedUid: string;
-  minLevelToJoin: number;
+  minPeakProgressToJoin: number;
   isPublic: boolean;
   status: 'pending' | 'accepted' | 'declined' | 'expired';
   createdAt: number;
@@ -171,6 +171,12 @@ function makeGuildId(normalizedName: string): string {
 }
 
 function parseGuildSummary(guildId: string, data: Record<string, unknown>): GuildSummary {
+  const minPeakProgressToJoin = typeof data.minPeakProgressToJoin === 'number'
+    ? Math.max(1, Math.floor(data.minPeakProgressToJoin))
+    : typeof data.minLevelToJoin === 'number'
+      ? Math.max(1, Math.floor(data.minLevelToJoin))
+      : 1;
+
   return {
     guildId,
     name: typeof data.name === 'string' ? data.name : 'Guild',
@@ -182,7 +188,7 @@ function parseGuildSummary(guildId: string, data: Record<string, unknown>): Guil
     memberCount: typeof data.memberCount === 'number' ? data.memberCount : 1,
     maxMembers: typeof data.maxMembers === 'number' ? data.maxMembers : 30,
     isPublic: data.isPublic !== false,
-    minLevelToJoin: typeof data.minLevelToJoin === 'number' ? data.minLevelToJoin : 1,
+    minPeakProgressToJoin,
     createdAt: typeof data.createdAt === 'number' ? data.createdAt : Date.now(),
   };
 }
@@ -258,7 +264,11 @@ function parseGuildInvite(inviteId: string, data: Record<string, unknown>): Guil
     inviterUid: typeof data.inviterUid === 'string' ? data.inviterUid : '',
     inviterName: typeof data.inviterName === 'string' ? data.inviterName : 'Leader',
     invitedUid: typeof data.invitedUid === 'string' ? data.invitedUid : '',
-    minLevelToJoin: typeof data.minLevelToJoin === 'number' ? Math.max(1, Math.floor(data.minLevelToJoin)) : 1,
+    minPeakProgressToJoin: typeof data.minPeakProgressToJoin === 'number'
+      ? Math.max(1, Math.floor(data.minPeakProgressToJoin))
+      : typeof data.minLevelToJoin === 'number'
+        ? Math.max(1, Math.floor(data.minLevelToJoin))
+        : 1,
     isPublic: data.isPublic !== false,
     status,
     createdAt: typeof data.createdAt === 'number' ? data.createdAt : 0,
@@ -293,7 +303,7 @@ export async function createGuild(input: {
   guildName: string;
   guildTag: string;
   description?: string;
-  minLevelToJoin?: number;
+  minPeakProgressToJoin?: number;
   isPublic?: boolean;
 }): Promise<GuildSummary> {
   const db = requireDb();
@@ -317,6 +327,8 @@ export async function createGuild(input: {
   const userGuildRef = doc(db, USER_GUILD_COLLECTION, uid);
   const memberRef = doc(db, GUILD_COLLECTION, guildId, 'members', uid);
   const saveRef = doc(db, 'users', uid, 'saveSlots', saveSlotId);
+
+  const minPeakProgressToJoin = Math.max(1, Math.floor(input.minPeakProgressToJoin ?? 1));
 
   await runTransaction(db, async tx => {
     const [existingMembership, existingName, saveSnap] = await Promise.all([
@@ -367,7 +379,8 @@ export async function createGuild(input: {
       maxMembers: 30,
       createdAt: now,
       isPublic: input.isPublic !== false,
-      minLevelToJoin: Math.max(1, Math.floor(input.minLevelToJoin ?? 1)),
+      minPeakProgressToJoin,
+      minLevelToJoin: minPeakProgressToJoin,
       updatedAt: now,
     });
 
@@ -411,7 +424,7 @@ export async function createGuild(input: {
     memberCount: 1,
     maxMembers: 30,
     isPublic: input.isPublic !== false,
-    minLevelToJoin: Math.max(1, Math.floor(input.minLevelToJoin ?? 1)),
+    minPeakProgressToJoin,
     createdAt: now,
   };
 }
@@ -420,7 +433,7 @@ export async function joinGuild(input: {
   uid: string;
   displayName: string;
   guildId: string;
-  playerLevel: number;
+  playerPeakProgress: number;
 }): Promise<void> {
   const db = requireDb();
   const uid = input.uid.trim();
@@ -448,10 +461,14 @@ export async function joinGuild(input: {
     const guild = guildSnap.data();
     const memberCount = typeof guild.memberCount === 'number' ? guild.memberCount : 0;
     const maxMembers = typeof guild.maxMembers === 'number' ? guild.maxMembers : 30;
-    const minLevel = typeof guild.minLevelToJoin === 'number' ? guild.minLevelToJoin : 1;
+    const minPeakProgress = typeof guild.minPeakProgressToJoin === 'number'
+      ? Math.max(1, Math.floor(guild.minPeakProgressToJoin))
+      : typeof guild.minLevelToJoin === 'number'
+        ? Math.max(1, Math.floor(guild.minLevelToJoin))
+        : 1;
 
     if (memberCount >= maxMembers) throw new Error('Guild is full.');
-    if (input.playerLevel < minLevel) throw new Error(`Level ${minLevel}+ required to join.`);
+    if (input.playerPeakProgress < minPeakProgress) throw new Error(`Peak progress ${minPeakProgress}+ required to join.`);
 
     tx.set(memberRef, {
       displayName: input.displayName.trim().slice(0, 24) || 'Member',
@@ -981,14 +998,14 @@ export async function updateGuildDescription(input: { uid: string; description: 
 
 export async function updateGuildSettings(input: {
   uid: string;
-  minLevelToJoin: number;
+  minPeakProgressToJoin: number;
   isPublic: boolean;
 }): Promise<void> {
   const db = requireDb();
   const actorUid = input.uid.trim();
   if (!actorUid) throw new Error('Missing user id.');
 
-  const minLevelToJoin = Math.max(1, Math.min(999, Math.floor(input.minLevelToJoin || 1)));
+  const minPeakProgressToJoin = Math.max(1, Math.min(999_999, Math.floor(input.minPeakProgressToJoin || 1)));
   const isPublic = input.isPublic !== false;
   const actorMembershipRef = doc(db, USER_GUILD_COLLECTION, actorUid);
   const now = Date.now();
@@ -1010,7 +1027,12 @@ export async function updateGuildSettings(input: {
     const guild = guildSnap.data();
     const normalizedName = typeof guild.normalizedName === 'string' ? guild.normalizedName : '';
 
-    tx.set(guildRef, { minLevelToJoin, isPublic, updatedAt: now }, { merge: true });
+    tx.set(guildRef, {
+      minPeakProgressToJoin,
+      minLevelToJoin: minPeakProgressToJoin,
+      isPublic,
+      updatedAt: now,
+    }, { merge: true });
 
     if (normalizedName) {
       tx.set(doc(db, GUILD_LOOKUP_COLLECTION, normalizedName), { isPublic, updatedAt: now }, { merge: true });
@@ -1077,7 +1099,16 @@ export async function sendGuildInvite(input: {
       inviterUid: actorUid,
       inviterName: actorDisplayName,
       invitedUid: targetUid,
-      minLevelToJoin: typeof guild.minLevelToJoin === 'number' ? Math.max(1, Math.floor(guild.minLevelToJoin)) : 1,
+      minPeakProgressToJoin: typeof guild.minPeakProgressToJoin === 'number'
+        ? Math.max(1, Math.floor(guild.minPeakProgressToJoin))
+        : typeof guild.minLevelToJoin === 'number'
+          ? Math.max(1, Math.floor(guild.minLevelToJoin))
+          : 1,
+      minLevelToJoin: typeof guild.minPeakProgressToJoin === 'number'
+        ? Math.max(1, Math.floor(guild.minPeakProgressToJoin))
+        : typeof guild.minLevelToJoin === 'number'
+          ? Math.max(1, Math.floor(guild.minLevelToJoin))
+          : 1,
       isPublic: guild.isPublic !== false,
       status: 'pending',
       createdAt: now,
@@ -1117,7 +1148,7 @@ export async function respondToGuildInvite(input: {
   inviteId: string;
   action: 'accept' | 'decline';
   displayName: string;
-  playerLevel: number;
+  playerPeakProgress: number;
 }): Promise<void> {
   const db = requireDb();
   const uid = input.uid.trim();
@@ -1158,10 +1189,14 @@ export async function respondToGuildInvite(input: {
 
     const memberCount = typeof guild.memberCount === 'number' ? guild.memberCount : 0;
     const maxMembers = typeof guild.maxMembers === 'number' ? guild.maxMembers : 30;
-    const minLevelToJoin = typeof guild.minLevelToJoin === 'number' ? guild.minLevelToJoin : 1;
+    const minPeakProgressToJoin = typeof guild.minPeakProgressToJoin === 'number'
+      ? Math.max(1, Math.floor(guild.minPeakProgressToJoin))
+      : typeof guild.minLevelToJoin === 'number'
+        ? Math.max(1, Math.floor(guild.minLevelToJoin))
+        : 1;
     if (memberCount >= maxMembers) throw new Error('Guild is full.');
-    if (Math.max(1, Math.floor(input.playerLevel || 1)) < minLevelToJoin) {
-      throw new Error(`Level ${minLevelToJoin}+ required to join.`);
+    if (Math.max(1, Math.floor(input.playerPeakProgress || 1)) < minPeakProgressToJoin) {
+      throw new Error(`Peak progress ${minPeakProgressToJoin}+ required to join.`);
     }
 
     const memberRef = doc(db, GUILD_COLLECTION, invite.guildId, 'members', uid);
