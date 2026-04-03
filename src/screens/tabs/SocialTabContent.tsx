@@ -181,6 +181,11 @@ function buildProfileHighlights(profile: PublicPlayerProfile): string[] {
   return highlights.slice(0, 4);
 }
 
+function formatSigned(value: number): string {
+  if (value === 0) return '0';
+  return value > 0 ? `+${value}` : `${value}`;
+}
+
 export function SocialTabContent({
   tab,
   accountName,
@@ -622,7 +627,7 @@ export function SocialTabContent({
     }
   };
 
-  const openProfileCard = async (uid: string) => {
+  const openProfileCard = async (uid: string, source: string) => {
     if (!uid) return;
     setActiveProfileUid(uid);
     setProfileError(null);
@@ -630,7 +635,7 @@ export function SocialTabContent({
     const cached = profileCacheRef.current[uid];
     if (cached) {
       setActiveProfile(cached);
-      void trackEvent('social_profile_opened', { source: subTab, cached: true });
+      void trackEvent('social_profile_opened', { sourceTab: subTab, source, cached: true });
       void fetchPublicPlayerProfile(uid)
         .then(profile => {
           if (!profile) return;
@@ -651,7 +656,7 @@ export function SocialTabContent({
       }
       profileCacheRef.current[uid] = profile;
       setActiveProfile(profile);
-      void trackEvent('social_profile_opened', { source: subTab, cached: false });
+      void trackEvent('social_profile_opened', { sourceTab: subTab, source, cached: false });
     } catch {
       setProfileError('Failed to load player profile.');
     } finally {
@@ -768,7 +773,7 @@ export function SocialTabContent({
             formatTime={formatTime}
             onSend={send}
             onOpenUserMenu={setActiveUserMenu}
-            onOpenProfile={uid => void openProfileCard(uid)}
+            onOpenProfile={uid => void openProfileCard(uid, 'chat_row_tap')}
             onMute={muteWithDuration}
             meDisplayName={me.name}
             meLevel={me.level}
@@ -797,7 +802,7 @@ export function SocialTabContent({
             onSendDailyGift={sendDailyGift}
             onRemoveFriend={removeFriendEntry}
             onRetryLoad={refreshFriendsData}
-            onViewProfile={uid => void openProfileCard(uid)}
+            onViewProfile={uid => void openProfileCard(uid, 'friends_row')}
           />
         )}
 
@@ -837,7 +842,7 @@ export function SocialTabContent({
             setConfirmKickMember={setConfirmKickMember}
             setConfirmTransferLeader={setConfirmTransferLeader}
             setConfirmDisbandGuild={setConfirmDisbandGuild}
-            onViewProfile={uid => void openProfileCard(uid)}
+            onViewProfile={uid => void openProfileCard(uid, 'guild_row')}
           />
         )}
       </Animated.View>
@@ -879,7 +884,7 @@ export function SocialTabContent({
               <Pressable
                 style={styles.smallBtn}
                 onPress={() => {
-                  void openProfileCard(activeUserMenu.uid);
+                  void openProfileCard(activeUserMenu.uid, 'chat_user_menu');
                   setActiveUserMenu(null);
                 }}
               >
@@ -943,6 +948,14 @@ export function SocialTabContent({
                     <Text style={styles.metricLabel}>Rank</Text>
                     <Text style={styles.metricValue}>{activeProfile.leaderboardRank ? `#${activeProfile.leaderboardRank}` : 'N/A'}</Text>
                   </View>
+                  <View style={styles.metricChip}>
+                    <Text style={styles.metricLabel}>Friends</Text>
+                    <Text style={styles.metricValue}>{activeProfile.friendCount}</Text>
+                  </View>
+                  <View style={styles.metricChip}>
+                    <Text style={styles.metricLabel}>Guild Damage</Text>
+                    <Text style={styles.metricValue}>{activeProfile.guildContribution.toLocaleString()}</Text>
+                  </View>
                 </View>
                 <Text style={styles.metaText}>Wave Peak: {activeProfile.highestWaveReached.toLocaleString()}</Text>
                 <Text style={styles.metaText}>Score: {activeProfile.score.toLocaleString()}</Text>
@@ -950,6 +963,13 @@ export function SocialTabContent({
                 <Text style={styles.metaText}>
                   Guild: {activeProfile.guildName ? `${activeProfile.guildName}${activeProfile.guildRank ? ` (${activeProfile.guildRank})` : ''}` : 'No guild'}
                 </Text>
+
+                <View style={styles.compareCard}>
+                  <Text style={styles.compareTitle}>Compare With You</Text>
+                  <Text style={styles.metaText}>Level Delta: {formatSigned(activeProfile.level - me.level)}</Text>
+                  <Text style={styles.metaText}>VIP Delta: {formatSigned(activeProfile.vipLevel - me.vipLevel)}</Text>
+                  <Text style={styles.metaText}>Wave Delta: {formatSigned(activeProfile.highestWaveReached - Math.max(0, level))}</Text>
+                </View>
 
                 <View style={styles.friendActions}>
                   <Pressable
@@ -961,14 +981,24 @@ export function SocialTabContent({
                     onPress={async () => {
                       if (!me.uid || !activeProfile || profileRelationship !== 'none') return;
                       setProfileActionBusy(true);
+                      void trackEvent('social_profile_friend_cta_clicked', {
+                        relation: profileRelationship,
+                        sourceTab: subTab,
+                      });
                       try {
                         await sendFriendRequest(me.uid, me.name, activeProfile.publicUsername);
                         setProfileRelationship('outgoing');
-                        void trackEvent('social_profile_friend_request_sent');
+                        void trackEvent('social_profile_friend_request_sent', {
+                          sourceTab: subTab,
+                          relationBefore: 'none',
+                        });
                       } catch (err) {
                         const msg = err instanceof Error ? err.message : 'Failed to send friend request.';
                         setProfileError(msg);
-                        void trackEvent('social_profile_friend_request_failed', { reason: msg.slice(0, 80) });
+                        void trackEvent('social_profile_friend_request_failed', {
+                          reason: msg.slice(0, 80),
+                          sourceTab: subTab,
+                        });
                       } finally {
                         setProfileActionBusy(false);
                       }
@@ -1643,6 +1673,20 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     overflow: 'hidden',
+  },
+  compareCard: {
+    borderWidth: 1,
+    borderColor: '#3C5D77',
+    borderRadius: RADIUS.md,
+    backgroundColor: '#102636',
+    padding: 10,
+    gap: 4,
+  },
+  compareTitle: {
+    color: '#E7F4FF',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   confirmBackdrop: {
     flex: 1,

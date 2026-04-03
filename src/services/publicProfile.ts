@@ -21,6 +21,8 @@ export interface PublicPlayerProfile {
   guildName: string | null;
   guildRank: string | null;
   leaderboardRank: number | null;
+  friendCount: number;
+  guildContribution: number;
 }
 
 function normalizeGiftPreference(value: unknown): 'gold' | 'shards' | 'essence' {
@@ -32,10 +34,11 @@ export async function fetchPublicPlayerProfile(uid: string): Promise<PublicPlaye
   const db = getFirebaseFirestore();
   if (!db || !uid) return null;
 
-  const [profileSnap, boardSnap, guildSnap] = await Promise.all([
+  const [profileSnap, boardSnap, guildSnap, friendCountSnap] = await Promise.all([
     getDoc(doc(db, USER_PROFILES_COLLECTION, uid)),
     getDoc(doc(db, LEADERBOARD_COLLECTION, uid)),
     getDoc(doc(db, USER_GUILD_COLLECTION, uid)),
+    getCountFromServer(query(collection(db, 'friends', uid, 'list'))),
   ]);
 
   const profileData = profileSnap.exists() ? profileSnap.data() : {};
@@ -59,6 +62,22 @@ export async function fetchPublicPlayerProfile(uid: string): Promise<PublicPlaye
     leaderboardRank = null;
   }
 
+  let guildContribution = 0;
+  try {
+    const guildId = typeof guildData.guildId === 'string' ? guildData.guildId : '';
+    if (guildId) {
+      const memberSnap = await getDoc(doc(db, 'guilds', guildId, 'members', uid));
+      if (memberSnap.exists()) {
+        const memberData = memberSnap.data();
+        guildContribution = typeof memberData.guildContribution === 'number'
+          ? Math.max(0, Math.floor(memberData.guildContribution))
+          : 0;
+      }
+    }
+  } catch {
+    guildContribution = 0;
+  }
+
   return {
     uid,
     publicUsername,
@@ -73,6 +92,8 @@ export async function fetchPublicPlayerProfile(uid: string): Promise<PublicPlaye
     guildName: typeof guildData.guildName === 'string' ? guildData.guildName : null,
     guildRank: typeof guildData.rank === 'string' ? guildData.rank : null,
     leaderboardRank,
+    friendCount: friendCountSnap.data().count,
+    guildContribution,
   };
 }
 
