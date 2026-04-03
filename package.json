@@ -7,7 +7,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build:web": "npx expo export --platform web && node scripts/patch-web.mjs",
+    "build:web": "npx expo export --platform web && node scripts/patch-web.mjs && npm --prefix wiki install && npm --prefix wiki run docs:generate && npm --prefix wiki run docs:build && node scripts/merge-wiki-into-dist.mjs",
     "wiki:dev": "npm --prefix wiki run docs:dev",
     "wiki:generate": "npm --prefix wiki run docs:generate",
     "wiki:build": "npm --prefix wiki run docs:build",

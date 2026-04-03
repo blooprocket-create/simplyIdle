@@ -1,9 +1,10 @@
 import { defineConfig } from 'vitepress';
 
 export default defineConfig({
+  base: '/wiki/',
   title: 'SimplyIdle Wiki',
   description: 'Player reference for systems, progression, and live features.',
-  cleanUrls: true,
+  cleanUrls: false,
   lastUpdated: true,
   themeConfig: {
     search: {

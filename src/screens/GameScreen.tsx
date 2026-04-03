@@ -184,6 +184,13 @@ function scoreEquipmentForClass(item: { rarity: string; bonus: Record<string, nu
 }
 
 function resolveWikiUrl(): string {
+  if (Platform.OS === 'web') {
+    const webOrigin = globalThis?.location?.origin;
+    if (typeof webOrigin === 'string' && webOrigin.length > 0) {
+      return `${webOrigin.replace(/\/$/, '')}/wiki/`;
+    }
+  }
+
   const expoExtra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra ?? {}) as {
     wikiUrl?: string;
     wikiUrlWeb?: string;
