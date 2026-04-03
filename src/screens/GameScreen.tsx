@@ -390,7 +390,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [selectedMailId, setSelectedMailId] = useState<string | null>(null);
   const [shopOpen, setShopOpen] = useState(false);
   const [shopTab, setShopTab] = useState<ShopTab>('diamond');
-  const [shopFeedback, setShopFeedback] = useState<{ text: string; tone: 'success' | 'info' } | null>(null);
+  const [shopFlashActionId, setShopFlashActionId] = useState<string | null>(null);
   const [vipMilestoneIndex, setVipMilestoneIndex] = useState(0);
   const [heroesSubTab, setHeroesSubTab] = useState<HeroesSubTab>('summon');
   const [equipmentSubTab, setEquipmentSubTab] = useState<EquipmentSubTab>('inventory');
@@ -424,6 +424,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const cinematicTimersRef = useRef<number[]>([]);
   const cinematicPulse = useRef(new Animated.Value(0)).current;
   const cinematicRevealScale = useRef(new Animated.Value(0.8)).current;
+  const shopFlashAnim = useRef(new Animated.Value(0)).current;
   const topChipRefs = useRef<Record<'dps' | 'power' | 'gear', View | null>>({ dps: null, power: null, gear: null });
   const storyUnlockInitRef = useRef(false);
   const seenStoryUnlockIdsRef = useRef<Set<string>>(new Set());
@@ -839,11 +840,27 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const currentVipMilestoneClaimed = vipClaimedLevels.includes(currentVipMilestone.level);
   const currentVipMilestoneCanClaim = !currentVipMilestoneClaimed && vipLevel >= currentVipMilestone.level;
 
-  useEffect(() => {
-    if (!shopFeedback) return;
-    const timer = setTimeout(() => setShopFeedback(null), 1800);
-    return () => clearTimeout(timer);
-  }, [shopFeedback]);
+  const triggerShopButtonFlash = useCallback((actionId: string) => {
+    setShopFlashActionId(actionId);
+    shopFlashAnim.stopAnimation();
+    shopFlashAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(shopFlashAnim, {
+        toValue: 1,
+        duration: 110,
+        useNativeDriver: false,
+      }),
+      Animated.timing(shopFlashAnim, {
+        toValue: 0,
+        duration: 520,
+        useNativeDriver: false,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) {
+        setShopFlashActionId(prev => (prev === actionId ? null : prev));
+      }
+    });
+  }, [shopFlashAnim]);
 
   useEffect(() => {
     if (!shopOpen) return;
@@ -3233,12 +3250,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               { id: 'dollar', label: 'Dollar Shop', active: shopTab === 'dollar', onPress: () => { debugLog('shop', 'Switch shop tab', { from: shopTab, to: 'dollar' }); setShopTab('dollar'); } },
             ])}
 
-            {!!shopFeedback && (
-              <View style={[styles.shopFeedbackBanner, shopFeedback.tone === 'success' ? styles.shopFeedbackSuccess : styles.shopFeedbackInfo]}>
-                <Text style={styles.shopFeedbackText}>{shopFeedback.text}</Text>
-              </View>
-            )}
-
             <ScrollView style={styles.eventsScroll} contentContainerStyle={styles.eventsScrollContent}>
               <View style={styles.eventsCard}>
                 <Text style={styles.eventsCardTitle}>👑 VIP Status</Text>
@@ -3271,6 +3282,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Text style={styles.eventsHint}>Spend diamonds on premium consumables like heat coolants.</Text>
                   {DIAMOND_SHOP_OFFERS.map(offer => {
                     const canBuy = state.diamonds >= offer.cost;
+                    const flashId = `diamond_${offer.id}`;
+                    const isFlashing = shopFlashActionId === flashId;
                     const shortBy = Math.max(0, offer.cost - state.diamonds);
                     const owned = offer.id === 'coolant_i_pack'
                       ? `${state.usableItemCounts.coolant_mk1 ?? 0} owned`
@@ -3289,16 +3302,25 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                           {!canBuy && <Text style={styles.shopOfferNeed}>Need {shortBy} more diamonds</Text>}
                         </View>
                         <Pressable
-                          style={[styles.eventsActionBtn, !canBuy && styles.shopBuyBtnDisabled]}
+                          style={[styles.eventsActionBtn, styles.shopActionBtnFrame, !canBuy && styles.shopBuyBtnDisabled]}
                           disabled={!canBuy}
                           onPress={() => {
                             debugLog('shop', 'Buy diamond shop item', { offerId: offer.id, cost: offer.cost });
                             void trackGameplayAction('shop_diamond_purchase', { offerId: offer.id, cost: offer.cost }, 0);
                             buyDiamondShopItem(offer.id);
-                            setShopFeedback({ text: `Purchased ${offer.name}`, tone: 'success' });
+                            triggerShopButtonFlash(flashId);
                           }}
                         >
-                          <Text style={styles.eventsActionBtnText}>{canBuy ? 'Buy Now' : 'Need 💎'}</Text>
+                          <Animated.View
+                            pointerEvents="none"
+                            style={[
+                              styles.shopActionFlash,
+                              {
+                                opacity: isFlashing ? shopFlashAnim : 0,
+                              },
+                            ]}
+                          />
+                          <Text style={[styles.eventsActionBtnText, styles.shopActionBtnText]}>{canBuy ? 'Buy Now' : 'Need 💎'}</Text>
                         </Pressable>
                       </View>
                     );
@@ -3312,6 +3334,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Text style={styles.eventsHint}>Spend gold on progression items, potions, and gear crates.</Text>
                   {GOLD_SHOP_OFFERS.map(offer => {
                     const canBuy = state.gold >= offer.cost;
+                    const flashId = `gold_${offer.id}`;
+                    const isFlashing = shopFlashActionId === flashId;
                     const shortBy = Math.max(0, offer.cost - state.gold);
                     const owned = offer.id === 'exp_cache'
                       ? `${state.usableItemCounts.exp_scroll ?? 0} scrolls owned`
@@ -3328,16 +3352,25 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                           {!canBuy && <Text style={styles.shopOfferNeed}>Need {fmt(shortBy)} more gold</Text>}
                         </View>
                         <Pressable
-                          style={[styles.eventsActionBtn, !canBuy && styles.shopBuyBtnDisabled]}
+                          style={[styles.eventsActionBtn, styles.shopActionBtnFrame, !canBuy && styles.shopBuyBtnDisabled]}
                           disabled={!canBuy}
                           onPress={() => {
                             debugLog('shop', 'Buy gold shop item', { offerId: offer.id, cost: offer.cost });
                             void trackGameplayAction('shop_gold_purchase', { offerId: offer.id, cost: offer.cost }, 0);
                             buyGoldShopItem(offer.id);
-                            setShopFeedback({ text: `Purchased ${offer.name}`, tone: 'success' });
+                            triggerShopButtonFlash(flashId);
                           }}
                         >
-                          <Text style={styles.eventsActionBtnText}>{canBuy ? 'Buy Now' : 'Need Gold'}</Text>
+                          <Animated.View
+                            pointerEvents="none"
+                            style={[
+                              styles.shopActionFlash,
+                              {
+                                opacity: isFlashing ? shopFlashAnim : 0,
+                              },
+                            ]}
+                          />
+                          <Text style={[styles.eventsActionBtnText, styles.shopActionBtnText]}>{canBuy ? 'Buy Now' : 'Need Gold'}</Text>
                         </Pressable>
                       </View>
                     );
@@ -3381,16 +3414,26 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       </Pressable>
                     </View>
                     <Pressable
-                      style={[styles.eventsActionBtn, !currentVipMilestoneCanClaim && styles.shopBuyBtnDisabled]}
+                      style={[styles.eventsActionBtn, styles.shopActionBtnFrame, !currentVipMilestoneCanClaim && styles.shopBuyBtnDisabled]}
                       disabled={!currentVipMilestoneCanClaim}
                       onPress={() => {
+                        const flashId = `vip_reward_${currentVipMilestone.level}`;
                         debugLog('shop', 'Claim VIP reward', { level: currentVipMilestone.level });
                         void trackGameplayAction('shop_vip_reward_claimed', { level: currentVipMilestone.level }, 0);
                         claimVipReward(currentVipMilestone.level);
-                        setShopFeedback({ text: `Claimed VIP ${currentVipMilestone.level} reward`, tone: 'success' });
+                        triggerShopButtonFlash(flashId);
                       }}
                     >
-                      <Text style={styles.eventsActionBtnText}>
+                      <Animated.View
+                        pointerEvents="none"
+                        style={[
+                          styles.shopActionFlash,
+                          {
+                            opacity: shopFlashActionId === `vip_reward_${currentVipMilestone.level}` ? shopFlashAnim : 0,
+                          },
+                        ]}
+                      />
+                      <Text style={[styles.eventsActionBtnText, styles.shopActionBtnText]}>
                         {currentVipMilestoneClaimed ? 'Claimed' : currentVipMilestoneCanClaim ? 'Claim Reward' : `Unlocks at VIP ${currentVipMilestone.level}`}
                       </Text>
                     </Pressable>
@@ -3398,6 +3441,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
                   {DOLLAR_SHOP_OFFERS.map(offer => {
                     const firstBonusAvailable = !dollarFirstPurchaseClaimed.has(offer.id);
+                    const flashId = `dollar_${offer.id}`;
+                    const isFlashing = shopFlashActionId === flashId;
                     const totalDiamonds = offer.diamonds + (firstBonusAvailable ? offer.firstBonusDiamonds : 0);
                     return (
                       <View key={offer.id} style={styles.shopOfferRow}>
@@ -3407,16 +3452,25 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                           <Text style={styles.shopOfferPrice}>{firstBonusAvailable ? `First Purchase Bonus: +${fmt(offer.firstBonusDiamonds)} diamonds` : 'First purchase bonus already claimed'}</Text>
                         </View>
                         <Pressable
-                          style={[styles.eventsActionBtn, !ENABLE_SIMULATED_DOLLAR_PURCHASES && styles.shopBuyBtnDisabled]}
+                          style={[styles.eventsActionBtn, styles.shopActionBtnFrame, !ENABLE_SIMULATED_DOLLAR_PURCHASES && styles.shopBuyBtnDisabled]}
                           disabled={!ENABLE_SIMULATED_DOLLAR_PURCHASES}
                           onPress={() => {
                             debugLog('shop', 'Simulate IAP dollar purchase', { offerId: offer.id, firstBonus: firstBonusAvailable });
                             void trackGameplayAction('shop_iap_simulated', { offerId: offer.id, firstBonus: firstBonusAvailable }, 0);
                             simulateDollarPurchase(offer.id);
-                            setShopFeedback({ text: `Processed ${offer.label} pack`, tone: 'success' });
+                            triggerShopButtonFlash(flashId);
                           }}
                         >
-                          <Text style={styles.eventsActionBtnText}>
+                          <Animated.View
+                            pointerEvents="none"
+                            style={[
+                              styles.shopActionFlash,
+                              {
+                                opacity: isFlashing ? shopFlashAnim : 0,
+                              },
+                            ]}
+                          />
+                          <Text style={[styles.eventsActionBtnText, styles.shopActionBtnText]}>
                             {ENABLE_SIMULATED_DOLLAR_PURCHASES
                               ? firstBonusAvailable ? 'Sim Buy x2' : 'Sim Buy'
                               : 'Unavailable'}

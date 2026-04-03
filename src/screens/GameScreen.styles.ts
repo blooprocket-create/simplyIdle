@@ -4382,6 +4382,17 @@ export const styles = StyleSheet.create({
     marginTop: 4,
     fontStyle: 'italic',
   },
+  shopActionBtnFrame: {
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  shopActionFlash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#5EE084',
+  },
+  shopActionBtnText: {
+    zIndex: 1,
+  },
   shopFeedbackBanner: {
     borderRadius: 8,
     paddingVertical: 7,
