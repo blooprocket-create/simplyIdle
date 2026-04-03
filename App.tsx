@@ -1,6 +1,7 @@
 import 'react-native-reanimated';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
+import { onAuthStateChanged } from 'firebase/auth';
 import GameScreen from './src/screens/GameScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import { debugLog, identifyTelemetryDevice, initTelemetry, trackEvent, trackTelemetryHeartbeat } from './src/telemetry';
@@ -46,17 +47,25 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    (async () => {
-      if (isOnlineAuthAvailable()) {
-        const online = await getValidOnlineSession();
-        if (online) {
-          setAccountName(online);
-          return;
-        }
-      }
+    if (!isOnlineAuthAvailable()) {
+      setLoading(false);
+      return;
+    }
 
-    })()
-      .finally(() => setLoading(false));
+    const auth = getFirebaseAuth();
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, () => {
+      void (async () => {
+        const online = await getValidOnlineSession();
+        setAccountName(online);
+      })().finally(() => setLoading(false));
+    });
+
+    return unsubscribe;
   }, []);
 
   useEffect(() => {

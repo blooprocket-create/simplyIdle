@@ -1,6 +1,6 @@
 import { FirebaseApp, getApp, getApps, initializeApp } from 'firebase/app';
 import { Analytics, getAnalytics, isSupported, logEvent } from 'firebase/analytics';
-import { Auth, getAuth } from 'firebase/auth';
+import { Auth, browserLocalPersistence, getAuth, setPersistence } from 'firebase/auth';
 import { Firestore, getFirestore } from 'firebase/firestore';
 import { Platform } from 'react-native';
 
@@ -8,6 +8,7 @@ let cachedApp: FirebaseApp | null = null;
 let cachedAuth: Auth | null = null;
 let cachedDb: Firestore | null = null;
 let cachedAnalytics: Analytics | null = null;
+let authPersistenceInitialized = false;
 
 // Firebase config provided for SimplyIdle. Expo public env vars still override these.
 const FALLBACK_FIREBASE_CONFIG = {
@@ -50,6 +51,14 @@ export function getFirebaseAuth(): Auth | null {
   const app = getFirebaseApp();
   if (!app) return null;
   cachedAuth = getAuth(app);
+
+  if (Platform.OS === 'web' && !authPersistenceInitialized) {
+    authPersistenceInitialized = true;
+    void setPersistence(cachedAuth, browserLocalPersistence).catch(() => {
+      // Persistence fallback is handled by Firebase defaults if this fails.
+    });
+  }
+
   return cachedAuth;
 }
 
