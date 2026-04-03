@@ -3,7 +3,7 @@ import { View, Text, Pressable, Image } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import { ACHIEVEMENTS, HERO_POOL, WEEKLY_TRACK_MILESTONES, getHeroBackstory, getHeroUniqueWeaponName } from '../../gameConfig';
 import { getHeroPortraitSource } from '../../heroPortraits';
-import { ACH_BONUS_PER_UNLOCK_PCT, ACH_BONUS_CAP_PCT } from '../GameScreen';
+import { ACH_BONUS_PER_UNLOCK_PCT } from '../GameScreen';
 import { styles } from '../GameScreen';
 
 export interface AchievementsTabContentProps {
@@ -109,7 +109,7 @@ export const AchievementsTabContent: React.FC<AchievementsTabContentProps> = ({
                 Each unlocked achievement grants +{ACH_BONUS_PER_UNLOCK_PCT}% to final DPS, gold gain, and EXP gain multipliers.
               </Text>
               <Text style={styles.achievementBonusDesc}>
-                Cap: +{ACH_BONUS_CAP_PCT}% • Unlocked: {state.achievements.size}/{ACHIEVEMENTS.length}
+                Unlocked: {state.achievements.size}/{ACHIEVEMENTS.length}
               </Text>
               <Text style={styles.achievementBonusDesc}>
                 Current multiplier: x{(1 + stats.achievementBonusPercent).toFixed(2)} applied after most build/class/rebirth modifiers.

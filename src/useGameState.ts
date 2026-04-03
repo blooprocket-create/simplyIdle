@@ -248,7 +248,6 @@ type DiamondShopOfferId = 'coolant_i_pack' | 'coolant_ii_pack' | 'elite_supply' 
 type DollarShopOfferId = 'usd_499' | 'usd_1999' | 'usd_4999' | 'usd_9999';
 
 const ACHIEVEMENT_BONUS_PER_UNLOCK = 0.03;
-const ACHIEVEMENT_BONUS_CAP = 0.75;
 export const EXPEDITION_CONTRACT_REFRESH_MS = 8 * 60 * 60 * 1000;
 export const EXPEDITION_CONTRACT_REFRESH_GOLD_COST = 100_000;
 export const MINI_OPS_COOLDOWN_MS = 4 * 60 * 60 * 1000;
@@ -1752,7 +1751,7 @@ function getActiveStrikeDamage(state: GameState): number {
 }
 
 function getAchievementBonusMultiplier(state: GameState): number {
-  const pct = Math.min(ACHIEVEMENT_BONUS_CAP, state.achievements.size * ACHIEVEMENT_BONUS_PER_UNLOCK);
+  const pct = state.achievements.size * ACHIEVEMENT_BONUS_PER_UNLOCK;
   return 1 + pct;
 }
 
