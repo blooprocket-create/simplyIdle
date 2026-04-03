@@ -220,11 +220,14 @@ export const BattleTabContent: React.FC<BattleTabContentProps> = ({
             ) : (
               usableInventory.map(({ item, count }) => {
                 if (!item) return null;
+                const scalesWithProgress = item.effect !== 'heal_team_percent';
                 return (
                   <View key={item.id} style={styles.usableRow}>
                     <View style={styles.usableInfo}>
                       <Text style={styles.usableName}>{item.emoji} {item.name} x{count}</Text>
-                      <Text style={styles.usableDesc}>{item.description}</Text>
+                      <Text style={styles.usableDesc}>
+                        {item.description}{scalesWithProgress ? ' Scales with progression.' : ''}
+                      </Text>
                     </View>
                     <View style={styles.usableActionsCol}>
                       <Pressable style={styles.useItemBtn} onPress={() => useUsableItem(item.id)}>

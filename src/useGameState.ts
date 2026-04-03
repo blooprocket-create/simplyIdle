@@ -1775,6 +1775,38 @@ function getVipExpMultiplier(state: GameState): number {
   return 1 + state.vipLevel * VIP_EXP_PER_LEVEL;
 }
 
+function getUsableProgressScale(state: GameState): number {
+  const levelFactor = 1 + Math.pow(Math.max(1, state.level), 0.32) * 0.35;
+  const waveFactor = 1 + Math.log10(Math.max(10, state.highestWaveReached + 9)) * 0.8;
+  const prestigeFactor = 1 + state.prestigeCount * 0.12;
+  return levelFactor * waveFactor * prestigeFactor;
+}
+
+function getScaledUsableGoldGain(state: GameState, baseValue: number, itemType: 'basic' | 'advanced'): number {
+  const scaledBase = Math.ceil(baseValue * getUsableProgressScale(state) * getVipGoldMultiplier(state));
+  const waveFloor = Math.ceil(getMonsterGold(Math.max(1, state.highestWaveReached)) * (itemType === 'advanced' ? 8 : 3));
+  return Math.max(scaledBase, waveFloor);
+}
+
+function getScaledUsableExpGain(state: GameState, baseValue: number, itemType: 'basic' | 'advanced'): number {
+  const scaledBase = Math.ceil(baseValue * getUsableProgressScale(state) * getAchievementBonusMultiplier(state) * getVipExpMultiplier(state));
+  const waveFloor = Math.ceil(getMonsterExp(Math.max(1, state.highestWaveReached)) * (itemType === 'advanced' ? 6 : 2));
+  return Math.max(scaledBase, waveFloor);
+}
+
+function getScaledUsableShardGain(state: GameState, baseValue: number, itemType: 'basic' | 'advanced'): number {
+  const weekly = getCurrentWeeklyEvent(state);
+  const scaledBase = Math.ceil(baseValue * getUsableProgressScale(state) * weekly.shardMultiplier);
+  const waveFloor = Math.ceil(calculateShardReward(Math.max(1, state.highestWaveReached)) * (itemType === 'advanced' ? 10 : 4));
+  return Math.max(scaledBase, waveFloor);
+}
+
+function getScaledUsableHeatReduction(state: GameState, baseValue: number, itemType: 'basic' | 'advanced'): number {
+  const maxHeat = getMaxHeatForLevel(state.level);
+  const pctFloor = itemType === 'advanced' ? 0.22 : 0.1;
+  return Math.max(Math.ceil(baseValue), Math.ceil(maxHeat * pctFloor));
+}
+
 function canUseTempo4(state: Pick<GameState, 'vipLevel'>): boolean {
   return (state.vipLevel ?? 0) >= 1;
 }
@@ -3726,7 +3758,8 @@ function reducer(state: GameState, action: Action): GameState {
       }
 
       if (item.effect === 'gain_gold_flat') {
-        const gain = Math.ceil(item.value * Math.pow(REBIRTH_BONUS, nextState.prestigeCount) * getVipGoldMultiplier(nextState)) * requestedUses;
+        const gainPerUse = getScaledUsableGoldGain(nextState, item.value, item.itemType);
+        const gain = gainPerUse * requestedUses;
         nextState = queueReward({
           ...nextState,
           gold: nextState.gold + gain,
@@ -3740,7 +3773,8 @@ function reducer(state: GameState, action: Action): GameState {
       }
 
       if (item.effect === 'gain_exp_flat') {
-        const gain = Math.ceil(item.value * getAchievementBonusMultiplier(nextState) * getVipExpMultiplier(nextState)) * requestedUses;
+        const gainPerUse = getScaledUsableExpGain(nextState, item.value, item.itemType);
+        const gain = gainPerUse * requestedUses;
         const lvl = processLevelUp(nextState.exp + gain, nextState.level);
         nextState = queueReward({
           ...nextState,
@@ -3757,8 +3791,8 @@ function reducer(state: GameState, action: Action): GameState {
       }
 
       if (item.effect === 'gain_shards_flat') {
-        const weekly = getCurrentWeeklyEvent(nextState);
-        const gain = Math.ceil(item.value * (1 + nextState.prestigeCount * 0.04) * weekly.shardMultiplier) * requestedUses;
+        const gainPerUse = getScaledUsableShardGain(nextState, item.value, item.itemType);
+        const gain = gainPerUse * requestedUses;
         nextState = queueReward({
           ...nextState,
           heroShards: nextState.heroShards + gain,
@@ -3771,7 +3805,8 @@ function reducer(state: GameState, action: Action): GameState {
       }
 
       if (item.effect === 'reduce_heat_flat') {
-        const reduced = Math.max(0, nextState.combatHeat - item.value * requestedUses);
+        const reducePerUse = getScaledUsableHeatReduction(nextState, item.value, item.itemType);
+        const reduced = Math.max(0, nextState.combatHeat - reducePerUse * requestedUses);
         nextState = queueReward({
           ...nextState,
           combatHeat: reduced,
@@ -3779,12 +3814,16 @@ function reducer(state: GameState, action: Action): GameState {
           id: `use_${item.id}_${Date.now()}`,
           kind: 'system',
           title: `Used ${item.emoji} ${item.name}${useSuffix}`,
-          detail: `Heat ${Math.ceil(nextState.combatHeat)} -> ${Math.ceil(reduced)}`,
+          detail: `Heat ${Math.ceil(nextState.combatHeat)} -> ${Math.ceil(reduced)} (${Math.ceil(reducePerUse)} each)`,
         });
       }
 
       if (item.effect === 'gain_vip_points_flat') {
-        const gain = item.value * requestedUses;
+        const gainPerUse = Math.max(
+          Math.ceil(item.value * (1 + nextState.prestigeCount * 0.08)),
+          Math.ceil(Math.log10(Math.max(10, nextState.highestWaveReached + 9)) * 4),
+        );
+        const gain = gainPerUse * requestedUses;
         const nextPoints = nextState.vipPoints + gain;
         const nextLevel = getVipLevelFromPoints(nextPoints);
         const leveledUp = nextLevel > nextState.vipLevel;
