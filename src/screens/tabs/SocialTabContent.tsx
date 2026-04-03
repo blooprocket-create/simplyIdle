@@ -1149,6 +1149,10 @@ const styles = StyleSheet.create({
     borderColor: '#67E6B6',
     backgroundColor: '#79F0C6',
   },
+  sendBtnPressed: {
+    transform: [{ scale: 0.97 }],
+    opacity: 0.9,
+  },
   sendBtnDisabled: {
     opacity: 0.5,
   },
@@ -1218,6 +1222,63 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginTop: 2,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+  },
+  statusDotReady: {
+    backgroundColor: '#67E6B6',
+  },
+  statusDotCooldown: {
+    backgroundColor: '#F9D66D',
+  },
+  statusText: {
+    color: '#C6E2F5',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  statusBadge: {
+    color: '#E2F3FF',
+    borderWidth: 1,
+    borderColor: '#4F7898',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    fontSize: 10,
+    fontWeight: '800',
+    backgroundColor: '#1B334A',
+    overflow: 'hidden',
+  },
+  progressBlock: {
+    gap: 6,
+    marginTop: 4,
+  },
+  progressLabel: {
+    color: '#A7C8DF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  progressTrack: {
+    width: '100%',
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: '#12283A',
+    borderWidth: 1,
+    borderColor: '#2A4B66',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#7EC8FF',
   },
   smallBtn: {
     borderWidth: 1,

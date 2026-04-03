@@ -20,7 +20,7 @@ import {
   leaveGuild,
   updateGuildDescription,
 } from '../../../services/guild';
-import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
+import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton, SocialProgressBar } from './SocialPrimitives';
 
 type GuildSubTab = 'home' | 'boss' | 'events' | 'chat';
 
@@ -567,6 +567,9 @@ export function GuildSection({
               <View key={member.uid} style={styles.friendRow}>
                 <View style={styles.friendMeta}>
                   <Text style={styles.friendName}>{member.displayName}</Text>
+                  <View style={styles.statusRow}>
+                    <Text style={styles.statusBadge}>{member.rank.toUpperCase()}</Text>
+                  </View>
                   <Text style={styles.metaText}>{member.rank} • Boss Damage {Math.floor(member.guildContribution).toLocaleString()}</Text>
                 </View>
                 {isLeader && member.uid !== me.uid && (
@@ -671,6 +674,12 @@ export function GuildSection({
             <>
               <Text style={styles.metaText}>{guildBoss.name} • Tier {guildBoss.tier}</Text>
               <Text style={styles.metaText}>HP: {Math.floor(guildBoss.currentHp).toLocaleString()} / {Math.floor(guildBoss.maxHp).toLocaleString()}</Text>
+              <SocialProgressBar
+                styles={styles}
+                progress={guildBoss.currentHp / Math.max(1, guildBoss.maxHp)}
+                label={`${Math.floor((guildBoss.currentHp / Math.max(1, guildBoss.maxHp)) * 100)}% Boss HP`}
+                tint={guildBoss.currentHp / Math.max(1, guildBoss.maxHp) < 0.25 ? '#FF7A90' : '#7EC8FF'}
+              />
               <Text style={styles.metaText}>Status: {guildBoss.status} • Expires: {new Date(guildBoss.expiresAt).toLocaleString()}</Text>
               <Text style={styles.metaText}>Participants: {guildBoss.participantUids.length}</Text>
             </>
@@ -852,6 +861,12 @@ export function GuildSection({
                 <View style={styles.friendMeta}>
                   <Text style={styles.friendName}>{isWar ? 'Warfront Assault' : 'Expedition'} • {event.status}</Text>
                   <Text style={styles.metaText}>Progress: {total.toLocaleString()} / {target.toLocaleString()} ({pct}%)</Text>
+                  <SocialProgressBar
+                    styles={styles}
+                    progress={pct / 100}
+                    label={`${pct}% completion`}
+                    tint={pct >= 100 ? '#67E6B6' : '#7EC8FF'}
+                  />
                   <Text style={styles.metaText}>Ends: {new Date(event.endsAt).toLocaleString()}</Text>
                   {myContributionRow && (
                     <Text style={styles.metaText}>Your total contribution: {formatCompactNumber(myContributionRow.totalContributed)}</Text>

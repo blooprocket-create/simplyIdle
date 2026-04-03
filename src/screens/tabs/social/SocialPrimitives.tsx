@@ -43,12 +43,35 @@ interface SocialPrimaryButtonProps {
 export function SocialPrimaryButton({ styles, label, onPress, disabled }: SocialPrimaryButtonProps) {
   return (
     <Pressable
-      style={[styles.sendBtn, disabled && styles.sendBtnDisabled]}
+      style={({ pressed }) => [
+        styles.sendBtn,
+        disabled && styles.sendBtnDisabled,
+        pressed && !disabled && styles.sendBtnPressed,
+      ]}
       onPress={onPress}
       disabled={disabled}
     >
       <Text style={styles.sendBtnText}>{label}</Text>
     </Pressable>
+  );
+}
+
+interface SocialProgressBarProps {
+  styles: any;
+  progress: number;
+  label?: string;
+  tint?: string;
+}
+
+export function SocialProgressBar({ styles, progress, label, tint }: SocialProgressBarProps) {
+  const clamped = Math.max(0, Math.min(1, progress));
+  return (
+    <View style={styles.progressBlock}>
+      {!!label && <Text style={styles.progressLabel}>{label}</Text>}
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: `${Math.round(clamped * 100)}%` }, tint ? { backgroundColor: tint } : null]} />
+      </View>
+    </View>
   );
 }
 

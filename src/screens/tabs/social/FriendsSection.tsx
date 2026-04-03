@@ -143,6 +143,10 @@ export function FriendsSection({
             <View style={styles.friendMeta}>
               <Text style={styles.friendName}>{friend.displayName}</Text>
               <Text style={styles.metaText}>Lv.{friend.level} • Wants {giftIcon(friend.giftPreference)} {friend.giftPreference}</Text>
+              <View style={styles.statusRow}>
+                <View style={[styles.statusDot, styles.statusDotReady]} />
+                <Text style={styles.statusText}>Gift Ready</Text>
+              </View>
             </View>
             <View style={styles.friendActions}>
               <Pressable
@@ -171,6 +175,10 @@ export function FriendsSection({
             <View style={styles.friendMeta}>
               <Text style={styles.friendName}>{friend.displayName}</Text>
               <Text style={styles.metaText}>Lv.{friend.level} • Wants {giftIcon(friend.giftPreference)} {friend.giftPreference}</Text>
+              <View style={styles.statusRow}>
+                <View style={[styles.statusDot, styles.statusDotCooldown]} />
+                <Text style={styles.statusText}>Gift Cooldown</Text>
+              </View>
               <Text style={styles.cooldownText}>Next gift in {timeUntilNextUtcMidnightLabel(nowMs)}</Text>
             </View>
             <View style={styles.friendActions}>
