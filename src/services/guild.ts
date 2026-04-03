@@ -777,6 +777,33 @@ export async function fetchGuildInfo(uid: string): Promise<GuildSummary | null> 
   return parseGuildSummary(guildId, guildSnap.data() as Record<string, unknown>);
 }
 
+export async function updateGuildDescription(input: { uid: string; description: string }): Promise<void> {
+  const db = requireDb();
+  const actorUid = input.uid.trim();
+  if (!actorUid) throw new Error('Missing user id.');
+
+  const description = input.description.trim().slice(0, 140);
+  const actorMembershipRef = doc(db, USER_GUILD_COLLECTION, actorUid);
+  const now = Date.now();
+
+  await runTransaction(db, async tx => {
+    const actorMembershipSnap = await tx.get(actorMembershipRef);
+    if (!actorMembershipSnap.exists()) throw new Error('You are not in a guild.');
+
+    const actorMembership = actorMembershipSnap.data();
+    const guildId = typeof actorMembership.guildId === 'string' ? actorMembership.guildId : '';
+    const actorRank = typeof actorMembership.rank === 'string' ? actorMembership.rank : 'member';
+    if (!guildId) throw new Error('Guild data invalid.');
+    if (actorRank !== 'leader') throw new Error('Only guild leader can edit description.');
+
+    const guildRef = doc(db, GUILD_COLLECTION, guildId);
+    const guildSnap = await tx.get(guildRef);
+    if (!guildSnap.exists()) throw new Error('Guild not found.');
+
+    tx.set(guildRef, { description, updatedAt: now }, { merge: true });
+  });
+}
+
 export async function fetchGuildMembers(guildId: string): Promise<GuildMember[]> {
   const db = requireDb();
   const snap = await getDocs(collection(db, GUILD_COLLECTION, guildId, 'members'));

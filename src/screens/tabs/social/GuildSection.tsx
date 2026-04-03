@@ -18,6 +18,7 @@ import {
   startEvent,
   sendGuildChatMessage,
   leaveGuild,
+  updateGuildDescription,
 } from '../../../services/guild';
 import { SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
 
@@ -141,6 +142,7 @@ export function GuildSection({
   const [localBossCooldownUntil, setLocalBossCooldownUntil] = useState(0);
   const [eventCooldownUntilById, setEventCooldownUntilById] = useState<Record<string, number>>({});
   const [eventContribByEventId, setEventContribByEventId] = useState<Record<string, GuildEventContributor[]>>({});
+  const [descriptionDraft, setDescriptionDraft] = useState('');
 
   useEffect(() => {
     const timer = setInterval(() => setNowMs(Date.now()), 1000);
@@ -151,7 +153,16 @@ export function GuildSection({
     setLocalBossCooldownUntil(0);
     setEventCooldownUntilById({});
     setEventContribByEventId({});
+    setDescriptionDraft(myGuild?.description ?? '');
   }, [myGuild?.guildId, me.uid]);
+
+  useEffect(() => {
+    if (!myGuild) {
+      setDescriptionDraft('');
+      return;
+    }
+    setDescriptionDraft(myGuild.description || '');
+  }, [myGuild?.description, myGuild?.guildId]);
 
   useEffect(() => {
     setEventCooldownUntilById(prev => {
@@ -261,13 +272,26 @@ export function GuildSection({
     return items.sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
   }, [guildBoss, guildEvents]);
 
+  const canSaveDescription = isLeader
+    && !guildBusy
+    && !!myGuild
+    && descriptionDraft.trim().slice(0, 140) !== (myGuild.description || '');
+
   return (
     <>
-      <SocialCard styles={styles} title="Guild Command" subtitle="Create Guild Cost: 2,500 Diamonds.">
-        <Text style={styles.metaText}>Your Diamonds: {diamonds}</Text>
-        {guildBusy && <Text style={styles.metaText}>Syncing guild actions...</Text>}
-        {!!error && <Text style={styles.errorText}>{error}</Text>}
-      </SocialCard>
+      {!myGuild && (
+        <SocialCard styles={styles} title="Guild Command" subtitle="Create Guild Cost: 2,500 Diamonds.">
+          <Text style={styles.metaText}>Your Diamonds: {diamonds}</Text>
+          {guildBusy && <Text style={styles.metaText}>Syncing guild actions...</Text>}
+          {!!error && <Text style={styles.errorText}>{error}</Text>}
+        </SocialCard>
+      )}
+
+      {!!myGuild && !!error && (
+        <SocialCard styles={styles} title="Guild Status">
+          <Text style={styles.errorText}>{error}</Text>
+        </SocialCard>
+      )}
 
       {!myGuild && (
         <SocialCard styles={styles} title="Create Guild">
@@ -353,7 +377,7 @@ export function GuildSection({
 
       {myGuild && guildSubTab === 'home' && (
         <>
-          <SocialCard styles={styles} title="Guild Command Center" subtitle="Operational snapshot inspired by modern guild hubs.">
+          <SocialCard styles={styles} title="Guild Command Center">
             <Text style={styles.metaText}>{myGuild.description || 'No description set.'}</Text>
             <Text style={styles.metaText}>Leader: {myGuild.leaderName} • Members: {myGuild.memberCount}/{myGuild.maxMembers}</Text>
             <Text style={styles.metaText}>Min Join Level: {myGuild.minLevelToJoin} • Public: {myGuild.isPublic ? 'Yes' : 'No'}</Text>
@@ -363,6 +387,45 @@ export function GuildSection({
             )}
             {recentCompletedEvents.length > 0 && (
               <Text style={styles.metaText}>Recent Wins: {recentCompletedEvents.map(event => event.type === 'war' ? 'Warfront' : 'Expedition').join(', ')}</Text>
+            )}
+          </SocialCard>
+
+          <SocialCard styles={styles} title="Guild Description">
+            {isLeader ? (
+              <>
+                <SocialInput
+                  styles={styles}
+                  value={descriptionDraft}
+                  onChangeText={setDescriptionDraft}
+                  placeholder="Set guild description and strategy notes"
+                  editable={!guildBusy}
+                  maxLength={140}
+                />
+                <SocialPrimaryButton
+                  styles={styles}
+                  label="Save Description"
+                  disabled={!canSaveDescription}
+                  onPress={async () => {
+                    if (!me.uid || !myGuild) return;
+                    setGuildBusy(true);
+                    setError(null);
+                    try {
+                      await updateGuildDescription({
+                        uid: me.uid,
+                        description: descriptionDraft,
+                      });
+                      await refreshGuildData();
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : 'Failed to update description.';
+                      setError(msg);
+                    } finally {
+                      setGuildBusy(false);
+                    }
+                  }}
+                />
+              </>
+            ) : (
+              <Text style={styles.metaText}>{myGuild.description || 'No description set.'}</Text>
             )}
           </SocialCard>
 

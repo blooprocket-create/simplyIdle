@@ -170,6 +170,30 @@ export function SocialTabContent({
   }, [tab, me.uid]);
 
   useEffect(() => {
+    if (tab !== 'social') return;
+    if (!me.uid) {
+      setMyGuild(null);
+      return;
+    }
+
+    let cancelled = false;
+    const refreshMembership = () => {
+      void fetchGuildInfo(me.uid)
+        .then(guildInfo => {
+          if (!cancelled) setMyGuild(guildInfo);
+        })
+        .catch(() => {});
+    };
+
+    refreshMembership();
+    const timer = setInterval(refreshMembership, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [tab, me.uid]);
+
+  useEffect(() => {
     onPendingRequestsCountChange?.(pendingRequests.length);
   }, [onPendingRequestsCountChange, pendingRequests.length]);
 
