@@ -52,6 +52,14 @@ function parseCooldownSeconds(errorMessage: string): number | null {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
+function formatCompactNumber(value: number): string {
+  if (!Number.isFinite(value)) return '0';
+  if (Math.abs(value) >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
+  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return `${Math.floor(value)}`;
+}
+
 interface GuildSectionProps {
   styles: any;
   me: {
@@ -169,6 +177,52 @@ export function GuildSection({
       ? `Attack ${formatCooldownHoursMinutes(bossCooldownRemainingMs)}`
       : 'Attack Ready';
 
+  const activeEvents = useMemo(
+    () => guildEvents.filter(event => event.status === 'active'),
+    [guildEvents],
+  );
+
+  const recentCompletedEvents = useMemo(
+    () => guildEvents.filter(event => event.status === 'completed').slice(0, 3),
+    [guildEvents],
+  );
+
+  const topRaiders = useMemo(
+    () => [...guildMembers]
+      .sort((a, b) => b.guildContribution - a.guildContribution)
+      .slice(0, 3),
+    [guildMembers],
+  );
+
+  const totalBossDamage = useMemo(
+    () => guildMembers.reduce((acc, member) => acc + Math.max(0, member.guildContribution), 0),
+    [guildMembers],
+  );
+
+  const activityFeed = useMemo(() => {
+    const items: Array<{ label: string; detail: string; timestamp: number }> = [];
+
+    if (guildBoss) {
+      items.push({
+        label: `Boss ${guildBoss.status === 'active' ? 'Active' : guildBoss.status === 'defeated' ? 'Defeated' : 'Expired'}`,
+        detail: `${guildBoss.name} • Tier ${guildBoss.tier} • Raiders ${guildBoss.participantUids.length}`,
+        timestamp: guildBoss.status === 'active' ? guildBoss.startedAt : guildBoss.expiresAt,
+      });
+    }
+
+    for (const event of guildEvents.slice(0, 4)) {
+      items.push({
+        label: `${event.type === 'war' ? 'Warfront' : 'Expedition'} ${event.status}`,
+        detail: event.status === 'active'
+          ? `Ends ${new Date(event.endsAt).toLocaleString()}`
+          : `Started ${new Date(event.startedAt).toLocaleString()}`,
+        timestamp: event.startedAt,
+      });
+    }
+
+    return items.sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
+  }, [guildBoss, guildEvents]);
+
   return (
     <>
       <SocialCard styles={styles} title="Guild Command" subtitle="Create Guild Cost: 2,500 Diamonds.">
@@ -259,96 +313,137 @@ export function GuildSection({
       )}
 
       {myGuild && guildSubTab === 'home' && (
-        <View style={styles.card}>
-          <Text style={styles.metaText}>Guild profile and members</Text>
-          <Text style={styles.metaText}>{myGuild.description || 'No description set.'}</Text>
-          <Text style={styles.metaText}>Leader: {myGuild.leaderName} • Members: {myGuild.memberCount}/{myGuild.maxMembers}</Text>
-          <Text style={styles.metaText}>Min Join Level: {myGuild.minLevelToJoin} • Public: {myGuild.isPublic ? 'Yes' : 'No'}</Text>
-          {guildMembers.slice(0, 12).map(member => (
-            <View key={member.uid} style={styles.friendRow}>
-              <View style={styles.friendMeta}>
-                <Text style={styles.friendName}>{member.displayName}</Text>
-                <Text style={styles.metaText}>{member.rank} • Boss Damage {Math.floor(member.guildContribution).toLocaleString()}</Text>
-              </View>
-              {myGuild.leaderId === me.uid && member.uid !== me.uid && (
-                <View style={styles.friendActions}>
-                  <Pressable
-                    style={styles.smallBtn}
-                    disabled={guildBusy}
-                    onPress={async () => {
-                      if (!me.uid) return;
-                      setGuildBusy(true);
-                      setError(null);
-                      try {
-                        await setMemberRank({
-                          actorUid: me.uid,
-                          targetUid: member.uid,
-                          rank: member.rank === 'officer' ? 'member' : 'officer',
-                        });
-                        await refreshGuildData();
-                      } catch (err) {
-                        const msg = err instanceof Error ? err.message : 'Failed to update member rank.';
-                        setError(msg);
-                      } finally {
-                        setGuildBusy(false);
-                      }
-                    }}
-                  >
-                    <Text style={styles.smallBtnText}>{member.rank === 'officer' ? 'Demote' : 'Promote'}</Text>
-                  </Pressable>
-                  <Pressable
-                    style={styles.smallBtn}
-                    disabled={guildBusy}
-                    onPress={() => setConfirmTransferLeader(member)}
-                  >
-                    <Text style={styles.smallBtnText}>Leader</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.smallBtn, styles.smallBtnDanger]}
-                    disabled={guildBusy}
-                    onPress={() => setConfirmKickMember(member)}
-                  >
-                    <Text style={styles.smallBtnText}>Kick</Text>
-                  </Pressable>
+        <>
+          <SocialCard styles={styles} title="Guild Command Center" subtitle="Operational snapshot inspired by modern guild hubs.">
+            <Text style={styles.metaText}>{myGuild.description || 'No description set.'}</Text>
+            <Text style={styles.metaText}>Leader: {myGuild.leaderName} • Members: {myGuild.memberCount}/{myGuild.maxMembers}</Text>
+            <Text style={styles.metaText}>Min Join Level: {myGuild.minLevelToJoin} • Public: {myGuild.isPublic ? 'Yes' : 'No'}</Text>
+            <Text style={styles.metaText}>Boss Damage Pool: {formatCompactNumber(totalBossDamage)} • Active Ops: {activeEvents.length}</Text>
+            {guildBoss && (
+              <Text style={styles.metaText}>Boss Front: {guildBoss.name} ({guildBoss.status}) • Tier {guildBoss.tier}</Text>
+            )}
+            {recentCompletedEvents.length > 0 && (
+              <Text style={styles.metaText}>Recent Wins: {recentCompletedEvents.map(event => event.type === 'war' ? 'Warfront' : 'Expedition').join(', ')}</Text>
+            )}
+          </SocialCard>
+
+          <SocialCard styles={styles} title="Role Matrix" subtitle="Clear authority lines reduce guild chaos.">
+            <Text style={styles.metaText}>Leader: full control, role assignments, disband, event launch.</Text>
+            <Text style={styles.metaText}>Officer: delegated command (future pass: event moderation and recruitment tools).</Text>
+            <Text style={styles.metaText}>Member: contributes in boss/events and strengthens guild progression.</Text>
+          </SocialCard>
+
+          <SocialCard styles={styles} title="Top Raiders" subtitle="Highest recorded boss damage contributors.">
+            {topRaiders.length === 0 && <Text style={styles.metaText}>No boss damage recorded yet.</Text>}
+            {topRaiders.map((member, index) => (
+              <View key={member.uid} style={styles.friendRow}>
+                <View style={styles.friendMeta}>
+                  <Text style={styles.friendName}>#{index + 1} {member.displayName}</Text>
+                  <Text style={styles.metaText}>{member.rank} • Boss Damage {formatCompactNumber(member.guildContribution)}</Text>
                 </View>
-              )}
-            </View>
-          ))}
-          {myGuild.leaderId !== me.uid && (
-            <Pressable
-              style={[styles.smallBtn, styles.smallBtnDanger]}
-              disabled={guildBusy}
-              onPress={async () => {
-                if (!me.uid) return;
-                setGuildBusy(true);
-                setError(null);
-                try {
-                  await leaveGuild({ uid: me.uid });
-                  await refreshGuildData();
-                } catch (err) {
-                  const msg = err instanceof Error ? err.message : 'Failed to leave guild.';
-                  setError(msg);
-                } finally {
-                  setGuildBusy(false);
-                }
-              }}
-            >
-              <Text style={styles.smallBtnText}>Leave Guild</Text>
-            </Pressable>
-          )}
-          {myGuild.leaderId === me.uid && (
-            <>
-              <Text style={styles.metaText}>Leaders can transfer leadership to another member, or disband the guild.</Text>
+              </View>
+            ))}
+          </SocialCard>
+
+          <SocialCard styles={styles} title="Roster" subtitle="Boss Damage tracks boss-only impact. Event progress is shown in Events tab.">
+            {guildMembers.slice(0, 12).map(member => (
+              <View key={member.uid} style={styles.friendRow}>
+                <View style={styles.friendMeta}>
+                  <Text style={styles.friendName}>{member.displayName}</Text>
+                  <Text style={styles.metaText}>{member.rank} • Boss Damage {Math.floor(member.guildContribution).toLocaleString()}</Text>
+                </View>
+                {myGuild.leaderId === me.uid && member.uid !== me.uid && (
+                  <View style={styles.friendActions}>
+                    <Pressable
+                      style={styles.smallBtn}
+                      disabled={guildBusy}
+                      onPress={async () => {
+                        if (!me.uid) return;
+                        setGuildBusy(true);
+                        setError(null);
+                        try {
+                          await setMemberRank({
+                            actorUid: me.uid,
+                            targetUid: member.uid,
+                            rank: member.rank === 'officer' ? 'member' : 'officer',
+                          });
+                          await refreshGuildData();
+                        } catch (err) {
+                          const msg = err instanceof Error ? err.message : 'Failed to update member rank.';
+                          setError(msg);
+                        } finally {
+                          setGuildBusy(false);
+                        }
+                      }}
+                    >
+                      <Text style={styles.smallBtnText}>{member.rank === 'officer' ? 'Demote' : 'Promote'}</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.smallBtn}
+                      disabled={guildBusy}
+                      onPress={() => setConfirmTransferLeader(member)}
+                    >
+                      <Text style={styles.smallBtnText}>Leader</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.smallBtn, styles.smallBtnDanger]}
+                      disabled={guildBusy}
+                      onPress={() => setConfirmKickMember(member)}
+                    >
+                      <Text style={styles.smallBtnText}>Kick</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+            ))}
+            {myGuild.leaderId !== me.uid && (
               <Pressable
                 style={[styles.smallBtn, styles.smallBtnDanger]}
                 disabled={guildBusy}
-                onPress={() => setConfirmDisbandGuild(true)}
+                onPress={async () => {
+                  if (!me.uid) return;
+                  setGuildBusy(true);
+                  setError(null);
+                  try {
+                    await leaveGuild({ uid: me.uid });
+                    await refreshGuildData();
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : 'Failed to leave guild.';
+                    setError(msg);
+                  } finally {
+                    setGuildBusy(false);
+                  }
+                }}
               >
-                <Text style={styles.smallBtnText}>Disband Guild</Text>
+                <Text style={styles.smallBtnText}>Leave Guild</Text>
               </Pressable>
-            </>
-          )}
-        </View>
+            )}
+            {myGuild.leaderId === me.uid && (
+              <>
+                <Text style={styles.metaText}>Leaders can transfer leadership to another member, or disband the guild.</Text>
+                <Pressable
+                  style={[styles.smallBtn, styles.smallBtnDanger]}
+                  disabled={guildBusy}
+                  onPress={() => setConfirmDisbandGuild(true)}
+                >
+                  <Text style={styles.smallBtnText}>Disband Guild</Text>
+                </Pressable>
+              </>
+            )}
+          </SocialCard>
+
+          <SocialCard styles={styles} title="Recent Activity" subtitle="Live ops timeline for guild awareness.">
+            {activityFeed.length === 0 && <Text style={styles.metaText}>No guild activity yet.</Text>}
+            {activityFeed.map((item, index) => (
+              <View key={`${item.label}_${index}`} style={styles.friendRow}>
+                <View style={styles.friendMeta}>
+                  <Text style={styles.friendName}>{item.label}</Text>
+                  <Text style={styles.metaText}>{item.detail}</Text>
+                </View>
+              </View>
+            ))}
+          </SocialCard>
+        </>
       )}
 
       {myGuild && guildSubTab === 'boss' && (
@@ -482,24 +577,25 @@ export function GuildSection({
             const total = Number(event.details[isWar ? 'totalDamage' : 'totalKills'] ?? 0);
             const target = Number(event.details[isWar ? 'targetDamage' : 'targetKills'] ?? 1);
             const pct = Math.min(100, Math.floor((total / Math.max(1, target)) * 100));
+            const eventCooldownRemainingMs = Math.max(0, (eventCooldownUntilById[event.eventId] ?? 0) - nowMs);
+            const canContribute = !guildBusy && event.status === 'active' && eventCooldownRemainingMs <= 0;
             return (
               <View key={event.eventId} style={styles.friendRow}>
                 <View style={styles.friendMeta}>
                   <Text style={styles.friendName}>{isWar ? 'Warfront Assault' : 'Expedition'} • {event.status}</Text>
                   <Text style={styles.metaText}>Progress: {total.toLocaleString()} / {target.toLocaleString()} ({pct}%)</Text>
                   <Text style={styles.metaText}>Ends: {new Date(event.endsAt).toLocaleString()}</Text>
+                  {eventCooldownRemainingMs > 0 && (
+                    <Text style={styles.metaText}>Your cooldown: {formatCooldownMinutesSeconds(eventCooldownRemainingMs)}</Text>
+                  )}
                 </View>
                 <Pressable
-                  style={({ pressed }) => {
-                    const eventCooldownRemainingMs = Math.max(0, (eventCooldownUntilById[event.eventId] ?? 0) - nowMs);
-                    const canContribute = !guildBusy && event.status === 'active' && eventCooldownRemainingMs <= 0;
-                    return [
-                      styles.smallBtn,
-                      !canContribute && styles.sendBtnDisabled,
-                      pressed && canContribute && styles.smallBtnPressed,
-                    ];
-                  }}
-                  disabled={guildBusy || event.status !== 'active' || Math.max(0, (eventCooldownUntilById[event.eventId] ?? 0) - nowMs) > 0}
+                  style={({ pressed }) => [
+                    styles.smallBtn,
+                    !canContribute && styles.sendBtnDisabled,
+                    pressed && canContribute && styles.smallBtnPressed,
+                  ]}
+                  disabled={!canContribute}
                   onPress={async () => {
                     if (!me.uid) return;
                     setGuildBusy(true);
@@ -532,10 +628,7 @@ export function GuildSection({
                   }}
                 >
                   <Text style={styles.smallBtnText}>
-                    {(() => {
-                      const remainingMs = Math.max(0, (eventCooldownUntilById[event.eventId] ?? 0) - nowMs);
-                      return remainingMs > 0 ? `Contribute ${formatCooldownMinutesSeconds(remainingMs)}` : 'Contribute';
-                    })()}
+                    {eventCooldownRemainingMs > 0 ? `Contribute ${formatCooldownMinutesSeconds(eventCooldownRemainingMs)}` : 'Contribute'}
                   </Text>
                 </Pressable>
               </View>

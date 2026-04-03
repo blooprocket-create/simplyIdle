@@ -1033,6 +1033,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 12,
   },
+  smallBtnPressed: {
+    transform: [{ scale: 0.97 }],
+    opacity: 0.88,
+  },
   userMenuBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(4, 8, 16, 0.62)',
