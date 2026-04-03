@@ -128,6 +128,8 @@ export function ChatSection({
       guildTag: message.guildTag,
       text: message.text,
       sentAt: message.sentAt,
+      reactions: message.reactions,
+      myReaction: message.myReaction,
     }));
   }, [activeChannel, guildMessages, messages]);
 
