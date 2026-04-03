@@ -143,6 +143,7 @@ export function GuildSection({
   const [eventCooldownUntilById, setEventCooldownUntilById] = useState<Record<string, number>>({});
   const [eventContribByEventId, setEventContribByEventId] = useState<Record<string, GuildEventContributor[]>>({});
   const [descriptionDraft, setDescriptionDraft] = useState('');
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNowMs(Date.now()), 1000);
@@ -154,6 +155,7 @@ export function GuildSection({
     setEventCooldownUntilById({});
     setEventContribByEventId({});
     setDescriptionDraft(myGuild?.description ?? '');
+    setIsEditingDescription(false);
   }, [myGuild?.guildId, me.uid]);
 
   useEffect(() => {
@@ -275,6 +277,7 @@ export function GuildSection({
   const canSaveDescription = isLeader
     && !guildBusy
     && !!myGuild
+    && isEditingDescription
     && descriptionDraft.trim().slice(0, 140) !== (myGuild.description || '');
 
   return (
@@ -378,20 +381,31 @@ export function GuildSection({
       {myGuild && guildSubTab === 'home' && (
         <>
           <SocialCard styles={styles} title="Guild Command Center">
-            <Text style={styles.metaText}>{myGuild.description || 'No description set.'}</Text>
-            <Text style={styles.metaText}>Leader: {myGuild.leaderName} • Members: {myGuild.memberCount}/{myGuild.maxMembers}</Text>
-            <Text style={styles.metaText}>Min Join Level: {myGuild.minLevelToJoin} • Public: {myGuild.isPublic ? 'Yes' : 'No'}</Text>
-            <Text style={styles.metaText}>Boss Damage Pool: {formatCompactNumber(totalBossDamage)} • Active Ops: {activeEvents.length}</Text>
-            {guildBoss && (
-              <Text style={styles.metaText}>Boss Front: {guildBoss.name} ({guildBoss.status}) • Tier {guildBoss.tier}</Text>
+            {!isEditingDescription && (
+              <>
+                <View style={styles.friendRow}>
+                  <View style={styles.friendMeta}>
+                    <Text style={styles.friendName}>Guild Description</Text>
+                    <Text style={styles.metaText}>{myGuild.description || 'No description set.'}</Text>
+                  </View>
+                  {isLeader && (
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.smallBtn,
+                        guildBusy && styles.sendBtnDisabled,
+                        pressed && !guildBusy && styles.smallBtnPressed,
+                      ]}
+                      disabled={guildBusy}
+                      onPress={() => setIsEditingDescription(true)}
+                    >
+                      <Text style={styles.smallBtnText}>✏️ Edit</Text>
+                    </Pressable>
+                  )}
+                </View>
+              </>
             )}
-            {recentCompletedEvents.length > 0 && (
-              <Text style={styles.metaText}>Recent Wins: {recentCompletedEvents.map(event => event.type === 'war' ? 'Warfront' : 'Expedition').join(', ')}</Text>
-            )}
-          </SocialCard>
 
-          <SocialCard styles={styles} title="Guild Description">
-            {isLeader ? (
+            {isEditingDescription && isLeader && (
               <>
                 <SocialInput
                   styles={styles}
@@ -401,31 +415,61 @@ export function GuildSection({
                   editable={!guildBusy}
                   maxLength={140}
                 />
-                <SocialPrimaryButton
-                  styles={styles}
-                  label="Save Description"
-                  disabled={!canSaveDescription}
-                  onPress={async () => {
-                    if (!me.uid || !myGuild) return;
-                    setGuildBusy(true);
-                    setError(null);
-                    try {
-                      await updateGuildDescription({
-                        uid: me.uid,
-                        description: descriptionDraft,
-                      });
-                      await refreshGuildData();
-                    } catch (err) {
-                      const msg = err instanceof Error ? err.message : 'Failed to update description.';
-                      setError(msg);
-                    } finally {
-                      setGuildBusy(false);
-                    }
-                  }}
-                />
+                <View style={styles.friendActions}>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.smallBtn,
+                      guildBusy && styles.sendBtnDisabled,
+                      pressed && !guildBusy && styles.smallBtnPressed,
+                    ]}
+                    disabled={guildBusy}
+                    onPress={() => {
+                      setDescriptionDraft(myGuild.description || '');
+                      setIsEditingDescription(false);
+                    }}
+                  >
+                    <Text style={styles.smallBtnText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.smallBtn,
+                      !canSaveDescription && styles.sendBtnDisabled,
+                      pressed && canSaveDescription && styles.smallBtnPressed,
+                    ]}
+                    disabled={!canSaveDescription}
+                    onPress={async () => {
+                      if (!me.uid || !myGuild) return;
+                      setGuildBusy(true);
+                      setError(null);
+                      try {
+                        await updateGuildDescription({
+                          uid: me.uid,
+                          description: descriptionDraft,
+                        });
+                        setIsEditingDescription(false);
+                        await refreshGuildData();
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : 'Failed to update description.';
+                        setError(msg);
+                      } finally {
+                        setGuildBusy(false);
+                      }
+                    }}
+                  >
+                    <Text style={styles.smallBtnText}>Save</Text>
+                  </Pressable>
+                </View>
               </>
-            ) : (
-              <Text style={styles.metaText}>{myGuild.description || 'No description set.'}</Text>
+            )}
+
+            <Text style={styles.metaText}>Leader: {myGuild.leaderName} • Members: {myGuild.memberCount}/{myGuild.maxMembers}</Text>
+            <Text style={styles.metaText}>Min Join Level: {myGuild.minLevelToJoin} • Public: {myGuild.isPublic ? 'Yes' : 'No'}</Text>
+            <Text style={styles.metaText}>Boss Damage Pool: {formatCompactNumber(totalBossDamage)} • Active Ops: {activeEvents.length}</Text>
+            {guildBoss && (
+              <Text style={styles.metaText}>Boss Front: {guildBoss.name} ({guildBoss.status}) • Tier {guildBoss.tier}</Text>
+            )}
+            {recentCompletedEvents.length > 0 && (
+              <Text style={styles.metaText}>Recent Wins: {recentCompletedEvents.map(event => event.type === 'war' ? 'Warfront' : 'Expedition').join(', ')}</Text>
             )}
           </SocialCard>
 
