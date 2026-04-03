@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Constants from 'expo-constants';
 import {
   View,
   Text,
@@ -128,8 +129,7 @@ export const ACH_BONUS_PER_UNLOCK_PCT = 3;
 export const ACH_BONUS_CAP_PCT = 75;
 const FEEDBACK_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSf6txIw9UL-F9kItXZfOfr9d0qA_XCvaNIsBUf_4NZ1HZpfrw/viewform?usp=publish-editor';
 const HAS_BETA_FEEDBACK_FORM = !FEEDBACK_FORM_URL.includes('replace-with-your-beta-form');
-const WIKI_URL = 'https://simplyidle.vercel.app/wiki/';
-const HAS_WIKI_URL = !WIKI_URL.includes('replace-with-your-wiki-url');
+const FALLBACK_WIKI_URL = 'https://wiki.simplyidle.com/';
 const GEAR_RARITY_POINTS: Record<string, number> = { common: 40, rare: 90, epic: 170, legendary: 280, mythic: 430, transcendent: 680 };
 const ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
@@ -184,14 +184,19 @@ function scoreEquipmentForClass(item: { rarity: string; bonus: Record<string, nu
 }
 
 function resolveWikiUrl(): string {
-  if (Platform.OS === 'web') {
-    const webOrigin = globalThis?.location?.origin;
-    if (typeof webOrigin === 'string' && webOrigin.length > 0) {
-      return `${webOrigin.replace(/\/$/, '')}/wiki/`;
-    }
+  const expoExtra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra ?? {}) as {
+    wikiUrl?: string;
+    wikiUrlWeb?: string;
+  };
+  const preferred = Platform.OS === 'web' ? expoExtra.wikiUrlWeb : expoExtra.wikiUrl;
+  const fallback = expoExtra.wikiUrl ?? FALLBACK_WIKI_URL;
+  const resolved = (preferred ?? fallback ?? '').trim();
+  if (resolved.length > 0) {
+    return resolved;
   }
-  return WIKI_URL;
+  return FALLBACK_WIKI_URL;
 }
+const HAS_WIKI_URL = !resolveWikiUrl().includes('replace-with-your-wiki-url');
 const VIP_LEVEL_THRESHOLDS = [0, 50, 150, 350, 700, 1500, 3000, 6500, 15000, 35000, 100000] as const;
 const GOLD_SHOP_OFFERS = [
   { id: 'exp_cache', name: 'Training Cache', desc: '+6 Training Scrolls', cost: 2200 },

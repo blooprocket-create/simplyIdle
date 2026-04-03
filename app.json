@@ -33,6 +33,8 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
+      "wikiUrl": "https://wiki.simplyidle.com/",
+      "wikiUrlWeb": "https://wiki.simplyidle.com/",
       "eas": {
         "projectId": "9d7afc17-faa5-4d8c-a34c-94ac8c439204"
       }
