@@ -7,6 +7,7 @@ import {
   muteUser,
   sendChatMessage,
   subscribeToChat,
+  toggleChatReaction,
 } from '../../services/chat';
 import { fetchOnlineCount } from '../../services/presence';
 import { getFirebaseAuth } from '../../services/firebase';
@@ -487,6 +488,16 @@ export function SocialTabContent({
     }
   };
 
+  const toggleReaction = async (messageId: string, emoji: string) => {
+    if (!me.uid) return;
+    try {
+      await toggleChatReaction(me.uid, messageId, emoji);
+      void trackEvent('social_chat_reaction_toggled', { emoji });
+    } catch {
+      setChatError('Failed to react to message.');
+    }
+  };
+
   const muteWithDuration = async (targetUid: string, durationMs: number, reason: string) => {
     if (!isAdmin || !me.uid || !targetUid || targetUid === me.uid) return;
     try {
@@ -803,6 +814,7 @@ export function SocialTabContent({
             onSendGuild={sendGuildFromChat}
             onOpenUserMenu={setActiveUserMenu}
             onOpenProfile={uid => void openProfileCard(uid, 'chat_row_tap')}
+            onToggleReaction={toggleReaction}
             onMute={muteWithDuration}
             meDisplayName={me.name}
             meLevel={me.level}
@@ -1566,6 +1578,37 @@ const styles = StyleSheet.create({
     color: '#D5E6F5',
     fontSize: 13,
     lineHeight: 19,
+  },
+  reactionRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 7,
+    flexWrap: 'wrap',
+  },
+  reactionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#3A5E79',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: '#162B3D',
+  },
+  reactionChipActive: {
+    borderColor: '#8AD0FF',
+    backgroundColor: '#214661',
+  },
+  reactionChipText: {
+    color: '#EAF7FF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  reactionChipCount: {
+    color: '#B6D8EF',
+    fontSize: 10,
+    fontWeight: '800',
   },
   muteBtn: {
     alignSelf: 'flex-start',

@@ -4,6 +4,8 @@ import { GlobalChatMessage } from '../../../services/chat';
 import { GuildChatMessage } from '../../../services/guild';
 import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
 
+type ChatChannel = 'global' | 'guild' | 'party';
+
 type ChatListRow =
   | { key: string; type: 'day'; label: string }
   | { key: string; type: 'message'; showHeader: boolean; mine: boolean; compact: boolean; source: 'global' | 'guild'; message: ChatRenderMessage };
@@ -17,6 +19,8 @@ interface ChatRenderMessage {
   guildTag?: string;
   text: string;
   sentAt: number;
+  reactions?: Record<string, number>;
+  myReaction?: string | null;
 }
 
 function dayKey(ts: number): string {
@@ -54,6 +58,7 @@ interface ChatSectionProps {
   onSendGuild: () => Promise<void>;
   onOpenUserMenu: (item: GlobalChatMessage) => void;
   onOpenProfile: (uid: string) => void;
+  onToggleReaction: (messageId: string, emoji: string) => Promise<void>;
   onMute: (targetUid: string, durationMs: number, reason: string) => Promise<void>;
   meDisplayName: string;
   meLevel: number;
@@ -82,19 +87,24 @@ export function ChatSection({
   onSendGuild,
   onOpenUserMenu,
   onOpenProfile,
+  onToggleReaction,
   onMute,
   meDisplayName,
   meLevel,
 }: ChatSectionProps) {
-  const [activeChannel, setActiveChannel] = useState<'global' | 'guild' | 'party'>('global');
+  const [activeChannel, setActiveChannel] = useState<ChatChannel>('global');
   const listRef = useRef<FlatList<ChatListRow> | null>(null);
-  const prevCountByChannelRef = useRef<{ global: number; guild: number; party: number }>({
+  const prevCountByChannelRef = useRef<Record<ChatChannel, number>>({
     global: messages.length,
     guild: guildMessages.length,
     party: 0,
   });
   const [isNearBottom, setIsNearBottom] = useState(true);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadByChannel, setUnreadByChannel] = useState<Record<ChatChannel, number>>({
+    global: 0,
+    guild: 0,
+    party: 0,
+  });
 
   const activeSourceMessages = useMemo<ChatRenderMessage[]>(() => {
     if (activeChannel === 'guild') {
@@ -167,29 +177,60 @@ export function ChatSection({
     const distanceFromBottom = contentSize.height - (layoutMeasurement.height + contentOffset.y);
     const nearBottom = distanceFromBottom <= 40;
     setIsNearBottom(nearBottom);
-    if (nearBottom && unreadCount > 0) {
-      setUnreadCount(0);
+    if (nearBottom) {
+      setUnreadByChannel(current => ({
+        ...current,
+        [activeChannel]: 0,
+      }));
     }
   };
 
   useEffect(() => {
-    if (!rows.length) return;
-    const previous = prevCountByChannelRef.current[activeChannel];
-    const next = activeSourceMessages.length;
-    const appended = Math.max(0, next - previous);
+    const prevGlobal = prevCountByChannelRef.current.global;
+    const prevGuild = prevCountByChannelRef.current.guild;
+    const nextGlobal = messages.length;
+    const nextGuild = guildMessages.length;
 
-    if (appended > 0 && !isNearBottom) {
-      setUnreadCount(count => count + appended);
-    } else {
-      scrollToLatest(next > previous);
-      setUnreadCount(0);
+    const deltaGlobal = Math.max(0, nextGlobal - prevGlobal);
+    const deltaGuild = Math.max(0, nextGuild - prevGuild);
+
+    if (deltaGlobal > 0 || deltaGuild > 0) {
+      setUnreadByChannel(current => {
+        const nextState = { ...current };
+
+        if (deltaGlobal > 0) {
+          if (activeChannel === 'global' && isNearBottom) {
+            nextState.global = 0;
+          } else {
+            nextState.global = current.global + deltaGlobal;
+          }
+        }
+
+        if (deltaGuild > 0) {
+          if (activeChannel === 'guild' && isNearBottom) {
+            nextState.guild = 0;
+          } else {
+            nextState.guild = current.guild + deltaGuild;
+          }
+        }
+
+        return nextState;
+      });
     }
 
-    prevCountByChannelRef.current[activeChannel] = next;
-  }, [activeChannel, activeSourceMessages.length, isNearBottom, rows.length]);
+    if (rows.length && isNearBottom) {
+      scrollToLatest(nextGlobal > prevGlobal || nextGuild > prevGuild);
+    }
+
+    prevCountByChannelRef.current.global = nextGlobal;
+    prevCountByChannelRef.current.guild = nextGuild;
+  }, [activeChannel, guildMessages.length, isNearBottom, messages.length, rows.length]);
 
   useEffect(() => {
-    setUnreadCount(0);
+    setUnreadByChannel(current => ({
+      ...current,
+      [activeChannel]: 0,
+    }));
     setIsNearBottom(true);
     scrollToLatest(false);
   }, [activeChannel]);
@@ -209,6 +250,8 @@ export function ChatSection({
     void onSend();
   };
 
+  const activeUnread = unreadByChannel[activeChannel];
+
   return (
     <>
       <SocialCard styles={styles} title="Global Chat" subtitle={`Online now: ${onlineCount} • Real-time feed`}>
@@ -225,6 +268,11 @@ export function ChatSection({
             onPress={() => setActiveChannel('global')}
           >
             <Text style={[styles.chatChannelChipText, activeChannel === 'global' && styles.chatChannelChipTextActive]}>Global</Text>
+            {unreadByChannel.global > 0 && activeChannel !== 'global' && (
+              <View style={styles.chatChannelBadge}>
+                <Text style={styles.chatChannelBadgeText}>{unreadByChannel.global}</Text>
+              </View>
+            )}
           </Pressable>
           <Pressable
             style={[
@@ -238,6 +286,11 @@ export function ChatSection({
             }}
           >
             <Text style={[styles.chatChannelChipText, activeChannel === 'guild' && styles.chatChannelChipTextActive]}>Guild</Text>
+            {unreadByChannel.guild > 0 && activeChannel !== 'guild' && (
+              <View style={styles.chatChannelBadge}>
+                <Text style={styles.chatChannelBadgeText}>{unreadByChannel.guild}</Text>
+              </View>
+            )}
           </Pressable>
           <Pressable style={[styles.chatChannelChip, styles.sendBtnDisabled]} disabled>
             <Text style={styles.chatChannelChipText}>Party (Soon)</Text>
@@ -315,6 +368,26 @@ export function ChatSection({
                     <Text style={styles.chatTimeCompact}>{formatTime(message.sentAt)}</Text>
                   )}
                   <Text style={styles.chatText}>{message.text}</Text>
+                  {item.source === 'global' && (
+                    <View style={styles.reactionRow}>
+                      {(['👍', '🔥', '💪', '🎉'] as const).map(emoji => {
+                        const count = message.reactions?.[emoji] ?? 0;
+                        const active = message.myReaction === emoji;
+                        return (
+                          <Pressable
+                            key={`${message.id}_${emoji}`}
+                            style={[styles.reactionChip, active && styles.reactionChipActive]}
+                            onPress={() => {
+                              void onToggleReaction(message.id, emoji);
+                            }}
+                          >
+                            <Text style={styles.reactionChipText}>{emoji}</Text>
+                            {!!count && <Text style={styles.reactionChipCount}>{count}</Text>}
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  )}
                   {isAdmin && !item.mine && item.source === 'global' && (
                     <View style={styles.muteActionsRow}>
                       <Pressable style={styles.muteBtn} onPress={() => void onMute(message.uid, 60 * 60 * 1000, 'Muted by admin (1h)')}>
@@ -334,12 +407,15 @@ export function ChatSection({
           />
         </View>
 
-        {!isNearBottom && unreadCount > 0 && (
+        {!isNearBottom && activeUnread > 0 && (
           <Pressable style={styles.chatJumpToLatestBtn} onPress={() => {
-            setUnreadCount(0);
+            setUnreadByChannel(current => ({
+              ...current,
+              [activeChannel]: 0,
+            }));
             scrollToLatest();
           }}>
-            <Text style={styles.chatJumpToLatestText}>New {unreadCount} • Jump to Latest</Text>
+            <Text style={styles.chatJumpToLatestText}>New {activeUnread} • Jump to Latest</Text>
           </Pressable>
         )}
 

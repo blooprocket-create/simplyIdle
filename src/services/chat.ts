@@ -3,6 +3,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   limit,
   onSnapshot,
   orderBy,
@@ -11,11 +12,14 @@ import {
   setDoc,
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase';
+import { getFirebaseAuth } from './firebase';
 
 const CHAT_COLLECTION = 'globalChat';
 const CHAT_MUTES_COLLECTION = 'chatMutes';
 const CHAT_RATE_LIMIT_COLLECTION = 'chatRateLimit';
+const CHAT_REACTIONS_COLLECTION = 'reactions';
 const CHAT_SEND_COOLDOWN_MS = 3_000;
+const ALLOWED_REACTIONS = new Set(['👍', '🔥', '💪', '🎉']);
 
 export interface GlobalChatMessage {
   id: string;
@@ -26,6 +30,8 @@ export interface GlobalChatMessage {
   guildTag: string;
   text: string;
   sentAt: number;
+  reactions: Record<string, number>;
+  myReaction: string | null;
 }
 
 export interface ChatMuteRecord {
@@ -34,6 +40,30 @@ export interface ChatMuteRecord {
   reason: string;
   mutedBy: string;
   updatedAt: number;
+}
+
+interface ChatReactionSummary {
+  counts: Record<string, number>;
+  mine: string | null;
+}
+
+async function fetchChatReactionSummary(messageId: string, viewerUid: string): Promise<ChatReactionSummary> {
+  const db = getFirebaseFirestore();
+  if (!db || !messageId) return { counts: {}, mine: null };
+
+  const snap = await getDocs(collection(db, CHAT_COLLECTION, messageId, CHAT_REACTIONS_COLLECTION));
+  const counts: Record<string, number> = {};
+  let mine: string | null = null;
+
+  snap.docs.forEach(reactionDoc => {
+    const data = reactionDoc.data() as { emoji?: unknown };
+    const emoji = typeof data.emoji === 'string' ? data.emoji : '';
+    if (!emoji || !ALLOWED_REACTIONS.has(emoji)) return;
+    counts[emoji] = (counts[emoji] ?? 0) + 1;
+    if (reactionDoc.id === viewerUid) mine = emoji;
+  });
+
+  return { counts, mine };
 }
 
 async function resolveChatIdentity(uid: string): Promise<{ level: number; vipLevel: number; guildTag: string }> {
@@ -173,6 +203,8 @@ export function subscribeToChat(onMessages: (messages: GlobalChatMessage[]) => v
           guildTag: typeof data.guildTag === 'string' ? data.guildTag : '',
           text: typeof data.text === 'string' ? data.text : '',
           sentAt: typeof data.sentAt === 'number' ? data.sentAt : 0,
+          reactions: {},
+          myReaction: null,
         } satisfies GlobalChatMessage;
       })
       .filter(row => !!row.uid && !!row.text)
@@ -180,16 +212,22 @@ export function subscribeToChat(onMessages: (messages: GlobalChatMessage[]) => v
 
     const uniqueUids = [...new Set(baseRows.map(r => r.uid))];
     void (async () => {
+      const viewerUid = getFirebaseAuth()?.currentUser?.uid ?? '';
       const identityPairs = await Promise.all(uniqueUids.map(async uid => [uid, await resolveChatIdentity(uid)] as const));
       const identityByUid = new Map(identityPairs);
+      const reactionPairs = await Promise.all(baseRows.map(async row => [row.id, await fetchChatReactionSummary(row.id, viewerUid)] as const));
+      const reactionsByMessageId = new Map(reactionPairs);
 
       const rows = baseRows.map(row => {
         const identity = identityByUid.get(row.uid);
+        const reaction = reactionsByMessageId.get(row.id);
         return {
           ...row,
           level: identity ? identity.level : row.level,
           vipLevel: identity ? identity.vipLevel : row.vipLevel,
           guildTag: identity ? identity.guildTag : row.guildTag,
+          reactions: reaction ? reaction.counts : {},
+          myReaction: reaction ? reaction.mine : null,
         };
       });
 
@@ -197,6 +235,38 @@ export function subscribeToChat(onMessages: (messages: GlobalChatMessage[]) => v
     })().catch(() => {
       onMessages(baseRows);
     });
+  });
+}
+
+export async function toggleChatReaction(uid: string, messageId: string, emoji: string): Promise<void> {
+  const db = getFirebaseFirestore();
+  if (!db || !uid || !messageId) return;
+  if (!ALLOWED_REACTIONS.has(emoji)) return;
+
+  const reactionRef = doc(db, CHAT_COLLECTION, messageId, CHAT_REACTIONS_COLLECTION, uid);
+  await runTransaction(db, async tx => {
+    const current = await tx.get(reactionRef);
+    if (!current.exists()) {
+      tx.set(reactionRef, {
+        uid,
+        emoji,
+        updatedAt: Date.now(),
+      });
+      return;
+    }
+
+    const currentData = current.data() as { emoji?: unknown };
+    const currentEmoji = typeof currentData.emoji === 'string' ? currentData.emoji : '';
+    if (currentEmoji === emoji) {
+      tx.delete(reactionRef);
+      return;
+    }
+
+    tx.set(reactionRef, {
+      uid,
+      emoji,
+      updatedAt: Date.now(),
+    }, { merge: true });
   });
 }
 
