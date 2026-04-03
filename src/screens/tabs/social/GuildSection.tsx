@@ -201,6 +201,10 @@ export function GuildSection({
     [guildMembers, me.uid],
   );
 
+  const isLeader = !!myGuild && myGuild.leaderId === me.uid;
+  const isOfficer = myGuildMember?.rank === 'officer';
+  const roleLabel = isLeader ? 'Leader' : isOfficer ? 'Officer' : 'Member';
+
   const persistedBossCooldownUntil = (myGuildMember?.lastBossAttackAt ?? 0) + BOSS_ATTACK_COOLDOWN_MS;
   const bossCooldownUntil = Math.max(localBossCooldownUntil, persistedBossCooldownUntil);
   const bossCooldownRemainingMs = Math.max(0, bossCooldownUntil - nowMs);
@@ -329,6 +333,7 @@ export function GuildSection({
       {myGuild && (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>My Guild: [{myGuild.tag}] {myGuild.name}</Text>
+          <Text style={styles.metaText}>Your Role: {roleLabel}</Text>
           <View style={styles.prefRow}>
             <Pressable style={[styles.prefBtn, guildSubTab === 'home' && styles.prefBtnActive]} onPress={() => setGuildSubTab('home')}>
               <Text style={styles.prefBtnText}>Home</Text>
@@ -363,8 +368,9 @@ export function GuildSection({
 
           <SocialCard styles={styles} title="Role Matrix" subtitle="Clear authority lines reduce guild chaos.">
             <Text style={styles.metaText}>Leader: full control, role assignments, disband, event launch.</Text>
-            <Text style={styles.metaText}>Officer: delegated command (future pass: event moderation and recruitment tools).</Text>
+            <Text style={styles.metaText}>Officer: combat specialist and roster anchor (expanded command tools planned).</Text>
             <Text style={styles.metaText}>Member: contributes in boss/events and strengthens guild progression.</Text>
+            <Text style={styles.metaText}>Current Access: {isLeader ? 'Full Command' : isOfficer ? 'Combat Operations' : 'Participant'}</Text>
           </SocialCard>
 
           <SocialCard styles={styles} title="Top Raiders" subtitle="Highest recorded boss damage contributors.">
@@ -386,7 +392,7 @@ export function GuildSection({
                   <Text style={styles.friendName}>{member.displayName}</Text>
                   <Text style={styles.metaText}>{member.rank} • Boss Damage {Math.floor(member.guildContribution).toLocaleString()}</Text>
                 </View>
-                {myGuild.leaderId === me.uid && member.uid !== me.uid && (
+                {isLeader && member.uid !== me.uid && (
                   <View style={styles.friendActions}>
                     <Pressable
                       style={styles.smallBtn}
@@ -430,7 +436,7 @@ export function GuildSection({
                 )}
               </View>
             ))}
-            {myGuild.leaderId !== me.uid && (
+            {!isLeader && (
               <Pressable
                 style={[styles.smallBtn, styles.smallBtnDanger]}
                 disabled={guildBusy}
@@ -452,7 +458,7 @@ export function GuildSection({
                 <Text style={styles.smallBtnText}>Leave Guild</Text>
               </Pressable>
             )}
-            {myGuild.leaderId === me.uid && (
+            {isLeader && (
               <>
                 <Text style={styles.metaText}>Leaders can transfer leadership to another member, or disband the guild.</Text>
                 <Pressable
@@ -561,49 +567,58 @@ export function GuildSection({
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Guild Events</Text>
           <Text style={styles.metaText}>Coordinate and contribute before event timers expire.</Text>
-          {myGuild.leaderId === me.uid && (
-            <View style={styles.friendActions}>
-              <Pressable
-                style={styles.smallBtn}
-                disabled={guildBusy}
-                onPress={async () => {
-                  if (!me.uid) return;
-                  setGuildBusy(true);
-                  setError(null);
-                  try {
-                    await startEvent({ uid: me.uid, type: 'war' });
-                    await refreshGuildData();
-                  } catch (err) {
-                    const msg = err instanceof Error ? err.message : 'Failed to start war.';
-                    setError(msg);
-                  } finally {
-                    setGuildBusy(false);
-                  }
-                }}
-              >
-                <Text style={styles.smallBtnText}>Start War</Text>
-              </Pressable>
-              <Pressable
-                style={styles.smallBtn}
-                disabled={guildBusy}
-                onPress={async () => {
-                  if (!me.uid) return;
-                  setGuildBusy(true);
-                  setError(null);
-                  try {
-                    await startEvent({ uid: me.uid, type: 'expedition' });
-                    await refreshGuildData();
-                  } catch (err) {
-                    const msg = err instanceof Error ? err.message : 'Failed to start expedition.';
-                    setError(msg);
-                  } finally {
-                    setGuildBusy(false);
-                  }
-                }}
-              >
-                <Text style={styles.smallBtnText}>Start Expedition</Text>
-              </Pressable>
-            </View>
+          <View style={styles.friendActions}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.smallBtn,
+                (!isLeader || guildBusy) && styles.sendBtnDisabled,
+                pressed && isLeader && !guildBusy && styles.smallBtnPressed,
+              ]}
+              disabled={!isLeader || guildBusy}
+              onPress={async () => {
+                if (!me.uid) return;
+                setGuildBusy(true);
+                setError(null);
+                try {
+                  await startEvent({ uid: me.uid, type: 'war' });
+                  await refreshGuildData();
+                } catch (err) {
+                  const msg = err instanceof Error ? err.message : 'Failed to start war.';
+                  setError(msg);
+                } finally {
+                  setGuildBusy(false);
+                }
+              }}
+            >
+              <Text style={styles.smallBtnText}>Start War</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.smallBtn,
+                (!isLeader || guildBusy) && styles.sendBtnDisabled,
+                pressed && isLeader && !guildBusy && styles.smallBtnPressed,
+              ]}
+              disabled={!isLeader || guildBusy}
+              onPress={async () => {
+                if (!me.uid) return;
+                setGuildBusy(true);
+                setError(null);
+                try {
+                  await startEvent({ uid: me.uid, type: 'expedition' });
+                  await refreshGuildData();
+                } catch (err) {
+                  const msg = err instanceof Error ? err.message : 'Failed to start expedition.';
+                  setError(msg);
+                } finally {
+                  setGuildBusy(false);
+                }
+              }}
+            >
+              <Text style={styles.smallBtnText}>Start Expedition</Text>
+            </Pressable>
+          </View>
+          {!isLeader && (
+            <Text style={styles.metaText}>Only guild leader can launch new events in the current ruleset.</Text>
           )}
           {guildEvents.length === 0 && <Text style={styles.metaText}>No guild events yet.</Text>}
           {guildEvents.map(event => {
