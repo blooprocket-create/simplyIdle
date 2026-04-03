@@ -19,6 +19,7 @@ export interface LeaderboardEntry {
   publicUsername: string;
   score: number;
   level: number;
+  vipLevel: number;
   highestWaveReached: number;
   prestigeCount: number;
   updatedAt: number;
@@ -29,6 +30,7 @@ export interface SubmitLeaderboardScoreInput {
   publicUsername: string;
   score: number;
   level: number;
+  vipLevel: number;
   highestWaveReached: number;
   prestigeCount: number;
 }
@@ -86,6 +88,7 @@ export async function submitLeaderboardScore(input: SubmitLeaderboardScoreInput)
       publicUsername: input.publicUsername.trim().slice(0, 24) || 'Commander',
       score,
       level: clampLevel(input.level),
+      vipLevel: Math.max(0, Math.floor(input.vipLevel || 0)),
       highestWaveReached: clampScore(input.highestWaveReached),
       prestigeCount: clampScore(input.prestigeCount),
       updatedAt: now,

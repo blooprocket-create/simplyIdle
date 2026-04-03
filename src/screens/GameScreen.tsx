@@ -1664,6 +1664,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           publicUsername: publicUsername || accountName,
           score: playerBoardScore,
           level: state.level,
+          vipLevel: state.vipLevel,
           highestWaveReached: state.highestWaveReached,
           prestigeCount: state.prestigeCount,
         });
@@ -1703,6 +1704,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             publicUsername: publicUsername || accountName,
             score: playerBoardScore,
             level: state.level,
+            vipLevel: state.vipLevel,
             highestWaveReached: state.highestWaveReached,
             prestigeCount: state.prestigeCount,
           });

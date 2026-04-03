@@ -36,17 +36,20 @@ export interface ChatMuteRecord {
   updatedAt: number;
 }
 
-async function resolveChatIdentity(uid: string): Promise<{ vipLevel: number; guildTag: string }> {
+async function resolveChatIdentity(uid: string): Promise<{ level: number; vipLevel: number; guildTag: string }> {
   const db = getFirebaseFirestore();
-  if (!db || !uid) return { vipLevel: 0, guildTag: '' };
+  if (!db || !uid) return { level: 1, vipLevel: 0, guildTag: '' };
 
   const [leaderboardSnap, membershipSnap] = await Promise.all([
     getDoc(doc(db, 'leaderboard_global_v1', uid)),
     getDoc(doc(db, 'userGuild', uid)),
   ]);
 
-  const vipLevel = leaderboardSnap.exists() && typeof leaderboardSnap.data().level === 'number'
-    ? Math.max(0, Math.floor(leaderboardSnap.data().level))
+  const level = leaderboardSnap.exists() && typeof leaderboardSnap.data().level === 'number'
+    ? Math.max(1, Math.floor(leaderboardSnap.data().level))
+    : 1;
+  const vipLevel = leaderboardSnap.exists() && typeof leaderboardSnap.data().vipLevel === 'number'
+    ? Math.max(0, Math.floor(leaderboardSnap.data().vipLevel))
     : 0;
 
   let guildTag = '';
@@ -62,7 +65,7 @@ async function resolveChatIdentity(uid: string): Promise<{ vipLevel: number; gui
     }
   }
 
-  return { vipLevel, guildTag };
+  return { level, vipLevel, guildTag };
 }
 
 async function resolveGuildTag(uid: string): Promise<string> {
@@ -184,6 +187,7 @@ export function subscribeToChat(onMessages: (messages: GlobalChatMessage[]) => v
         const identity = identityByUid.get(row.uid);
         return {
           ...row,
+          level: identity ? identity.level : row.level,
           vipLevel: identity ? identity.vipLevel : row.vipLevel,
           guildTag: identity ? identity.guildTag : row.guildTag,
         };
