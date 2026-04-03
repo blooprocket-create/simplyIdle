@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import {
   attackBoss,
@@ -20,6 +20,37 @@ import {
 import { SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
 
 type GuildSubTab = 'home' | 'boss' | 'events' | 'chat';
+
+const BOSS_ATTACK_COOLDOWN_MS = 4 * 60 * 60 * 1000;
+const EVENT_CONTRIBUTION_COOLDOWN_MS = 5 * 60 * 1000;
+
+function formatCooldownHoursMinutes(ms: number): string {
+  const totalMinutes = Math.max(0, Math.ceil(ms / 60_000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m`;
+}
+
+function formatCooldownMinutesSeconds(ms: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function parseCooldownMinutes(errorMessage: string): number | null {
+  const match = /\((\d+)m remaining\)/i.exec(errorMessage);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function parseCooldownSeconds(errorMessage: string): number | null {
+  const match = /\((\d+)s remaining\)/i.exec(errorMessage);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
 
 interface GuildSectionProps {
   styles: any;
@@ -96,6 +127,48 @@ export function GuildSection({
   setConfirmTransferLeader,
   setConfirmDisbandGuild,
 }: GuildSectionProps) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [localBossCooldownUntil, setLocalBossCooldownUntil] = useState(0);
+  const [eventCooldownUntilById, setEventCooldownUntilById] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    setLocalBossCooldownUntil(0);
+    setEventCooldownUntilById({});
+  }, [myGuild?.guildId, me.uid]);
+
+  useEffect(() => {
+    setEventCooldownUntilById(prev => {
+      const activeEventIds = new Set(guildEvents.map(event => event.eventId));
+      const next: Record<string, number> = {};
+      for (const [eventId, cooldownUntil] of Object.entries(prev)) {
+        if (activeEventIds.has(eventId) && cooldownUntil > nowMs) {
+          next[eventId] = cooldownUntil;
+        }
+      }
+      return next;
+    });
+  }, [guildEvents, nowMs]);
+
+  const myGuildMember = useMemo(
+    () => guildMembers.find(member => member.uid === me.uid) ?? null,
+    [guildMembers, me.uid],
+  );
+
+  const persistedBossCooldownUntil = (myGuildMember?.lastBossAttackAt ?? 0) + BOSS_ATTACK_COOLDOWN_MS;
+  const bossCooldownUntil = Math.max(localBossCooldownUntil, persistedBossCooldownUntil);
+  const bossCooldownRemainingMs = Math.max(0, bossCooldownUntil - nowMs);
+  const canAttackBoss = !guildBusy && !!guildBoss && guildBoss.status === 'active' && bossCooldownRemainingMs <= 0;
+  const attackButtonLabel = !guildBoss || guildBoss.status !== 'active'
+    ? 'Attack Unavailable'
+    : bossCooldownRemainingMs > 0
+      ? `Attack ${formatCooldownHoursMinutes(bossCooldownRemainingMs)}`
+      : 'Attack Ready';
+
   return (
     <>
       <SocialCard styles={styles} title="Guild Command" subtitle="Create Guild Cost: 2,500 Diamonds.">
@@ -195,7 +268,7 @@ export function GuildSection({
             <View key={member.uid} style={styles.friendRow}>
               <View style={styles.friendMeta}>
                 <Text style={styles.friendName}>{member.displayName}</Text>
-                <Text style={styles.metaText}>{member.rank} • Contribution {Math.floor(member.guildContribution).toLocaleString()}</Text>
+                <Text style={styles.metaText}>{member.rank} • Boss Damage {Math.floor(member.guildContribution).toLocaleString()}</Text>
               </View>
               {myGuild.leaderId === me.uid && member.uid !== me.uid && (
                 <View style={styles.friendActions}>
@@ -292,7 +365,11 @@ export function GuildSection({
           )}
           <View style={styles.friendActions}>
             <Pressable
-              style={styles.smallBtn}
+              style={({ pressed }) => [
+                styles.smallBtn,
+                guildBusy && styles.sendBtnDisabled,
+                pressed && !guildBusy && styles.smallBtnPressed,
+              ]}
               disabled={guildBusy}
               onPress={async () => {
                 if (!me.uid) return;
@@ -312,8 +389,12 @@ export function GuildSection({
               <Text style={styles.smallBtnText}>Summon / Refresh</Text>
             </Pressable>
             <Pressable
-              style={styles.smallBtn}
-              disabled={guildBusy || !guildBoss || guildBoss.status !== 'active'}
+              style={({ pressed }) => [
+                styles.smallBtn,
+                !canAttackBoss && styles.sendBtnDisabled,
+                pressed && canAttackBoss && styles.smallBtnPressed,
+              ]}
+              disabled={!canAttackBoss}
               onPress={async () => {
                 if (!me.uid) return;
                 setGuildBusy(true);
@@ -325,18 +406,25 @@ export function GuildSection({
                     dps: Math.max(1, Math.floor(me.level * 10_000_000)),
                   });
                   setGuildBoss(result.boss);
+                  setLocalBossCooldownUntil(Date.now() + BOSS_ATTACK_COOLDOWN_MS);
+                  await refreshGuildData();
                   if (result.rewardGranted) setError('Boss defeated. Guild rewards sent by mail.');
                 } catch (err) {
                   const msg = err instanceof Error ? err.message : 'Failed to attack boss.';
+                  const minutesLeft = parseCooldownMinutes(msg);
+                  if (minutesLeft) setLocalBossCooldownUntil(Date.now() + minutesLeft * 60_000);
                   setError(msg);
                 } finally {
                   setGuildBusy(false);
                 }
               }}
             >
-              <Text style={styles.smallBtnText}>Attack (4h cd)</Text>
+              <Text style={styles.smallBtnText}>{attackButtonLabel}</Text>
             </Pressable>
           </View>
+          {guildBoss && guildBoss.status === 'active' && bossCooldownRemainingMs > 0 && (
+            <Text style={styles.metaText}>Boss attack cooldown active. Ready in {formatCooldownHoursMinutes(bossCooldownRemainingMs)}.</Text>
+          )}
         </View>
       )}
 
@@ -402,8 +490,16 @@ export function GuildSection({
                   <Text style={styles.metaText}>Ends: {new Date(event.endsAt).toLocaleString()}</Text>
                 </View>
                 <Pressable
-                  style={styles.smallBtn}
-                  disabled={guildBusy || event.status !== 'active'}
+                  style={({ pressed }) => {
+                    const eventCooldownRemainingMs = Math.max(0, (eventCooldownUntilById[event.eventId] ?? 0) - nowMs);
+                    const canContribute = !guildBusy && event.status === 'active' && eventCooldownRemainingMs <= 0;
+                    return [
+                      styles.smallBtn,
+                      !canContribute && styles.sendBtnDisabled,
+                      pressed && canContribute && styles.smallBtnPressed,
+                    ];
+                  }}
+                  disabled={guildBusy || event.status !== 'active' || Math.max(0, (eventCooldownUntilById[event.eventId] ?? 0) - nowMs) > 0}
                   onPress={async () => {
                     if (!me.uid) return;
                     setGuildBusy(true);
@@ -415,16 +511,32 @@ export function GuildSection({
                         dps: isWar ? Math.max(1, Math.floor(me.level * 10_000_000)) : undefined,
                         kills: isWar ? undefined : Math.max(1, Math.floor(me.level * 12)),
                       });
+                      setEventCooldownUntilById(prev => ({
+                        ...prev,
+                        [event.eventId]: Date.now() + EVENT_CONTRIBUTION_COOLDOWN_MS,
+                      }));
                       await refreshGuildData();
                     } catch (err) {
                       const msg = err instanceof Error ? err.message : 'Contribution failed.';
+                      const secondsLeft = parseCooldownSeconds(msg);
+                      if (secondsLeft) {
+                        setEventCooldownUntilById(prev => ({
+                          ...prev,
+                          [event.eventId]: Date.now() + secondsLeft * 1000,
+                        }));
+                      }
                       setError(msg);
                     } finally {
                       setGuildBusy(false);
                     }
                   }}
                 >
-                  <Text style={styles.smallBtnText}>Contribute</Text>
+                  <Text style={styles.smallBtnText}>
+                    {(() => {
+                      const remainingMs = Math.max(0, (eventCooldownUntilById[event.eventId] ?? 0) - nowMs);
+                      return remainingMs > 0 ? `Contribute ${formatCooldownMinutesSeconds(remainingMs)}` : 'Contribute';
+                    })()}
+                  </Text>
                 </Pressable>
               </View>
             );
