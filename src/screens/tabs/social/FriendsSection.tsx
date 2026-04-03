@@ -2,12 +2,13 @@ import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { GiftPreference } from '../../../gameConfig';
 import { FriendListEntry, PendingFriendRequest } from '../../../services/friends';
-import { SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
+import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
 
 interface FriendsSectionProps {
   styles: any;
   myGiftPreference: GiftPreference;
   friendsBusy: boolean;
+  friendsError: string | null;
   friendSearch: string;
   setFriendSearch: (value: string) => void;
   pendingRequests: PendingFriendRequest[];
@@ -22,12 +23,14 @@ interface FriendsSectionProps {
   onDeclineRequest: (fromUid: string) => Promise<void>;
   onSendDailyGift: (friend: FriendListEntry) => Promise<void>;
   onRemoveFriend: (friendUid: string) => Promise<void>;
+  onRetryLoad: () => Promise<void>;
 }
 
 export function FriendsSection({
   styles,
   myGiftPreference,
   friendsBusy,
+  friendsError,
   friendSearch,
   setFriendSearch,
   pendingRequests,
@@ -42,6 +45,7 @@ export function FriendsSection({
   onDeclineRequest,
   onSendDailyGift,
   onRemoveFriend,
+  onRetryLoad,
 }: FriendsSectionProps) {
   return (
     <>
@@ -76,6 +80,7 @@ export function FriendsSection({
           onPress={() => void onSendRequest()}
           disabled={!friendSearch.trim() || friendsBusy}
         />
+        <SocialAsyncState styles={styles} error={friendsError} variant="inline" onRetry={() => void onRetryLoad()} />
       </SocialCard>
 
       {pendingRequests.length > 0 && (
@@ -96,14 +101,21 @@ export function FriendsSection({
         </SocialCard>
       )}
 
-      {pendingRequests.length === 0 && (
-        <SocialCard styles={styles}>
-          <Text style={styles.metaText}>No pending requests right now.</Text>
-        </SocialCard>
-      )}
+      <SocialAsyncState
+        styles={styles}
+        isEmpty={pendingRequests.length === 0}
+        emptyTitle="No Pending Requests"
+        emptySubtitle="Friend requests you receive will show up here."
+      />
+
+      <SocialAsyncState
+        styles={styles}
+        isEmpty={friends.length === 0}
+        emptyTitle="No Friends Yet"
+        emptySubtitle="Search for a public username to send your first friend request."
+      />
 
       <SocialCard styles={styles} title={`Friends (${friends.length})`}>
-        {friends.length === 0 && <Text style={styles.metaText}>No friends yet. Add someone by public username.</Text>}
         {friends.map(friend => {
           const cooldownAt = giftCooldowns[friend.uid] ?? 0;
           const giftedToday = isSameUtcDay(cooldownAt, Date.now());

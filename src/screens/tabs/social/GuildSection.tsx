@@ -20,7 +20,7 @@ import {
   leaveGuild,
   updateGuildDescription,
 } from '../../../services/guild';
-import { SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
+import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
 
 type GuildSubTab = 'home' | 'boss' | 'events' | 'chat';
 
@@ -313,15 +313,10 @@ export function GuildSection({
         <SocialCard styles={styles} title="Guild Command" subtitle="Create Guild Cost: 2,500 Diamonds.">
           <Text style={styles.metaText}>Your Diamonds: {diamonds}</Text>
           {guildBusy && <Text style={styles.metaText}>Syncing guild actions...</Text>}
-          {!!error && <Text style={styles.errorText}>{error}</Text>}
         </SocialCard>
       )}
 
-      {!!myGuild && !!error && (
-        <SocialCard styles={styles} title="Guild Status">
-          <Text style={styles.errorText}>{error}</Text>
-        </SocialCard>
-      )}
+      <SocialAsyncState styles={styles} error={error} onRetry={() => void refreshGuildData()} />
 
       {!myGuild && (
         <SocialCard styles={styles} title="Create Guild">
@@ -877,8 +872,14 @@ export function GuildSection({
 
       {myGuild && guildSubTab === 'chat' && (
         <SocialCard styles={styles} title="Guild Chat" subtitle="Tactical channel for your guild.">
+          <SocialAsyncState
+            styles={styles}
+            isEmpty={guildChat.length === 0}
+            emptyTitle="No Guild Messages"
+            emptySubtitle="Break the silence and coordinate your next move."
+            variant="inline"
+          />
           <View style={[styles.card, styles.chatListCard]}>
-            {guildChat.length === 0 && <Text style={styles.metaText}>No guild messages yet.</Text>}
             <FlatList
               data={guildChat}
               keyExtractor={item => item.id}
@@ -933,7 +934,13 @@ export function GuildSection({
             editable={!guildBusy}
             maxLength={32}
           />
-          {guildList.length === 0 && <Text style={styles.metaText}>No guilds found.</Text>}
+          <SocialAsyncState
+            styles={styles}
+            isEmpty={guildList.length === 0}
+            emptyTitle="No Guilds Found"
+            emptySubtitle="Try a different search term or create your own guild."
+            variant="inline"
+          />
           {guildList.map(row => (
             <View key={row.guildId} style={styles.friendRow}>
               <View style={styles.friendMeta}>

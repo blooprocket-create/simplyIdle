@@ -110,7 +110,9 @@ export function SocialTabContent({
   const [giftCooldowns, setGiftCooldowns] = useState<Record<string, number>>({});
   const [myGiftPreference, setMyGiftPreference] = useState<GiftPreference>('gold');
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [friendsError, setFriendsError] = useState<string | null>(null);
+  const [guildError, setGuildError] = useState<string | null>(null);
   const [mutedUntil, setMutedUntil] = useState<number | null>(null);
   const [lastSendAt, setLastSendAt] = useState(0);
   const [friendsBusy, setFriendsBusy] = useState(false);
@@ -198,6 +200,12 @@ export function SocialTabContent({
   }, [onPendingRequestsCountChange, pendingRequests.length]);
 
   useEffect(() => {
+    setChatError(null);
+    setFriendsError(null);
+    setGuildError(null);
+  }, [subTab]);
+
+  useEffect(() => {
     if (tab !== 'social' || subTab !== 'friends' || !me.uid) return;
 
     const refresh = async () => {
@@ -213,7 +221,7 @@ export function SocialTabContent({
         setGiftCooldowns(cooldownRows);
         if (myProfile?.giftPreference) setMyGiftPreference(myProfile.giftPreference);
       } catch {
-        setError('Failed to load friends data.');
+        setFriendsError('Failed to load friends data.');
       }
     };
 
@@ -251,7 +259,7 @@ export function SocialTabContent({
           setGuildChat([]);
         }
       } catch {
-        setError('Failed to load guild data.');
+        setGuildError('Failed to load guild data.');
       }
     };
 
@@ -285,15 +293,15 @@ export function SocialTabContent({
     if (!me.uid || sending) return;
     const now = Date.now();
     if (now - lastSendAt < 3_000) {
-      setError('Slow down: chat has a 3-second cooldown.');
+      setChatError('Slow down: chat has a 3-second cooldown.');
       return;
     }
     if (mutedUntil && mutedUntil > now) {
-      setError('You are muted right now.');
+      setChatError('You are muted right now.');
       return;
     }
 
-    setError(null);
+    setChatError(null);
     setSending(true);
     try {
       await sendChatMessage(me.uid, me.name, me.level, draft, me.vipLevel);
@@ -301,7 +309,7 @@ export function SocialTabContent({
       setLastSendAt(now);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to send message.';
-      setError(msg);
+      setChatError(msg);
     } finally {
       setSending(false);
     }
@@ -312,7 +320,7 @@ export function SocialTabContent({
     try {
       await muteUser(targetUid, me.uid, durationMs, reason);
     } catch {
-      setError('Failed to mute user.');
+      setChatError('Failed to mute user.');
     }
   };
 
@@ -331,14 +339,14 @@ export function SocialTabContent({
   const sendRequest = async () => {
     if (!me.uid || !friendSearch.trim() || friendsBusy) return;
     setFriendsBusy(true);
-    setError(null);
+    setFriendsError(null);
     try {
       await sendFriendRequest(me.uid, me.name, friendSearch);
       setFriendSearch('');
       await refreshFriendsData();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to send friend request.';
-      setError(msg);
+      setFriendsError(msg);
     } finally {
       setFriendsBusy(false);
     }
@@ -347,12 +355,12 @@ export function SocialTabContent({
   const acceptRequest = async (fromUid: string) => {
     if (!me.uid || friendsBusy) return;
     setFriendsBusy(true);
-    setError(null);
+    setFriendsError(null);
     try {
       await acceptFriendRequest(me.uid, fromUid);
       await refreshFriendsData();
     } catch {
-      setError('Failed to accept request.');
+      setFriendsError('Failed to accept request.');
     } finally {
       setFriendsBusy(false);
     }
@@ -361,12 +369,12 @@ export function SocialTabContent({
   const declineRequest = async (fromUid: string) => {
     if (!me.uid || friendsBusy) return;
     setFriendsBusy(true);
-    setError(null);
+    setFriendsError(null);
     try {
       await declineFriendRequest(me.uid, fromUid);
       await refreshFriendsData();
     } catch {
-      setError('Failed to decline request.');
+      setFriendsError('Failed to decline request.');
     } finally {
       setFriendsBusy(false);
     }
@@ -375,13 +383,13 @@ export function SocialTabContent({
   const sendDailyGift = async (friend: FriendListEntry) => {
     if (!me.uid || friendsBusy) return;
     setFriendsBusy(true);
-    setError(null);
+    setFriendsError(null);
     try {
       await sendGift(me.uid, me.name, friend.uid, friend.giftPreference);
       await refreshFriendsData();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to send gift.';
-      setError(msg);
+      setFriendsError(msg);
     } finally {
       setFriendsBusy(false);
     }
@@ -390,12 +398,12 @@ export function SocialTabContent({
   const updatePreference = async (preference: GiftPreference) => {
     if (!me.uid || friendsBusy) return;
     setFriendsBusy(true);
-    setError(null);
+    setFriendsError(null);
     try {
       await setGiftPreference(me.uid, preference);
       setMyGiftPreference(preference);
     } catch {
-      setError('Failed to update gift preference.');
+      setFriendsError('Failed to update gift preference.');
     } finally {
       setFriendsBusy(false);
     }
@@ -453,12 +461,12 @@ export function SocialTabContent({
   const removeFriendEntry = async (friendUid: string) => {
     if (friendsBusy || !me.uid) return;
     setFriendsBusy(true);
-    setError(null);
+    setFriendsError(null);
     try {
       await removeFriend(me.uid, friendUid);
       await refreshFriendsData();
     } catch {
-      setError('Failed to remove friend.');
+      setFriendsError('Failed to remove friend.');
     } finally {
       setFriendsBusy(false);
     }
@@ -512,7 +520,7 @@ export function SocialTabContent({
           sending={sending}
           draft={draft}
           setDraft={setDraft}
-          error={error}
+          error={chatError}
           formatTime={formatTime}
           onSend={send}
           onOpenUserMenu={setActiveUserMenu}
@@ -527,6 +535,7 @@ export function SocialTabContent({
           styles={styles}
           myGiftPreference={myGiftPreference}
           friendsBusy={friendsBusy}
+          friendsError={friendsError}
           friendSearch={friendSearch}
           setFriendSearch={setFriendSearch}
           pendingRequests={pendingRequests}
@@ -541,6 +550,7 @@ export function SocialTabContent({
           onDeclineRequest={declineRequest}
           onSendDailyGift={sendDailyGift}
           onRemoveFriend={removeFriendEntry}
+          onRetryLoad={refreshFriendsData}
         />
       )}
 
@@ -551,7 +561,7 @@ export function SocialTabContent({
           diamonds={diamonds}
           saveSlotId={saveSlotId}
           level={level}
-          error={error}
+          error={guildError}
           guildBusy={guildBusy}
           guildNameInput={guildNameInput}
           setGuildNameInput={setGuildNameInput}
@@ -572,7 +582,7 @@ export function SocialTabContent({
           guildChat={guildChat}
           guildChatDraft={guildChatDraft}
           setGuildChatDraft={setGuildChatDraft}
-          setError={setError}
+          setError={setGuildError}
           setGuildBusy={setGuildBusy}
           refreshGuildData={refreshGuildData}
           formatTime={formatTime}
@@ -599,13 +609,13 @@ export function SocialTabContent({
               onPress={async () => {
                 if (!me.uid || !activeUserMenu?.displayName || !canAddFriendFromMenu) return;
                 setFriendsBusy(true);
-                setError(null);
+                setFriendsError(null);
                 try {
                   await sendFriendRequest(me.uid, me.name, activeUserMenu.displayName);
                   setActiveUserRelationship('outgoing');
                 } catch (err) {
                   const msg = err instanceof Error ? err.message : 'Failed to send friend request.';
-                  setError(msg);
+                  setFriendsError(msg);
                 } finally {
                   setFriendsBusy(false);
                   setActiveUserMenu(null);
@@ -644,13 +654,13 @@ export function SocialTabContent({
                 onPress={async () => {
                   if (!me.uid || !confirmKickMember) return;
                   setGuildBusy(true);
-                  setError(null);
+                  setGuildError(null);
                   try {
                     await kickGuildMember({ actorUid: me.uid, targetUid: confirmKickMember.uid });
                     await refreshGuildData();
                   } catch (err) {
                     const msg = err instanceof Error ? err.message : 'Failed to kick member.';
-                    setError(msg);
+                    setGuildError(msg);
                   } finally {
                     setGuildBusy(false);
                     setConfirmKickMember(null);
@@ -689,13 +699,13 @@ export function SocialTabContent({
                 onPress={async () => {
                   if (!me.uid || !confirmTransferLeader) return;
                   setGuildBusy(true);
-                  setError(null);
+                  setGuildError(null);
                   try {
                     await transferGuildLeadership({ actorUid: me.uid, newLeaderUid: confirmTransferLeader.uid });
                     await refreshGuildData();
                   } catch (err) {
                     const msg = err instanceof Error ? err.message : 'Failed to transfer leadership.';
-                    setError(msg);
+                    setGuildError(msg);
                   } finally {
                     setGuildBusy(false);
                     setConfirmTransferLeader(null);
@@ -738,13 +748,13 @@ export function SocialTabContent({
                 onPress={async () => {
                   if (!me.uid) return;
                   setGuildBusy(true);
-                  setError(null);
+                  setGuildError(null);
                   try {
                     await disbandGuild({ actorUid: me.uid });
                     await refreshGuildData();
                   } catch (err) {
                     const msg = err instanceof Error ? err.message : 'Failed to disband guild.';
-                    setError(msg);
+                    setGuildError(msg);
                   } finally {
                     setGuildBusy(false);
                     setConfirmDisbandGuild(false);
@@ -898,6 +908,19 @@ const styles = StyleSheet.create({
     color: '#9AB4CA',
     fontSize: 12,
   },
+  asyncInlineContainer: {
+    borderWidth: 1,
+    borderColor: '#2F465D',
+    borderRadius: RADIUS.md,
+    backgroundColor: '#0E1B29',
+    padding: 10,
+    gap: 6,
+  },
+  asyncInlineTitle: {
+    color: '#E8F3FF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   cooldownText: {
     color: '#9DD8FF',
     fontSize: 11,
@@ -923,11 +946,13 @@ const styles = StyleSheet.create({
   chatHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 5,
     gap: 8,
   },
   chatName: {
     flex: 1,
+    flexShrink: 1,
     color: '#EAF6FF',
     fontWeight: '700',
     fontSize: 12,

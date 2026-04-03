@@ -1,7 +1,7 @@
 import React from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import { GlobalChatMessage } from '../../../services/chat';
-import { SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
+import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
 
 interface ChatSectionProps {
   styles: any;
@@ -48,8 +48,14 @@ export function ChatSection({
         )}
       </SocialCard>
 
+      <SocialAsyncState
+        styles={styles}
+        isEmpty={messages.length === 0}
+        emptyTitle="No Messages Yet"
+        emptySubtitle="Start the conversation and rally your alliance."
+      />
+
       <View style={[styles.card, styles.chatListCard]}>
-        {messages.length === 0 && <Text style={styles.metaText}>No messages yet. Start the conversation.</Text>}
         <FlatList
           data={messages}
           keyExtractor={item => item.id}
@@ -64,7 +70,7 @@ export function ChatSection({
                 }}
               >
                 <View style={styles.chatHeaderRow}>
-                  <Text style={styles.chatName}>
+                  <Text style={styles.chatName} numberOfLines={1} ellipsizeMode="tail">
                     {item.displayName} Lv.{item.level} VIP {item.vipLevel}{item.guildTag ? ` [${item.guildTag}]` : ''}
                   </Text>
                   <Text style={styles.chatTime}>{formatTime(item.sentAt)}</Text>
@@ -104,7 +110,7 @@ export function ChatSection({
           onPress={() => void onSend()}
           disabled={sending || !draft.trim()}
         />
-        {!!error && <Text style={styles.errorText}>{error}</Text>}
+        <SocialAsyncState styles={styles} error={error} variant="inline" />
       </SocialCard>
     </>
   );

@@ -51,3 +51,64 @@ export function SocialPrimaryButton({ styles, label, onPress, disabled }: Social
     </Pressable>
   );
 }
+
+interface SocialAsyncStateProps {
+  styles: any;
+  isLoading?: boolean;
+  isEmpty?: boolean;
+  emptyTitle?: string;
+  emptySubtitle?: string;
+  error?: string | null;
+  onRetry?: () => void;
+  variant?: 'card' | 'inline';
+}
+
+export function SocialAsyncState({
+  styles,
+  isLoading,
+  isEmpty,
+  emptyTitle,
+  emptySubtitle,
+  error,
+  onRetry,
+  variant = 'card',
+}: SocialAsyncStateProps) {
+  if (!isLoading && !isEmpty && !error) return null;
+
+  const title = error
+    ? 'Sync Issue'
+    : isLoading
+      ? 'Syncing...'
+      : (emptyTitle ?? 'Nothing Here Yet');
+
+  const subtitle = error
+    ? error
+    : isLoading
+      ? 'Pulling latest social data.'
+      : (emptySubtitle ?? 'Try checking back shortly.');
+
+  if (variant === 'inline') {
+    return (
+      <View style={styles.asyncInlineContainer}>
+        <Text style={styles.asyncInlineTitle}>{title}</Text>
+        <Text style={error ? styles.errorText : styles.metaText}>{subtitle}</Text>
+        {!!error && !!onRetry && (
+          <Pressable style={styles.smallBtn} onPress={onRetry}>
+            <Text style={styles.smallBtnText}>Retry</Text>
+          </Pressable>
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <SocialCard styles={styles} title={title}>
+      <Text style={error ? styles.errorText : styles.metaText}>{subtitle}</Text>
+      {!!error && !!onRetry && (
+        <Pressable style={styles.smallBtn} onPress={onRetry}>
+          <Text style={styles.smallBtnText}>Retry</Text>
+        </Pressable>
+      )}
+    </SocialCard>
+  );
+}
