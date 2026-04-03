@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import {
   attackBoss,
   contributeToGuildEvent,
@@ -7,7 +7,6 @@ import {
   ensureActiveBoss,
   GuildBossState,
   GuildBrowseRow,
-  GuildChatMessage,
   GuildEventContributor,
   GuildEventState,
   fetchGuildEventContributors,
@@ -18,7 +17,6 @@ import {
   setMemberRank,
   startEvent,
   transactGuildTreasury,
-  sendGuildChatMessage,
   leaveGuild,
   updateGuildDescription,
   fetchGuildTreasuryLedger,
@@ -28,7 +26,7 @@ import {
 } from '../../../services/guild';
 import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton, SocialProgressBar } from './SocialPrimitives';
 
-type GuildSubTab = 'home' | 'boss' | 'events' | 'treasury' | 'chat';
+type GuildSubTab = 'home' | 'boss' | 'events' | 'treasury';
 
 const BOSS_ATTACK_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 const EVENT_CONTRIBUTION_COOLDOWN_MS = 5 * 60 * 1000;
@@ -104,13 +102,9 @@ interface GuildSectionProps {
   guildBoss: GuildBossState | null;
   setGuildBoss: (boss: GuildBossState | null) => void;
   guildEvents: GuildEventState[];
-  guildChat: GuildChatMessage[];
-  guildChatDraft: string;
-  setGuildChatDraft: (value: string) => void;
   setError: (value: string | null) => void;
   setGuildBusy: (value: boolean) => void;
   refreshGuildData: () => Promise<void>;
-  formatTime: (ts: number) => string;
   setConfirmKickMember: (member: GuildMember) => void;
   setConfirmTransferLeader: (member: GuildMember) => void;
   setConfirmDisbandGuild: (value: boolean) => void;
@@ -142,13 +136,9 @@ export function GuildSection({
   guildBoss,
   setGuildBoss,
   guildEvents,
-  guildChat,
-  guildChatDraft,
-  setGuildChatDraft,
   setError,
   setGuildBusy,
   refreshGuildData,
-  formatTime,
   setConfirmKickMember,
   setConfirmTransferLeader,
   setConfirmDisbandGuild,
@@ -468,15 +458,6 @@ export function GuildSection({
               accessibilityLabel="Guild treasury tab"
             >
               <Text style={styles.prefBtnText}>Treasury</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.prefBtn, guildSubTab === 'chat' && styles.prefBtnActive]}
-              onPress={() => setGuildSubTab('chat')}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: guildSubTab === 'chat' }}
-              accessibilityLabel="Guild chat tab"
-            >
-              <Text style={styles.prefBtnText}>Chat</Text>
             </Pressable>
           </View>
         </View>
@@ -1171,60 +1152,6 @@ export function GuildSection({
             </SocialCard>
           )}
         </>
-      )}
-
-      {myGuild && guildSubTab === 'chat' && (
-        <SocialCard styles={styles} title="Guild Chat" subtitle="Tactical channel for your guild.">
-          <SocialAsyncState
-            styles={styles}
-            isEmpty={guildChat.length === 0}
-            emptyTitle="No Guild Messages"
-            emptySubtitle="Break the silence and coordinate your next move."
-            variant="inline"
-          />
-          <View style={[styles.card, styles.chatListCard]}>
-            <FlatList
-              data={guildChat}
-              keyExtractor={item => item.id}
-              renderItem={({ item }) => (
-                <View style={styles.chatRow}>
-                  <View style={styles.chatHeaderRow}>
-                    <Text style={styles.chatName}>{item.displayName}</Text>
-                    <Text style={styles.chatTime}>{formatTime(item.sentAt)}</Text>
-                  </View>
-                  <Text style={styles.chatText}>{item.text}</Text>
-                </View>
-              )}
-            />
-          </View>
-          <SocialInput
-            styles={styles}
-            value={guildChatDraft}
-            onChangeText={setGuildChatDraft}
-            placeholder="Message guild..."
-            editable={!guildBusy}
-            maxLength={300}
-          />
-          <SocialPrimaryButton
-            styles={styles}
-            label="Send"
-            disabled={!guildChatDraft.trim() || guildBusy}
-            onPress={async () => {
-              if (!me.uid) return;
-              setGuildBusy(true);
-              setError(null);
-              try {
-                await sendGuildChatMessage({ uid: me.uid, displayName: me.name, text: guildChatDraft });
-                setGuildChatDraft('');
-              } catch (err) {
-                const msg = err instanceof Error ? err.message : 'Failed to send guild chat.';
-                setError(msg);
-              } finally {
-                setGuildBusy(false);
-              }
-            }}
-          />
-        </SocialCard>
       )}
 
       {!myGuild && (

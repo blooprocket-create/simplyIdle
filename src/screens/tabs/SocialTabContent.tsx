@@ -68,7 +68,7 @@ export interface SocialTabContentProps {
 }
 
 type SocialSubTab = 'chat' | 'friends' | 'guild';
-type GuildSubTab = 'home' | 'boss' | 'events' | 'treasury' | 'chat';
+type GuildSubTab = 'home' | 'boss' | 'events' | 'treasury';
 const SOCIAL_TABS: SocialSubTab[] = ['chat', 'friends', 'guild'];
 
 interface SocialUiState {
@@ -873,13 +873,9 @@ export function SocialTabContent({
             guildBoss={guildBoss}
             setGuildBoss={setGuildBoss}
             guildEvents={guildEvents}
-            guildChat={guildChat}
-            guildChatDraft={guildChatDraft}
-            setGuildChatDraft={setGuildChatDraft}
             setError={setGuildError}
             setGuildBusy={setGuildBusy}
             refreshGuildData={refreshGuildData}
-            formatTime={formatTime}
             setConfirmKickMember={setConfirmKickMember}
             setConfirmTransferLeader={setConfirmTransferLeader}
             setConfirmDisbandGuild={setConfirmDisbandGuild}
