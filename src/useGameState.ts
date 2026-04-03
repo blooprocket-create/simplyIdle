@@ -93,15 +93,15 @@ const PREMIUM_COOLANT_COSTS = {
   coolant_mk2: 18,
 } as const;
 const GOLD_SHOP_COSTS: Record<GoldShopOfferId, number> = {
-  exp_cache: 2800,
-  potion_bundle: 4200,
-  armory_crate: 12000,
+  exp_cache: 2200,
+  potion_bundle: 3600,
+  armory_crate: 9500,
 };
 const DIAMOND_SHOP_COSTS: Record<DiamondShopOfferId, number> = {
-  coolant_i_pack: 24,
-  coolant_ii_pack: 58,
-  elite_supply: 120,
-  rift_raid_ticket: 150,
+  coolant_i_pack: 18,
+  coolant_ii_pack: 42,
+  elite_supply: 88,
+  rift_raid_ticket: 120,
 };
 const DOLLAR_SHOP_PACKS: Record<DollarShopOfferId, { usdCents: number; diamonds: number }> = {
   usd_499: { usdCents: 499, diamonds: 500 },
@@ -3259,19 +3259,22 @@ function reducer(state: GameState, action: Action): GameState {
 
       // Check if team dies
       if (teamHp <= 0) {
-        // Retreat to first wave of current campaign chapter, lose 50% of current gold, keep exp and heroes
+        // Retreat to chapter start; if you wipe on chapter start itself, fall back to previous chapter start.
         const currentChapter = Math.floor((Math.max(1, working.wave) - 1) / 20);
         const chapterStartWave = currentChapter * 20 + 1;
+        const retreatWave = working.wave === chapterStartWave && chapterStartWave > 1
+          ? Math.max(1, chapterStartWave - 20)
+          : chapterStartWave;
         return {
           ...working,
-          wave: chapterStartWave,
-          monsterHp: getMonsterMaxHp(chapterStartWave),
-          monsterMaxHp: getMonsterMaxHp(chapterStartWave),
+          wave: retreatWave,
+          monsterHp: getMonsterMaxHp(retreatWave),
+          monsterMaxHp: getMonsterMaxHp(retreatWave),
           teamHp: getTeamMaxHp(working),
           teamMaxHp: getTeamMaxHp(working),
           gold: Math.floor(working.gold * 0.5),
           lastActiveAt: Date.now(),
-          combatLog: [`${new Date().toLocaleTimeString()} • Team collapsed and retreated to Wave ${chapterStartWave}`, ...working.combatLog].slice(0, 24),
+          combatLog: [`${new Date().toLocaleTimeString()} • Team collapsed and retreated to Wave ${retreatWave}`, ...working.combatLog].slice(0, 24),
         };
       }
 
@@ -5108,7 +5111,7 @@ function reducer(state: GameState, action: Action): GameState {
           id: `shop_gold_exp_${Date.now()}`,
           kind: 'item',
           title: 'Gold Shop Purchase: Training Cache',
-          detail: '-2800 gold, +6 Training Scrolls',
+          detail: `-${cost} gold, +6 Training Scrolls`,
         });
       }
 
@@ -5125,7 +5128,7 @@ function reducer(state: GameState, action: Action): GameState {
           id: `shop_gold_potion_${Date.now()}`,
           kind: 'item',
           title: 'Gold Shop Purchase: Field Bundle',
-          detail: '-4200 gold, +3 Small Potions, +1 Grand Potion, +2 Gold Cache',
+          detail: `-${cost} gold, +3 Small Potions, +1 Grand Potion, +2 Gold Cache`,
         });
       }
 
@@ -5150,7 +5153,7 @@ function reducer(state: GameState, action: Action): GameState {
         id: `shop_gold_gear_${Date.now()}`,
         kind: 'item',
         title: `Gold Shop Purchase: ${item.emoji} ${item.name}`,
-        detail: `${equipmentRarityConfig(item.rarity).label} gear • iLv ${item.itemLevel} • -12000 gold`,
+        detail: `${equipmentRarityConfig(item.rarity).label} gear • iLv ${item.itemLevel} • -${cost} gold`,
       });
     }
 
@@ -5162,10 +5165,10 @@ function reducer(state: GameState, action: Action): GameState {
       let detail = '';
       if (action.offerId === 'coolant_i_pack') {
         counts = addUsableItemCount(counts, 'coolant_mk1', 4);
-        detail = '-24 diamonds, +4 Coolant Capsule I';
+        detail = `-${cost} diamonds, +4 Coolant Capsule I`;
       } else if (action.offerId === 'coolant_ii_pack') {
         counts = addUsableItemCount(counts, 'coolant_mk2', 3);
-        detail = '-58 diamonds, +3 Coolant Capsule II';
+        detail = `-${cost} diamonds, +3 Coolant Capsule II`;
       } else if (action.offerId === 'rift_raid_ticket') {
         return queueReward({
           ...state,
@@ -5175,13 +5178,13 @@ function reducer(state: GameState, action: Action): GameState {
           id: `shop_diamond_rift_ticket_${Date.now()}`,
           kind: 'item',
           title: 'Diamond Shop Purchase: Dungeon Raid Ticket',
-          detail: '-150 diamonds, +1 Dungeon Raid Ticket',
+          detail: `-${cost} diamonds, +1 Dungeon Raid Ticket`,
         });
       } else {
         counts = addUsableItemCount(counts, 'coolant_mk1', 5);
         counts = addUsableItemCount(counts, 'coolant_mk2', 3);
         counts = addUsableItemCount(counts, 'grand_potion', 2);
-        detail = '-120 diamonds, +5 Coolant I, +3 Coolant II, +2 Grand Potions';
+        detail = `-${cost} diamonds, +5 Coolant I, +3 Coolant II, +2 Grand Potions`;
       }
 
       return queueReward({

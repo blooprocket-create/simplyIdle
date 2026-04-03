@@ -4363,6 +4363,90 @@ export const styles = StyleSheet.create({
     fontSize: 10,
     color: '#FFE39A',
   },
+  shopOfferHint: {
+    fontSize: 10,
+    color: '#89BCD9',
+  },
+  shopOfferNeed: {
+    fontSize: 10,
+    color: '#FFB4B4',
+  },
+  shopFeatureUnlocked: {
+    fontSize: 10,
+    color: '#8DE6A3',
+    marginTop: 2,
+  },
+  shopFeatureLocked: {
+    fontSize: 10,
+    color: '#FFCF8A',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  shopFeedbackBanner: {
+    borderRadius: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  shopFeedbackSuccess: {
+    backgroundColor: '#1B3A2B',
+    borderColor: '#4F9E70',
+  },
+  shopFeedbackInfo: {
+    backgroundColor: '#193149',
+    borderColor: '#4D78A8',
+  },
+  shopFeedbackText: {
+    fontSize: 11,
+    color: '#DFF3FF',
+    fontWeight: '700',
+  },
+  shopVipRailCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#335777',
+    backgroundColor: '#14273B',
+    padding: 10,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  shopVipRailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+  },
+  shopVipRailCenter: {
+    flex: 1,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2A4A69',
+    backgroundColor: '#102131',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  shopVipTierIndex: {
+    fontSize: 10,
+    color: '#8DB5D6',
+    marginTop: 4,
+  },
+  shopVipArrowBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#517BA0',
+    backgroundColor: '#1D3852',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shopVipArrowText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#E4F2FF',
+    lineHeight: 18,
+  },
 
   // Daily quest rows
   dailyQuestRow: {

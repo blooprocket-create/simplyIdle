@@ -174,15 +174,15 @@ function scoreEquipmentForClass(item: { rarity: string; bonus: Record<string, nu
 }
 const VIP_LEVEL_THRESHOLDS = [0, 50, 150, 350, 700, 1500, 3000, 6500, 15000, 35000, 100000] as const;
 const GOLD_SHOP_OFFERS = [
-  { id: 'exp_cache', name: 'Training Cache', desc: '+6 Training Scrolls', cost: 2800 },
-  { id: 'potion_bundle', name: 'Field Bundle', desc: '+3 Small Potion, +1 Grand Potion, +2 Gold Cache', cost: 4200 },
-  { id: 'armory_crate', name: 'Armory Crate', desc: 'Random class-compatible gear', cost: 12000 },
+  { id: 'exp_cache', name: 'Training Cache', desc: '+6 Training Scrolls', cost: 2200 },
+  { id: 'potion_bundle', name: 'Field Bundle', desc: '+3 Small Potion, +1 Grand Potion, +2 Gold Cache', cost: 3600 },
+  { id: 'armory_crate', name: 'Armory Crate', desc: 'Random class-compatible gear', cost: 9500 },
 ] as const;
 const DIAMOND_SHOP_OFFERS = [
-  { id: 'coolant_i_pack', name: 'Coolant Pack I', desc: '+4 Coolant Capsule I', cost: 24 },
-  { id: 'coolant_ii_pack', name: 'Coolant Pack II', desc: '+3 Coolant Capsule II', cost: 58 },
-  { id: 'rift_raid_ticket', name: 'Dungeon Raid Ticket', desc: '+1 ticket (raids prior Rift level, no free-entry cost)', cost: 150 },
-  { id: 'elite_supply', name: 'Elite Supply Crate', desc: '+5 Coolant I, +3 Coolant II, +2 Grand Potions', cost: 120 },
+  { id: 'coolant_i_pack', name: 'Coolant Pack I', desc: '+4 Coolant Capsule I', cost: 18 },
+  { id: 'coolant_ii_pack', name: 'Coolant Pack II', desc: '+3 Coolant Capsule II', cost: 42 },
+  { id: 'rift_raid_ticket', name: 'Dungeon Raid Ticket', desc: '+1 ticket (raids prior Rift level, no free-entry cost)', cost: 120 },
+  { id: 'elite_supply', name: 'Elite Supply Crate', desc: '+5 Coolant I, +3 Coolant II, +2 Grand Potions', cost: 88 },
 ] as const;
 const DOLLAR_SHOP_OFFERS = [
   { id: 'usd_499', label: '$4.99', diamonds: 500, vipPoints: 50, firstBonusDiamonds: 500 },
@@ -201,6 +201,11 @@ const VIP_REWARD_MILESTONES = [
   { level: 8, diamonds: 2000, gold: 90000, shards: 1100, essence: 9 },
   { level: 9, diamonds: 3200, gold: 145000, shards: 1550, essence: 13 },
   { level: 10, diamonds: 5000, gold: 220000, shards: 2200, essence: 20 },
+] as const;
+const VIP_UNLOCK_FEATURES = [
+  { level: 1, label: 'Unlock 4x combat tempo' },
+  { level: 2, label: 'Rift + Treasury daily cap increased to 4' },
+  { level: 4, label: 'Rift + Treasury daily cap increased to 5' },
 ] as const;
 
 export const EXPEDITION_TYPES: ExpeditionType[] = ['artifact', 'merchant', 'ruins', 'vault', 'abyss'];
@@ -385,6 +390,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [selectedMailId, setSelectedMailId] = useState<string | null>(null);
   const [shopOpen, setShopOpen] = useState(false);
   const [shopTab, setShopTab] = useState<ShopTab>('diamond');
+  const [shopFeedback, setShopFeedback] = useState<{ text: string; tone: 'success' | 'info' } | null>(null);
+  const [vipMilestoneIndex, setVipMilestoneIndex] = useState(0);
   const [heroesSubTab, setHeroesSubTab] = useState<HeroesSubTab>('summon');
   const [equipmentSubTab, setEquipmentSubTab] = useState<EquipmentSubTab>('inventory');
   const [achievementsSubTab, setAchievementsSubTab] = useState<AchievementsSubTab>('overview');
@@ -826,6 +833,32 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     : Math.max(0, Math.min(100, ((vipPoints - vipCurrentThreshold) / Math.max(1, vipNextThreshold - vipCurrentThreshold)) * 100));
   const vipClaimedLevels = state.vipRewardClaimedLevels ?? [];
   const dollarFirstPurchaseClaimed = new Set(state.dollarFirstPurchaseClaimedOfferIds ?? []);
+  const vipUnlockedFeatures = VIP_UNLOCK_FEATURES.filter(feature => vipLevel >= feature.level);
+  const vipNextFeature = VIP_UNLOCK_FEATURES.find(feature => vipLevel < feature.level) ?? null;
+  const currentVipMilestone = VIP_REWARD_MILESTONES[Math.max(0, Math.min(VIP_REWARD_MILESTONES.length - 1, vipMilestoneIndex))];
+  const currentVipMilestoneClaimed = vipClaimedLevels.includes(currentVipMilestone.level);
+  const currentVipMilestoneCanClaim = !currentVipMilestoneClaimed && vipLevel >= currentVipMilestone.level;
+
+  useEffect(() => {
+    if (!shopFeedback) return;
+    const timer = setTimeout(() => setShopFeedback(null), 1800);
+    return () => clearTimeout(timer);
+  }, [shopFeedback]);
+
+  useEffect(() => {
+    if (!shopOpen) return;
+    const firstClaimable = VIP_REWARD_MILESTONES.findIndex(row => vipLevel >= row.level && !vipClaimedLevels.includes(row.level));
+    if (firstClaimable >= 0) {
+      setVipMilestoneIndex(firstClaimable);
+      return;
+    }
+    const firstUnclaimed = VIP_REWARD_MILESTONES.findIndex(row => !vipClaimedLevels.includes(row.level));
+    if (firstUnclaimed >= 0) {
+      setVipMilestoneIndex(firstUnclaimed);
+      return;
+    }
+    setVipMilestoneIndex(VIP_REWARD_MILESTONES.length - 1);
+  }, [shopOpen, vipLevel, vipClaimedLevels]);
   const storyEntries = useMemo(
     () => STORY_BEATS.map(beat => {
       const waveReady = state.highestWaveReached >= beat.unlockWave;
@@ -3200,6 +3233,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               { id: 'dollar', label: 'Dollar Shop', active: shopTab === 'dollar', onPress: () => { debugLog('shop', 'Switch shop tab', { from: shopTab, to: 'dollar' }); setShopTab('dollar'); } },
             ])}
 
+            {!!shopFeedback && (
+              <View style={[styles.shopFeedbackBanner, shopFeedback.tone === 'success' ? styles.shopFeedbackSuccess : styles.shopFeedbackInfo]}>
+                <Text style={styles.shopFeedbackText}>{shopFeedback.text}</Text>
+              </View>
+            )}
+
             <ScrollView style={styles.eventsScroll} contentContainerStyle={styles.eventsScrollContent}>
               <View style={styles.eventsCard}>
                 <Text style={styles.eventsCardTitle}>👑 VIP Status</Text>
@@ -3213,36 +3252,17 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     ? 'MAX VIP reached.'
                     : `Next VIP at ${fmt(vipNextThreshold)} points (${fmt(Math.max(0, vipNextThreshold - vipPoints))} to go).`}
                 </Text>
-              </View>
-
-              <View style={styles.eventsCard}>
-                <Text style={styles.eventsCardTitle}>🎁 VIP Milestone Rewards</Text>
-                <Text style={styles.eventsHint}>Each VIP level reward is one-time claimable after reaching that level.</Text>
-                {VIP_REWARD_MILESTONES.map(row => {
-                  const claimed = vipClaimedLevels.includes(row.level);
-                  const canClaim = !claimed && vipLevel >= row.level;
-                  return (
-                    <View key={row.level} style={styles.shopOfferRow}>
-                      <View style={styles.shopOfferInfo}>
-                        <Text style={styles.shopOfferTitle}>VIP {row.level} Milestone</Text>
-                        <Text style={styles.shopOfferDesc}>
-                          +{fmt(row.diamonds)} diamonds • +{fmt(row.gold)} gold • +{fmt(row.shards)} shards{row.essence > 0 ? ` • +${fmt(row.essence)} essence` : ''}
-                        </Text>
-                      </View>
-                      <Pressable
-                        style={[styles.eventsActionBtn, !canClaim && styles.shopBuyBtnDisabled]}
-                        disabled={!canClaim}
-                        onPress={() => {
-                          debugLog('shop', 'Claim VIP reward', { level: row.level });
-                          void trackGameplayAction('shop_vip_reward_claimed', { level: row.level }, 0);
-                          claimVipReward(row.level);
-                        }}
-                      >
-                        <Text style={styles.eventsActionBtnText}>{claimed ? 'Claimed' : canClaim ? 'Claim' : `VIP ${row.level}`}</Text>
-                      </Pressable>
-                    </View>
-                  );
-                })}
+                <Text style={styles.eventsSubtitle}>Unlocked Features</Text>
+                {vipUnlockedFeatures.length === 0 ? (
+                  <Text style={styles.eventsHint}>No VIP feature unlocks yet. Reach VIP 1 to unlock 4x combat tempo.</Text>
+                ) : (
+                  vipUnlockedFeatures.map(feature => (
+                    <Text key={feature.label} style={styles.shopFeatureUnlocked}>✓ VIP {feature.level}: {feature.label}</Text>
+                  ))
+                )}
+                {!!vipNextFeature && (
+                  <Text style={styles.shopFeatureLocked}>Next unlock at VIP {vipNextFeature.level}: {vipNextFeature.label}</Text>
+                )}
               </View>
 
               {shopTab === 'diamond' && (
@@ -3251,12 +3271,22 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Text style={styles.eventsHint}>Spend diamonds on premium consumables like heat coolants.</Text>
                   {DIAMOND_SHOP_OFFERS.map(offer => {
                     const canBuy = state.diamonds >= offer.cost;
+                    const shortBy = Math.max(0, offer.cost - state.diamonds);
+                    const owned = offer.id === 'coolant_i_pack'
+                      ? `${state.usableItemCounts.coolant_mk1 ?? 0} owned`
+                      : offer.id === 'coolant_ii_pack'
+                        ? `${state.usableItemCounts.coolant_mk2 ?? 0} owned`
+                        : offer.id === 'elite_supply'
+                          ? `${state.usableItemCounts.grand_potion ?? 0} grand potions owned`
+                          : `${state.riftRaidTickets} raid tickets owned`;
                     return (
                       <View key={offer.id} style={styles.shopOfferRow}>
                         <View style={styles.shopOfferInfo}>
                           <Text style={styles.shopOfferTitle}>{offer.name}</Text>
                           <Text style={styles.shopOfferDesc}>{offer.desc}</Text>
                           <Text style={styles.shopOfferPrice}>Cost: {offer.cost} 💎</Text>
+                          <Text style={styles.shopOfferHint}>{owned}</Text>
+                          {!canBuy && <Text style={styles.shopOfferNeed}>Need {shortBy} more diamonds</Text>}
                         </View>
                         <Pressable
                           style={[styles.eventsActionBtn, !canBuy && styles.shopBuyBtnDisabled]}
@@ -3265,9 +3295,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                             debugLog('shop', 'Buy diamond shop item', { offerId: offer.id, cost: offer.cost });
                             void trackGameplayAction('shop_diamond_purchase', { offerId: offer.id, cost: offer.cost }, 0);
                             buyDiamondShopItem(offer.id);
+                            setShopFeedback({ text: `Purchased ${offer.name}`, tone: 'success' });
                           }}
                         >
-                          <Text style={styles.eventsActionBtnText}>{canBuy ? 'Buy' : 'Need 💎'}</Text>
+                          <Text style={styles.eventsActionBtnText}>{canBuy ? 'Buy Now' : 'Need 💎'}</Text>
                         </Pressable>
                       </View>
                     );
@@ -3281,12 +3312,20 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   <Text style={styles.eventsHint}>Spend gold on progression items, potions, and gear crates.</Text>
                   {GOLD_SHOP_OFFERS.map(offer => {
                     const canBuy = state.gold >= offer.cost;
+                    const shortBy = Math.max(0, offer.cost - state.gold);
+                    const owned = offer.id === 'exp_cache'
+                      ? `${state.usableItemCounts.exp_scroll ?? 0} scrolls owned`
+                      : offer.id === 'potion_bundle'
+                        ? `${state.usableItemCounts.small_potion ?? 0} small / ${state.usableItemCounts.grand_potion ?? 0} grand potions`
+                        : `${state.inventoryItemIds.length} gear in inventory`;
                     return (
                       <View key={offer.id} style={styles.shopOfferRow}>
                         <View style={styles.shopOfferInfo}>
                           <Text style={styles.shopOfferTitle}>{offer.name}</Text>
                           <Text style={styles.shopOfferDesc}>{offer.desc}</Text>
                           <Text style={styles.shopOfferPrice}>Cost: {fmt(offer.cost)} gold</Text>
+                          <Text style={styles.shopOfferHint}>{owned}</Text>
+                          {!canBuy && <Text style={styles.shopOfferNeed}>Need {fmt(shortBy)} more gold</Text>}
                         </View>
                         <Pressable
                           style={[styles.eventsActionBtn, !canBuy && styles.shopBuyBtnDisabled]}
@@ -3295,9 +3334,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                             debugLog('shop', 'Buy gold shop item', { offerId: offer.id, cost: offer.cost });
                             void trackGameplayAction('shop_gold_purchase', { offerId: offer.id, cost: offer.cost }, 0);
                             buyGoldShopItem(offer.id);
+                            setShopFeedback({ text: `Purchased ${offer.name}`, tone: 'success' });
                           }}
                         >
-                          <Text style={styles.eventsActionBtnText}>{canBuy ? 'Buy' : 'Need Gold'}</Text>
+                          <Text style={styles.eventsActionBtnText}>{canBuy ? 'Buy Now' : 'Need Gold'}</Text>
                         </Pressable>
                       </View>
                     );
@@ -3313,6 +3353,49 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       ? 'Standard IAP flow simulation: every pack has a one-time first-purchase bonus (x2 diamonds).'
                       : 'Disabled in live balance builds to avoid free premium-currency exploits.'}
                   </Text>
+
+                  <View style={styles.shopVipRailCard}>
+                    <Text style={styles.eventsCardTitle}>🎁 VIP Milestone Rewards</Text>
+                    <Text style={styles.eventsHint}>Browse tiers with arrows and claim once eligible.</Text>
+                    <View style={styles.shopVipRailRow}>
+                      <Pressable
+                        style={[styles.shopVipArrowBtn, vipMilestoneIndex <= 0 && styles.shopBuyBtnDisabled]}
+                        disabled={vipMilestoneIndex <= 0}
+                        onPress={() => setVipMilestoneIndex(prev => Math.max(0, prev - 1))}
+                      >
+                        <Text style={styles.shopVipArrowText}>{'<'}</Text>
+                      </Pressable>
+                      <View style={styles.shopVipRailCenter}>
+                        <Text style={styles.shopOfferTitle}>VIP {currentVipMilestone.level} Milestone</Text>
+                        <Text style={styles.shopOfferDesc}>
+                          +{fmt(currentVipMilestone.diamonds)} diamonds • +{fmt(currentVipMilestone.gold)} gold • +{fmt(currentVipMilestone.shards)} shards{currentVipMilestone.essence > 0 ? ` • +${fmt(currentVipMilestone.essence)} essence` : ''}
+                        </Text>
+                        <Text style={styles.shopVipTierIndex}>Tier {vipMilestoneIndex + 1}/{VIP_REWARD_MILESTONES.length}</Text>
+                      </View>
+                      <Pressable
+                        style={[styles.shopVipArrowBtn, vipMilestoneIndex >= VIP_REWARD_MILESTONES.length - 1 && styles.shopBuyBtnDisabled]}
+                        disabled={vipMilestoneIndex >= VIP_REWARD_MILESTONES.length - 1}
+                        onPress={() => setVipMilestoneIndex(prev => Math.min(VIP_REWARD_MILESTONES.length - 1, prev + 1))}
+                      >
+                        <Text style={styles.shopVipArrowText}>{'>'}</Text>
+                      </Pressable>
+                    </View>
+                    <Pressable
+                      style={[styles.eventsActionBtn, !currentVipMilestoneCanClaim && styles.shopBuyBtnDisabled]}
+                      disabled={!currentVipMilestoneCanClaim}
+                      onPress={() => {
+                        debugLog('shop', 'Claim VIP reward', { level: currentVipMilestone.level });
+                        void trackGameplayAction('shop_vip_reward_claimed', { level: currentVipMilestone.level }, 0);
+                        claimVipReward(currentVipMilestone.level);
+                        setShopFeedback({ text: `Claimed VIP ${currentVipMilestone.level} reward`, tone: 'success' });
+                      }}
+                    >
+                      <Text style={styles.eventsActionBtnText}>
+                        {currentVipMilestoneClaimed ? 'Claimed' : currentVipMilestoneCanClaim ? 'Claim Reward' : `Unlocks at VIP ${currentVipMilestone.level}`}
+                      </Text>
+                    </Pressable>
+                  </View>
+
                   {DOLLAR_SHOP_OFFERS.map(offer => {
                     const firstBonusAvailable = !dollarFirstPurchaseClaimed.has(offer.id);
                     const totalDiamonds = offer.diamonds + (firstBonusAvailable ? offer.firstBonusDiamonds : 0);
@@ -3330,6 +3413,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                             debugLog('shop', 'Simulate IAP dollar purchase', { offerId: offer.id, firstBonus: firstBonusAvailable });
                             void trackGameplayAction('shop_iap_simulated', { offerId: offer.id, firstBonus: firstBonusAvailable }, 0);
                             simulateDollarPurchase(offer.id);
+                            setShopFeedback({ text: `Processed ${offer.label} pack`, tone: 'success' });
                           }}
                         >
                           <Text style={styles.eventsActionBtnText}>
