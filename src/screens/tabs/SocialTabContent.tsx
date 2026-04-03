@@ -135,6 +135,9 @@ export function SocialTabContent({
   const [guildChatDraft, setGuildChatDraft] = useState('');
   const [activeUserMenu, setActiveUserMenu] = useState<GlobalChatMessage | null>(null);
   const [activeUserRelationship, setActiveUserRelationship] = useState<FriendRelationshipStatus>('none');
+  const [confirmKickMember, setConfirmKickMember] = useState<GuildMember | null>(null);
+  const [confirmTransferLeader, setConfirmTransferLeader] = useState<GuildMember | null>(null);
+  const [confirmDisbandGuild, setConfirmDisbandGuild] = useState(false);
 
   const me = useMemo(() => {
     const authUid = getFirebaseAuth()?.currentUser?.uid ?? '';
@@ -751,40 +754,14 @@ export function SocialTabContent({
                       <Pressable
                         style={styles.smallBtn}
                         disabled={guildBusy}
-                        onPress={async () => {
-                          if (!me.uid) return;
-                          setGuildBusy(true);
-                          setError(null);
-                          try {
-                            await transferGuildLeadership({ actorUid: me.uid, newLeaderUid: member.uid });
-                            await refreshGuildData();
-                          } catch (err) {
-                            const msg = err instanceof Error ? err.message : 'Failed to transfer leadership.';
-                            setError(msg);
-                          } finally {
-                            setGuildBusy(false);
-                          }
-                        }}
+                        onPress={() => setConfirmTransferLeader(member)}
                       >
                         <Text style={styles.smallBtnText}>Leader</Text>
                       </Pressable>
                       <Pressable
                         style={[styles.smallBtn, styles.smallBtnDanger]}
                         disabled={guildBusy}
-                        onPress={async () => {
-                          if (!me.uid) return;
-                          setGuildBusy(true);
-                          setError(null);
-                          try {
-                            await kickGuildMember({ actorUid: me.uid, targetUid: member.uid });
-                            await refreshGuildData();
-                          } catch (err) {
-                            const msg = err instanceof Error ? err.message : 'Failed to kick member.';
-                            setError(msg);
-                          } finally {
-                            setGuildBusy(false);
-                          }
-                        }}
+                        onPress={() => setConfirmKickMember(member)}
                       >
                         <Text style={styles.smallBtnText}>Kick</Text>
                       </Pressable>
@@ -820,20 +797,7 @@ export function SocialTabContent({
                   <Pressable
                     style={[styles.smallBtn, styles.smallBtnDanger]}
                     disabled={guildBusy}
-                    onPress={async () => {
-                      if (!me.uid) return;
-                      setGuildBusy(true);
-                      setError(null);
-                      try {
-                        await disbandGuild({ actorUid: me.uid });
-                        await refreshGuildData();
-                      } catch (err) {
-                        const msg = err instanceof Error ? err.message : 'Failed to disband guild.';
-                        setError(msg);
-                      } finally {
-                        setGuildBusy(false);
-                      }
-                    }}
+                    onPress={() => setConfirmDisbandGuild(true)}
                   >
                     <Text style={styles.smallBtnText}>Disband Guild</Text>
                   </Pressable>
@@ -1133,6 +1097,145 @@ export function SocialTabContent({
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Modal
+        visible={!!confirmKickMember}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmKickMember(null)}
+      >
+        <Pressable style={styles.confirmBackdrop} onPress={() => setConfirmKickMember(null)}>
+          <Pressable style={styles.confirmCard} onPress={() => {}}>
+            <Text style={styles.confirmTitle}>Confirm Kick Member</Text>
+            <Text style={styles.confirmText}>Are you sure you want to kick {confirmKickMember?.displayName} from the guild?</Text>
+            <Text style={styles.confirmWarning}>This action cannot be undone. They can rejoin if the guild accepts them.</Text>
+            <View style={styles.confirmButtonRow}>
+              <Pressable
+                style={[styles.confirmBtn, styles.confirmBtnCancel]}
+                disabled={guildBusy}
+                onPress={() => setConfirmKickMember(null)}
+              >
+                <Text style={styles.confirmBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.confirmBtn, styles.confirmBtnDanger]}
+                disabled={guildBusy}
+                onPress={async () => {
+                  if (!me.uid || !confirmKickMember) return;
+                  setGuildBusy(true);
+                  setError(null);
+                  try {
+                    await kickGuildMember({ actorUid: me.uid, targetUid: confirmKickMember.uid });
+                    await refreshGuildData();
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : 'Failed to kick member.';
+                    setError(msg);
+                  } finally {
+                    setGuildBusy(false);
+                    setConfirmKickMember(null);
+                  }
+                }}
+              >
+                <Text style={styles.confirmBtnText}>{guildBusy ? 'Kicking...' : 'Kick Member'}</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={!!confirmTransferLeader}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmTransferLeader(null)}
+      >
+        <Pressable style={styles.confirmBackdrop} onPress={() => setConfirmTransferLeader(null)}>
+          <Pressable style={styles.confirmCard} onPress={() => {}}>
+            <Text style={styles.confirmTitle}>Transfer Leadership</Text>
+            <Text style={styles.confirmText}>Transfer leadership to {confirmTransferLeader?.displayName}?</Text>
+            <Text style={styles.confirmWarning}>⚠️ This is a one-way action. {confirmTransferLeader?.displayName} will become the new leader. You will lose all leader powers unless they grant them back.</Text>
+            <View style={styles.confirmButtonRow}>
+              <Pressable
+                style={[styles.confirmBtn, styles.confirmBtnCancel]}
+                disabled={guildBusy}
+                onPress={() => setConfirmTransferLeader(null)}
+              >
+                <Text style={styles.confirmBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.confirmBtn, styles.confirmBtnDanger]}
+                disabled={guildBusy}
+                onPress={async () => {
+                  if (!me.uid || !confirmTransferLeader) return;
+                  setGuildBusy(true);
+                  setError(null);
+                  try {
+                    await transferGuildLeadership({ actorUid: me.uid, newLeaderUid: confirmTransferLeader.uid });
+                    await refreshGuildData();
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : 'Failed to transfer leadership.';
+                    setError(msg);
+                  } finally {
+                    setGuildBusy(false);
+                    setConfirmTransferLeader(null);
+                  }
+                }}
+              >
+                <Text style={styles.confirmBtnText}>{guildBusy ? 'Transferring...' : 'Transfer'}</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={confirmDisbandGuild}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmDisbandGuild(false)}
+      >
+        <Pressable style={styles.confirmBackdrop} onPress={() => setConfirmDisbandGuild(false)}>
+          <Pressable style={styles.confirmCard} onPress={() => {}}>
+            <Text style={styles.confirmTitleDanger}>⚠️ DISBAND GUILD ⚠️</Text>
+            <Text style={styles.confirmText}>Permanently disband {myGuild?.name}?</Text>
+            <Text style={styles.confirmWarning}>This action is IRREVERSIBLE. All guild data will be lost including:</Text>
+            <Text style={styles.confirmWarning}>• Guild members ({myGuild?.memberCount})</Text>
+            <Text style={styles.confirmWarning}>• Guild treasury and assets</Text>
+            <Text style={styles.confirmWarning}>• All guild history and records</Text>
+            <Text style={styles.confirmWarning}>Make sure you have backed up any important data.</Text>
+            <View style={styles.confirmButtonRow}>
+              <Pressable
+                style={[styles.confirmBtn, styles.confirmBtnCancel]}
+                disabled={guildBusy}
+                onPress={() => setConfirmDisbandGuild(false)}
+              >
+                <Text style={styles.confirmBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.confirmBtn, styles.confirmBtnDanger]}
+                disabled={guildBusy}
+                onPress={async () => {
+                  if (!me.uid) return;
+                  setGuildBusy(true);
+                  setError(null);
+                  try {
+                    await disbandGuild({ actorUid: me.uid });
+                    await refreshGuildData();
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : 'Failed to disband guild.';
+                    setError(msg);
+                  } finally {
+                    setGuildBusy(false);
+                    setConfirmDisbandGuild(false);
+                  }
+                }}
+              >
+                <Text style={styles.confirmBtnText}>{guildBusy ? 'Disbanding...' : 'DISBAND GUILD'}</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -1355,5 +1458,64 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     padding: 12,
     gap: 10,
+  },
+  confirmBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(4, 8, 16, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#121A2A',
+    borderWidth: 1,
+    borderColor: THEME.surface.border,
+    borderRadius: RADIUS.md,
+    padding: 16,
+    gap: 12,
+  },
+  confirmTitle: {
+    color: THEME.text.primary,
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  confirmTitleDanger: {
+    color: '#FF5555',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  confirmText: {
+    color: THEME.text.secondary,
+    fontSize: 14,
+  },
+  confirmWarning: {
+    color: '#FFB347',
+    fontSize: 12,
+  },
+  confirmButtonRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  confirmBtn: {
+    flex: 1,
+    borderRadius: RADIUS.sm,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  confirmBtnCancel: {
+    borderWidth: 1,
+    borderColor: THEME.surface.border,
+    backgroundColor: '#151D2A',
+  },
+  confirmBtnDanger: {
+    backgroundColor: THEME.status.error,
+  },
+  confirmBtnText: {
+    fontWeight: '800',
+    fontSize: 12,
+    color: '#FFFFFF',
   },
 });

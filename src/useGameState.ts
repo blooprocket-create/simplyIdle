@@ -3259,17 +3259,19 @@ function reducer(state: GameState, action: Action): GameState {
 
       // Check if team dies
       if (teamHp <= 0) {
-        // Retreat to wave 1, lose 50% of current gold, keep exp and heroes
+        // Retreat to first wave of current campaign chapter, lose 50% of current gold, keep exp and heroes
+        const currentChapter = Math.floor((Math.max(1, working.wave) - 1) / 20);
+        const chapterStartWave = currentChapter * 20 + 1;
         return {
           ...working,
-          wave: 1,
-          monsterHp: getMonsterMaxHp(1),
-          monsterMaxHp: getMonsterMaxHp(1),
+          wave: chapterStartWave,
+          monsterHp: getMonsterMaxHp(chapterStartWave),
+          monsterMaxHp: getMonsterMaxHp(chapterStartWave),
           teamHp: getTeamMaxHp(working),
           teamMaxHp: getTeamMaxHp(working),
           gold: Math.floor(working.gold * 0.5),
           lastActiveAt: Date.now(),
-          combatLog: [`${new Date().toLocaleTimeString()} • Team collapsed and retreated to Wave 1`, ...working.combatLog].slice(0, 24),
+          combatLog: [`${new Date().toLocaleTimeString()} • Team collapsed and retreated to Wave ${chapterStartWave}`, ...working.combatLog].slice(0, 24),
         };
       }
 

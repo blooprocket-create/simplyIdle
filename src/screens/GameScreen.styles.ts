@@ -4168,11 +4168,26 @@ export const styles = StyleSheet.create({
     backgroundColor: '#24405C',
     paddingVertical: 6,
     paddingHorizontal: 8,
+    position: 'relative',
+  },
+  mailAttachmentBtnClaimed: {
+    opacity: 0.55,
+    borderColor: '#3A5278',
+    backgroundColor: '#1A2A3A',
   },
   mailAttachmentBtnText: {
     fontSize: 10,
     fontWeight: '700',
     color: '#EAF6FF',
+  },
+  mailAttachmentCheckmark: {
+    position: 'absolute',
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#7FFF7F',
+    opacity: 0.6,
+    right: 4,
+    top: 2,
   },
   chapterMapModalBox: {
     backgroundColor: '#0F1A2A',

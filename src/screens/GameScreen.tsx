@@ -3911,7 +3911,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     <View style={styles.mailAttachmentRow}>
                       {(Object.keys(selectedMail.attachments) as Array<'shards' | 'gold' | 'diamonds' | 'tears' | 'essence'>).map(key => {
                         const amount = selectedMail.attachments[key];
-                        if (amount <= 0) return null;
                         const label = key === 'shards'
                           ? 'Shards'
                           : key === 'gold'
@@ -3921,13 +3920,22 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                               : key === 'tears'
                                 ? 'Tears'
                                 : 'Essence';
+                        const isClaimed = amount <= 0;
                         return (
                           <Pressable
                             key={`${selectedMail.id}_${key}`}
-                            style={styles.mailAttachmentBtn}
-                            onPress={() => claimMailAttachment(selectedMail.id, key)}
+                            style={[styles.mailAttachmentBtn, isClaimed && styles.mailAttachmentBtnClaimed]}
+                            onPress={() => !isClaimed && claimMailAttachment(selectedMail.id, key)}
+                            disabled={isClaimed}
                           >
-                            <Text style={styles.mailAttachmentBtnText}>Claim {label} +{amount}</Text>
+                            {isClaimed ? (
+                              <>
+                                <Text style={styles.mailAttachmentBtnText}>Claim {label}</Text>
+                                <Text style={styles.mailAttachmentCheckmark}>✓</Text>
+                              </>
+                            ) : (
+                              <Text style={styles.mailAttachmentBtnText}>Claim {label} +{amount}</Text>
+                            )}
                           </Pressable>
                         );
                       })}
