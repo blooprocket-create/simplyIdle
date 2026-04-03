@@ -47,6 +47,7 @@ import {
   GuildMember,
   GuildSummary,
   kickGuildMember,
+  sendGuildInvite,
   sendGuildChatMessage,
   subscribeGuildChat,
   subscribeGuildMembership,
@@ -660,6 +661,8 @@ export function SocialTabContent({
       : 'Live';
 
   const activeGuildLabel = myGuild ? `[${myGuild.tag}] ${myGuild.name}` : 'No Guild';
+  const myGuildRole = guildMembers.find(member => member.uid === me.uid)?.rank ?? null;
+  const canInviteToGuild = !!myGuild?.guildId && (myGuild.leaderId === me.uid || myGuildRole === 'officer');
 
   const removeFriendEntry = async (friendUid: string) => {
     if (friendsBusy || !me.uid) return;
@@ -1071,8 +1074,41 @@ export function SocialTabContent({
                     </Text>
                   </Pressable>
 
-                  <Pressable style={[styles.smallBtn, styles.sendBtnDisabled]} disabled>
-                    <Text style={styles.smallBtnText}>Guild Invite (Soon)</Text>
+                  <Pressable
+                    style={[
+                      styles.smallBtn,
+                      (!canInviteToGuild || profileActionBusy || !activeProfile || activeProfile.uid === me.uid || !!activeProfile.guildName) && styles.sendBtnDisabled,
+                    ]}
+                    disabled={!canInviteToGuild || profileActionBusy || !activeProfile || activeProfile.uid === me.uid || !!activeProfile.guildName}
+                    onPress={async () => {
+                      if (!me.uid || !activeProfile || !canInviteToGuild) return;
+                      setProfileActionBusy(true);
+                      try {
+                        await sendGuildInvite({
+                          actorUid: me.uid,
+                          targetUid: activeProfile.uid,
+                          actorDisplayName: me.name,
+                        });
+                        setProfileError('Guild invite sent.');
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : 'Failed to send guild invite.';
+                        setProfileError(msg);
+                      } finally {
+                        setProfileActionBusy(false);
+                      }
+                    }}
+                  >
+                    <Text style={styles.smallBtnText}>
+                      {!canInviteToGuild
+                        ? 'Invite Locked'
+                        : profileActionBusy
+                          ? 'Inviting...'
+                          : activeProfile?.uid === me.uid
+                            ? 'You'
+                            : activeProfile?.guildName
+                              ? 'Already in Guild'
+                              : 'Invite to Guild'}
+                    </Text>
                   </Pressable>
                 </View>
               </>

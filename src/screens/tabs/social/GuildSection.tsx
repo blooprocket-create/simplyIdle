@@ -10,18 +10,22 @@ import {
   GuildEventContributor,
   GuildEventState,
   fetchGuildEventContributors,
+  fetchGuildInvites,
   GuildMember,
   GuildSummary,
   fetchPlayerTreasuryGold,
   joinGuild,
   isGuildTreasuryEnabled,
+  respondToGuildInvite,
   setMemberRank,
   startEvent,
   transactGuildTreasury,
   leaveGuild,
   updateGuildDescription,
+  updateGuildSettings,
   fetchGuildTreasuryLedger,
   fetchGuildTreasuryState,
+  GuildInvite,
   GuildTreasuryEntry,
   GuildTreasuryState,
 } from '../../../services/guild';
@@ -166,6 +170,11 @@ export function GuildSection({
   const [eventContribByEventId, setEventContribByEventId] = useState<Record<string, GuildEventContributor[]>>({});
   const [descriptionDraft, setDescriptionDraft] = useState('');
   const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [joinLevelDraft, setJoinLevelDraft] = useState('1');
+  const [isPublicDraft, setIsPublicDraft] = useState(true);
+  const [isEditingGuildSettings, setIsEditingGuildSettings] = useState(false);
+  const [pendingInvites, setPendingInvites] = useState<GuildInvite[]>([]);
+  const [invitesLoading, setInvitesLoading] = useState(false);
   const [treasuryState, setTreasuryState] = useState<GuildTreasuryState | null>(null);
   const [treasuryLedger, setTreasuryLedger] = useState<GuildTreasuryEntry[]>([]);
   const [treasuryAmountInput, setTreasuryAmountInput] = useState('50000');
@@ -188,6 +197,10 @@ export function GuildSection({
     setWalletGold(0);
     setDescriptionDraft(myGuild?.description ?? '');
     setIsEditingDescription(false);
+    setJoinLevelDraft(`${myGuild?.minLevelToJoin ?? 1}`);
+    setIsPublicDraft(myGuild?.isPublic !== false);
+    setIsEditingGuildSettings(false);
+    setPendingInvites([]);
   }, [myGuild?.guildId, me.uid]);
 
   useEffect(() => {
@@ -196,7 +209,37 @@ export function GuildSection({
       return;
     }
     setDescriptionDraft(myGuild.description || '');
+    setJoinLevelDraft(`${Math.max(1, myGuild.minLevelToJoin || 1)}`);
+    setIsPublicDraft(myGuild.isPublic !== false);
   }, [myGuild?.description, myGuild?.guildId]);
+
+  useEffect(() => {
+    if (!me.uid || !!myGuild) {
+      setPendingInvites([]);
+      setInvitesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setInvitesLoading(true);
+    void fetchGuildInvites(me.uid)
+      .then(rows => {
+        if (cancelled) return;
+        setPendingInvites(rows.filter(invite => invite.status === 'pending'));
+      })
+      .catch(err => {
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : 'Failed to load guild invites.';
+        setError(msg);
+      })
+      .finally(() => {
+        if (!cancelled) setInvitesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [me.uid, myGuild, setError]);
 
   useEffect(() => {
     setEventCooldownUntilById(prev => {
@@ -386,6 +429,15 @@ export function GuildSection({
     && !!myGuild
     && isEditingDescription
     && descriptionDraft.trim().slice(0, 140) !== (myGuild.description || '');
+  const joinLevelParsed = Math.max(1, Math.min(999, parsePositiveInt(joinLevelDraft) || 1));
+  const canSaveGuildSettings = isLeader
+    && !guildBusy
+    && !!myGuild
+    && isEditingGuildSettings
+    && (
+      joinLevelParsed !== Math.max(1, myGuild.minLevelToJoin || 1)
+      || isPublicDraft !== (myGuild.isPublic !== false)
+    );
 
   const startGuildEvent = async (type: 'war' | 'expedition', forceRestart = false) => {
     if (!me.uid) return;
@@ -417,6 +469,83 @@ export function GuildSection({
 
       {!myGuild && (
         <SocialCard styles={styles} title="Create Guild">
+          <SocialAsyncState styles={styles} isLoading={invitesLoading} variant="inline" />
+          {pendingInvites.length > 0 && (
+            <>
+              <Text style={styles.friendName}>Pending Invites</Text>
+              {pendingInvites.map(invite => (
+                <View key={invite.id} style={styles.friendRow}>
+                  <View style={styles.friendMeta}>
+                    <Text style={styles.friendName}>[{invite.guildTag}] {invite.guildName}</Text>
+                    <Text style={styles.metaText}>From {invite.inviterName} • Min Lv {invite.minLevelToJoin}</Text>
+                  </View>
+                  <View style={styles.friendActions}>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.smallBtn,
+                        guildBusy && styles.sendBtnDisabled,
+                        pressed && !guildBusy && styles.smallBtnPressed,
+                      ]}
+                      disabled={guildBusy}
+                      onPress={async () => {
+                        if (!me.uid) return;
+                        setGuildBusy(true);
+                        setError(null);
+                        try {
+                          await respondToGuildInvite({
+                            uid: me.uid,
+                            inviteId: invite.id,
+                            action: 'accept',
+                            displayName: me.name,
+                            playerLevel: level,
+                          });
+                          await refreshGuildData();
+                        } catch (err) {
+                          const msg = err instanceof Error ? err.message : 'Failed to accept guild invite.';
+                          setError(msg);
+                        } finally {
+                          setGuildBusy(false);
+                        }
+                      }}
+                    >
+                      <Text style={styles.smallBtnText}>Accept</Text>
+                    </Pressable>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.smallBtn,
+                        guildBusy && styles.sendBtnDisabled,
+                        pressed && !guildBusy && styles.smallBtnPressed,
+                      ]}
+                      disabled={guildBusy}
+                      onPress={async () => {
+                        if (!me.uid) return;
+                        setGuildBusy(true);
+                        setError(null);
+                        try {
+                          await respondToGuildInvite({
+                            uid: me.uid,
+                            inviteId: invite.id,
+                            action: 'decline',
+                            displayName: me.name,
+                            playerLevel: level,
+                          });
+                          setPendingInvites(current => current.filter(row => row.id !== invite.id));
+                        } catch (err) {
+                          const msg = err instanceof Error ? err.message : 'Failed to decline guild invite.';
+                          setError(msg);
+                        } finally {
+                          setGuildBusy(false);
+                        }
+                      }}
+                    >
+                      <Text style={styles.smallBtnText}>Decline</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
+
           <SocialInput
             styles={styles}
             value={guildNameInput}
@@ -634,6 +763,110 @@ export function GuildSection({
 
             <Text style={styles.metaText}>Leader: {myGuild.leaderName} • Members: {myGuild.memberCount}/{myGuild.maxMembers}</Text>
             <Text style={styles.metaText}>Min Join Level: {myGuild.minLevelToJoin} • Public: {myGuild.isPublic ? 'Yes' : 'No'}</Text>
+            {!isEditingGuildSettings && isLeader && (
+              <View style={styles.friendActions}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.smallBtn,
+                    guildBusy && styles.sendBtnDisabled,
+                    pressed && !guildBusy && styles.smallBtnPressed,
+                  ]}
+                  disabled={guildBusy}
+                  onPress={() => {
+                    setJoinLevelDraft(`${Math.max(1, myGuild.minLevelToJoin || 1)}`);
+                    setIsPublicDraft(myGuild.isPublic !== false);
+                    setIsEditingGuildSettings(true);
+                  }}
+                >
+                  <Text style={styles.smallBtnText}>✏️ Edit Join Rules</Text>
+                </Pressable>
+              </View>
+            )}
+            {isEditingGuildSettings && isLeader && (
+              <>
+                <SocialInput
+                  styles={styles}
+                  value={joinLevelDraft}
+                  onChangeText={setJoinLevelDraft}
+                  placeholder="Min Join Level"
+                  editable={!guildBusy}
+                  maxLength={3}
+                  keyboardType="number-pad"
+                />
+                <View style={styles.friendActions}>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.smallBtn,
+                      !isPublicDraft && styles.prefBtnActive,
+                      guildBusy && styles.sendBtnDisabled,
+                      pressed && !guildBusy && styles.smallBtnPressed,
+                    ]}
+                    disabled={guildBusy}
+                    onPress={() => setIsPublicDraft(false)}
+                  >
+                    <Text style={styles.smallBtnText}>Private</Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.smallBtn,
+                      isPublicDraft && styles.prefBtnActive,
+                      guildBusy && styles.sendBtnDisabled,
+                      pressed && !guildBusy && styles.smallBtnPressed,
+                    ]}
+                    disabled={guildBusy}
+                    onPress={() => setIsPublicDraft(true)}
+                  >
+                    <Text style={styles.smallBtnText}>Public</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.friendActions}>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.smallBtn,
+                      guildBusy && styles.sendBtnDisabled,
+                      pressed && !guildBusy && styles.smallBtnPressed,
+                    ]}
+                    disabled={guildBusy}
+                    onPress={() => {
+                      setJoinLevelDraft(`${Math.max(1, myGuild.minLevelToJoin || 1)}`);
+                      setIsPublicDraft(myGuild.isPublic !== false);
+                      setIsEditingGuildSettings(false);
+                    }}
+                  >
+                    <Text style={styles.smallBtnText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.smallBtn,
+                      !canSaveGuildSettings && styles.sendBtnDisabled,
+                      pressed && canSaveGuildSettings && styles.smallBtnPressed,
+                    ]}
+                    disabled={!canSaveGuildSettings}
+                    onPress={async () => {
+                      if (!me.uid || !myGuild) return;
+                      setGuildBusy(true);
+                      setError(null);
+                      try {
+                        await updateGuildSettings({
+                          uid: me.uid,
+                          minLevelToJoin: joinLevelParsed,
+                          isPublic: isPublicDraft,
+                        });
+                        setIsEditingGuildSettings(false);
+                        await refreshGuildData();
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : 'Failed to update join settings.';
+                        setError(msg);
+                      } finally {
+                        setGuildBusy(false);
+                      }
+                    }}
+                  >
+                    <Text style={styles.smallBtnText}>Save Rules</Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
             <Text style={styles.metaText}>Boss Damage Pool: {formatCompactNumber(totalBossDamage)} • Active Ops: {activeEvents.length}</Text>
             {guildBoss && (
               <Text style={styles.metaText}>Boss Front: {guildBoss.name} ({guildBoss.status}) • Tier {guildBoss.tier}</Text>

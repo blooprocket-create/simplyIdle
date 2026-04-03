@@ -120,6 +120,7 @@ const USER_GUILD_COLLECTION = 'userGuild';
 const GUILD_CHAT_RATE_LIMIT_COLLECTION = 'guildChatRateLimit';
 const GUILD_TREASURY_STATE_COLLECTION = 'treasuryState';
 const GUILD_TREASURY_LEDGER_COLLECTION = 'treasuryLedger';
+const GUILD_INVITES_COLLECTION = 'guildInvites';
 const BOSS_ATTACK_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 const BOSS_DURATION_MS = 5 * 24 * 60 * 60 * 1000;
 const WAR_DURATION_MS = 48 * 60 * 60 * 1000;
@@ -128,6 +129,23 @@ const GUILD_CHAT_COOLDOWN_MS = 3000;
 const EVENT_CONTRIBUTION_COOLDOWN_MS = 5 * 60 * 1000;
 const TREASURY_DAILY_WITHDRAW_CAP_LEADER = 25_000_000;
 const TREASURY_DAILY_WITHDRAW_CAP_OFFICER = 5_000_000;
+const GUILD_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export interface GuildInvite {
+  id: string;
+  guildId: string;
+  guildName: string;
+  guildTag: string;
+  inviterUid: string;
+  inviterName: string;
+  invitedUid: string;
+  minLevelToJoin: number;
+  isPublic: boolean;
+  status: 'pending' | 'accepted' | 'declined' | 'expired';
+  createdAt: number;
+  expiresAt: number;
+  respondedAt: number | null;
+}
 
 function guildTreasuryEnabled(): boolean {
   return SOCIAL_FEATURE_FLAGS.guildTreasury === true;
@@ -220,6 +238,32 @@ function parseGuildTreasuryState(data: Record<string, unknown>): GuildTreasurySt
     dailyWindowStart: typeof data.dailyWindowStart === 'number' ? data.dailyWindowStart : 0,
     updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : 0,
     updatedByUid: typeof data.updatedByUid === 'string' ? data.updatedByUid : '',
+  };
+}
+
+function parseGuildInvite(inviteId: string, data: Record<string, unknown>): GuildInvite {
+  const statusRaw = typeof data.status === 'string' ? data.status : 'pending';
+  const status: GuildInvite['status'] = statusRaw === 'accepted'
+    ? 'accepted'
+    : statusRaw === 'declined'
+      ? 'declined'
+      : statusRaw === 'expired'
+        ? 'expired'
+        : 'pending';
+  return {
+    id: inviteId,
+    guildId: typeof data.guildId === 'string' ? data.guildId : '',
+    guildName: typeof data.guildName === 'string' ? data.guildName : 'Guild',
+    guildTag: typeof data.guildTag === 'string' ? data.guildTag : 'TAG',
+    inviterUid: typeof data.inviterUid === 'string' ? data.inviterUid : '',
+    inviterName: typeof data.inviterName === 'string' ? data.inviterName : 'Leader',
+    invitedUid: typeof data.invitedUid === 'string' ? data.invitedUid : '',
+    minLevelToJoin: typeof data.minLevelToJoin === 'number' ? Math.max(1, Math.floor(data.minLevelToJoin)) : 1,
+    isPublic: data.isPublic !== false,
+    status,
+    createdAt: typeof data.createdAt === 'number' ? data.createdAt : 0,
+    expiresAt: typeof data.expiresAt === 'number' ? data.expiresAt : 0,
+    respondedAt: typeof data.respondedAt === 'number' ? data.respondedAt : null,
   };
 }
 
@@ -932,6 +976,219 @@ export async function updateGuildDescription(input: { uid: string; description: 
     if (!guildSnap.exists()) throw new Error('Guild not found.');
 
     tx.set(guildRef, { description, updatedAt: now }, { merge: true });
+  });
+}
+
+export async function updateGuildSettings(input: {
+  uid: string;
+  minLevelToJoin: number;
+  isPublic: boolean;
+}): Promise<void> {
+  const db = requireDb();
+  const actorUid = input.uid.trim();
+  if (!actorUid) throw new Error('Missing user id.');
+
+  const minLevelToJoin = Math.max(1, Math.min(999, Math.floor(input.minLevelToJoin || 1)));
+  const isPublic = input.isPublic !== false;
+  const actorMembershipRef = doc(db, USER_GUILD_COLLECTION, actorUid);
+  const now = Date.now();
+
+  await runTransaction(db, async tx => {
+    const actorMembershipSnap = await tx.get(actorMembershipRef);
+    if (!actorMembershipSnap.exists()) throw new Error('You are not in a guild.');
+
+    const actorMembership = actorMembershipSnap.data();
+    const guildId = typeof actorMembership.guildId === 'string' ? actorMembership.guildId : '';
+    const actorRank = typeof actorMembership.rank === 'string' ? actorMembership.rank : 'member';
+    if (!guildId) throw new Error('Guild data invalid.');
+    if (actorRank !== 'leader') throw new Error('Only guild leader can edit join requirements.');
+
+    const guildRef = doc(db, GUILD_COLLECTION, guildId);
+    const guildSnap = await tx.get(guildRef);
+    if (!guildSnap.exists()) throw new Error('Guild not found.');
+
+    const guild = guildSnap.data();
+    const normalizedName = typeof guild.normalizedName === 'string' ? guild.normalizedName : '';
+
+    tx.set(guildRef, { minLevelToJoin, isPublic, updatedAt: now }, { merge: true });
+
+    if (normalizedName) {
+      tx.set(doc(db, GUILD_LOOKUP_COLLECTION, normalizedName), { isPublic, updatedAt: now }, { merge: true });
+    }
+  });
+}
+
+export async function sendGuildInvite(input: {
+  actorUid: string;
+  targetUid: string;
+  actorDisplayName: string;
+}): Promise<void> {
+  const db = requireDb();
+  const actorUid = input.actorUid.trim();
+  const targetUid = input.targetUid.trim();
+  const actorDisplayName = input.actorDisplayName.trim().slice(0, 24) || 'Leader';
+  if (!actorUid || !targetUid) throw new Error('Missing invite parameters.');
+  if (actorUid === targetUid) throw new Error('Cannot invite yourself.');
+
+  const now = Date.now();
+  const expiresAt = now + GUILD_INVITE_TTL_MS;
+  const actorMembershipRef = doc(db, USER_GUILD_COLLECTION, actorUid);
+  const targetMembershipRef = doc(db, USER_GUILD_COLLECTION, targetUid);
+
+  await runTransaction(db, async tx => {
+    const [actorMembershipSnap, targetMembershipSnap] = await Promise.all([
+      tx.get(actorMembershipRef),
+      tx.get(targetMembershipRef),
+    ]);
+
+    if (!actorMembershipSnap.exists()) throw new Error('You are not in a guild.');
+    if (targetMembershipSnap.exists()) throw new Error('Player is already in a guild.');
+
+    const actorMembership = actorMembershipSnap.data();
+    const guildId = typeof actorMembership.guildId === 'string' ? actorMembership.guildId : '';
+    const actorRank = typeof actorMembership.rank === 'string' ? actorMembership.rank : 'member';
+    if (!guildId) throw new Error('Guild data invalid.');
+    if (actorRank !== 'leader' && actorRank !== 'officer') throw new Error('Only leader or officer can invite players.');
+
+    const guildRef = doc(db, GUILD_COLLECTION, guildId);
+    const guildSnap = await tx.get(guildRef);
+    if (!guildSnap.exists()) throw new Error('Guild not found.');
+    const guild = guildSnap.data();
+
+    const memberCount = typeof guild.memberCount === 'number' ? guild.memberCount : 0;
+    const maxMembers = typeof guild.maxMembers === 'number' ? guild.maxMembers : 30;
+    if (memberCount >= maxMembers) throw new Error('Guild is full.');
+
+    const inviteRef = doc(db, GUILD_INVITES_COLLECTION, targetUid, 'incoming', guildId);
+    const existingInviteSnap = await tx.get(inviteRef);
+    if (existingInviteSnap.exists()) {
+      const existing = existingInviteSnap.data();
+      const existingStatus = typeof existing.status === 'string' ? existing.status : 'pending';
+      const existingExpiresAt = typeof existing.expiresAt === 'number' ? existing.expiresAt : 0;
+      if (existingStatus === 'pending' && existingExpiresAt > now) {
+        throw new Error('Invite already pending for this player.');
+      }
+    }
+
+    tx.set(inviteRef, {
+      guildId,
+      guildName: typeof guild.name === 'string' ? guild.name : 'Guild',
+      guildTag: typeof guild.tag === 'string' ? guild.tag : 'TAG',
+      inviterUid: actorUid,
+      inviterName: actorDisplayName,
+      invitedUid: targetUid,
+      minLevelToJoin: typeof guild.minLevelToJoin === 'number' ? Math.max(1, Math.floor(guild.minLevelToJoin)) : 1,
+      isPublic: guild.isPublic !== false,
+      status: 'pending',
+      createdAt: now,
+      expiresAt,
+      updatedAt: now,
+      respondedAt: null,
+    }, { merge: true });
+  });
+}
+
+export async function fetchGuildInvites(uid: string): Promise<GuildInvite[]> {
+  const db = requireDb();
+  const cleanUid = uid.trim();
+  if (!cleanUid) return [];
+  const now = Date.now();
+
+  const snap = await getDocs(query(
+    collection(db, GUILD_INVITES_COLLECTION, cleanUid, 'incoming'),
+    orderBy('createdAt', 'desc'),
+    limit(25),
+  ));
+
+  const invites = snap.docs
+    .map(docSnap => parseGuildInvite(docSnap.id, docSnap.data() as Record<string, unknown>))
+    .map(invite => {
+      if (invite.status === 'pending' && invite.expiresAt > 0 && invite.expiresAt <= now) {
+        return { ...invite, status: 'expired' as const };
+      }
+      return invite;
+    });
+
+  return invites;
+}
+
+export async function respondToGuildInvite(input: {
+  uid: string;
+  inviteId: string;
+  action: 'accept' | 'decline';
+  displayName: string;
+  playerLevel: number;
+}): Promise<void> {
+  const db = requireDb();
+  const uid = input.uid.trim();
+  const inviteId = input.inviteId.trim();
+  const displayName = input.displayName.trim().slice(0, 24) || 'Member';
+  const now = Date.now();
+  if (!uid || !inviteId) throw new Error('Missing invite response parameters.');
+
+  const inviteRef = doc(db, GUILD_INVITES_COLLECTION, uid, 'incoming', inviteId);
+  const userGuildRef = doc(db, USER_GUILD_COLLECTION, uid);
+
+  await runTransaction(db, async tx => {
+    const [inviteSnap, existingMembershipSnap] = await Promise.all([
+      tx.get(inviteRef),
+      tx.get(userGuildRef),
+    ]);
+
+    if (!inviteSnap.exists()) throw new Error('Invite not found.');
+    if (existingMembershipSnap.exists()) throw new Error('You are already in a guild.');
+
+    const invite = parseGuildInvite(inviteSnap.id, inviteSnap.data() as Record<string, unknown>);
+    if (invite.invitedUid !== uid) throw new Error('Invite target mismatch.');
+    if (invite.status !== 'pending') throw new Error('Invite already processed.');
+    if (invite.expiresAt <= now) {
+      tx.set(inviteRef, { status: 'expired', respondedAt: now, updatedAt: now }, { merge: true });
+      throw new Error('Invite expired.');
+    }
+
+    if (input.action === 'decline') {
+      tx.set(inviteRef, { status: 'declined', respondedAt: now, updatedAt: now }, { merge: true });
+      return;
+    }
+
+    const guildRef = doc(db, GUILD_COLLECTION, invite.guildId);
+    const guildSnap = await tx.get(guildRef);
+    if (!guildSnap.exists()) throw new Error('Guild no longer exists.');
+    const guild = guildSnap.data();
+
+    const memberCount = typeof guild.memberCount === 'number' ? guild.memberCount : 0;
+    const maxMembers = typeof guild.maxMembers === 'number' ? guild.maxMembers : 30;
+    const minLevelToJoin = typeof guild.minLevelToJoin === 'number' ? guild.minLevelToJoin : 1;
+    if (memberCount >= maxMembers) throw new Error('Guild is full.');
+    if (Math.max(1, Math.floor(input.playerLevel || 1)) < minLevelToJoin) {
+      throw new Error(`Level ${minLevelToJoin}+ required to join.`);
+    }
+
+    const memberRef = doc(db, GUILD_COLLECTION, invite.guildId, 'members', uid);
+    const normalizedName = typeof guild.normalizedName === 'string' ? guild.normalizedName : '';
+    const nextCount = memberCount + 1;
+
+    tx.set(memberRef, {
+      displayName,
+      rank: 'member',
+      joinedAt: now,
+      guildContribution: 0,
+      lastBossAttackAt: 0,
+    });
+
+    tx.set(userGuildRef, {
+      guildId: invite.guildId,
+      guildName: typeof guild.name === 'string' ? guild.name : invite.guildName,
+      rank: 'member',
+      joinedAt: now,
+    });
+
+    tx.set(guildRef, { memberCount: nextCount, updatedAt: now }, { merge: true });
+    if (normalizedName) {
+      tx.set(doc(db, GUILD_LOOKUP_COLLECTION, normalizedName), { memberCount: nextCount, updatedAt: now }, { merge: true });
+    }
+
+    tx.set(inviteRef, { status: 'accepted', respondedAt: now, updatedAt: now }, { merge: true });
   });
 }
 
