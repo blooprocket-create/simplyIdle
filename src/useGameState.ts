@@ -3271,7 +3271,6 @@ function reducer(state: GameState, action: Action): GameState {
           monsterMaxHp: getMonsterMaxHp(retreatWave),
           teamHp: getTeamMaxHp(working),
           teamMaxHp: getTeamMaxHp(working),
-          gold: Math.floor(working.gold * 0.5),
           lastActiveAt: Date.now(),
           combatLog: [`${new Date().toLocaleTimeString()} • Team collapsed and retreated to Wave ${retreatWave}`, ...working.combatLog].slice(0, 24),
         };
