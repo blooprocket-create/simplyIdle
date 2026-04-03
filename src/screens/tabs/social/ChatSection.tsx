@@ -339,35 +339,38 @@ export function ChatSection({
 
               const { message } = item;
               return (
-                <Pressable
+                <View
                   style={[
                     styles.chatRow,
                     item.mine && styles.chatRowMine,
                     item.compact && styles.chatRowCompact,
                   ]}
-                  onPress={() => {
-                    if (item.mine) return;
-                    onOpenProfile(message.uid);
-                  }}
-                  onLongPress={() => {
-                    if (item.mine) return;
-                    onOpenUserMenu(message);
-                  }}
-                  delayLongPress={200}
                 >
-                  {item.showHeader ? (
-                    <View style={styles.chatHeaderRow}>
-                      <Text style={styles.chatName} numberOfLines={1} ellipsizeMode="tail">
-                        {item.source === 'global'
-                          ? `${message.displayName} Lv.${message.level ?? 1} VIP ${message.vipLevel ?? 0}${message.guildTag ? ` [${message.guildTag}]` : ''}`
-                          : `${message.displayName} [Guild]`}
-                      </Text>
-                      <Text style={styles.chatTime}>{formatTime(message.sentAt)}</Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.chatTimeCompact}>{formatTime(message.sentAt)}</Text>
-                  )}
-                  <Text style={styles.chatText}>{message.text}</Text>
+                  <Pressable
+                    onPress={() => {
+                      if (item.mine) return;
+                      onOpenProfile(message.uid);
+                    }}
+                    onLongPress={() => {
+                      if (item.mine) return;
+                      onOpenUserMenu(message);
+                    }}
+                    delayLongPress={200}
+                  >
+                    {item.showHeader ? (
+                      <View style={styles.chatHeaderRow}>
+                        <Text style={styles.chatName} numberOfLines={1} ellipsizeMode="tail">
+                          {item.source === 'global'
+                            ? `${message.displayName} Lv.${message.level ?? 1} VIP ${message.vipLevel ?? 0}${message.guildTag ? ` [${message.guildTag}]` : ''}`
+                            : `${message.displayName} [Guild]`}
+                        </Text>
+                        <Text style={styles.chatTime}>{formatTime(message.sentAt)}</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.chatTimeCompact}>{formatTime(message.sentAt)}</Text>
+                    )}
+                    <Text style={styles.chatText}>{message.text}</Text>
+                  </Pressable>
                   {item.source === 'global' && (
                     <View style={styles.reactionRow}>
                       {(['👍', '🔥', '💪', '🎉'] as const).map(emoji => {
@@ -401,7 +404,7 @@ export function ChatSection({
                       </Pressable>
                     </View>
                   )}
-                </Pressable>
+                </View>
               );
             }}
           />

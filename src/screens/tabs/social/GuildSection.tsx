@@ -923,11 +923,14 @@ export function GuildSection({
             const total = Number(event.details[isWar ? 'totalDamage' : 'totalKills'] ?? 0);
             const target = Number(event.details[isWar ? 'targetDamage' : 'targetKills'] ?? 1);
             const pct = Math.min(100, Math.floor((total / Math.max(1, target)) * 100));
-            const eventCooldownRemainingMs = Math.max(0, (eventCooldownUntilById[event.eventId] ?? 0) - nowMs);
-            const canContribute = !guildBusy && event.status === 'active' && eventCooldownRemainingMs <= 0;
             const contributors = eventContribByEventId[event.eventId] ?? [];
-            const topContributors = contributors.slice(0, 3);
+            const contributorsLoaded = eventContribByEventId[event.eventId] !== undefined;
             const myContributionRow = contributors.find(row => row.uid === me.uid) ?? null;
+            const persistedCooldownUntil = (myContributionRow?.lastContributedAt ?? 0) + EVENT_CONTRIBUTION_COOLDOWN_MS;
+            const localCooldownUntil = eventCooldownUntilById[event.eventId] ?? 0;
+            const eventCooldownRemainingMs = Math.max(0, Math.max(persistedCooldownUntil, localCooldownUntil) - nowMs);
+            const canContribute = !guildBusy && contributorsLoaded && event.status === 'active' && eventCooldownRemainingMs <= 0;
+            const topContributors = contributors.slice(0, 3);
             return (
               <View key={event.eventId} style={styles.friendRow}>
                 <View style={styles.friendMeta}>
@@ -952,6 +955,9 @@ export function GuildSection({
                         })
                         .join(' • ')}
                     </Text>
+                  )}
+                  {!contributorsLoaded && event.status === 'active' && (
+                    <Text style={styles.metaText}>Syncing your cooldown status...</Text>
                   )}
                   {eventCooldownRemainingMs > 0 && (
                     <Text style={styles.metaText}>Your cooldown: {formatCooldownMinutesSeconds(eventCooldownRemainingMs)}</Text>
@@ -996,7 +1002,11 @@ export function GuildSection({
                   }}
                 >
                   <Text style={styles.smallBtnText}>
-                    {eventCooldownRemainingMs > 0 ? `Contribute ${formatCooldownMinutesSeconds(eventCooldownRemainingMs)}` : 'Contribute'}
+                    {!contributorsLoaded && event.status === 'active'
+                      ? 'Syncing...'
+                      : eventCooldownRemainingMs > 0
+                        ? `Contribute ${formatCooldownMinutesSeconds(eventCooldownRemainingMs)}`
+                        : 'Contribute'}
                   </Text>
                 </Pressable>
               </View>
