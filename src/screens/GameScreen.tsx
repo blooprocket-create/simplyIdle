@@ -326,7 +326,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     rebirthHero,
     levelUpHeroGold,
     convertShardsToEssence,
-    convertShardsToScrap,
+    convertScrapToShards,
     spendRebirthCore,
     useUsableItem,
     dismantleEquipment,
@@ -3015,7 +3015,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             upgradeEquipmentRarity,
             dismantleEquipment,
             convertShardsToEssence,
-            convertShardsToScrap,
+            convertScrapToShards,
             renderSubTabBar,
           } as any)}
         />

@@ -26,7 +26,7 @@ export interface EquipmentTabContentProps {
   upgradeEquipmentRarity: (itemId: string) => void;
   dismantleEquipment: (itemId: string) => void;
   convertShardsToEssence: () => void;
-  convertShardsToScrap: () => void;
+  convertScrapToShards: () => void;
   renderSubTabBar: (tabs: any[]) => React.ReactNode;
 }
 
@@ -51,7 +51,7 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
   upgradeEquipmentRarity,
   dismantleEquipment,
   convertShardsToEssence,
-  convertShardsToScrap,
+  convertScrapToShards,
   renderSubTabBar,
 }) => {
   const rarityRank = useMemo(() => {
@@ -295,7 +295,7 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
             <>
               <View style={styles.shardForgeCard}>
                 <Text style={styles.shardForgeTitle}>Shard Forge</Text>
-                <Text style={styles.shardForgeDesc}>Spend overflow shards for persistent value and keep the roster economy under control.</Text>
+                <Text style={styles.shardForgeDesc}>Refine excess scrap into shards so forge progression feeds hero growth.</Text>
                 <View style={styles.shardForgeRow}>
                   <Pressable
                     style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.essenceCost && styles.shardForgeBtnDisabled]}
@@ -305,11 +305,11 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
                     <Text style={styles.shardForgeBtnText}>Essence • {shardForgeCosts.essenceCost} 💠</Text>
                   </Pressable>
                   <Pressable
-                    style={[styles.shardForgeBtn, state.heroShards < shardForgeCosts.scrapCost && styles.shardForgeBtnDisabled]}
-                    disabled={state.heroShards < shardForgeCosts.scrapCost}
-                    onPress={convertShardsToScrap}
+                    style={[styles.shardForgeBtn, state.equipmentScrap < shardForgeCosts.shardRefineScrapCost && styles.shardForgeBtnDisabled]}
+                    disabled={state.equipmentScrap < shardForgeCosts.shardRefineScrapCost}
+                    onPress={convertScrapToShards}
                   >
-                    <Text style={styles.shardForgeBtnText}>Scrap • {shardForgeCosts.scrapCost} 💠</Text>
+                    <Text style={styles.shardForgeBtnText}>Shards • {shardForgeCosts.shardRefineScrapCost} 🔩</Text>
                   </Pressable>
                 </View>
               </View>

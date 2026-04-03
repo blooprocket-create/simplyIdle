@@ -1939,7 +1939,7 @@ function getShardToEssenceCost(state: GameState): number {
   return 600 + state.metaDamageLevel * 40 + state.metaEconomyLevel * 40 + state.metaSurvivalLevel * 40;
 }
 
-function getShardToScrapCost(): number {
+function getScrapToShardCost(): number {
   return 180;
 }
 
@@ -3160,7 +3160,7 @@ type Action =
   | { type: 'TOGGLE_HERO_UNIQUE_WEAPON'; heroUid: string }
   | { type: 'RANK_UP_HERO'; uid: string }
   | { type: 'CONVERT_SHARDS_TO_ESSENCE' }
-  | { type: 'CONVERT_SHARDS_TO_SCRAP' }
+  | { type: 'CONVERT_SCRAP_TO_SHARDS' }
   | { type: 'SPEND_REBIRTH_CORE'; path: 'damage' | 'economy' | 'survival' }
   | { type: 'SET_AUTO_SUMMON_ENABLED'; enabled: boolean }
   | { type: 'SET_AUTO_SUMMON_MODE'; mode: 'single' | 'x10' }
@@ -5032,18 +5032,18 @@ function reducer(state: GameState, action: Action): GameState {
       });
     }
 
-    case 'CONVERT_SHARDS_TO_SCRAP': {
-      const cost = getShardToScrapCost();
-      if (state.heroShards < cost) return state;
+    case 'CONVERT_SCRAP_TO_SHARDS': {
+      const cost = getScrapToShardCost();
+      if (state.equipmentScrap < cost) return state;
       return queueReward({
         ...state,
-        heroShards: state.heroShards - cost,
-        equipmentScrap: state.equipmentScrap + 140,
+        equipmentScrap: state.equipmentScrap - cost,
+        heroShards: state.heroShards + 140,
       }, {
-        id: `shard_to_scrap_${Date.now()}`,
+        id: `scrap_to_shards_${Date.now()}`,
         kind: 'system',
         title: 'Shard Forge',
-        detail: `Converted ${cost} shards into +140 scrap`,
+        detail: `Refined ${cost} scrap into +140 shards`,
       });
     }
 
@@ -6221,7 +6221,7 @@ export function useGameState(saveSlot: string = 'default') {
   const rankUpHero = useCallback((uid: string) => dispatch({ type: 'RANK_UP_HERO', uid }), []);
   const levelUpHeroGold = useCallback((uid: string) => dispatch({ type: 'LEVEL_UP_HERO_GOLD', uid }), []);
   const convertShardsToEssence = useCallback(() => dispatch({ type: 'CONVERT_SHARDS_TO_ESSENCE' }), []);
-  const convertShardsToScrap = useCallback(() => dispatch({ type: 'CONVERT_SHARDS_TO_SCRAP' }), []);
+  const convertScrapToShards = useCallback(() => dispatch({ type: 'CONVERT_SCRAP_TO_SHARDS' }), []);
   const spendRebirthCore = useCallback((path: 'damage' | 'economy' | 'survival') => {
     dispatch({ type: 'SPEND_REBIRTH_CORE', path });
   }, []);
@@ -6309,7 +6309,7 @@ export function useGameState(saveSlot: string = 'default') {
 
   const getShardForgeCosts = useCallback(() => ({
     essenceCost: getShardToEssenceCost(state),
-    scrapCost: getShardToScrapCost(),
+    shardRefineScrapCost: getScrapToShardCost(),
   }), [state]);
 
   const getNextTeamSlotUnlock = useCallback(() => {
@@ -6420,7 +6420,7 @@ export function useGameState(saveSlot: string = 'default') {
     rankUpHero,
     levelUpHeroGold,
     convertShardsToEssence,
-    convertShardsToScrap,
+    convertScrapToShards,
     spendRebirthCore,
     useUsableItem,
     dismantleEquipment,
