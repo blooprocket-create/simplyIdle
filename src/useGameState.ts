@@ -198,6 +198,7 @@ export interface MailMessage {
   from: string;
   sentAt: number;
   attachments: MailAttachments;
+  claimedAttachments?: MailAttachments;
 }
 
 const WELCOME_GIFT_MAIL_ID = 'mail_welcome_gift_v1';
@@ -223,6 +224,7 @@ function createWelcomeGiftMail(): MailMessage {
       essence: WELCOME_GIFT_ATTACHMENTS.essence,
       tears: WELCOME_GIFT_ATTACHMENTS.tears,
     },
+    claimedAttachments: emptyAttachments(),
   };
 }
 
@@ -1245,6 +1247,7 @@ function claimMailAttachments(state: GameState, mailId: string, keys: MailAttach
 
   const claimSet = new Set(keys);
   const prev = targetMail.attachments;
+  const prevClaimed = targetMail.claimedAttachments ?? emptyAttachments();
   const addShards = claimSet.has('shards') ? Math.max(0, prev.shards) : 0;
   const addGold = claimSet.has('gold') ? Math.max(0, prev.gold) : 0;
   const addDiamonds = claimSet.has('diamonds') ? Math.max(0, prev.diamonds) : 0;
@@ -1261,9 +1264,17 @@ function claimMailAttachments(state: GameState, mailId: string, keys: MailAttach
       tears: claimSet.has('tears') ? 0 : mail.attachments.tears,
       essence: claimSet.has('essence') ? 0 : mail.attachments.essence,
     };
+    const nextClaimedAttachments: MailAttachments = {
+      shards: prevClaimed.shards + addShards,
+      gold: prevClaimed.gold + addGold,
+      diamonds: prevClaimed.diamonds + addDiamonds,
+      tears: prevClaimed.tears + addTears,
+      essence: prevClaimed.essence + addEssence,
+    };
     return {
       ...mail,
       attachments: nextAttachments,
+      claimedAttachments: nextClaimedAttachments,
     };
   });
 
@@ -2504,6 +2515,13 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
           diamonds: clampInt(isRecord(entry.attachments) ? entry.attachments.diamonds : 0, 0, SAFE_INTEGER_CAP, 0),
           tears: clampInt(isRecord(entry.attachments) ? entry.attachments.tears : 0, 0, SAFE_INTEGER_CAP, 0),
           essence: clampInt(isRecord(entry.attachments) ? entry.attachments.essence : 0, 0, SAFE_INTEGER_CAP, 0),
+        },
+        claimedAttachments: {
+          shards: clampInt(isRecord(entry.claimedAttachments) ? entry.claimedAttachments.shards : 0, 0, SAFE_INTEGER_CAP, 0),
+          gold: clampInt(isRecord(entry.claimedAttachments) ? entry.claimedAttachments.gold : 0, 0, SAFE_INTEGER_CAP, 0),
+          diamonds: clampInt(isRecord(entry.claimedAttachments) ? entry.claimedAttachments.diamonds : 0, 0, SAFE_INTEGER_CAP, 0),
+          tears: clampInt(isRecord(entry.claimedAttachments) ? entry.claimedAttachments.tears : 0, 0, SAFE_INTEGER_CAP, 0),
+          essence: clampInt(isRecord(entry.claimedAttachments) ? entry.claimedAttachments.essence : 0, 0, SAFE_INTEGER_CAP, 0),
         },
       }));
 
@@ -4200,6 +4218,13 @@ function reducer(state: GameState, action: Action): GameState {
             diamonds: clampInt(mail.attachments?.diamonds, 0, SAFE_INTEGER_CAP, 0),
             tears: clampInt(mail.attachments?.tears, 0, SAFE_INTEGER_CAP, 0),
             essence: clampInt(mail.attachments?.essence, 0, SAFE_INTEGER_CAP, 0),
+          },
+          claimedAttachments: {
+            shards: clampInt(mail.claimedAttachments?.shards, 0, SAFE_INTEGER_CAP, 0),
+            gold: clampInt(mail.claimedAttachments?.gold, 0, SAFE_INTEGER_CAP, 0),
+            diamonds: clampInt(mail.claimedAttachments?.diamonds, 0, SAFE_INTEGER_CAP, 0),
+            tears: clampInt(mail.claimedAttachments?.tears, 0, SAFE_INTEGER_CAP, 0),
+            essence: clampInt(mail.claimedAttachments?.essence, 0, SAFE_INTEGER_CAP, 0),
           },
         }));
       if (fresh.length === 0) return state;
@@ -6086,6 +6111,7 @@ export function useGameState(saveSlot: string = 'default') {
                   from: mail.from,
                   sentAt: mail.sentAt,
                   attachments: mail.attachments,
+                  claimedAttachments: emptyAttachments(),
                 }));
               if (newMails.length > 0) {
                 payloadWithCloudMail = {

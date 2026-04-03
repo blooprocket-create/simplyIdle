@@ -156,6 +156,13 @@ type SaveMailboxEntry = {
     tears: number;
     essence: number;
   };
+  claimedAttachments?: {
+    shards: number;
+    gold: number;
+    diamonds: number;
+    tears: number;
+    essence: number;
+  };
 };
 
 function scoreEquipmentForClass(item: { rarity: string; bonus: Record<string, number | undefined | null> }, playerClass: PlayerClass | null): number {
@@ -4051,36 +4058,48 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                       <Text style={styles.mailDetailMessage}>{selectedMail.message}</Text>
                     </ScrollView>
                     <View style={styles.mailAttachmentRow}>
-                      {(Object.keys(selectedMail.attachments) as Array<'shards' | 'gold' | 'diamonds' | 'tears' | 'essence'>).map(key => {
-                        const amount = selectedMail.attachments[key];
-                        const label = key === 'shards'
-                          ? 'Shards'
-                          : key === 'gold'
-                            ? 'Gold'
-                            : key === 'diamonds'
-                              ? 'Diamonds'
-                              : key === 'tears'
-                                ? 'Tears'
-                                : 'Essence';
-                        const isClaimed = amount <= 0;
-                        return (
-                          <Pressable
-                            key={`${selectedMail.id}_${key}`}
-                            style={[styles.mailAttachmentBtn, isClaimed && styles.mailAttachmentBtnClaimed]}
-                            onPress={() => !isClaimed && claimMailAttachment(selectedMail.id, key)}
-                            disabled={isClaimed}
-                          >
-                            {isClaimed ? (
-                              <>
-                                <Text style={styles.mailAttachmentBtnText}>Claim {label}</Text>
-                                <Text style={styles.mailAttachmentCheckmark}>✓</Text>
-                              </>
-                            ) : (
-                              <Text style={styles.mailAttachmentBtnText}>Claim {label} +{amount}</Text>
-                            )}
-                          </Pressable>
-                        );
-                      })}
+                      {(() => {
+                        const attachmentKeys: Array<'shards' | 'gold' | 'diamonds' | 'tears' | 'essence'> = ['shards', 'gold', 'diamonds', 'tears', 'essence'];
+                        const rows = attachmentKeys.filter(key => {
+                          const amount = selectedMail.attachments[key] ?? 0;
+                          const claimedAmount = selectedMail.claimedAttachments?.[key] ?? 0;
+                          return amount > 0 || claimedAmount > 0;
+                        });
+
+                        if (rows.length === 0) {
+                          return <Text style={styles.metaText}>No claimable attachments.</Text>;
+                        }
+
+                        return rows.map(key => {
+                          const amount = selectedMail.attachments[key] ?? 0;
+                          const claimedAmount = selectedMail.claimedAttachments?.[key] ?? 0;
+                          const label = key === 'shards'
+                            ? 'Shards'
+                            : key === 'gold'
+                              ? 'Gold'
+                              : key === 'diamonds'
+                                ? 'Diamonds'
+                                : key === 'tears'
+                                  ? 'Tears'
+                                  : 'Essence';
+                          const isClaimed = amount <= 0 && claimedAmount > 0;
+
+                          return (
+                            <Pressable
+                              key={`${selectedMail.id}_${key}`}
+                              style={[styles.mailAttachmentBtn, isClaimed && styles.mailAttachmentBtnClaimed]}
+                              onPress={() => !isClaimed && amount > 0 && claimMailAttachment(selectedMail.id, key)}
+                              disabled={isClaimed || amount <= 0}
+                            >
+                              {isClaimed ? (
+                                <Text style={styles.mailAttachmentBtnText}>Claimed {fmt(claimedAmount)} {label} ✓</Text>
+                              ) : (
+                                <Text style={styles.mailAttachmentBtnText}>Claim {fmt(amount)} {label}</Text>
+                              )}
+                            </Pressable>
+                          );
+                        });
+                      })()}
                     </View>
                   </>
                 ) : (
