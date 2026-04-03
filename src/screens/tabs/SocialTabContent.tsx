@@ -1372,6 +1372,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   chatChannelChip: {
+    position: 'relative',
     borderWidth: 1,
     borderColor: '#2F4C64',
     borderRadius: 999,
@@ -1390,6 +1391,25 @@ const styles = StyleSheet.create({
   },
   chatChannelChipTextActive: {
     color: '#EAF7FF',
+  },
+  chatChannelBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF5A7A',
+    borderWidth: 1,
+    borderColor: '#FFD2DC',
+    paddingHorizontal: 4,
+  },
+  chatChannelBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '900',
   },
   chatStreamArea: {
     flex: 1,
