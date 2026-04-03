@@ -14,15 +14,21 @@ import {
   GuildMember,
   GuildSummary,
   joinGuild,
+  isGuildTreasuryEnabled,
   setMemberRank,
   startEvent,
+  transactGuildTreasury,
   sendGuildChatMessage,
   leaveGuild,
   updateGuildDescription,
+  fetchGuildTreasuryLedger,
+  fetchGuildTreasuryState,
+  GuildTreasuryEntry,
+  GuildTreasuryState,
 } from '../../../services/guild';
 import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton, SocialProgressBar } from './SocialPrimitives';
 
-type GuildSubTab = 'home' | 'boss' | 'events' | 'chat';
+type GuildSubTab = 'home' | 'boss' | 'events' | 'treasury' | 'chat';
 
 const BOSS_ATTACK_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 const EVENT_CONTRIBUTION_COOLDOWN_MS = 5 * 60 * 1000;
@@ -61,6 +67,12 @@ function formatCompactNumber(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
   return `${Math.floor(value)}`;
+}
+
+function parsePositiveInt(raw: string): number {
+  const parsed = Number(raw.replace(/[^0-9]/g, ''));
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.floor(parsed));
 }
 
 interface GuildSectionProps {
@@ -149,6 +161,12 @@ export function GuildSection({
   const [eventContribByEventId, setEventContribByEventId] = useState<Record<string, GuildEventContributor[]>>({});
   const [descriptionDraft, setDescriptionDraft] = useState('');
   const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [treasuryState, setTreasuryState] = useState<GuildTreasuryState | null>(null);
+  const [treasuryLedger, setTreasuryLedger] = useState<GuildTreasuryEntry[]>([]);
+  const [treasuryAmountInput, setTreasuryAmountInput] = useState('50000');
+  const [treasuryReasonInput, setTreasuryReasonInput] = useState('');
+  const [treasuryLoading, setTreasuryLoading] = useState(false);
+  const treasuryEnabled = isGuildTreasuryEnabled();
 
   useEffect(() => {
     const timer = setInterval(() => setNowMs(Date.now()), 1000);
@@ -214,6 +232,31 @@ export function GuildSection({
     };
   }, [guildEvents, guildSubTab, me.uid, myGuild]);
 
+  useEffect(() => {
+    if (!myGuild || guildSubTab !== 'treasury' || !me.uid || !treasuryEnabled) return;
+    let cancelled = false;
+    setTreasuryLoading(true);
+    setError(null);
+    void Promise.all([
+      fetchGuildTreasuryState(me.uid),
+      fetchGuildTreasuryLedger(me.uid, 18),
+    ]).then(([state, ledger]) => {
+      if (cancelled) return;
+      setTreasuryState(state);
+      setTreasuryLedger(ledger);
+    }).catch(err => {
+      if (cancelled) return;
+      const msg = err instanceof Error ? err.message : 'Failed to load guild treasury.';
+      setError(msg);
+    }).finally(() => {
+      if (!cancelled) setTreasuryLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [guildSubTab, me.uid, myGuild, setError, treasuryEnabled]);
+
   const myGuildMember = useMemo(
     () => guildMembers.find(member => member.uid === me.uid) ?? null,
     [guildMembers, me.uid],
@@ -221,6 +264,7 @@ export function GuildSection({
 
   const isLeader = !!myGuild && myGuild.leaderId === me.uid;
   const isOfficer = myGuildMember?.rank === 'officer';
+  const canWithdrawFromTreasury = isLeader || isOfficer;
   const roleLabel = isLeader ? 'Leader' : isOfficer ? 'Officer' : 'Member';
 
   const persistedBossCooldownUntil = (myGuildMember?.lastBossAttackAt ?? 0) + BOSS_ATTACK_COOLDOWN_MS;
@@ -415,6 +459,15 @@ export function GuildSection({
               accessibilityLabel="Guild events tab"
             >
               <Text style={styles.prefBtnText}>Events</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.prefBtn, guildSubTab === 'treasury' && styles.prefBtnActive]}
+              onPress={() => setGuildSubTab('treasury')}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: guildSubTab === 'treasury' }}
+              accessibilityLabel="Guild treasury tab"
+            >
+              <Text style={styles.prefBtnText}>Treasury</Text>
             </Pressable>
             <Pressable
               style={[styles.prefBtn, guildSubTab === 'chat' && styles.prefBtnActive]}
@@ -950,6 +1003,164 @@ export function GuildSection({
             );
           })}
         </View>
+      )}
+
+      {myGuild && guildSubTab === 'treasury' && (
+        <>
+          {!treasuryEnabled && (
+            <SocialCard styles={styles} title="Guild Treasury" subtitle="Staged rollout in progress.">
+              <Text style={styles.metaText}>Treasury is currently disabled by feature flag for this build.</Text>
+            </SocialCard>
+          )}
+
+          {treasuryEnabled && (
+            <SocialCard styles={styles} title="Guild Treasury" subtitle="Shared reserves with role-gated withdrawals.">
+              <SocialAsyncState styles={styles} isLoading={treasuryLoading} variant="inline" />
+              <View style={styles.metricGrid}>
+                <View style={styles.metricChip}>
+                  <Text style={styles.metricLabel}>Balance</Text>
+                  <Text style={styles.metricValue}>{(treasuryState?.balance ?? 0).toLocaleString()}</Text>
+                </View>
+                <View style={styles.metricChip}>
+                  <Text style={styles.metricLabel}>Deposited</Text>
+                  <Text style={styles.metricValue}>{(treasuryState?.totalDeposited ?? 0).toLocaleString()}</Text>
+                </View>
+                <View style={styles.metricChip}>
+                  <Text style={styles.metricLabel}>Withdrawn</Text>
+                  <Text style={styles.metricValue}>{(treasuryState?.totalWithdrawn ?? 0).toLocaleString()}</Text>
+                </View>
+                <View style={styles.metricChip}>
+                  <Text style={styles.metricLabel}>Daily Outflow</Text>
+                  <Text style={styles.metricValue}>{(treasuryState?.dailyWithdrawn ?? 0).toLocaleString()}</Text>
+                </View>
+              </View>
+
+              <SocialInput
+                styles={styles}
+                value={treasuryAmountInput}
+                onChangeText={setTreasuryAmountInput}
+                placeholder="Amount"
+                editable={!guildBusy && !treasuryLoading}
+                maxLength={12}
+                keyboardType="number-pad"
+              />
+              <SocialInput
+                styles={styles}
+                value={treasuryReasonInput}
+                onChangeText={setTreasuryReasonInput}
+                placeholder="Reason (optional)"
+                editable={!guildBusy && !treasuryLoading}
+                maxLength={80}
+              />
+
+              <View style={styles.friendActions}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.smallBtn,
+                    (guildBusy || treasuryLoading || parsePositiveInt(treasuryAmountInput) <= 0) && styles.sendBtnDisabled,
+                    pressed && !guildBusy && !treasuryLoading && parsePositiveInt(treasuryAmountInput) > 0 && styles.smallBtnPressed,
+                  ]}
+                  disabled={guildBusy || treasuryLoading || parsePositiveInt(treasuryAmountInput) <= 0}
+                  onPress={async () => {
+                    if (!me.uid) return;
+                    const amount = parsePositiveInt(treasuryAmountInput);
+                    if (amount <= 0) {
+                      setError('Enter a valid treasury amount.');
+                      return;
+                    }
+                    setGuildBusy(true);
+                    setError(null);
+                    try {
+                      const nextState = await transactGuildTreasury({
+                        uid: me.uid,
+                        displayName: me.name,
+                        type: 'deposit',
+                        amount,
+                        reason: treasuryReasonInput,
+                      });
+                      setTreasuryState(nextState);
+                      const nextLedger = await fetchGuildTreasuryLedger(me.uid, 18);
+                      setTreasuryLedger(nextLedger);
+                      setTreasuryReasonInput('');
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : 'Deposit failed.';
+                      setError(msg);
+                    } finally {
+                      setGuildBusy(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.smallBtnText}>Deposit</Text>
+                </Pressable>
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.smallBtn,
+                    (!canWithdrawFromTreasury || guildBusy || treasuryLoading || parsePositiveInt(treasuryAmountInput) <= 0) && styles.sendBtnDisabled,
+                    pressed && canWithdrawFromTreasury && !guildBusy && !treasuryLoading && parsePositiveInt(treasuryAmountInput) > 0 && styles.smallBtnPressed,
+                  ]}
+                  disabled={!canWithdrawFromTreasury || guildBusy || treasuryLoading || parsePositiveInt(treasuryAmountInput) <= 0}
+                  onPress={async () => {
+                    if (!me.uid) return;
+                    const amount = parsePositiveInt(treasuryAmountInput);
+                    if (amount <= 0) {
+                      setError('Enter a valid treasury amount.');
+                      return;
+                    }
+                    setGuildBusy(true);
+                    setError(null);
+                    try {
+                      const nextState = await transactGuildTreasury({
+                        uid: me.uid,
+                        displayName: me.name,
+                        type: 'withdrawal',
+                        amount,
+                        reason: treasuryReasonInput,
+                      });
+                      setTreasuryState(nextState);
+                      const nextLedger = await fetchGuildTreasuryLedger(me.uid, 18);
+                      setTreasuryLedger(nextLedger);
+                      setTreasuryReasonInput('');
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : 'Withdrawal failed.';
+                      setError(msg);
+                    } finally {
+                      setGuildBusy(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.smallBtnText}>Withdraw</Text>
+                </Pressable>
+              </View>
+
+              {!canWithdrawFromTreasury && (
+                <Text style={styles.metaText}>Withdrawals require officer or leader rank.</Text>
+              )}
+            </SocialCard>
+          )}
+
+          {treasuryEnabled && (
+            <SocialCard styles={styles} title="Treasury Ledger" subtitle="Transparent guild fund activity.">
+              <SocialAsyncState
+                styles={styles}
+                isLoading={treasuryLoading}
+                isEmpty={!treasuryLoading && treasuryLedger.length === 0}
+                emptyTitle="No Treasury Activity"
+                emptySubtitle="Deposits and withdrawals will appear here."
+                variant="inline"
+              />
+              {treasuryLedger.map(entry => (
+                <View key={entry.id} style={styles.friendRow}>
+                  <View style={styles.friendMeta}>
+                    <Text style={styles.friendName}>{entry.type === 'deposit' ? 'Deposit' : 'Withdrawal'} • {entry.amount.toLocaleString()}</Text>
+                    <Text style={styles.metaText}>{entry.actorName} ({entry.actorRank}) • {new Date(entry.createdAt).toLocaleString()}</Text>
+                    {!!entry.reason && <Text style={styles.metaText}>Reason: {entry.reason}</Text>}
+                  </View>
+                </View>
+              ))}
+            </SocialCard>
+          )}
+        </>
       )}
 
       {myGuild && guildSubTab === 'chat' && (

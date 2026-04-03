@@ -14,6 +14,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase';
+import { SOCIAL_FEATURE_FLAGS } from '../socialFeatureFlags';
 
 export type GuildMemberRank = 'leader' | 'officer' | 'member';
 
@@ -87,16 +88,45 @@ export interface GuildBrowseRow {
   isPublic: boolean;
 }
 
+export interface GuildTreasuryState {
+  balance: number;
+  totalDeposited: number;
+  totalWithdrawn: number;
+  dailyWithdrawn: number;
+  dailyWindowStart: number;
+  updatedAt: number;
+  updatedByUid: string;
+}
+
+export interface GuildTreasuryEntry {
+  id: string;
+  type: 'deposit' | 'withdrawal';
+  amount: number;
+  actorUid: string;
+  actorName: string;
+  actorRank: GuildMemberRank;
+  reason: string;
+  createdAt: number;
+}
+
 const GUILD_COLLECTION = 'guilds';
 const GUILD_LOOKUP_COLLECTION = 'guildLookup';
 const USER_GUILD_COLLECTION = 'userGuild';
 const GUILD_CHAT_RATE_LIMIT_COLLECTION = 'guildChatRateLimit';
+const GUILD_TREASURY_STATE_COLLECTION = 'treasuryState';
+const GUILD_TREASURY_LEDGER_COLLECTION = 'treasuryLedger';
 const BOSS_ATTACK_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 const BOSS_DURATION_MS = 5 * 24 * 60 * 60 * 1000;
 const WAR_DURATION_MS = 48 * 60 * 60 * 1000;
 const EXPEDITION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const GUILD_CHAT_COOLDOWN_MS = 3000;
 const EVENT_CONTRIBUTION_COOLDOWN_MS = 5 * 60 * 1000;
+const TREASURY_DAILY_WITHDRAW_CAP_LEADER = 25_000_000;
+const TREASURY_DAILY_WITHDRAW_CAP_OFFICER = 5_000_000;
+
+function guildTreasuryEnabled(): boolean {
+  return SOCIAL_FEATURE_FLAGS.guildTreasury === true;
+}
 
 function requireDb() {
   const db = getFirebaseFirestore();
@@ -154,6 +184,38 @@ async function resolveGuildIdForUser(uid: string): Promise<string | null> {
   if (!snap.exists()) return null;
   const data = snap.data();
   return typeof data.guildId === 'string' ? data.guildId : null;
+}
+
+async function resolveGuildMembershipForUser(uid: string): Promise<{ guildId: string; rank: GuildMemberRank } | null> {
+  const db = requireDb();
+  const snap = await getDoc(doc(db, USER_GUILD_COLLECTION, uid));
+  if (!snap.exists()) return null;
+  const data = snap.data();
+  const guildId = typeof data.guildId === 'string' ? data.guildId : '';
+  if (!guildId) return null;
+  const rank = data.rank === 'leader' || data.rank === 'officer' ? data.rank : 'member';
+  return { guildId, rank };
+}
+
+function startOfCurrentUtcDay(nowMs: number): number {
+  const now = new Date(nowMs);
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0);
+}
+
+function clampTreasuryAmount(amount: number): number {
+  return Math.max(1, Math.min(500_000_000, Math.floor(amount)));
+}
+
+function parseGuildTreasuryState(data: Record<string, unknown>): GuildTreasuryState {
+  return {
+    balance: typeof data.balance === 'number' ? Math.max(0, Math.floor(data.balance)) : 0,
+    totalDeposited: typeof data.totalDeposited === 'number' ? Math.max(0, Math.floor(data.totalDeposited)) : 0,
+    totalWithdrawn: typeof data.totalWithdrawn === 'number' ? Math.max(0, Math.floor(data.totalWithdrawn)) : 0,
+    dailyWithdrawn: typeof data.dailyWithdrawn === 'number' ? Math.max(0, Math.floor(data.dailyWithdrawn)) : 0,
+    dailyWindowStart: typeof data.dailyWindowStart === 'number' ? data.dailyWindowStart : 0,
+    updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : 0,
+    updatedByUid: typeof data.updatedByUid === 'string' ? data.updatedByUid : '',
+  };
 }
 
 export async function createGuild(input: {
@@ -564,10 +626,11 @@ export async function disbandGuild(input: { actorUid: string }): Promise<void> {
 
   const guild = guildSnap.data() as Record<string, unknown>;
   const normalizedName = typeof guild.normalizedName === 'string' ? guild.normalizedName : '';
-  const [memberSnaps, eventSnaps, chatSnaps] = await Promise.all([
+  const [memberSnaps, eventSnaps, chatSnaps, treasuryLedgerSnaps] = await Promise.all([
     getDocs(collection(db, GUILD_COLLECTION, guildId, 'members')),
     getDocs(collection(db, GUILD_COLLECTION, guildId, 'events')),
     getDocs(query(collection(db, GUILD_COLLECTION, guildId, 'chat'), limit(300))),
+    getDocs(query(collection(db, GUILD_COLLECTION, guildId, GUILD_TREASURY_LEDGER_COLLECTION), limit(300))),
   ]);
 
   const memberUids = memberSnaps.docs.map(s => s.id);
@@ -596,9 +659,18 @@ export async function disbandGuild(input: { actorUid: string }): Promise<void> {
     await batch.commit();
   }
 
+  for (let i = 0; i < treasuryLedgerSnaps.docs.length; i += chunkSize) {
+    const batch = writeBatch(db);
+    const chunk = treasuryLedgerSnaps.docs.slice(i, i + chunkSize);
+    chunk.forEach(entryDoc => batch.delete(entryDoc.ref));
+    await batch.commit();
+  }
+
   const bossRef = doc(db, GUILD_COLLECTION, guildId, 'boss', 'active');
+  const treasuryStateRef = doc(db, GUILD_COLLECTION, guildId, GUILD_TREASURY_STATE_COLLECTION, 'active');
   const finalBatch = writeBatch(db);
   finalBatch.delete(bossRef);
+  finalBatch.delete(treasuryStateRef);
   if (normalizedName) finalBatch.delete(doc(db, GUILD_LOOKUP_COLLECTION, normalizedName));
   finalBatch.delete(guildRef);
   await finalBatch.commit();
@@ -1179,4 +1251,156 @@ export async function fetchGuildBrowse(searchTerm = ''): Promise<GuildBrowseRow[
       isPublic: data.isPublic !== false,
     } satisfies GuildBrowseRow;
   }).filter(row => !!row.guildId);
+}
+
+export async function fetchGuildTreasuryState(uid: string): Promise<GuildTreasuryState> {
+  if (!guildTreasuryEnabled()) {
+    throw new Error('Guild treasury is disabled for this rollout.');
+  }
+  const db = requireDb();
+  const membership = await resolveGuildMembershipForUser(uid);
+  if (!membership) throw new Error('You are not in a guild.');
+
+  const stateRef = doc(db, GUILD_COLLECTION, membership.guildId, GUILD_TREASURY_STATE_COLLECTION, 'active');
+  const stateSnap = await getDoc(stateRef);
+  if (!stateSnap.exists()) {
+    return {
+      balance: 0,
+      totalDeposited: 0,
+      totalWithdrawn: 0,
+      dailyWithdrawn: 0,
+      dailyWindowStart: startOfCurrentUtcDay(Date.now()),
+      updatedAt: 0,
+      updatedByUid: '',
+    };
+  }
+  return parseGuildTreasuryState(stateSnap.data() as Record<string, unknown>);
+}
+
+export async function fetchGuildTreasuryLedger(uid: string, maxRows = 25): Promise<GuildTreasuryEntry[]> {
+  if (!guildTreasuryEnabled()) {
+    throw new Error('Guild treasury is disabled for this rollout.');
+  }
+  const db = requireDb();
+  const membership = await resolveGuildMembershipForUser(uid);
+  if (!membership) throw new Error('You are not in a guild.');
+
+  const limitRows = Math.max(1, Math.min(80, Math.floor(maxRows || 25)));
+  const snap = await getDocs(query(
+    collection(db, GUILD_COLLECTION, membership.guildId, GUILD_TREASURY_LEDGER_COLLECTION),
+    orderBy('createdAt', 'desc'),
+    limit(limitRows),
+  ));
+
+  return snap.docs.map(entrySnap => {
+    const data = entrySnap.data() as Record<string, unknown>;
+    return {
+      id: entrySnap.id,
+      type: data.type === 'withdrawal' ? 'withdrawal' : 'deposit',
+      amount: typeof data.amount === 'number' ? Math.max(0, Math.floor(data.amount)) : 0,
+      actorUid: typeof data.actorUid === 'string' ? data.actorUid : '',
+      actorName: typeof data.actorName === 'string' ? data.actorName : 'Member',
+      actorRank: data.actorRank === 'leader' || data.actorRank === 'officer' ? data.actorRank : 'member',
+      reason: typeof data.reason === 'string' ? data.reason : '',
+      createdAt: typeof data.createdAt === 'number' ? data.createdAt : 0,
+    } satisfies GuildTreasuryEntry;
+  }).filter(entry => !!entry.actorUid && entry.amount > 0);
+}
+
+export async function transactGuildTreasury(input: {
+  uid: string;
+  displayName: string;
+  type: 'deposit' | 'withdrawal';
+  amount: number;
+  reason?: string;
+}): Promise<GuildTreasuryState> {
+  if (!guildTreasuryEnabled()) {
+    throw new Error('Guild treasury is disabled for this rollout.');
+  }
+  const db = requireDb();
+  const uid = input.uid.trim();
+  if (!uid) throw new Error('Missing user id.');
+
+  const membership = await resolveGuildMembershipForUser(uid);
+  if (!membership) throw new Error('You are not in a guild.');
+
+  const amount = clampTreasuryAmount(input.amount);
+  const now = Date.now();
+  const dailyWindowStart = startOfCurrentUtcDay(now);
+  const actorName = input.displayName.trim().slice(0, 24) || 'Member';
+  const reason = (input.reason ?? '').trim().slice(0, 80);
+
+  const stateRef = doc(db, GUILD_COLLECTION, membership.guildId, GUILD_TREASURY_STATE_COLLECTION, 'active');
+  const ledgerRef = doc(collection(db, GUILD_COLLECTION, membership.guildId, GUILD_TREASURY_LEDGER_COLLECTION));
+
+  return runTransaction(db, async tx => {
+    const stateSnap = await tx.get(stateRef);
+    const state = stateSnap.exists()
+      ? parseGuildTreasuryState(stateSnap.data() as Record<string, unknown>)
+      : {
+        balance: 0,
+        totalDeposited: 0,
+        totalWithdrawn: 0,
+        dailyWithdrawn: 0,
+        dailyWindowStart,
+        updatedAt: 0,
+        updatedByUid: '',
+      };
+
+    const withinToday = state.dailyWindowStart === dailyWindowStart;
+    const currentDailyWithdrawn = withinToday ? state.dailyWithdrawn : 0;
+
+    if (input.type === 'withdrawal') {
+      if (membership.rank === 'member') {
+        throw new Error('Only officers and leaders can withdraw from treasury.');
+      }
+      if (state.balance < amount) {
+        throw new Error('Treasury does not have enough balance for this withdrawal.');
+      }
+
+      const cap = membership.rank === 'leader'
+        ? TREASURY_DAILY_WITHDRAW_CAP_LEADER
+        : TREASURY_DAILY_WITHDRAW_CAP_OFFICER;
+      if (currentDailyWithdrawn + amount > cap) {
+        throw new Error(`Daily withdrawal cap exceeded (${cap.toLocaleString()}).`);
+      }
+    }
+
+    const nextState: GuildTreasuryState = input.type === 'deposit'
+      ? {
+        balance: state.balance + amount,
+        totalDeposited: state.totalDeposited + amount,
+        totalWithdrawn: state.totalWithdrawn,
+        dailyWithdrawn: currentDailyWithdrawn,
+        dailyWindowStart,
+        updatedAt: now,
+        updatedByUid: uid,
+      }
+      : {
+        balance: Math.max(0, state.balance - amount),
+        totalDeposited: state.totalDeposited,
+        totalWithdrawn: state.totalWithdrawn + amount,
+        dailyWithdrawn: currentDailyWithdrawn + amount,
+        dailyWindowStart,
+        updatedAt: now,
+        updatedByUid: uid,
+      };
+
+    tx.set(stateRef, nextState, { merge: true });
+    tx.set(ledgerRef, {
+      type: input.type,
+      amount,
+      actorUid: uid,
+      actorName,
+      actorRank: membership.rank,
+      reason,
+      createdAt: now,
+    });
+
+    return nextState;
+  });
+}
+
+export function isGuildTreasuryEnabled(): boolean {
+  return guildTreasuryEnabled();
 }

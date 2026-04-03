@@ -68,7 +68,7 @@ export interface SocialTabContentProps {
 }
 
 type SocialSubTab = 'chat' | 'friends' | 'guild';
-type GuildSubTab = 'home' | 'boss' | 'events' | 'chat';
+type GuildSubTab = 'home' | 'boss' | 'events' | 'treasury' | 'chat';
 const SOCIAL_TABS: SocialSubTab[] = ['chat', 'friends', 'guild'];
 
 interface SocialUiState {
