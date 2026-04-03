@@ -93,6 +93,8 @@ export function ChatSection({
   meLevel,
 }: ChatSectionProps) {
   const [activeChannel, setActiveChannel] = useState<ChatChannel>('global');
+  const [optimisticReactionByMessageId, setOptimisticReactionByMessageId] = useState<Record<string, string | null>>({});
+  const [reactionPendingByMessageId, setReactionPendingByMessageId] = useState<Record<string, boolean>>({});
   const listRef = useRef<FlatList<ChatListRow> | null>(null);
   const prevCountByChannelRef = useRef<Record<ChatChannel, number>>({
     global: messages.length,
@@ -235,6 +237,24 @@ export function ChatSection({
     scrollToLatest(false);
   }, [activeChannel]);
 
+  useEffect(() => {
+    // Clear optimistic overrides once server state catches up with the same reaction value.
+    setOptimisticReactionByMessageId(current => {
+      let changed = false;
+      const next = { ...current };
+      for (const message of messages) {
+        if (!Object.prototype.hasOwnProperty.call(next, message.id)) continue;
+        const optimistic = next[message.id] ?? null;
+        const serverValue = message.myReaction ?? null;
+        if (optimistic === serverValue) {
+          delete next[message.id];
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [messages]);
+
   const activeDraft = activeChannel === 'guild' ? guildDraft : draft;
   const setActiveDraft = activeChannel === 'guild' ? setGuildDraft : setDraft;
   const activeSending = activeChannel === 'guild' ? guildSending : sending;
@@ -251,6 +271,49 @@ export function ChatSection({
   };
 
   const activeUnread = unreadByChannel[activeChannel];
+
+  const getEffectiveMyReaction = (message: ChatRenderMessage): string | null => {
+    if (Object.prototype.hasOwnProperty.call(optimisticReactionByMessageId, message.id)) {
+      return optimisticReactionByMessageId[message.id] ?? null;
+    }
+    return message.myReaction ?? null;
+  };
+
+  const getEffectiveReactionCount = (message: ChatRenderMessage, emoji: string): number => {
+    const base = message.reactions?.[emoji] ?? 0;
+    const baseMine = message.myReaction === emoji;
+    const effectiveMine = getEffectiveMyReaction(message) === emoji;
+    if (baseMine === effectiveMine) return base;
+    if (baseMine && !effectiveMine) return Math.max(0, base - 1);
+    return base + 1;
+  };
+
+  const onReactionPress = async (message: ChatRenderMessage, emoji: string) => {
+    if (reactionPendingByMessageId[message.id]) return;
+
+    const currentEffective = getEffectiveMyReaction(message);
+    const nextEffective = currentEffective === emoji ? null : emoji;
+
+    setReactionPendingByMessageId(current => ({ ...current, [message.id]: true }));
+    setOptimisticReactionByMessageId(current => ({ ...current, [message.id]: nextEffective }));
+
+    try {
+      await onToggleReaction(message.id, emoji);
+    } catch {
+      // Revert optimistic state if transaction fails.
+      setOptimisticReactionByMessageId(current => {
+        const next = { ...current };
+        next[message.id] = currentEffective;
+        return next;
+      });
+    } finally {
+      setReactionPendingByMessageId(current => {
+        const next = { ...current };
+        delete next[message.id];
+        return next;
+      });
+    }
+  };
 
   return (
     <>
@@ -374,14 +437,17 @@ export function ChatSection({
                   {item.source === 'global' && (
                     <View style={styles.reactionRow}>
                       {(['👍', '🔥', '💪', '🎉'] as const).map(emoji => {
-                        const count = message.reactions?.[emoji] ?? 0;
-                        const active = message.myReaction === emoji;
+                        const count = getEffectiveReactionCount(message, emoji);
+                        const active = getEffectiveMyReaction(message) === emoji;
+                        const pending = !!reactionPendingByMessageId[message.id];
                         return (
                           <Pressable
                             key={`${message.id}_${emoji}`}
                             style={[styles.reactionChip, active && styles.reactionChipActive]}
+                            hitSlop={8}
+                            disabled={pending}
                             onPress={() => {
-                              void onToggleReaction(message.id, emoji);
+                              void onReactionPress(message, emoji);
                             }}
                           >
                             <Text style={styles.reactionChipText}>{emoji}</Text>

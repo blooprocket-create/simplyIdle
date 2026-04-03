@@ -1604,12 +1604,15 @@ const styles = StyleSheet.create({
   reactionChip: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
     borderWidth: 1,
     borderColor: '#3A5E79',
     borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    minHeight: 30,
+    minWidth: 38,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     backgroundColor: '#162B3D',
   },
   reactionChipActive: {

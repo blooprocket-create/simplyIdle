@@ -30,6 +30,8 @@ type GuildSubTab = 'home' | 'boss' | 'events' | 'treasury';
 
 const BOSS_ATTACK_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 const EVENT_CONTRIBUTION_COOLDOWN_MS = 5 * 60 * 1000;
+const TREASURY_DAILY_WITHDRAW_CAP_LEADER = 25_000_000;
+const TREASURY_DAILY_WITHDRAW_CAP_OFFICER = 5_000_000;
 
 function formatCooldownHoursMinutes(ms: number): string {
   const totalMinutes = Math.max(0, Math.ceil(ms / 60_000));
@@ -255,6 +257,12 @@ export function GuildSection({
   const isLeader = !!myGuild && myGuild.leaderId === me.uid;
   const isOfficer = myGuildMember?.rank === 'officer';
   const canWithdrawFromTreasury = isLeader || isOfficer;
+  const treasuryDailyCap = isLeader
+    ? TREASURY_DAILY_WITHDRAW_CAP_LEADER
+    : isOfficer
+      ? TREASURY_DAILY_WITHDRAW_CAP_OFFICER
+      : 0;
+  const treasuryRemainingWithdrawToday = Math.max(0, treasuryDailyCap - (treasuryState?.dailyWithdrawn ?? 0));
   const roleLabel = isLeader ? 'Leader' : isOfficer ? 'Officer' : 'Member';
 
   const persistedBossCooldownUntil = (myGuildMember?.lastBossAttackAt ?? 0) + BOSS_ATTACK_COOLDOWN_MS;
@@ -1126,6 +1134,11 @@ export function GuildSection({
 
               {!canWithdrawFromTreasury && (
                 <Text style={styles.metaText}>Withdrawals require officer or leader rank.</Text>
+              )}
+              {canWithdrawFromTreasury && (
+                <Text style={styles.metaText}>
+                  Daily withdrawal cap: {treasuryDailyCap.toLocaleString()} • Remaining today: {treasuryRemainingWithdrawToday.toLocaleString()}
+                </Text>
               )}
             </SocialCard>
           )}
