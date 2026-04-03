@@ -1,0 +1,30 @@
+:root {
+  --vp-c-brand-1: #0f766e;
+  --vp-c-brand-2: #115e59;
+  --vp-c-brand-3: #134e4a;
+  --vp-c-bg: #f8fafc;
+  --vp-c-bg-soft: #eef2f7;
+  --vp-c-text-1: #0f172a;
+  --vp-c-text-2: #334155;
+  --vp-font-family-base: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --vp-font-family-mono: "JetBrains Mono", "Consolas", monospace;
+}
+
+.dark {
+  --vp-c-brand-1: #5eead4;
+  --vp-c-brand-2: #2dd4bf;
+  --vp-c-brand-3: #14b8a6;
+}
+
+.VPNavBarTitle .title {
+  letter-spacing: 0.03em;
+  font-weight: 700;
+}
+
+.VPHero .name {
+  font-weight: 800;
+}
+
+.DocBadge {
+  border-radius: 999px;
+}

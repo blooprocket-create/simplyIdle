@@ -1521,7 +1521,7 @@ export function GuildSection({
               </View>
               <Pressable
                 style={styles.smallBtn}
-                disabled={guildBusy || level < 1}
+                disabled={guildBusy || me.level < 1}
                 onPress={async () => {
                   if (!me.uid) return;
                   setGuildBusy(true);

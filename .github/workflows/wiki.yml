@@ -1,0 +1,35 @@
+name: Wiki
+
+on:
+  pull_request:
+    paths:
+      - 'wiki/**'
+      - '.github/workflows/wiki.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'wiki/**'
+      - '.github/workflows/wiki.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wiki
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: wiki/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build wiki
+        run: npm run docs:build

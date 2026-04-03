@@ -417,8 +417,19 @@ export function ChatSection({
                       onOpenProfile(message.uid);
                     }}
                     onLongPress={() => {
-                      if (item.mine) return;
-                      onOpenUserMenu(message);
+                      if (item.mine || item.source !== 'global') return;
+                      onOpenUserMenu({
+                        id: message.id,
+                        uid: message.uid,
+                        displayName: message.displayName,
+                        level: message.level ?? 1,
+                        vipLevel: message.vipLevel ?? 0,
+                        guildTag: message.guildTag ?? '',
+                        text: message.text,
+                        sentAt: message.sentAt,
+                        reactions: message.reactions ?? {},
+                        myReaction: message.myReaction ?? null,
+                      });
                     }}
                     delayLongPress={200}
                   >

@@ -128,6 +128,8 @@ export const ACH_BONUS_PER_UNLOCK_PCT = 3;
 export const ACH_BONUS_CAP_PCT = 75;
 const FEEDBACK_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSf6txIw9UL-F9kItXZfOfr9d0qA_XCvaNIsBUf_4NZ1HZpfrw/viewform?usp=publish-editor';
 const HAS_BETA_FEEDBACK_FORM = !FEEDBACK_FORM_URL.includes('replace-with-your-beta-form');
+const WIKI_URL = 'https://simplyidle.vercel.app/wiki/';
+const HAS_WIKI_URL = !WIKI_URL.includes('replace-with-your-wiki-url');
 const GEAR_RARITY_POINTS: Record<string, number> = { common: 40, rare: 90, epic: 170, legendary: 280, mythic: 430, transcendent: 680 };
 const ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
@@ -179,6 +181,16 @@ function scoreEquipmentForClass(item: { rarity: string; bonus: Record<string, nu
     return sum + (value ?? 0) * weight;
   }, 0);
   return statScore * 12 + (GEAR_RARITY_POINTS[item.rarity] ?? 0);
+}
+
+function resolveWikiUrl(): string {
+  if (Platform.OS === 'web') {
+    const webOrigin = globalThis?.location?.origin;
+    if (typeof webOrigin === 'string' && webOrigin.length > 0) {
+      return `${webOrigin.replace(/\/$/, '')}/wiki/`;
+    }
+  }
+  return WIKI_URL;
 }
 const VIP_LEVEL_THRESHOLDS = [0, 50, 150, 350, 700, 1500, 3000, 6500, 15000, 35000, 100000] as const;
 const GOLD_SHOP_OFFERS = [
@@ -3804,6 +3816,27 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 </Pressable>
               </View>
 
+              <View style={styles.settingsCard}>
+                <Text style={styles.settingsCardTitle}>Wiki</Text>
+                <Text style={styles.settingsLabel}>
+                  {HAS_WIKI_URL
+                    ? 'Open the official SimplyIdle wiki for guides, formulas, and system references.'
+                    : 'Wiki URL is not configured yet. Add a live wiki URL before enabling this action.'}
+                </Text>
+                <Pressable
+                  style={[styles.settingsCycleBtn, !HAS_WIKI_URL && styles.shopBuyBtnDisabled]}
+                  disabled={!HAS_WIKI_URL}
+                  onPress={() => {
+                    const wikiUrl = resolveWikiUrl();
+                    debugLog('settings', 'Open wiki', { wikiUrl });
+                    void trackEvent('wiki_link_opened', { source: 'settings', wikiUrl });
+                    void Linking.openURL(wikiUrl);
+                  }}
+                >
+                  <Text style={styles.settingsCycleBtnText}>{HAS_WIKI_URL ? 'Open Wiki' : 'Wiki Coming Soon'}</Text>
+                </Pressable>
+              </View>
+
               {isAdmin ? (
                 <View style={styles.settingsCard}>
                   <Text style={styles.settingsCardTitle}>Dev Mail Console</Text>
@@ -4068,7 +4101,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                         });
 
                         if (rows.length === 0) {
-                          return <Text style={styles.metaText}>No claimable attachments.</Text>;
+                          return <Text style={styles.settingsLabel}>No claimable attachments.</Text>;
                         }
 
                         return rows.map(key => {
