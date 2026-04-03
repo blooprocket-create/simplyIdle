@@ -247,7 +247,6 @@ export function GuildSection({
     if (!shouldLoadState) return;
 
     let cancelled = false;
-    setError(null);
 
     if (guildSubTab === 'treasury') {
       setTreasuryLoading(true);
@@ -286,7 +285,7 @@ export function GuildSection({
     return () => {
       cancelled = true;
     };
-  }, [guildSubTab, me.uid, myGuild, saveSlotId, setError, treasuryEnabled]);
+  }, [guildSubTab, me.uid, myGuild, saveSlotId, treasuryEnabled]);
 
   const myGuildMember = useMemo(
     () => guildMembers.find(member => member.uid === me.uid) ?? null,
