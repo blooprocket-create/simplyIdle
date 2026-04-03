@@ -74,6 +74,7 @@ interface GuildSectionProps {
   saveSlotId: string;
   level: number;
   error: string | null;
+  isLoading: boolean;
   guildBusy: boolean;
   guildNameInput: string;
   setGuildNameInput: (value: string) => void;
@@ -110,6 +111,7 @@ export function GuildSection({
   saveSlotId,
   level,
   error,
+  isLoading,
   guildBusy,
   guildNameInput,
   setGuildNameInput,
@@ -311,6 +313,7 @@ export function GuildSection({
     <>
       {!myGuild && (
         <SocialCard styles={styles} title="Guild Command" subtitle="Create Guild Cost: 2,500 Diamonds.">
+          <SocialAsyncState styles={styles} isLoading={isLoading} variant="inline" />
           <Text style={styles.metaText}>Your Diamonds: {diamonds}</Text>
           {guildBusy && <Text style={styles.metaText}>Syncing guild actions...</Text>}
         </SocialCard>
@@ -383,17 +386,41 @@ export function GuildSection({
         <View style={styles.card}>
           <Text style={styles.cardTitle}>My Guild: [{myGuild.tag}] {myGuild.name}</Text>
           <Text style={styles.metaText}>Your Role: {roleLabel}</Text>
-          <View style={styles.prefRow}>
-            <Pressable style={[styles.prefBtn, guildSubTab === 'home' && styles.prefBtnActive]} onPress={() => setGuildSubTab('home')}>
+          <View style={styles.prefRow} accessibilityRole="tablist">
+            <Pressable
+              style={[styles.prefBtn, guildSubTab === 'home' && styles.prefBtnActive]}
+              onPress={() => setGuildSubTab('home')}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: guildSubTab === 'home' }}
+              accessibilityLabel="Guild home tab"
+            >
               <Text style={styles.prefBtnText}>Home</Text>
             </Pressable>
-            <Pressable style={[styles.prefBtn, guildSubTab === 'boss' && styles.prefBtnActive]} onPress={() => setGuildSubTab('boss')}>
+            <Pressable
+              style={[styles.prefBtn, guildSubTab === 'boss' && styles.prefBtnActive]}
+              onPress={() => setGuildSubTab('boss')}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: guildSubTab === 'boss' }}
+              accessibilityLabel="Guild boss tab"
+            >
               <Text style={styles.prefBtnText}>Boss</Text>
             </Pressable>
-            <Pressable style={[styles.prefBtn, guildSubTab === 'events' && styles.prefBtnActive]} onPress={() => setGuildSubTab('events')}>
+            <Pressable
+              style={[styles.prefBtn, guildSubTab === 'events' && styles.prefBtnActive]}
+              onPress={() => setGuildSubTab('events')}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: guildSubTab === 'events' }}
+              accessibilityLabel="Guild events tab"
+            >
               <Text style={styles.prefBtnText}>Events</Text>
             </Pressable>
-            <Pressable style={[styles.prefBtn, guildSubTab === 'chat' && styles.prefBtnActive]} onPress={() => setGuildSubTab('chat')}>
+            <Pressable
+              style={[styles.prefBtn, guildSubTab === 'chat' && styles.prefBtnActive]}
+              onPress={() => setGuildSubTab('chat')}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: guildSubTab === 'chat' }}
+              accessibilityLabel="Guild chat tab"
+            >
               <Text style={styles.prefBtnText}>Chat</Text>
             </Pressable>
           </View>
@@ -402,6 +429,12 @@ export function GuildSection({
 
       {myGuild && guildSubTab === 'home' && (
         <>
+          <SocialCard styles={styles} title="Ops Snapshot" subtitle="Rapid overview of guild posture.">
+            <Text style={styles.metaText}>Boss Front: {guildBoss ? `${guildBoss.name} (${guildBoss.status})` : 'No active boss'}</Text>
+            <Text style={styles.metaText}>Active Ops: {activeEvents.length} • Recent Wins: {recentCompletedEvents.length}</Text>
+            <Text style={styles.metaText}>Boss Damage Pool: {formatCompactNumber(totalBossDamage)}</Text>
+          </SocialCard>
+
           <SocialCard styles={styles} title="Guild Command Center">
             {!isEditingDescription && (
               <>

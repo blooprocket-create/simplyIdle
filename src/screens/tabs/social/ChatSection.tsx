@@ -8,6 +8,7 @@ interface ChatSectionProps {
   onlineCount: number;
   mutedUntil: number | null;
   messages: GlobalChatMessage[];
+  isLoading: boolean;
   meUid: string;
   isAdmin: boolean;
   sending: boolean;
@@ -27,6 +28,7 @@ export function ChatSection({
   onlineCount,
   mutedUntil,
   messages,
+  isLoading,
   meUid,
   isAdmin,
   sending,
@@ -50,6 +52,7 @@ export function ChatSection({
 
       <SocialAsyncState
         styles={styles}
+        isLoading={isLoading}
         isEmpty={messages.length === 0}
         emptyTitle="No Messages Yet"
         emptySubtitle="Start the conversation and rally your alliance."

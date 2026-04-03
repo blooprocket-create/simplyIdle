@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Modal, NativeSyntheticEvent, NativeTouchEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { THEME, RADIUS } from '../../theme';
 import {
   GlobalChatMessage,
@@ -63,6 +63,7 @@ export interface SocialTabContentProps {
 
 type SocialSubTab = 'chat' | 'friends' | 'guild';
 type GuildSubTab = 'home' | 'boss' | 'events' | 'chat';
+const SOCIAL_TABS: SocialSubTab[] = ['chat', 'friends', 'guild'];
 
 function formatTime(ts: number): string {
   const date = new Date(ts);
@@ -87,6 +88,13 @@ function timeUntilNextUtcMidnightLabel(nowMs: number): string {
   const hours = Math.floor(diffMs / 3_600_000);
   const minutes = Math.floor((diffMs % 3_600_000) / 60_000);
   return `${hours}h ${minutes}m`;
+}
+
+function shiftSocialTab(current: SocialSubTab, direction: -1 | 1): SocialSubTab {
+  const index = SOCIAL_TABS.indexOf(current);
+  if (index < 0) return current;
+  const nextIndex = Math.max(0, Math.min(SOCIAL_TABS.length - 1, index + direction));
+  return SOCIAL_TABS[nextIndex];
 }
 
 export function SocialTabContent({
@@ -134,6 +142,10 @@ export function SocialTabContent({
   const [confirmKickMember, setConfirmKickMember] = useState<GuildMember | null>(null);
   const [confirmTransferLeader, setConfirmTransferLeader] = useState<GuildMember | null>(null);
   const [confirmDisbandGuild, setConfirmDisbandGuild] = useState(false);
+  const [chatLoadedOnce, setChatLoadedOnce] = useState(false);
+  const [friendsLoadedOnce, setFriendsLoadedOnce] = useState(false);
+  const [guildLoadedOnce, setGuildLoadedOnce] = useState(false);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const me = useMemo(() => {
     const authUid = getFirebaseAuth()?.currentUser?.uid ?? '';
@@ -148,7 +160,10 @@ export function SocialTabContent({
   useEffect(() => {
     if (tab !== 'social') return;
 
-    const stopChat = subscribeToChat(setMessages);
+    const stopChat = subscribeToChat(rows => {
+      setMessages(rows);
+      setChatLoadedOnce(true);
+    });
     const refreshOnline = () => {
       void fetchOnlineCount().then(setOnlineCount).catch(() => {});
     };
@@ -220,8 +235,11 @@ export function SocialTabContent({
         setPendingRequests(pendingRows);
         setGiftCooldowns(cooldownRows);
         if (myProfile?.giftPreference) setMyGiftPreference(myProfile.giftPreference);
+        setFriendsLoadedOnce(true);
       } catch {
         setFriendsError('Failed to load friends data.');
+      } finally {
+        setFriendsLoadedOnce(true);
       }
     };
 
@@ -258,8 +276,11 @@ export function SocialTabContent({
           setGuildEvents([]);
           setGuildChat([]);
         }
+        setGuildLoadedOnce(true);
       } catch {
         setGuildError('Failed to load guild data.');
+      } finally {
+        setGuildLoadedOnce(true);
       }
     };
 
@@ -472,8 +493,31 @@ export function SocialTabContent({
     }
   };
 
+  const handleTouchStart = (event: NativeSyntheticEvent<NativeTouchEvent>) => {
+    touchStartRef.current = {
+      x: event.nativeEvent.pageX,
+      y: event.nativeEvent.pageY,
+    };
+  };
+
+  const handleTouchEnd = (event: NativeSyntheticEvent<NativeTouchEvent>) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start) return;
+
+    const deltaX = event.nativeEvent.pageX - start.x;
+    const deltaY = event.nativeEvent.pageY - start.y;
+    if (Math.abs(deltaX) < 50 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+
+    setSubTab(current => shiftSocialTab(current, deltaX < 0 ? 1 : -1));
+  };
+
+  const isChatLoading = subTab === 'chat' && !chatLoadedOnce;
+  const isFriendsLoading = subTab === 'friends' && !friendsLoadedOnce;
+  const isGuildLoading = subTab === 'guild' && !guildLoadedOnce;
+
   return (
-    <View style={styles.root}>
+    <View style={styles.root} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       <View style={styles.heroCard}>
         <View style={styles.heroTitleRow}>
           <Text style={styles.heroTitle}>Social Nexus</Text>
@@ -496,16 +540,36 @@ export function SocialTabContent({
         </View>
       </View>
 
-      <View style={styles.subTabRow}>
-        <Pressable style={[styles.subTabBtn, subTab === 'chat' && styles.subTabBtnActive]} onPress={() => setSubTab('chat')}>
-          <Text style={[styles.subTabText, subTab === 'chat' && styles.subTabTextActive]}>Chat</Text>
+      <View style={styles.subTabRow} accessibilityRole="tablist">
+        <Pressable
+          style={[styles.subTabBtn, subTab === 'chat' && styles.subTabBtnActive]}
+          onPress={() => setSubTab('chat')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: subTab === 'chat' }}
+          accessibilityLabel="Global chat tab"
+        >
+          <Text style={[styles.subTabText, subTab === 'chat' && styles.subTabTextActive]}>Global Chat</Text>
         </Pressable>
-        <Pressable style={[styles.subTabBtn, subTab === 'friends' && styles.subTabBtnActive]} onPress={() => setSubTab('friends')}>
+        <Pressable
+          style={[styles.subTabBtn, subTab === 'friends' && styles.subTabBtnActive]}
+          onPress={() => setSubTab('friends')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: subTab === 'friends' }}
+          accessibilityLabel="Friends tab"
+        >
           {!!pendingRequests.length && <View style={styles.subTabDot} />}
-          <Text style={[styles.subTabText, subTab === 'friends' && styles.subTabTextActive]}>Friends</Text>
+          <Text style={[styles.subTabText, subTab === 'friends' && styles.subTabTextActive]}>
+            Friends{pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ''}
+          </Text>
         </Pressable>
-        <Pressable style={[styles.subTabBtn, subTab === 'guild' && styles.subTabBtnActive]} onPress={() => setSubTab('guild')}>
-          <Text style={[styles.subTabText, subTab === 'guild' && styles.subTabTextActive]}>Guild</Text>
+        <Pressable
+          style={[styles.subTabBtn, subTab === 'guild' && styles.subTabBtnActive]}
+          onPress={() => setSubTab('guild')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: subTab === 'guild' }}
+          accessibilityLabel="Guild operations tab"
+        >
+          <Text style={[styles.subTabText, subTab === 'guild' && styles.subTabTextActive]}>Guild Ops</Text>
         </Pressable>
       </View>
 
@@ -520,6 +584,7 @@ export function SocialTabContent({
           sending={sending}
           draft={draft}
           setDraft={setDraft}
+          isLoading={isChatLoading}
           error={chatError}
           formatTime={formatTime}
           onSend={send}
@@ -535,6 +600,7 @@ export function SocialTabContent({
           styles={styles}
           myGiftPreference={myGiftPreference}
           friendsBusy={friendsBusy}
+          isLoading={isFriendsLoading}
           friendsError={friendsError}
           friendSearch={friendSearch}
           setFriendSearch={setFriendSearch}
@@ -562,6 +628,7 @@ export function SocialTabContent({
           saveSlotId={saveSlotId}
           level={level}
           error={guildError}
+          isLoading={isGuildLoading}
           guildBusy={guildBusy}
           guildNameInput={guildNameInput}
           setGuildNameInput={setGuildNameInput}
@@ -856,8 +923,11 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: '#314B63',
-    paddingVertical: 9,
+    minHeight: 46,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#101D2B',
   },
   subTabBtnActive: {
@@ -880,7 +950,8 @@ const styles = StyleSheet.create({
   subTabText: {
     color: '#AFC3D6',
     fontWeight: '700',
-    fontSize: 12,
+    fontSize: 11,
+    textAlign: 'center',
   },
   subTabTextActive: {
     color: '#F2FAFF',
@@ -1027,8 +1098,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#304960',
     borderRadius: RADIUS.md,
-    paddingVertical: 8,
+    minHeight: 44,
+    paddingVertical: 9,
+    paddingHorizontal: 6,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#0E1A29',
   },
   prefBtnActive: {
@@ -1064,6 +1138,14 @@ const styles = StyleSheet.create({
   friendActions: {
     flexDirection: 'row',
     gap: 8,
+  },
+  sectionLabel: {
+    color: '#B6D8F1',
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 2,
   },
   smallBtn: {
     borderWidth: 1,

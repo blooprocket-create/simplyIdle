@@ -8,6 +8,7 @@ interface FriendsSectionProps {
   styles: any;
   myGiftPreference: GiftPreference;
   friendsBusy: boolean;
+  isLoading: boolean;
   friendsError: string | null;
   friendSearch: string;
   setFriendSearch: (value: string) => void;
@@ -30,6 +31,7 @@ export function FriendsSection({
   styles,
   myGiftPreference,
   friendsBusy,
+  isLoading,
   friendsError,
   friendSearch,
   setFriendSearch,
@@ -47,6 +49,18 @@ export function FriendsSection({
   onRemoveFriend,
   onRetryLoad,
 }: FriendsSectionProps) {
+  const nowMs = Date.now();
+
+  const friendsReadyToGift = friends.filter(friend => {
+    const cooldownAt = giftCooldowns[friend.uid] ?? 0;
+    return !isSameUtcDay(cooldownAt, nowMs);
+  });
+
+  const friendsGiftedToday = friends.filter(friend => {
+    const cooldownAt = giftCooldowns[friend.uid] ?? 0;
+    return isSameUtcDay(cooldownAt, nowMs);
+  });
+
   return (
     <>
       <SocialCard styles={styles} title="My Gift Preference" subtitle="Set what friends send you at daily reset.">
@@ -65,6 +79,7 @@ export function FriendsSection({
       </SocialCard>
 
       <SocialCard styles={styles} title="Add Friend" subtitle="Search by exact public username.">
+        <SocialAsyncState styles={styles} isLoading={isLoading} variant="inline" />
         <SocialInput
           styles={styles}
           value={friendSearch}
@@ -115,36 +130,63 @@ export function FriendsSection({
         emptySubtitle="Search for a public username to send your first friend request."
       />
 
-      <SocialCard styles={styles} title={`Friends (${friends.length})`}>
-        {friends.map(friend => {
-          const cooldownAt = giftCooldowns[friend.uid] ?? 0;
-          const giftedToday = isSameUtcDay(cooldownAt, Date.now());
-          return (
-            <View key={friend.uid} style={styles.friendRow}>
-              <View style={styles.friendMeta}>
-                <Text style={styles.friendName}>{friend.displayName}</Text>
-                <Text style={styles.metaText}>Lv.{friend.level} • Wants {giftIcon(friend.giftPreference)} {friend.giftPreference}</Text>
-                {giftedToday && <Text style={styles.cooldownText}>Next gift in {timeUntilNextUtcMidnightLabel(Date.now())}</Text>}
-              </View>
-              <View style={styles.friendActions}>
-                <Pressable
-                  style={[styles.smallBtn, giftedToday && styles.sendBtnDisabled]}
-                  onPress={() => void onSendDailyGift(friend)}
-                  disabled={friendsBusy || giftedToday}
-                >
-                  <Text style={styles.smallBtnText}>{giftedToday ? 'Gifted' : 'Gift'}</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.smallBtn, styles.smallBtnDanger]}
-                  onPress={() => void onRemoveFriend(friend.uid)}
-                  disabled={friendsBusy}
-                >
-                  <Text style={styles.smallBtnText}>Remove</Text>
-                </Pressable>
-              </View>
+      <SocialCard
+        styles={styles}
+        title={`Friends (${friends.length})`}
+        subtitle={`Ready to gift: ${friendsReadyToGift.length} • Gifted today: ${friendsGiftedToday.length}`}
+      >
+        {friendsReadyToGift.length > 0 && (
+          <Text style={styles.sectionLabel}>Ready To Gift</Text>
+        )}
+        {friendsReadyToGift.map(friend => (
+          <View key={friend.uid} style={styles.friendRow}>
+            <View style={styles.friendMeta}>
+              <Text style={styles.friendName}>{friend.displayName}</Text>
+              <Text style={styles.metaText}>Lv.{friend.level} • Wants {giftIcon(friend.giftPreference)} {friend.giftPreference}</Text>
             </View>
-          );
-        })}
+            <View style={styles.friendActions}>
+              <Pressable
+                style={styles.smallBtn}
+                onPress={() => void onSendDailyGift(friend)}
+                disabled={friendsBusy}
+              >
+                <Text style={styles.smallBtnText}>Send Gift</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.smallBtn, styles.smallBtnDanger]}
+                onPress={() => void onRemoveFriend(friend.uid)}
+                disabled={friendsBusy}
+              >
+                <Text style={styles.smallBtnText}>Remove</Text>
+              </Pressable>
+            </View>
+          </View>
+        ))}
+
+        {friendsGiftedToday.length > 0 && (
+          <Text style={styles.sectionLabel}>Gifted Today</Text>
+        )}
+        {friendsGiftedToday.map(friend => (
+          <View key={friend.uid} style={styles.friendRow}>
+            <View style={styles.friendMeta}>
+              <Text style={styles.friendName}>{friend.displayName}</Text>
+              <Text style={styles.metaText}>Lv.{friend.level} • Wants {giftIcon(friend.giftPreference)} {friend.giftPreference}</Text>
+              <Text style={styles.cooldownText}>Next gift in {timeUntilNextUtcMidnightLabel(nowMs)}</Text>
+            </View>
+            <View style={styles.friendActions}>
+              <Pressable style={[styles.smallBtn, styles.sendBtnDisabled]} disabled>
+                <Text style={styles.smallBtnText}>Gifted</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.smallBtn, styles.smallBtnDanger]}
+                onPress={() => void onRemoveFriend(friend.uid)}
+                disabled={friendsBusy}
+              >
+                <Text style={styles.smallBtnText}>Remove</Text>
+              </Pressable>
+            </View>
+          </View>
+        ))}
       </SocialCard>
     </>
   );
