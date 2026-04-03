@@ -92,6 +92,12 @@ export function SocialAsyncState({
       <View style={styles.asyncInlineContainer}>
         <Text style={styles.asyncInlineTitle}>{title}</Text>
         <Text style={error ? styles.errorText : styles.metaText}>{subtitle}</Text>
+        {!!isLoading && (
+          <View style={styles.skeletonStack}>
+            <View style={[styles.skeletonBlock, styles.skeletonBlockShort]} />
+            <View style={[styles.skeletonBlock, styles.skeletonBlockMedium]} />
+          </View>
+        )}
         {!!error && !!onRetry && (
           <Pressable style={styles.smallBtn} onPress={onRetry}>
             <Text style={styles.smallBtnText}>Retry</Text>
@@ -104,6 +110,13 @@ export function SocialAsyncState({
   return (
     <SocialCard styles={styles} title={title}>
       <Text style={error ? styles.errorText : styles.metaText}>{subtitle}</Text>
+      {!!isLoading && (
+        <View style={styles.skeletonStack}>
+          <View style={styles.skeletonBlock} />
+          <View style={[styles.skeletonBlock, styles.skeletonBlockMedium]} />
+          <View style={[styles.skeletonBlock, styles.skeletonBlockShort]} />
+        </View>
+      )}
       {!!error && !!onRetry && (
         <Pressable style={styles.smallBtn} onPress={onRetry}>
           <Text style={styles.smallBtnText}>Retry</Text>

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, NativeSyntheticEvent, NativeTouchEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Modal, NativeSyntheticEvent, NativeTouchEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { THEME, RADIUS } from '../../theme';
 import {
   GlobalChatMessage,
@@ -146,6 +146,7 @@ export function SocialTabContent({
   const [friendsLoadedOnce, setFriendsLoadedOnce] = useState(false);
   const [guildLoadedOnce, setGuildLoadedOnce] = useState(false);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const sectionAnim = useRef(new Animated.Value(1)).current;
 
   const me = useMemo(() => {
     const authUid = getFirebaseAuth()?.currentUser?.uid ?? '';
@@ -219,6 +220,15 @@ export function SocialTabContent({
     setFriendsError(null);
     setGuildError(null);
   }, [subTab]);
+
+  useEffect(() => {
+    sectionAnim.setValue(0);
+    Animated.timing(sectionAnim, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [sectionAnim, subTab]);
 
   useEffect(() => {
     if (tab !== 'social' || subTab !== 'friends' || !me.uid) return;
@@ -515,6 +525,10 @@ export function SocialTabContent({
   const isChatLoading = subTab === 'chat' && !chatLoadedOnce;
   const isFriendsLoading = subTab === 'friends' && !friendsLoadedOnce;
   const isGuildLoading = subTab === 'guild' && !guildLoadedOnce;
+  const subTabTranslateY = sectionAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [8, 0],
+  });
 
   return (
     <View style={styles.root} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
@@ -573,91 +587,101 @@ export function SocialTabContent({
         </Pressable>
       </View>
 
-      {subTab === 'chat' && (
-        <ChatSection
-          styles={styles}
-          onlineCount={onlineCount}
-          mutedUntil={mutedUntil}
-          messages={messages}
-          meUid={me.uid}
-          isAdmin={isAdmin}
-          sending={sending}
-          draft={draft}
-          setDraft={setDraft}
-          isLoading={isChatLoading}
-          error={chatError}
-          formatTime={formatTime}
-          onSend={send}
-          onOpenUserMenu={setActiveUserMenu}
-          onMute={muteWithDuration}
-          meDisplayName={me.name}
-          meLevel={me.level}
-        />
-      )}
+      <Animated.View
+        style={[
+          styles.sectionTransition,
+          {
+            opacity: sectionAnim,
+            transform: [{ translateY: subTabTranslateY }],
+          },
+        ]}
+      >
+        {subTab === 'chat' && (
+          <ChatSection
+            styles={styles}
+            onlineCount={onlineCount}
+            mutedUntil={mutedUntil}
+            messages={messages}
+            meUid={me.uid}
+            isAdmin={isAdmin}
+            sending={sending}
+            draft={draft}
+            setDraft={setDraft}
+            isLoading={isChatLoading}
+            error={chatError}
+            formatTime={formatTime}
+            onSend={send}
+            onOpenUserMenu={setActiveUserMenu}
+            onMute={muteWithDuration}
+            meDisplayName={me.name}
+            meLevel={me.level}
+          />
+        )}
 
-      {subTab === 'friends' && (
-        <FriendsSection
-          styles={styles}
-          myGiftPreference={myGiftPreference}
-          friendsBusy={friendsBusy}
-          isLoading={isFriendsLoading}
-          friendsError={friendsError}
-          friendSearch={friendSearch}
-          setFriendSearch={setFriendSearch}
-          pendingRequests={pendingRequests}
-          friends={friends}
-          giftCooldowns={giftCooldowns}
-          giftIcon={giftIcon}
-          isSameUtcDay={isSameUtcDay}
-          timeUntilNextUtcMidnightLabel={timeUntilNextUtcMidnightLabel}
-          onUpdatePreference={updatePreference}
-          onSendRequest={sendRequest}
-          onAcceptRequest={acceptRequest}
-          onDeclineRequest={declineRequest}
-          onSendDailyGift={sendDailyGift}
-          onRemoveFriend={removeFriendEntry}
-          onRetryLoad={refreshFriendsData}
-        />
-      )}
+        {subTab === 'friends' && (
+          <FriendsSection
+            styles={styles}
+            myGiftPreference={myGiftPreference}
+            friendsBusy={friendsBusy}
+            isLoading={isFriendsLoading}
+            friendsError={friendsError}
+            friendSearch={friendSearch}
+            setFriendSearch={setFriendSearch}
+            pendingRequests={pendingRequests}
+            friends={friends}
+            giftCooldowns={giftCooldowns}
+            giftIcon={giftIcon}
+            isSameUtcDay={isSameUtcDay}
+            timeUntilNextUtcMidnightLabel={timeUntilNextUtcMidnightLabel}
+            onUpdatePreference={updatePreference}
+            onSendRequest={sendRequest}
+            onAcceptRequest={acceptRequest}
+            onDeclineRequest={declineRequest}
+            onSendDailyGift={sendDailyGift}
+            onRemoveFriend={removeFriendEntry}
+            onRetryLoad={refreshFriendsData}
+          />
+        )}
 
-      {subTab === 'guild' && (
-        <GuildSection
-          styles={styles}
-          me={{ uid: me.uid, name: me.name, level: me.level }}
-          diamonds={diamonds}
-          saveSlotId={saveSlotId}
-          level={level}
-          error={guildError}
-          isLoading={isGuildLoading}
-          guildBusy={guildBusy}
-          guildNameInput={guildNameInput}
-          setGuildNameInput={setGuildNameInput}
-          guildTagInput={guildTagInput}
-          setGuildTagInput={setGuildTagInput}
-          guildDescInput={guildDescInput}
-          setGuildDescInput={setGuildDescInput}
-          guildSearchInput={guildSearchInput}
-          setGuildSearchInput={setGuildSearchInput}
-          guildSubTab={guildSubTab}
-          setGuildSubTab={setGuildSubTab}
-          guildList={guildList}
-          myGuild={myGuild}
-          guildMembers={guildMembers}
-          guildBoss={guildBoss}
-          setGuildBoss={setGuildBoss}
-          guildEvents={guildEvents}
-          guildChat={guildChat}
-          guildChatDraft={guildChatDraft}
-          setGuildChatDraft={setGuildChatDraft}
-          setError={setGuildError}
-          setGuildBusy={setGuildBusy}
-          refreshGuildData={refreshGuildData}
-          formatTime={formatTime}
-          setConfirmKickMember={setConfirmKickMember}
-          setConfirmTransferLeader={setConfirmTransferLeader}
-          setConfirmDisbandGuild={setConfirmDisbandGuild}
-        />
-      )}
+        {subTab === 'guild' && (
+          <GuildSection
+            styles={styles}
+            me={{ uid: me.uid, name: me.name, level: me.level }}
+            diamonds={diamonds}
+            saveSlotId={saveSlotId}
+            level={level}
+            error={guildError}
+            isLoading={isGuildLoading}
+            guildBusy={guildBusy}
+            guildNameInput={guildNameInput}
+            setGuildNameInput={setGuildNameInput}
+            guildTagInput={guildTagInput}
+            setGuildTagInput={setGuildTagInput}
+            guildDescInput={guildDescInput}
+            setGuildDescInput={setGuildDescInput}
+            guildSearchInput={guildSearchInput}
+            setGuildSearchInput={setGuildSearchInput}
+            guildSubTab={guildSubTab}
+            setGuildSubTab={setGuildSubTab}
+            guildList={guildList}
+            myGuild={myGuild}
+            guildMembers={guildMembers}
+            guildBoss={guildBoss}
+            setGuildBoss={setGuildBoss}
+            guildEvents={guildEvents}
+            guildChat={guildChat}
+            guildChatDraft={guildChatDraft}
+            setGuildChatDraft={setGuildChatDraft}
+            setError={setGuildError}
+            setGuildBusy={setGuildBusy}
+            refreshGuildData={refreshGuildData}
+            formatTime={formatTime}
+            setConfirmKickMember={setConfirmKickMember}
+            setConfirmTransferLeader={setConfirmTransferLeader}
+            setConfirmDisbandGuild={setConfirmDisbandGuild}
+          />
+        )}
+      </Animated.View>
 
       <Modal
         visible={!!activeUserMenu}
@@ -842,6 +866,9 @@ const styles = StyleSheet.create({
   root: {
     gap: 12,
   },
+  sectionTransition: {
+    gap: 12,
+  },
   heroCard: {
     borderRadius: RADIUS.lg,
     borderWidth: 1,
@@ -991,6 +1018,51 @@ const styles = StyleSheet.create({
     color: '#E8F3FF',
     fontSize: 13,
     fontWeight: '700',
+  },
+  skeletonStack: {
+    gap: 8,
+    marginTop: 2,
+  },
+  skeletonBlock: {
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: '#1F3247',
+    borderWidth: 1,
+    borderColor: '#2C465F',
+  },
+  skeletonBlockShort: {
+    width: '62%',
+  },
+  skeletonBlockMedium: {
+    width: '78%',
+  },
+  metricGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  metricChip: {
+    minWidth: 96,
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#2E4E68',
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: '#0D1A28',
+    gap: 2,
+  },
+  metricLabel: {
+    color: '#99BAD3',
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  metricValue: {
+    color: '#E7F5FF',
+    fontSize: 12,
+    fontWeight: '800',
   },
   cooldownText: {
     color: '#9DD8FF',

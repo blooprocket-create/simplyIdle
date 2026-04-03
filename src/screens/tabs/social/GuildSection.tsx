@@ -430,9 +430,24 @@ export function GuildSection({
       {myGuild && guildSubTab === 'home' && (
         <>
           <SocialCard styles={styles} title="Ops Snapshot" subtitle="Rapid overview of guild posture.">
-            <Text style={styles.metaText}>Boss Front: {guildBoss ? `${guildBoss.name} (${guildBoss.status})` : 'No active boss'}</Text>
-            <Text style={styles.metaText}>Active Ops: {activeEvents.length} • Recent Wins: {recentCompletedEvents.length}</Text>
-            <Text style={styles.metaText}>Boss Damage Pool: {formatCompactNumber(totalBossDamage)}</Text>
+            <View style={styles.metricGrid}>
+              <View style={styles.metricChip}>
+                <Text style={styles.metricLabel}>Boss Front</Text>
+                <Text style={styles.metricValue}>{guildBoss ? `${guildBoss.name} (${guildBoss.status})` : 'No active boss'}</Text>
+              </View>
+              <View style={styles.metricChip}>
+                <Text style={styles.metricLabel}>Active Ops</Text>
+                <Text style={styles.metricValue}>{activeEvents.length}</Text>
+              </View>
+              <View style={styles.metricChip}>
+                <Text style={styles.metricLabel}>Recent Wins</Text>
+                <Text style={styles.metricValue}>{recentCompletedEvents.length}</Text>
+              </View>
+              <View style={styles.metricChip}>
+                <Text style={styles.metricLabel}>Boss Damage Pool</Text>
+                <Text style={styles.metricValue}>{formatCompactNumber(totalBossDamage)}</Text>
+              </View>
+            </View>
           </SocialCard>
 
           <SocialCard styles={styles} title="Guild Command Center">
