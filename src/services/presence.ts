@@ -36,7 +36,7 @@ export async function markPresenceOffline(uid: string): Promise<void> {
 }
 
 export function startPresenceHeartbeat(uid: string, displayName: string, level: number): () => void {
-  void writePresenceHeartbeat(uid, displayName, level);
+  void writePresenceHeartbeat(uid, displayName, level).catch(() => {});
 
   if (heartbeatTimer) {
     clearInterval(heartbeatTimer);
@@ -44,7 +44,7 @@ export function startPresenceHeartbeat(uid: string, displayName: string, level: 
   }
 
   heartbeatTimer = setInterval(() => {
-    void writePresenceHeartbeat(uid, displayName, level);
+    void writePresenceHeartbeat(uid, displayName, level).catch(() => {});
   }, HEARTBEAT_MS);
 
   return () => {

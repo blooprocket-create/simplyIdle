@@ -2264,7 +2264,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     const uid = getFirebaseAuth()?.currentUser?.uid;
     if (!uid) return;
     const display = (publicUsername || state.playerName || accountName).trim() || accountName;
-    void writePresenceHeartbeat(uid, display, state.level);
+    void writePresenceHeartbeat(uid, display, state.level).catch(() => {});
   }, [accountName, publicUsername, state.characterCreated, state.level, state.playerName]);
 
   useEffect(() => {
