@@ -102,6 +102,17 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
     return () => clearInterval(timer);
   }, []);
 
+  // Some older cloud saves may not include newer operations fields yet.
+  // Keep this tab resilient by falling back to safe defaults instead of crashing.
+  const safeExpeditionQueue = Array.isArray(state.expeditionQueue) ? state.expeditionQueue : [];
+  const safeExpeditionContractOffers = state.expeditionContractOffers ?? {};
+  const operationsFacilities = state.guildhallFacilities ?? {
+    training: { level: 0 },
+    treasury: { level: 0 },
+    forge: { level: 0 },
+    tactics: { level: 0 },
+  };
+
   const miniOpRemainingMs = (lastUsedMs: number | null) => {
     if (lastUsedMs == null) return 0;
     return Math.max(0, MINI_OPS_COOLDOWN_MS - (nowMs - lastUsedMs));
@@ -112,12 +123,11 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
   const targetRemainingMs = miniOpRemainingMs(state.lastTargetPracticeDay);
   const bountyRemainingMs = miniOpRemainingMs(state.lastBountyDraftDay);
 
-  const operationsFacilities = state.guildhallFacilities;
-  const expeditionClaimableCount = state.expeditionQueue.filter(exp => (Date.now() - exp.startTime) >= exp.durationMs).length;
-  const expeditionActiveTypes = new Set(state.expeditionQueue.map(exp => exp.type as ExpeditionType));
+  const expeditionClaimableCount = safeExpeditionQueue.filter(exp => (nowMs - exp.startTime) >= exp.durationMs).length;
+  const expeditionActiveTypes = new Set(safeExpeditionQueue.map(exp => exp.type as ExpeditionType));
   const expeditionLaunchableAffordableCount = EXPEDITION_TYPES.filter(type => {
     if (expeditionActiveTypes.has(type)) return false;
-    const rarity = state.expeditionContractOffers[type] ?? 'common';
+    const rarity = safeExpeditionContractOffers[type] ?? 'common';
     const cost = EXPEDITION_RARITY_META[rarity as ExpeditionRarity]?.goldCost ?? Number.MAX_SAFE_INTEGER;
     return state.gold >= cost;
   }).length;
@@ -298,7 +308,7 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
               <View style={styles.facilityCard}>
                 <Text style={styles.facilityName}>📜 Bounty Draft</Text>
                 <Text style={styles.facilityBonusText}>Pick one contract for this cycle and claim when objective is done.</Text>
-                {state.miniBounty ? (
+                  {state.miniBounty ? (
                   <>
                     <Text style={styles.facilityBonusText}>Active: {state.miniBounty.title}</Text>
                     <Text style={styles.facilityNextBonus}>Progress: {Math.min(activeMiniBountyProgress, state.miniBounty.targetValue)}/{state.miniBounty.targetValue}</Text>
@@ -471,11 +481,11 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
               <Text style={styles.expeditionsTitle}>🗺️ Expeditions</Text>
               <Text style={styles.expeditionsDesc}>Send parties on time-gated expeditions for rewards</Text>
 
-              {state.expeditionQueue.length > 0 && (
+              {safeExpeditionQueue.length > 0 && (
                 <View style={styles.expeditionQueueSection}>
                   <Text style={styles.expeditionQueueTitle}>Active Expeditions</Text>
-                  {state.expeditionQueue.map(exp => {
-                    const elapsed = Date.now() - exp.startTime;
+                  {safeExpeditionQueue.map(exp => {
+                    const elapsed = nowMs - exp.startTime;
                     const remaining = Math.max(0, exp.durationMs - elapsed);
                     const progress = (elapsed / exp.durationMs) * 100;
                     const isComplete = remaining <= 0;
@@ -520,7 +530,7 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
                     0,
                     EXPEDITION_CONTRACT_REFRESH_MS - (nowMs - (state.expeditionContractsRefreshedAt ?? nowMs)),
                   );
-                  const activeExpeditionTypes = new Set(state.expeditionQueue.map(exp => exp.type as string));
+                  const activeExpeditionTypes = new Set(safeExpeditionQueue.map(exp => exp.type as string));
                   const launchableTypes = EXPEDITION_TYPES.filter(type => !activeExpeditionTypes.has(type));
                   const canAffordRefresh = state.gold >= EXPEDITION_CONTRACT_REFRESH_GOLD_COST;
 
@@ -543,7 +553,7 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
                         <Text style={styles.expeditionNoLaunchText}>All contracts are currently active. Claim one to launch a new run.</Text>
                       )}
                       {launchableTypes.map((type: ExpeditionType) => {
-                        const rarity = state.expeditionContractOffers[type] ?? 'common';
+                        const rarity = safeExpeditionContractOffers[type] ?? 'common';
                         const typeMeta = EXPEDITION_TYPE_META[type];
                         const rarityMeta = EXPEDITION_RARITY_META[rarity as ExpeditionRarity];
                         const cfg = {
