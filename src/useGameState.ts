@@ -72,6 +72,8 @@ const SAVE_INTERVAL_MS = 5000;
 const ONLINE_SAVE_INTERVAL_MS = 12000;
 const STAT_POINTS_PER_LEVEL = 5;
 const OFFLINE_PROGRESS_CAP_MS = 8 * 60 * 60 * 1000;
+const OFFLINE_SIM_MAX_SLICE_MS = 1000;
+const OFFLINE_SIM_MAX_ITERATIONS = 300000;
 const PITY_THRESHOLD = 30;
 const SAFE_INTEGER_CAP = Number.MAX_SAFE_INTEGER;
 const MAX_SAVE_WAVE = 1_000_000;
@@ -3177,6 +3179,178 @@ function applyBurst(state: GameState, hits: number): GameState {
   return queueCombatLog(working, `Burst unleashed for ${burstHits} amplified strikes`);
 }
 
+function applyAutoTempo(state: GameState): GameState {
+  if (!state.autoTempoEnabled || state.combatHeat > 0 || state.combatTempo !== 1) {
+    return state;
+  }
+  return { ...state, combatTempo: state.autoTempoTarget };
+}
+
+function advanceCombatStep(state: GameState, elapsedMs: number): GameState {
+  if (!state.characterCreated) return state;
+
+  const refreshedState = maybeAutoRefreshExpeditionContracts(state, Date.now());
+  const withAutoTempo = applyAutoTempo(refreshedState);
+  const scaledElapsed = elapsedMs * withAutoTempo.combatTempo;
+  let working = decayBuffs(withAutoTempo, scaledElapsed);
+  working = tickHeroActives(working, scaledElapsed);
+  working = updateCombatHeat(working, elapsedMs);
+  const weekly = getCurrentWeeklyEvent(working);
+
+  const dps = getDps(working);
+  if (dps <= 0) return state;
+  const affix = getMonsterAffixModifiers(working.wave);
+  const damage = (dps * (scaledElapsed / 1000)) / (affix.hpMult * weekly.enemyHpMultiplier);
+  const hp = working.monsterHp - damage;
+
+  const enemyDmg = getMonsterDamage(working.wave) * affix.dmgMult * weekly.enemyDamageMultiplier;
+  const defense = getTeamDefense(working);
+  const damageReduction = Math.min(0.8, defense / (defense + 100));
+  const passive = working.playerClass ? getClassPassive(working.playerClass) : null;
+  const passiveIncomingMult = hasUnlock(working, 'class_passive') && passive
+    ? passive.incomingDamageMultiplier
+    : 1;
+  const heroPassive = getHeroPassiveMultipliers(working);
+  const formation = getFormationMultipliers(working);
+  const synergy = getTeamSynergy(working);
+  const activeReductionMult = 1 - Math.max(0, Math.min(0.7, working.damageReductionBuffPct));
+  const actualEnemyDamage = enemyDmg
+    * (1 - damageReduction)
+    * passiveIncomingMult
+    * heroPassive.incomingDmgMult
+    * formation.incomingMult
+    * synergy.incomingMult
+    * activeReductionMult
+    * (scaledElapsed / 1000);
+  const teamHp = working.teamHp - actualEnemyDamage;
+
+  if (hp <= 0) return withAchievement(killMonster(working));
+
+  if (teamHp <= 0) {
+    const currentChapter = Math.floor((Math.max(1, working.wave) - 1) / 20);
+    const chapterStartWave = currentChapter * 20 + 1;
+    const retreatWave = working.wave === chapterStartWave && chapterStartWave > 1
+      ? Math.max(1, chapterStartWave - 20)
+      : chapterStartWave;
+    return {
+      ...working,
+      wave: retreatWave,
+      monsterHp: getMonsterMaxHp(retreatWave),
+      monsterMaxHp: getMonsterMaxHp(retreatWave),
+      teamHp: getTeamMaxHp(working),
+      teamMaxHp: getTeamMaxHp(working),
+      lastActiveAt: Date.now(),
+      combatLog: [`${new Date().toLocaleTimeString()} • Team collapsed and retreated to Wave ${retreatWave}`, ...working.combatLog].slice(0, 24),
+    };
+  }
+
+  const withPotions = maybeAutoUsePotion({ ...working, monsterHp: hp, teamHp, lastActiveAt: Date.now() });
+  const withCoolant = maybeAutoUseCoolant(withPotions);
+  const withRecycle = maybeAutoRecycleBackground(withCoolant);
+  const withSummon = maybeAutoSummonTick(withRecycle);
+  if (withSummon.autoBurstEnabled && withSummon.burstCharge >= BURST_COST) {
+    return applyBurst(withSummon, 4 * withSummon.combatTempo);
+  }
+  return withSummon;
+}
+
+function getCombatTimedEventMs(state: GameState, combatTempo: number): number | null {
+  const timedEvents: number[] = [];
+
+  if (state.damageBuffMs > 0) timedEvents.push(state.damageBuffMs / combatTempo);
+  if (state.damageReductionBuffMs > 0) timedEvents.push(state.damageReductionBuffMs / combatTempo);
+  if (state.autoSummonCooldownMs > 0) timedEvents.push(state.autoSummonCooldownMs / combatTempo);
+
+  for (const cooldownMs of Object.values(state.heroActiveCdMs)) {
+    if (cooldownMs > 0) timedEvents.push(cooldownMs / combatTempo);
+  }
+
+  const maxHeat = getMaxHeatForLevel(state.level);
+  if (state.combatTempo > 1 && maxHeat > state.combatHeat) {
+    timedEvents.push(((maxHeat - state.combatHeat) / HEAT_BASE_RATE_PER_SEC) * 1000);
+  }
+  if (state.combatTempo === 1 && state.autoTempoEnabled && state.combatHeat > 0) {
+    timedEvents.push((state.combatHeat / HEAT_RECOVERY_RATE_PER_SEC) * 1000);
+  }
+
+  const nextTimedEventMs = timedEvents.filter(value => Number.isFinite(value) && value > 0);
+  return nextTimedEventMs.length > 0 ? Math.min(...nextTimedEventMs) : null;
+}
+
+function getOfflineStepElapsedMs(state: GameState, remainingMs: number): number {
+  const withAutoTempo = applyAutoTempo(state);
+  const combatTempo = Math.max(1, withAutoTempo.combatTempo);
+  const weekly = getCurrentWeeklyEvent(withAutoTempo);
+  const affix = getMonsterAffixModifiers(withAutoTempo.wave);
+  const dps = Math.max(1, getDps(withAutoTempo));
+  const monsterHpPerMs = (dps * combatTempo) / (1000 * affix.hpMult * weekly.enemyHpMultiplier);
+  const candidateWindows: number[] = [OFFLINE_SIM_MAX_SLICE_MS, remainingMs];
+
+  if (monsterHpPerMs > 0) {
+    candidateWindows.push(withAutoTempo.monsterHp / monsterHpPerMs);
+  }
+
+  const enemyDmg = getMonsterDamage(withAutoTempo.wave) * affix.dmgMult * weekly.enemyDamageMultiplier;
+  const defense = getTeamDefense(withAutoTempo);
+  const damageReduction = Math.min(0.8, defense / (defense + 100));
+  const passive = withAutoTempo.playerClass ? getClassPassive(withAutoTempo.playerClass) : null;
+  const passiveIncomingMult = hasUnlock(withAutoTempo, 'class_passive') && passive
+    ? passive.incomingDamageMultiplier
+    : 1;
+  const heroPassive = getHeroPassiveMultipliers(withAutoTempo);
+  const formation = getFormationMultipliers(withAutoTempo);
+  const synergy = getTeamSynergy(withAutoTempo);
+  const activeReductionMult = 1 - Math.max(0, Math.min(0.7, withAutoTempo.damageReductionBuffPct));
+  const enemyDmgPerMs = enemyDmg
+    * (1 - damageReduction)
+    * passiveIncomingMult
+    * heroPassive.incomingDmgMult
+    * formation.incomingMult
+    * synergy.incomingMult
+    * activeReductionMult
+    * (combatTempo / 1000);
+  if (enemyDmgPerMs > 0) {
+    candidateWindows.push(withAutoTempo.teamHp / enemyDmgPerMs);
+  }
+
+  const nextTimedEventMs = getCombatTimedEventMs(withAutoTempo, combatTempo);
+  if (nextTimedEventMs !== null) {
+    candidateWindows.push(nextTimedEventMs);
+  }
+
+  const boundedMs = Math.min(...candidateWindows.filter(value => Number.isFinite(value) && value > 0));
+  const roundedMs = Math.max(TICK_MS, Math.ceil(boundedMs / TICK_MS) * TICK_MS);
+  return Math.min(remainingMs, roundedMs, OFFLINE_SIM_MAX_SLICE_MS);
+}
+
+function simulateOfflineProgress(state: GameState, elapsedMs: number): {
+  state: GameState;
+  reachedIterationCap: boolean;
+} {
+  let remainingMs = elapsedMs;
+  let working = state;
+  let iterations = 0;
+  const preservedRewardQueue = state.rewardQueue;
+  const preservedCombatLog = state.combatLog;
+
+  while (remainingMs > 0 && working.characterCreated && iterations < OFFLINE_SIM_MAX_ITERATIONS) {
+    const stepElapsedMs = getOfflineStepElapsedMs(working, remainingMs);
+    const advanced = advanceCombatStep(working, stepElapsedMs);
+    working = {
+      ...advanced,
+      rewardQueue: preservedRewardQueue,
+      combatLog: preservedCombatLog,
+    };
+    remainingMs -= stepElapsedMs;
+    iterations += 1;
+  }
+
+  return {
+    state: working,
+    reachedIterationCap: remainingMs > 0,
+  };
+}
+
 function rollExpeditionContractOffers(): Record<ExpeditionType, ExpeditionRarity> {
   const offers = {
     artifact: 'common',
@@ -3274,6 +3448,7 @@ type Action =
   | { type: 'CLAIM_MAIL_ATTACHMENT'; mailId: string; attachment: MailAttachmentKey }
   | { type: 'CLAIM_ALL_MAIL_ATTACHMENTS' }
   | { type: 'APPLY_OFFLINE_PROGRESS'; elapsedMs: number }
+  | { type: 'SET_LAST_ACTIVE_AT'; timestampMs: number }
   | { type: 'APPLY_DAILY_LOGIN'; nowMs: number }
   | { type: 'REBIRTH' }
   | { type: 'CLEAR_ACHIEVEMENT' }
@@ -3325,78 +3500,7 @@ function reducer(state: GameState, action: Action): GameState {
     }
 
     case 'TICK': {
-      if (!state.characterCreated) return state;
-      const refreshedState = maybeAutoRefreshExpeditionContracts(state, Date.now());
-      const withAutoTempo = state.autoTempoEnabled && state.combatHeat <= 0 && state.combatTempo === 1
-        ? { ...refreshedState, combatTempo: refreshedState.autoTempoTarget }
-        : refreshedState;
-      const scaledElapsed = action.elapsed * withAutoTempo.combatTempo;
-      let working = decayBuffs(withAutoTempo, scaledElapsed);
-      working = tickHeroActives(working, scaledElapsed);
-      working = updateCombatHeat(working, action.elapsed);
-      const weekly = getCurrentWeeklyEvent(working);
-
-      const dps = getDps(working);
-      if (dps <= 0) return state;
-      const affix = getMonsterAffixModifiers(working.wave);
-
-      // Team deals damage to enemy
-      const damage = (dps * (scaledElapsed / 1000)) / (affix.hpMult * weekly.enemyHpMultiplier);
-      const hp = working.monsterHp - damage;
-
-      // Enemy deals damage to team (reduced by defense)
-      const enemyDmg = getMonsterDamage(working.wave) * affix.dmgMult * weekly.enemyDamageMultiplier;
-      const defense = getTeamDefense(working);
-      const damageReduction = Math.min(0.8, defense / (defense + 100));  // max 80% reduction
-      const passive = working.playerClass ? getClassPassive(working.playerClass) : null;
-      const passiveIncomingMult = hasUnlock(working, 'class_passive') && passive
-        ? passive.incomingDamageMultiplier
-        : 1;
-      const heroPassive = getHeroPassiveMultipliers(working);
-      const formation = getFormationMultipliers(working);
-      const synergy = getTeamSynergy(working);
-      const activeReductionMult = 1 - Math.max(0, Math.min(0.7, working.damageReductionBuffPct));
-      const actualEnemyDamage = enemyDmg
-        * (1 - damageReduction)
-        * passiveIncomingMult
-        * heroPassive.incomingDmgMult
-        * formation.incomingMult
-        * synergy.incomingMult
-        * activeReductionMult
-        * (scaledElapsed / 1000);
-      const teamHp = working.teamHp - actualEnemyDamage;
-
-      // Check if monster is defeated
-      if (hp <= 0) return withAchievement(killMonster(working));
-
-      // Check if team dies
-      if (teamHp <= 0) {
-        // Retreat to chapter start; if you wipe on chapter start itself, fall back to previous chapter start.
-        const currentChapter = Math.floor((Math.max(1, working.wave) - 1) / 20);
-        const chapterStartWave = currentChapter * 20 + 1;
-        const retreatWave = working.wave === chapterStartWave && chapterStartWave > 1
-          ? Math.max(1, chapterStartWave - 20)
-          : chapterStartWave;
-        return {
-          ...working,
-          wave: retreatWave,
-          monsterHp: getMonsterMaxHp(retreatWave),
-          monsterMaxHp: getMonsterMaxHp(retreatWave),
-          teamHp: getTeamMaxHp(working),
-          teamMaxHp: getTeamMaxHp(working),
-          lastActiveAt: Date.now(),
-          combatLog: [`${new Date().toLocaleTimeString()} • Team collapsed and retreated to Wave ${retreatWave}`, ...working.combatLog].slice(0, 24),
-        };
-      }
-
-      const withPotions = maybeAutoUsePotion({ ...working, monsterHp: hp, teamHp, lastActiveAt: Date.now() });
-      const withCoolant = maybeAutoUseCoolant(withPotions);
-      const withRecycle = maybeAutoRecycleBackground(withCoolant);
-      const withSummon = maybeAutoSummonTick(withRecycle);
-      if (withSummon.autoBurstEnabled && withSummon.burstCharge >= BURST_COST) {
-        return applyBurst(withSummon, 4 * withSummon.combatTempo);
-      }
-      return withSummon;
+      return advanceCombatStep(state, action.elapsed);
     }
 
     case 'ATTACK': {
@@ -4246,60 +4350,21 @@ function reducer(state: GameState, action: Action): GameState {
       if (!state.characterCreated) return state;
       const elapsed = Math.max(0, Math.min(action.elapsedMs, OFFLINE_PROGRESS_CAP_MS));
       if (elapsed < 5000) return { ...state, lastActiveAt: Date.now() };
-
-        // Scale kills and waves based on wave progress to simulate active gameplay
-        // At wave 100: ~2000 kills, ~150 waves; at wave 300: ~5000 kills, ~400 waves
-        const MAX_OFFLINE_KILLS = Math.min(12000, Math.max(2000, 1500 + Math.floor(state.highestWaveReached * 3)));
-        const MAX_OFFLINE_WAVES = Math.min(500, Math.max(100, 80 + Math.floor(state.highestWaveReached * 0.8)));
-      const MIN_KILL_MS = 140;
-      let remainingMs = elapsed;
-      let working = state;
       const startWave = state.wave;
       const startKills = state.totalKills;
       const startGold = state.gold;
       const startExp = state.totalExp;
-      const baseRewardQueue = state.rewardQueue;
-      const baseCombatLog = state.combatLog;
-
-      while (
-        remainingMs > 0
-        && working.characterCreated
-        && (working.totalKills - startKills) < MAX_OFFLINE_KILLS
-        && (working.wave - startWave) < MAX_OFFLINE_WAVES
-      ) {
-        const weekly = getCurrentWeeklyEvent(working);
-        const affix = getMonsterAffixModifiers(working.wave);
-        const dps = Math.max(1, getDps(working));
-        const killMs = Math.max(
-          MIN_KILL_MS,
-          Math.ceil((working.monsterHp * affix.hpMult * weekly.enemyHpMultiplier / dps) * 1000),
-        );
-
-        if (killMs > remainingMs) {
-          const dealt = (dps * (remainingMs / 1000)) / (affix.hpMult * weekly.enemyHpMultiplier);
-          working = {
-            ...working,
-            monsterHp: Math.max(1, working.monsterHp - dealt),
-          };
-          remainingMs = 0;
-          break;
-        }
-
-        working = killMonster(working);
-        remainingMs -= killMs;
-      }
+      const startItems = state.inventoryItemIds.length;
+      const startUsableCount = Object.values(state.usableItemCounts).reduce((sum, count) => sum + Math.max(0, count), 0);
+      const simulation = simulateOfflineProgress(state, elapsed);
+      const working = simulation.state;
 
       const killsGained = working.totalKills - startKills;
       const wavesGained = Math.max(0, working.wave - startWave);
       const goldGain = Math.max(0, working.gold - startGold);
       const expGain = Math.max(0, working.totalExp - startExp);
-      const reachedKillCap = killsGained >= MAX_OFFLINE_KILLS;
-      const reachedWaveCap = wavesGained >= MAX_OFFLINE_WAVES;
-      working = {
-        ...working,
-        rewardQueue: baseRewardQueue,
-        combatLog: baseCombatLog,
-      };
+      const itemsGained = Math.max(0, working.inventoryItemIds.length - startItems);
+      const usableNetGain = Math.max(0, Object.values(working.usableItemCounts).reduce((sum, count) => sum + Math.max(0, count), 0) - startUsableCount);
 
       const next = queueReward({
         ...working,
@@ -4308,9 +4373,18 @@ function reducer(state: GameState, action: Action): GameState {
         id: `offline_${Date.now()}`,
         kind: 'system',
         title: 'Offline Progress',
-        detail: `+${killsGained} kills • +${wavesGained} waves • +${goldGain} gold • +${expGain} EXP • now Wave ${working.wave}${(reachedKillCap || reachedWaveCap) ? ' (simulation cap reached)' : ''}`,
+        detail: `+${killsGained} kills • +${wavesGained} waves • +${goldGain} gold • +${expGain} EXP${itemsGained > 0 ? ` • +${itemsGained} gear` : ''}${usableNetGain > 0 ? ` • +${usableNetGain} usable` : ''} • now Wave ${working.wave}${simulation.reachedIterationCap ? ' (simulation budget reached)' : ''}`,
       });
       return withAchievement((next));
+    }
+
+    case 'SET_LAST_ACTIVE_AT': {
+      if (!state.characterCreated) return state;
+      const timestampMs = Number.isFinite(action.timestampMs) ? Math.max(0, Math.floor(action.timestampMs)) : Date.now();
+      return {
+        ...state,
+        lastActiveAt: timestampMs,
+      };
     }
 
     case 'APPLY_DAILY_LOGIN': {
@@ -5980,8 +6054,8 @@ export function useGameState(saveSlot: string = 'default') {
     }
   }, [saveSlot]);
 
-  const persistSnapshot = useCallback(async (forceOnline = false) => {
-    const snapshot = serialize(stateRef.current);
+  const persistSnapshot = useCallback(async (forceOnline = false, snapshotOverride?: SaveData) => {
+    const snapshot = snapshotOverride ?? serialize(stateRef.current);
       if (!onlineSlotEligible || onlineSyncDisabledRef.current || !isOnlineSaveAvailable()) {
       setOnlineSyncState('local-only');
       return;
@@ -6469,6 +6543,18 @@ export function useGameState(saveSlot: string = 'default') {
     dispatch({ type: 'APPLY_OFFLINE_PROGRESS', elapsedMs });
   }, []);
 
+  const setLastActiveAt = useCallback((timestampMs: number, persistNow = false) => {
+    const safeTimestampMs = Number.isFinite(timestampMs) ? Math.max(0, Math.floor(timestampMs)) : Date.now();
+    dispatch({ type: 'SET_LAST_ACTIVE_AT', timestampMs: safeTimestampMs });
+    if (!persistNow || !stateRef.current.characterCreated) return;
+
+    const snapshot = serialize({
+      ...stateRef.current,
+      lastActiveAt: safeTimestampMs,
+    });
+    void persistSnapshot(true, snapshot);
+  }, [persistSnapshot]);
+
   const stats = computeStats(state);
 
   return {
@@ -6561,6 +6647,7 @@ export function useGameState(saveSlot: string = 'default') {
     getWeeklyEvent,
     getMissionProgress,
     applyOfflineProgress,
+    setLastActiveAt,
   };
 }
 

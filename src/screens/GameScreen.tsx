@@ -404,6 +404,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     refreshExpeditionContracts,
     completeExpedition,
     applyOfflineProgress,
+    setLastActiveAt,
   } = useGameState(selectedCharacterClass ? getCharacterSaveSlot(accountName, selectedCharacterClass) : '__character_slot_preview__');
 
   const [tab, setTab] = useState<Tab>('warroom');
@@ -531,7 +532,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription.remove();
-  }, [hydrated, state.lastActiveAt]);
+  }, [applyOfflineProgress, hydrated, setLastActiveAt, state.characterCreated]);
 
   const handleAppStateChange = (nextState: typeof AppState.currentState) => {
     if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
@@ -546,7 +547,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       backgroundTimeRef.current = null;
     } else if (nextState.match(/inactive|background/)) {
       // App going to background or becoming inactive
-      backgroundTimeRef.current = Date.now();
+      if (!backgroundTimeRef.current) {
+        backgroundTimeRef.current = Date.now();
+        if (hydrated && state.characterCreated) {
+          setLastActiveAt(backgroundTimeRef.current, true);
+        }
+      }
     }
     appStateRef.current = nextState;
   };
