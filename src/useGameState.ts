@@ -86,10 +86,10 @@ const HEAT_RECOVERY_RATE_PER_SEC = HEAT_BASE_RATE_PER_SEC * 0.66;
 const HEAT_MAX_BASE = 100;
 const HEAT_MAX_PER_LEVEL = 2;
 export const FACILITY_MAX_LEVEL = 999;
-const BURST_COST = 20;
+const BURST_COST = 15;
 const BURST_BOSS_CHARGE_GAIN = 3;
 const ACTIVE_STRIKE_DPS_MULT = 0.9;
-const BURST_STRIKE_DPS_MULT = 1.35;
+const BURST_STRIKE_DPS_MULT = 1.8;
 const PREMIUM_COOLANT_COSTS = {
   coolant_mk1: 8,
   coolant_mk2: 18,
@@ -255,6 +255,14 @@ const ACHIEVEMENT_BONUS_PER_UNLOCK = 0.03;
 export const EXPEDITION_CONTRACT_REFRESH_MS = 8 * 60 * 60 * 1000;
 export const EXPEDITION_CONTRACT_REFRESH_GOLD_COST = 100_000;
 export const MINI_OPS_COOLDOWN_MS = 4 * 60 * 60 * 1000;
+
+/** Returns true if the cooldown has NOT elapsed. Handles future timestamps (clock skew) by treating them as "just now". */
+function isMiniOpOnCooldown(lastUsedMs: number | null, nowMs: number): boolean {
+  if (lastUsedMs == null) return false;
+  // Clamp: if lastUsedMs is in the future (clock skew), treat as just now → on cooldown
+  const clamped = Math.min(lastUsedMs, nowMs);
+  return (nowMs - clamped) < MINI_OPS_COOLDOWN_MS;
+}
 const EXPEDITION_TYPES: ExpeditionType[] = ['artifact', 'merchant', 'ruins', 'vault', 'abyss'];
 const EXPEDITION_RARITIES: ExpeditionRarity[] = ['common', 'rare', 'epic', 'legendary', 'godly'];
 
@@ -4579,7 +4587,7 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'PLAY_DICE_ROLL': {
       const nowMs = Date.now();
-      if (state.lastDiceRollDay != null && (nowMs - state.lastDiceRollDay) < MINI_OPS_COOLDOWN_MS) return state;
+      if (isMiniOpOnCooldown(state.lastDiceRollDay, nowMs)) return state;
 
       const forcedRoll = typeof action.forcedRoll === 'number' && Number.isFinite(action.forcedRoll)
         ? Math.floor(action.forcedRoll)
@@ -4605,7 +4613,7 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'PLAY_RECON_SWEEP': {
       const nowMs = Date.now();
-      if (state.lastReconSweepDay != null && (nowMs - state.lastReconSweepDay) < MINI_OPS_COOLDOWN_MS) return state;
+      if (isMiniOpOnCooldown(state.lastReconSweepDay, nowMs)) return state;
 
       const picks = ['intel_gold', 'intel_shards', 'intel_buff', 'ambush'] as const;
       const rolled = action.forcedOutcome && picks.includes(action.forcedOutcome)
@@ -4643,7 +4651,7 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'PLAY_LOCKPICK_CACHE': {
       const nowMs = Date.now();
-      if (state.lastLockpickDay != null && (nowMs - state.lastLockpickDay) < MINI_OPS_COOLDOWN_MS) return state;
+      if (isMiniOpOnCooldown(state.lastLockpickDay, nowMs)) return state;
 
       const success = typeof action.forcedSuccess === 'boolean' ? action.forcedSuccess : Math.random() < 0.46;
       const diamondGain = success ? Math.max(30, Math.floor(16 + state.highestWaveReached * 0.6)) : 0;
@@ -4665,7 +4673,7 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'PLAY_TARGET_PRACTICE': {
       const nowMs = Date.now();
-      if (state.lastTargetPracticeDay != null && (nowMs - state.lastTargetPracticeDay) < MINI_OPS_COOLDOWN_MS) return state;
+      if (isMiniOpOnCooldown(state.lastTargetPracticeDay, nowMs)) return state;
 
       const score = action.forcedScore == null
         ? Math.floor(Math.random() * 101)
@@ -4694,7 +4702,7 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'START_MINI_BOUNTY_DRAFT': {
       const nowMs = Date.now();
-      if ((state.lastBountyDraftDay != null && (nowMs - state.lastBountyDraftDay) < MINI_OPS_COOLDOWN_MS) || state.miniBounty) return state;
+      if (isMiniOpOnCooldown(state.lastBountyDraftDay, nowMs) || state.miniBounty) return state;
 
       const draftByType: Record<MiniBountyDraftType, {
         title: string;

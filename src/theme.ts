@@ -24,8 +24,8 @@ export const THEME = {
   text: {
     primary: '#F5F7FA',      // Main text - bright white
     secondary: '#B8C5D6',    // Secondary info
-    tertiary: '#7A8A9E',     // Hints, subtle text
-    muted: '#5A6A7E',        // Very muted
+    tertiary: '#9AAABE',     // Hints, subtle text (WCAG AA 4.5:1)
+    muted: '#8A9AAE',        // Very muted (WCAG AA 4.5:1)
   },
 
   // Status colors (rarity, importance)

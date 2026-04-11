@@ -13,6 +13,16 @@ export type GameTab = 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipmen
 
 export type GiftPreference = 'gold' | 'shards' | 'essence';
 
+/** Responsive layout breakpoints (width/height in logical pixels). */
+export const BREAKPOINTS = {
+  /** Below this width, use ultra-compact sub-tab layout */
+  compactSubTab: 390,
+  /** Below this width, phone-optimized compact layout */
+  compactPhone: 430,
+  /** Below this height, short phone layout adjustments */
+  shortPhone: 780,
+} as const;
+
 export const GIFT_AMOUNTS = {
   gold: (level: number) => Math.max(1, Math.floor(level)) * 1000,
   shards: (level: number) => Math.max(1, Math.floor(level)) * 10,

@@ -54,6 +54,7 @@ import {
   getUsableItem,
   Rarity,
   expForLevel,
+  BREAKPOINTS,
 } from '../gameConfig';
 import { getHeroPortraitSource } from '../heroPortraits';
 import { fmt } from '../utils';
@@ -525,9 +526,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [riftCurrentBonuses, setRiftCurrentBonuses] = useState<RiftBuffChoice[]>([]);
   const [riftWavePredictions, setRiftWavePredictions] = useState<number[]>([]);
 
-  // Timer tick for expedition countdown display
-  const [, setTimerTick] = useState(0);
-
   // Handle app state changes: track time when app goes to background
   // and apply offline progression when it returns to foreground
   useEffect(() => {
@@ -853,9 +851,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const economyEssenceCost = getEssenceCost('economy');
   const survivalEssenceCost = getEssenceCost('survival');
   const isNativeApp = Platform.OS !== 'web';
-  const isCompactPhone = viewportWidth < 430;
-  const isShortPhone = viewportHeight < 780;
-  const compactSubTabMinWidth = viewportWidth < 390 ? 92 : 108;
+  const isCompactPhone = viewportWidth < BREAKPOINTS.compactPhone;
+  const isShortPhone = viewportHeight < BREAKPOINTS.shortPhone;
+  const compactSubTabMinWidth = viewportWidth < BREAKPOINTS.compactSubTab ? 92 : 108;
   const claimableWeeklyMilestones = WEEKLY_TRACK_MILESTONES.filter(ms => state.weeklyKills >= ms && !state.weeklyTrackClaimed.includes(ms));
   const claimableMissionIds = missionCards.filter(m => !m.claimed && m.progress.done).map(m => m.mission.id);
   const hasClaimableRewards = claimableWeeklyMilestones.length > 0 || claimableMissionIds.length > 0;
@@ -1842,17 +1840,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventsOpen, state.characterCreated, accountName, publicUsername, playerBoardScore, state.highestWaveReached, state.prestigeCount]);
-
-  // Manage expedition queue timer display (ticks every second to update countdown display)
-  useEffect(() => {
-    const watchingExpeditionsTab = tab === 'operations' && operationsSubTab === 'expeditions';
-    if (state.expeditionQueue.length === 0 && !watchingExpeditionsTab) return;
-    const timer = setInterval(() => {
-      setTimerTick(prev => prev + 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [state.expeditionQueue, tab, operationsSubTab]);
-
 
   const isBossImminent = state.wave % 10 >= 8;
   const burstCost = 20;

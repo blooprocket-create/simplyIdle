@@ -17,10 +17,11 @@ export const theme = {
   text: {
     primary: '#FFFFFF',           // Main text
     secondary: '#B8B8CC',         // Muted text
-    tertiary: '#7A7A8C',          // Disabled, hints
+    tertiary: '#9A9AB0',          // Disabled, hints (WCAG AA 4.5:1 on #0A0A12)
     danger: '#FF5B8A',
     success: '#6DDB7B',
     warning: '#FFB347',
+    muted: '#8A9AAE',             // Subdued text (WCAG AA 4.5:1 on dark bg)
   },
   
   // Accents
