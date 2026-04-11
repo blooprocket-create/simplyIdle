@@ -134,17 +134,19 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - Client sends raw DPS value for boss attacks. Server multiplies by 30 for damage. No verification against player's actual gear/stats.
 - **Risk**: Clients can send inflated DPS to one-shot guild bosses.
 
-#### 2.7 Character Name Homoglyph Attack
-- Name normalization only lowercases/trims. No Unicode NFC normalization.
-- **Risk**: Players impersonate others using lookalike characters (e.g., Cyrillic `і` vs Latin `i`).
+#### ~~2.7 Character Name Homoglyph Attack~~ ✅ FIXED
+- ~~Name normalization only lowercases/trims. No Unicode NFC normalization.~~
+- ~~**Risk**: Players impersonate others using lookalike characters (e.g., Cyrillic `і` vs Latin `i`).~~
+- **Resolution**: `normalizeCharacterName()` now applies `String.normalize('NFC')` and strips all characters outside Basic Latin + Latin Extended (U+0000–U+024F). Cyrillic, Greek, and other homoglyph scripts are removed before the lowercase/trim pass.
 
 #### ~~2.8 Chat Rate Limiting is Client-Side Only~~ ✅ FIXED
 - ~~3-second cooldown enforced in client state. Bypassed by modifying client code.~~
 - **Resolution**: Firestore rules already enforced 3s cooldown via `chatRateLimit` and `guildChatRateLimit` docs. Hardened by adding `sentAt <= request.time.toMillis()` constraint to global chat, guild chat, and both rate-limit doc write rules — prevents clients from spoofing future timestamps to bypass the cooldown.
 
-#### 2.9 Guild Event Data Corruption
-- Any guild member can update event details (war damage, kills) without monotonic enforcement.
-- **Risk**: Players can falsify event progress to claim rewards.
+#### ~~2.9 Guild Event Data Corruption~~ ✅ FIXED
+- ~~Any guild member can update event details (war damage, kills) without monotonic enforcement.~~
+- ~~**Risk**: Players can falsify event progress to claim rewards.~~
+- **Resolution**: Firestore rules now enforce: (1) only leaders can modify event metadata (type, status, startedAt, endsAt); regular members can only touch `updatedAt`. (2) Event contributions split into separate `create` and `update` rules — `totalContributed` must be an int, non-negative, and monotonically increasing on updates. Each contributor can only write their own `uid` doc.
 
 #### 2.10 Guild Invite Spam (No Rate Limit)
 - No cooldown between guild invites. Unlimited invite spam possible.
@@ -163,11 +165,13 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 #### 2.14 Presence Heartbeat Allows Spoofed Display Names
 - `displayName` not validated against actual profile name.
 
-#### 2.15 Guild Member Count Not Re-Validated on Invite Accept
-- `respondToGuildInvite` doesn't re-verify `maxMembers` in the transaction, allowing simultaneous joins to bypass limit.
+#### ~~2.15 Guild Member Count Not Re-Validated on Invite Accept~~ ✅ VERIFIED SAFE
+- ~~`respondToGuildInvite` doesn't re-verify `maxMembers` in the transaction, allowing simultaneous joins to bypass limit.~~
+- **Resolution**: Code already reads the guild doc inside a `runTransaction()` and checks `memberCount >= maxMembers` before accepting. Firestore transactions provide atomic read-then-write, preventing race conditions.
 
-#### 2.16 No Expiration Check on Guild Invites in Rules
-- Rules don't enforce `expiresAt > now` during invite acceptance.
+#### ~~2.16 No Expiration Check on Guild Invites in Rules~~ ✅ FIXED
+- ~~Rules don't enforce `expiresAt > now` during invite acceptance.~~
+- **Resolution**: Firestore rules now require `resource.data.expiresAt > request.time.toMillis()` when setting status to `accepted`. Decline and expired status transitions remain unrestricted.
 
 #### 2.17 Expired Guild Invites Can Be Accepted Server-Side
 - Missing temporal validation in Firestore rules.

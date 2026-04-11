@@ -6,7 +6,15 @@ export type CharacterNameReserveResult =
   | { ok: false; error: 'taken' | 'unavailable' | 'unknown' };
 
 function normalizeCharacterName(name: string): string {
-  return name.trim().replace(/\s+/g, ' ').toLowerCase();
+  // NFC normalize to collapse composed/decomposed Unicode variants,
+  // then strip characters outside Basic Latin + Latin Extended to block
+  // Cyrillic/Greek/etc. homoglyphs (е→e, і→i, о→o).
+  return name
+    .normalize('NFC')
+    .replace(/[^\u0000-\u024F\s]/g, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
 }
 
 function toNameDocId(normalizedName: string): string {
