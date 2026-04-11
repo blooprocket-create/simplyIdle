@@ -10,26 +10,15 @@ let cachedDb: Firestore | null = null;
 let cachedAnalytics: Analytics | null = null;
 let authPersistenceInitialized = false;
 
-// Firebase config provided for SimplyIdle. Expo public env vars still override these.
-const FALLBACK_FIREBASE_CONFIG = {
-  apiKey: 'AIzaSyDjwMjg48BJqmvrDhgMv7cN0WxZcWG5354',
-  authDomain: 'simplyidle-43c81.firebaseapp.com',
-  projectId: 'simplyidle-43c81',
-  storageBucket: 'simplyidle-43c81.firebasestorage.app',
-  messagingSenderId: '619374758999',
-  appId: '1:619374758999:web:17ca191d4fb3c42a3da712',
-  measurementId: 'G-4TE7VYCSNK',
-} as const;
-
 function readConfig() {
   return {
-    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || FALLBACK_FIREBASE_CONFIG.apiKey,
-    authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || FALLBACK_FIREBASE_CONFIG.authDomain,
-    projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || FALLBACK_FIREBASE_CONFIG.projectId,
-    storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || FALLBACK_FIREBASE_CONFIG.storageBucket,
-    messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || FALLBACK_FIREBASE_CONFIG.messagingSenderId,
-    appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || FALLBACK_FIREBASE_CONFIG.appId,
-    measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID || FALLBACK_FIREBASE_CONFIG.measurementId,
+    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? '',
+    authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? '',
+    projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? '',
+    storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ?? '',
+    messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? '',
+    appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? '',
+    measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID ?? '',
   };
 }
 

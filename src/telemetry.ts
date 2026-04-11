@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import { customEvent, identifyDevice, vexo } from 'vexo-analytics';
 import { initFirebaseAnalytics, logFirebaseEvent } from './services/firebase';
 
-const VEXO_API_KEY = 'f974be1c-5121-4b5c-82f9-799a07387574';
+const VEXO_API_KEY = process.env.EXPO_PUBLIC_VEXO_API_KEY ?? '';
 
 let vexoInitialized = false;
 let telemetryBootstrapSent = false;
