@@ -19,7 +19,7 @@
 - State model: Single reducer-driven game state in useGameState.ts.
 - Persistence: AsyncStorage save key per character slot and class.
 - Tick loop: 100 ms simulation tick with periodic autosave.
-- Telemetry: vexo analytics + local telemetry ring buffer fallback.
+- Telemetry: Firebase Analytics.
 - UI: Large monolithic GameScreen plus extracted tab content components.
 
 ## 4. Player Journey

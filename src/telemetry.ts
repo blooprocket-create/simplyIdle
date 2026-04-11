@@ -1,10 +1,7 @@
 import { Platform } from 'react-native';
-import { customEvent, identifyDevice, vexo } from 'vexo-analytics';
 import { initFirebaseAnalytics, logFirebaseEvent } from './services/firebase';
 
-const VEXO_API_KEY = process.env.EXPO_PUBLIC_VEXO_API_KEY ?? '';
-
-let vexoInitialized = false;
+let firebaseInitialized = false;
 let telemetryBootstrapSent = false;
 const DEBUG_LOGS_ENABLED = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
 const gameplayThrottleMsByEvent = new Map<string, number>();
@@ -16,36 +13,27 @@ export interface TelemetryEvent {
 }
 
 export function initTelemetry(): void {
-  if (vexoInitialized) return;
+  if (firebaseInitialized) return;
 
   try {
-    if (!VEXO_API_KEY || VEXO_API_KEY.trim().length < 10) {
-      debugLog('telemetry', 'Vexo init skipped: API key missing or invalid');
-      return;
-    }
-
-    vexo(VEXO_API_KEY);
-    vexoInitialized = true;
-    debugLog('telemetry', 'Vexo initialized');
+    void initFirebaseAnalytics();
+    firebaseInitialized = true;
+    debugLog('telemetry', 'Firebase Analytics initialized');
 
     if (!telemetryBootstrapSent) {
       telemetryBootstrapSent = true;
-      customEvent('telemetry_initialized', { source: 'initTelemetry' });
+      logFirebaseEvent('telemetry_initialized', { source: 'initTelemetry' });
     }
   } catch {
-    debugLog('telemetry', 'Vexo initialization failed');
+    debugLog('telemetry', 'Firebase Analytics initialization failed');
     // Analytics must never block app startup.
   }
-
-  // Initialize Firebase Analytics in the background (web only, non-blocking).
-  void initFirebaseAnalytics();
 }
 
 export async function identifyTelemetryDevice(deviceId: string | null): Promise<void> {
   try {
     initTelemetry();
-    await identifyDevice(deviceId);
-    debugLog('telemetry', 'identifyDevice success', { hasDeviceId: !!deviceId });
+    debugLog('telemetry', 'identifyDevice', { hasDeviceId: !!deviceId });
   } catch {
     debugLog('telemetry', 'identifyDevice failed', { hasDeviceId: !!deviceId });
     // Analytics must never block auth or gameplay.
@@ -59,9 +47,6 @@ export async function trackEvent(
   try {
     initTelemetry();
     debugLog('telemetry', 'trackEvent called', { name });
-    customEvent(name, payload ?? {});
-
-    // Mirror to Firebase Analytics (web only, no-op if measurementId not set).
     logFirebaseEvent(name, payload);
   } catch {
     debugLog('telemetry', 'trackEvent failed', { name });
@@ -86,11 +71,11 @@ export async function clearTelemetryEvents(): Promise<void> {
 }
 
 export function getTelemetryDebugInfo(): {
-  vexoInitialized: boolean;
+  firebaseInitialized: boolean;
   telemetryBootstrapSent: boolean;
 } {
   return {
-    vexoInitialized,
+    firebaseInitialized,
     telemetryBootstrapSent,
   };
 }
@@ -99,7 +84,7 @@ export async function trackTelemetryHeartbeat(source: string): Promise<void> {
   await trackEvent('telemetry_heartbeat', {
     source,
     platform: Platform.OS,
-    vexoInitialized,
+    firebaseInitialized,
     telemetryBootstrapSent,
   });
 }
