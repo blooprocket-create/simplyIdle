@@ -107,11 +107,11 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~**Problem**: `FALLBACK_FIREBASE_CONFIG` contains full API keys in source code.~~
 - **Resolution**: Removed `FALLBACK_FIREBASE_CONFIG`. `readConfig()` now reads exclusively from `EXPO_PUBLIC_*` env vars. Created `.env.example` and `.env.local`.
 
-#### 2.2 Admin Save-Write Bypass
+#### ~~2.2 Admin Save-Write Bypass~~ ✅ FIXED
 - **File**: `src/services/onlineSave.ts`
-- **Problem**: `writeOnlineSaveForUid()` allows any authenticated user to write to any user's save slot without admin verification.
-- **Risk**: Players can inject items, gold, or mail into other players' accounts.
-- **Fix**: Add explicit admin claim verification + audit logging to Firestore.
+- ~~**Problem**: `writeOnlineSaveForUid()` allows any authenticated user to write to any user's save slot without admin verification.~~
+- ~~**Risk**: Players can inject items, gold, or mail into other players' accounts.~~
+- **Resolution**: Added `isCurrentUserAdmin()` gate to both `loadOnlineSaveForUid()` and `writeOnlineSaveForUid()`. Non-admin callers now get `permission-denied` before any Firestore read/write. Firestore rules already enforce admin-only access as a second layer.
 
 #### ~~2.3 Guild Treasury Balance Manipulation~~ ✅ FIXED
 - **File**: `firestore.rules`
@@ -138,9 +138,9 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - Name normalization only lowercases/trims. No Unicode NFC normalization.
 - **Risk**: Players impersonate others using lookalike characters (e.g., Cyrillic `і` vs Latin `i`).
 
-#### 2.8 Chat Rate Limiting is Client-Side Only
-- 3-second cooldown enforced in client state. Bypassed by modifying client code.
-- **Fix**: Enforce minimum cooldown in Firestore security rules.
+#### ~~2.8 Chat Rate Limiting is Client-Side Only~~ ✅ FIXED
+- ~~3-second cooldown enforced in client state. Bypassed by modifying client code.~~
+- **Resolution**: Firestore rules already enforced 3s cooldown via `chatRateLimit` and `guildChatRateLimit` docs. Hardened by adding `sentAt <= request.time.toMillis()` constraint to global chat, guild chat, and both rate-limit doc write rules — prevents clients from spoofing future timestamps to bypass the cooldown.
 
 #### 2.9 Guild Event Data Corruption
 - Any guild member can update event details (war damage, kills) without monotonic enforcement.
@@ -199,10 +199,10 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - Players stuck with low-rarity heroes have no viable catch-up path.
 - **Fix**: Implement diminishing returns on high-rarity scaling or add catch-up mechanics for low-rarity heroes.
 
-#### 3.5 Pity System Logic Error
-- Pity counter resets **only** when a legendary+ is pulled. This means a player can go 29 rare pulls → pity triggers → 29 more rare pulls in the next cycle.
-- The pity doesn't guarantee a legendary every 30 pulls as players would expect.
-- **Fix**: Reset counter unconditionally every 30 pulls.
+#### ~~3.5 Pity System Logic Error~~ ✅ FIXED
+- ~~Pity counter resets **only** when a legendary+ is pulled. This means a player can go 29 rare pulls → pity triggers → 29 more rare pulls in the next cycle.~~
+- ~~The pity doesn't guarantee a legendary every 30 pulls as players would expect.~~
+- **Resolution**: Counter now increments unconditionally on non-pity rolls. Natural legendary+ pulls are bonuses that do not reset the pity counter. Pity guarantees a legendary every `PITY_THRESHOLD` (30) pulls.
 
 #### 3.6 Nightmare Weekly Event is Asymmetric Risk/Reward
 - 2× HP + 2× damage (4× effective durability) for only 2.5× rewards.
@@ -455,10 +455,10 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 | 2 | ~~Remove hardcoded Firebase config fallback; require env vars~~ | P0 | ✅ Done |
 | 3 | ~~Move Vexo API key to env var~~ | P0 | ✅ Done |
 | 4 | ~~Fix Firestore treasury balance rule (deposits only for members)~~ | P0 | ✅ Done |
-| 5 | Add admin verification to `writeOnlineSaveForUid` | P0 | 2h |
+| 5 | ~~Add admin verification to `writeOnlineSaveForUid`~~ | P0 | ✅ Done |
 | 6 | Add admin audit logging collection | P0 | 2h |
 | 7 | Server-side DPS validation for guild boss attacks | P0 | 2h |
-| 8 | Server-side chat rate limiting in Firestore rules | P1 | 1h |
+| 8 | ~~Server-side chat rate limiting in Firestore rules~~ | P1 | ✅ Done |
 | 9 | ~~Move `firebase-admin` out of client dependencies~~ | P1 | ✅ Done |
 
 ### Phase 1: Stability & Safety (Weeks 2-3)
@@ -469,9 +469,9 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 | 2 | ~~Add `safeDivide()` utility, apply to all arithmetic~~ | P0 | ✅ Done |
 | 3 | ~~Add Error Boundaries (shell, tab, modal, widget levels)~~ | P0 | ✅ Done |
 | 4 | Fix equipment migration: logging + scrap compensation | P1 | 3h |
-| 5 | Fix pity counter logic (reset every 30 unconditionally) | P1 | 1h |
+| 5 | ~~Fix pity counter logic (reset every 30 unconditionally)~~ | P1 | ✅ Done |
 | 6 | Add save versioning + migration functions | P1 | 6h |
-| 7 | Fix floating point precision (use Math.round) | P2 | 2h |
+| 7 | ~~Fix floating point precision (use Math.round)~~ | P2 | ✅ Done |
 | 8 | Fix hero active skill cooldowns (per-skill config) | P2 | 3h |
 
 ### Phase 2: Testing Foundation (Weeks 3-5)

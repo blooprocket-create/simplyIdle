@@ -2784,8 +2784,9 @@ function rollRarityWithPity(counter: number, postgameUnlocked: boolean): { rarit
   }
 
   const rarity = rollRarity(Math.random(), getSummonRarityPool(postgameUnlocked));
-  const nextCounter = rarityRank(rarity) >= rarityRank('legendary') ? 0 : counter + 1;
-  return { rarity, nextCounter, pityTriggered: false };
+  // Counter always increments — natural legendary+ pulls are bonuses.
+  // Pity guarantees a legendary every PITY_THRESHOLD pulls unconditionally.
+  return { rarity, nextCounter: counter + 1, pityTriggered: false };
 }
 
 function equipmentScrapValue(rarity: ReturnType<typeof equipmentRarityConfig>['id']): number {

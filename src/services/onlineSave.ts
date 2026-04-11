@@ -1,5 +1,6 @@
 import { deleteDoc, doc, getDoc, runTransaction, setDoc } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseFirestore, isFirebaseConfigured } from './firebase';
+import { isCurrentUserAdmin } from './adminAccess';
 
 const SAVE_SCHEMA_VERSION = 1;
 
@@ -252,6 +253,7 @@ export async function deleteOnlineSave(saveSlot: string): Promise<{ ok: boolean;
   ): Promise<OnlineSaveLoadResult<TPayload>> {
     const db = getFirebaseFirestore();
     if (!db) return { ok: false, errorCode: 'unavailable' };
+    if (!(await isCurrentUserAdmin())) return { ok: false, errorCode: 'permission-denied' };
     try {
       const ref = doc(db, 'users', uid, 'saveSlots', saveSlotId);
       const snap = await getDoc(ref);
@@ -270,6 +272,7 @@ export async function deleteOnlineSave(saveSlot: string): Promise<{ ok: boolean;
   ): Promise<{ ok: boolean; errorCode?: OnlineSaveErrorCode }> {
     const db = getFirebaseFirestore();
     if (!db) return { ok: false, errorCode: 'unavailable' };
+    if (!(await isCurrentUserAdmin())) return { ok: false, errorCode: 'permission-denied' };
     try {
       const ref = doc(db, 'users', uid, 'saveSlots', saveSlotId);
       const safePayload = encodeFirestorePayload(payload as Record<string, unknown>);
