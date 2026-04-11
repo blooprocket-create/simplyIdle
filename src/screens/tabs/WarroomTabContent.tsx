@@ -47,7 +47,7 @@ export interface WarroomTabContentProps {
   craftEquipment: (slot: string) => void;
 }
 
-export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
+export const WarroomTabContent = React.memo<WarroomTabContentProps>(({
   tab,
   state,
   stats,
@@ -333,4 +333,4 @@ export const WarroomTabContent: React.FC<WarroomTabContentProps> = ({
       )}
     </>
   );
-};
+});

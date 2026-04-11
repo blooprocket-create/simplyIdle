@@ -26,7 +26,7 @@ export interface StatsTabContentProps {
   spendRebirthCore: (path: string) => void;
 }
 
-export const StatsTabContent: React.FC<StatsTabContentProps> = ({
+export const StatsTabContent = React.memo<StatsTabContentProps>(({
   tab,
   state,
   stats,
@@ -261,4 +261,4 @@ export const StatsTabContent: React.FC<StatsTabContentProps> = ({
       )}
     </>
   );
-};
+});

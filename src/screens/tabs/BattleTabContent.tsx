@@ -23,7 +23,7 @@ export interface BattleTabContentProps {
   useUsableItem: (itemId: string, amount?: number | 'all') => void;
 }
 
-export const BattleTabContent: React.FC<BattleTabContentProps> = ({
+export const BattleTabContent = React.memo<BattleTabContentProps>(({
   tab,
   state,
   stats,
@@ -263,4 +263,4 @@ export const BattleTabContent: React.FC<BattleTabContentProps> = ({
       )}
     </>
   );
-};
+});

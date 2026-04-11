@@ -27,7 +27,7 @@ export interface AchievementsTabContentProps {
   renderSubTabBar: (tabs: any[]) => React.ReactNode;
 }
 
-export const AchievementsTabContent: React.FC<AchievementsTabContentProps> = ({
+export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(({
   tab,
   state,
   stats,
@@ -374,4 +374,4 @@ export const AchievementsTabContent: React.FC<AchievementsTabContentProps> = ({
       )}
     </>
   );
-};
+});

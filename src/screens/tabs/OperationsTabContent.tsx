@@ -51,7 +51,7 @@ export interface OperationsTabContentProps {
   renderSubTabBar: (tabs: any[]) => React.ReactNode;
 }
 
-export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
+export const OperationsTabContent = React.memo<OperationsTabContentProps>(({
   tab,
   state,
   stats: _stats,
@@ -600,4 +600,4 @@ export const OperationsTabContent: React.FC<OperationsTabContentProps> = ({
       )}
     </>
   );
-};
+});

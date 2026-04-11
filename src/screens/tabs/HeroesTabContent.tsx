@@ -64,7 +64,7 @@ export interface HeroesTabContentProps {
   renderSubTabBar: (tabs: any[]) => React.ReactNode;
 }
 
-export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
+export const HeroesTabContent = React.memo<HeroesTabContentProps>(({
   tab,
   state,
   stats,
@@ -808,4 +808,4 @@ export const HeroesTabContent: React.FC<HeroesTabContentProps> = ({
       )}
     </>
   );
-};
+});

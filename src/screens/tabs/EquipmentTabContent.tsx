@@ -30,7 +30,7 @@ export interface EquipmentTabContentProps {
   renderSubTabBar: (tabs: any[]) => React.ReactNode;
 }
 
-export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
+export const EquipmentTabContent = React.memo<EquipmentTabContentProps>(({
   tab,
   state,
   stats: _stats,
@@ -321,4 +321,4 @@ export const EquipmentTabContent: React.FC<EquipmentTabContentProps> = ({
       )}
     </>
   );
-};
+});

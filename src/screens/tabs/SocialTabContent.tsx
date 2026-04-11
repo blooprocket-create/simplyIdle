@@ -192,7 +192,7 @@ function formatSigned(value: number): string {
   return value > 0 ? `+${value}` : `${value}`;
 }
 
-export function SocialTabContent({
+export const SocialTabContent = React.memo(function SocialTabContent({
   tab,
   accountName,
   publicUsername,
@@ -1273,7 +1273,7 @@ export function SocialTabContent({
       </Modal>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: {
