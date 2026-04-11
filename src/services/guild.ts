@@ -826,7 +826,9 @@ export async function attackBoss(input: { uid: string; displayName: string; dps:
   const now = Date.now();
   const memberRef = doc(db, GUILD_COLLECTION, guildId, 'members', input.uid);
   const bossRef = doc(db, GUILD_COLLECTION, guildId, 'boss', 'active');
-  const safeDps = Math.max(1, Math.floor(input.dps || 1));
+  // Cap DPS to prevent inflated client values (1 billion ceiling)
+  const MAX_ALLOWED_DPS = 1_000_000_000;
+  const safeDps = Math.min(MAX_ALLOWED_DPS, Math.max(1, Math.floor(input.dps || 1)));
   const strikeDamage = safeDps * 30;
 
   const txResult = await runTransaction<{ dealt: number; rewardGranted: boolean; rewardAmount: number; boss: GuildBossState }>(db, async tx => {
@@ -851,7 +853,9 @@ export async function attackBoss(input: { uid: string; displayName: string; dps:
 
     const currentHp = Math.max(0, typeof bossData.currentHp === 'number' ? bossData.currentHp : 0);
     const maxHp = Math.max(1, typeof bossData.maxHp === 'number' ? bossData.maxHp : 1);
-    const nextHp = Math.max(0, currentHp - strikeDamage);
+    // Clamp strike damage: cannot exceed remaining HP (prevents inflated contribution)
+    const effectiveDamage = Math.min(strikeDamage, currentHp);
+    const nextHp = Math.max(0, currentHp - effectiveDamage);
     const participantUids = Array.isArray(bossData.participantUids)
       ? [...new Set((bossData.participantUids as unknown[]).filter(v => typeof v === 'string') as string[]) ]
       : [];
@@ -859,7 +863,7 @@ export async function attackBoss(input: { uid: string; displayName: string; dps:
 
     tx.set(memberRef, {
       lastBossAttackAt: now,
-      guildContribution: (typeof memberData.guildContribution === 'number' ? memberData.guildContribution : 0) + strikeDamage,
+      guildContribution: (typeof memberData.guildContribution === 'number' ? memberData.guildContribution : 0) + effectiveDamage,
       displayName: input.displayName.trim().slice(0, 24) || memberData.displayName || 'Member',
     }, { merge: true });
 

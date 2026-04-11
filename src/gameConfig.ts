@@ -259,37 +259,37 @@ export const CLASS_PASSIVES: Record<PlayerClass, ClassPassive> = {
   warrior: {
     id: 'frontline_ward',
     name: 'Frontline Ward',
-    description: 'Hardened formation reduces all incoming team damage by 10%.',
-    dpsMultiplier: 1.04,
-    incomingDamageMultiplier: 0.9,
+    description: 'Hardened formation reduces all incoming team damage by 15%.',
+    dpsMultiplier: 1.02,
+    incomingDamageMultiplier: 0.85,
   },
   berserker: {
     id: 'blood_frenzy',
     name: 'Blood Frenzy',
-    description: 'Relentless assault amplifies total team DPS by 9%.',
-    dpsMultiplier: 1.09,
-    incomingDamageMultiplier: 0.98,
+    description: 'Relentless assault amplifies total team DPS by 18%, but takes 5% more damage.',
+    dpsMultiplier: 1.18,
+    incomingDamageMultiplier: 1.05,
   },
   archer: {
     id: 'marking_volley',
     name: 'Marking Volley',
-    description: 'Precision fire boosts team DPS by 8%.',
-    dpsMultiplier: 1.08,
-    incomingDamageMultiplier: 0.98,
+    description: 'Precision fire boosts team DPS by 14%.',
+    dpsMultiplier: 1.14,
+    incomingDamageMultiplier: 1.0,
   },
   mage: {
     id: 'arcane_barrier',
     name: 'Arcane Barrier',
-    description: 'Protective weave cuts incoming damage by 8% and boosts DPS by 4%.',
-    dpsMultiplier: 1.04,
-    incomingDamageMultiplier: 0.92,
+    description: 'Protective weave cuts incoming damage by 12% and boosts DPS by 6%.',
+    dpsMultiplier: 1.06,
+    incomingDamageMultiplier: 0.88,
   },
   monk: {
     id: 'tranquil_aura',
     name: 'Tranquil Aura',
-    description: 'Balanced stance grants 6% DPS and 6% mitigation.',
-    dpsMultiplier: 1.06,
-    incomingDamageMultiplier: 0.94,
+    description: 'Balanced stance grants 10% DPS and 8% mitigation.',
+    dpsMultiplier: 1.10,
+    incomingDamageMultiplier: 0.92,
   },
 };
 
@@ -946,6 +946,18 @@ export type HeroActiveSkillArchetypeId =
   | 'burst_volley'
   | 'battle_chant'
   | 'mending_pulse';
+
+/** Per-skill cooldown in ms. Different archetypes have different rhythms. */
+export const ACTIVE_SKILL_COOLDOWN_MS: Record<HeroActiveSkillArchetypeId, number> = {
+  frontline_ward: 10000,  // defensive shield — long cooldown
+  burst_volley:    7000,  // burst damage — moderate cooldown
+  battle_chant:    9000,  // team DPS buff — moderate-long cooldown
+  mending_pulse:   6000,  // healing — shorter cooldown for sustain
+};
+
+/** Mending pulse base heal fraction (scales with hero level). */
+export const MENDING_PULSE_BASE_HEAL = 0.08;
+export const MENDING_PULSE_LEVEL_SCALE = 0.0004; // +0.04% per hero level
 
 export function getHeroPassiveTraitInfo(id: HeroPassiveTraitId): { name: string; description: string } {
   return {
@@ -1795,10 +1807,10 @@ export const WEEKLY_EVENTS: WeeklyEventConfig[] = [
   {
     id: 'nightmare_assault',
     name: 'Nightmare',
-    description: 'Monsters are 2x stronger but rewards scale massively.',
+    description: 'Monsters are tougher and hit harder, but rewards scale massively.',
     emoji: '💀',
-    enemyHpMultiplier: 2,
-    enemyDamageMultiplier: 2,
+    enemyHpMultiplier: 1.8,
+    enemyDamageMultiplier: 1.5,
     goldMultiplier: 3,
     expMultiplier: 2.5,
     shardMultiplier: 2.5,

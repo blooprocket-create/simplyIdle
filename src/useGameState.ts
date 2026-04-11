@@ -35,6 +35,9 @@ import {
   getBossUnlockForWave,
   getClassPassive,
   getHeroActiveArchetypeInfo,
+  ACTIVE_SKILL_COOLDOWN_MS,
+  MENDING_PULSE_BASE_HEAL,
+  MENDING_PULSE_LEVEL_SCALE,
   getMonsterAffixes,
   expForLevel,
   getClassConfig,
@@ -928,10 +931,14 @@ function migrateLegacyEquipmentIds(
   inventoryItemIds: string[];
   equippedItems: Record<EquipmentSlot, string | null>;
   equipmentInventory: Record<string, EquipmentInstance>;
+  migratedCount: number;
+  droppedCount: number;
 } {
   const nextInventory = { ...equipmentInventory };
   const legacyMap = new Map<string, string>();
   const migratedInventoryIds: string[] = [];
+  let migratedCount = 0;
+  let droppedCount = 0;
 
   for (const itemId of inventoryItemIds) {
     if (nextInventory[itemId]) {
@@ -939,13 +946,14 @@ function migrateLegacyEquipmentIds(
       continue;
     }
     const baseItem = getEquipmentItem(itemId);
-    if (!baseItem) continue;
+    if (!baseItem) { droppedCount++; continue; }
     let migratedId = legacyMap.get(itemId);
     if (!migratedId) {
       const instance = createEquipmentInstance(baseItem, playerLevel, 'legacy');
       nextInventory[instance.id] = instance;
       migratedId = instance.id;
       legacyMap.set(itemId, migratedId);
+      migratedCount++;
     }
     if (migratedId) {
       migratedInventoryIds.push(migratedId);
@@ -969,6 +977,8 @@ function migrateLegacyEquipmentIds(
     inventoryItemIds: migratedInventoryIds,
     equippedItems: migratedEquipped,
     equipmentInventory: nextInventory,
+    migratedCount,
+    droppedCount,
   };
 }
 
@@ -1597,7 +1607,8 @@ function tickHeroActives(state: GameState, elapsedMs: number): GameState {
     }
 
     if (archetype === 'mending_pulse') {
-      const heal = Math.ceil(nextState.teamMaxHp * 0.1);
+      const healFrac = MENDING_PULSE_BASE_HEAL + hero.level * MENDING_PULSE_LEVEL_SCALE;
+      const heal = Math.ceil(nextState.teamMaxHp * Math.min(healFrac, 0.25));
       nextState = {
         ...nextState,
         teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + heal),
@@ -1605,7 +1616,7 @@ function tickHeroActives(state: GameState, elapsedMs: number): GameState {
       nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} triggered ${info.name} (+${heal} HP)`);
     }
 
-    cooldowns[hero.uid] = 8000;
+    cooldowns[hero.uid] = ACTIVE_SKILL_COOLDOWN_MS[archetype];
   }
 
   return {
@@ -2374,12 +2385,15 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     if (!item || item.slot !== slot || !rawInventoryItemIds.includes(itemId)) continue;
     equippedItems[slot] = itemId;
   }
-  const { inventoryItemIds, equippedItems: migratedEquippedItems, equipmentInventory: migratedEquipmentInventory } = migrateLegacyEquipmentIds(
+  const { inventoryItemIds, equippedItems: migratedEquippedItems, equipmentInventory: migratedEquipmentInventory, migratedCount, droppedCount } = migrateLegacyEquipmentIds(
     rawInventoryItemIds,
     equippedItems,
     equipmentInventory,
     level,
   );
+  if (migratedCount > 0 || droppedCount > 0) {
+    debugLog(`[Equipment Migration] Migrated: ${migratedCount}, Dropped (unrecognized): ${droppedCount}`);
+  }
   const cleanedEquipmentInventory = Object.fromEntries(
     Object.entries(migratedEquipmentInventory).filter(([, item]) => item.source !== 'hero_unique'),
   ) as Record<string, EquipmentInstance>;

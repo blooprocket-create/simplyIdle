@@ -1,6 +1,6 @@
 import { deleteDoc, doc, getDoc, runTransaction, setDoc } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseFirestore, isFirebaseConfigured } from './firebase';
-import { isCurrentUserAdmin } from './adminAccess';
+import { isCurrentUserAdmin, logAdminAction } from './adminAccess';
 
 const SAVE_SCHEMA_VERSION = 1;
 
@@ -258,6 +258,7 @@ export async function deleteOnlineSave(saveSlot: string): Promise<{ ok: boolean;
       const ref = doc(db, 'users', uid, 'saveSlots', saveSlotId);
       const snap = await getDoc(ref);
       if (!snap.exists()) return { ok: true, data: null };
+      await logAdminAction('load_save_for_uid', { targetUid: uid, saveSlotId });
       return { ok: true, data: toEnvelope<TPayload>(snap.data()) };
     } catch (error) {
       return { ok: false, errorCode: mapFirestoreErrorCode(error) };
@@ -284,6 +285,7 @@ export async function deleteOnlineSave(saveSlot: string): Promise<{ ok: boolean;
         updatedAt: Date.now(),
         payload: safePayload,
       });
+      await logAdminAction('write_save_for_uid', { targetUid: uid, saveSlotId });
       return { ok: true };
     } catch (error) {
       return { ok: false, errorCode: mapFirestoreErrorCode(error) };

@@ -1,4 +1,4 @@
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc } from 'firebase/firestore';
 import { getIdTokenResult } from 'firebase/auth';
 import { getFirebaseAuth, getFirebaseFirestore, isFirebaseConfigured } from './firebase';
 
@@ -38,5 +38,30 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
     return payload.active === true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Writes an immutable audit log entry to the `adminAuditLog` collection.
+ * Best-effort — failures are silently caught so they don't block admin actions.
+ */
+export async function logAdminAction(
+  action: string,
+  details: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const db = getFirebaseFirestore();
+    const auth = getFirebaseAuth();
+    const user = auth?.currentUser;
+    if (!db || !user) return;
+    await addDoc(collection(db, 'adminAuditLog'), {
+      adminUid: user.uid,
+      adminEmail: user.email ?? null,
+      action,
+      details,
+      timestamp: Date.now(),
+    });
+  } catch {
+    // Audit logging is best-effort; never block the admin action.
   }
 }
