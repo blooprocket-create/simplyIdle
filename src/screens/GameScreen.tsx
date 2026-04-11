@@ -61,6 +61,7 @@ import AchievementToast from '../components/AchievementToast';
 import RebirthModal from '../components/PrestigeModal';
 import BottomNavigation, { BottomTabType } from '../components/BottomNavigation';
 import GameHeader from '../components/GameHeader';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import {
   BattleTabContent,
   WarroomTabContent,
@@ -2898,6 +2899,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         ]}
       >
 
+        <ErrorBoundary label="War Room">
         <WarroomTabContent
           {...({
             tab,
@@ -2942,7 +2944,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             craftEquipment,
           } as any)}
         />
+        </ErrorBoundary>
 
+        <ErrorBoundary label="Battle">
         <BattleTabContent
           {...({
             tab,
@@ -2963,6 +2967,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             useUsableItem,
           } as any)}
         />
+        </ErrorBoundary>
+        <ErrorBoundary label="Heroes">
         <HeroesTabContent
           {...({
             tab,
@@ -3011,7 +3017,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             renderSubTabBar,
           } as any)}
         />
+        </ErrorBoundary>
 
+        <ErrorBoundary label="Stats">
         <StatsTabContent
           {...({
             tab,
@@ -3033,7 +3041,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             spendRebirthCore,
           } as any)}
         />
+        </ErrorBoundary>
 
+        <ErrorBoundary label="Equipment">
         <EquipmentTabContent
           {...({
             tab,
@@ -3060,7 +3070,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             renderSubTabBar,
           } as any)}
         />
+        </ErrorBoundary>
 
+        <ErrorBoundary label="Achievements">
         <AchievementsTabContent
           {...({
             tab,
@@ -3083,7 +3095,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             renderSubTabBar,
           } as any)}
         />
+        </ErrorBoundary>
 
+        <ErrorBoundary label="Operations">
         <OperationsTabContent
           {...({
             tab,
@@ -3131,7 +3145,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             renderSubTabBar,
           } as any)}
         />
+        </ErrorBoundary>
 
+        <ErrorBoundary label="Social">
         <SocialTabContent
           {...({
             tab,
@@ -3146,6 +3162,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             onPendingRequestsCountChange: setSocialPendingCount,
           } as any)}
         />
+        </ErrorBoundary>
       </ScrollView>
 
       {/* Bottom Navigation */}

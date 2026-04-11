@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, Platform } from 'react-native';
 import { onAuthStateChanged } from 'firebase/auth';
 import GameScreen from './src/screens/GameScreen';
 import AuthScreen from './src/screens/AuthScreen';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { debugLog, identifyTelemetryDevice, initTelemetry, trackEvent, trackTelemetryHeartbeat } from './src/telemetry';
 import { getValidOnlineSession, isOnlineAuthAvailable, logoutOnline } from './src/services/onlineAuth';
 import { getFirebaseAuth } from './src/services/firebase';
@@ -103,11 +104,16 @@ export default function App() {
   }
 
   if (!accountName) {
-    return <AuthScreen onAuthenticated={setAccountName} />;
+    return (
+      <ErrorBoundary label="Authentication">
+        <AuthScreen onAuthenticated={setAccountName} />
+      </ErrorBoundary>
+    );
   }
 
   return (
-    <GameScreen
+    <ErrorBoundary label="Game">
+      <GameScreen
       accountName={accountName}
       onLogout={async () => {
         const uid = getFirebaseAuth()?.currentUser?.uid;
@@ -136,6 +142,7 @@ export default function App() {
         setAccountName(null);
       }}
     />
+    </ErrorBoundary>
   );
 }
 

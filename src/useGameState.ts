@@ -61,7 +61,7 @@ import {
   getHeroUniqueWeaponName,
   unlockLabel,
 } from './gameConfig';
-import { buildingCost, bulkCost } from './utils';
+import { buildingCost, bulkCost, safeDivide, roundTo4, safeMultiplier } from './utils';
 import { debugLog, trackEvent, trackGameplayAction } from './telemetry';
 import { isOnlineSaveAvailable, loadOnlineSave, writeOnlineSave } from './services/onlineSave';
 import { claimCloudMail, fetchCloudMail } from './services/cloudMail';
@@ -1452,7 +1452,7 @@ function maybeAutoSummonTick(state: GameState): GameState {
       rarity,
       level: 1,
       rank: 1,
-      teamBoost: Number((template.baseTeamBoost * rarityMult).toFixed(4)),
+      teamBoost: roundTo4(template.baseTeamBoost * rarityMult),
     };
     const historyEntry: SummonHistoryEntry = {
       id: `hist_${uid}`,
@@ -1499,7 +1499,7 @@ function maybeAutoSummonTick(state: GameState): GameState {
         rarity,
         level: 1,
         rank: 1,
-        teamBoost: Number((template.baseTeamBoost * rarityMult).toFixed(4)),
+        teamBoost: roundTo4(template.baseTeamBoost * rarityMult),
       };
       summoned.push(summonedHero);
       historyBatch.push({
@@ -1732,7 +1732,8 @@ export function getDpsBreakdown(state: GameState): {
     uniqueRelics: uniqueSkillMult,
     temporaryBuff: activeBuffMult,
   };
-  const totalMultiplier = multipliers.rebirthLegacy
+  const totalMultiplier = safeMultiplier(
+    multipliers.rebirthLegacy
     * multipliers.achievementLegacy
     * multipliers.metaDamage
     * multipliers.rebirthDamagePath
@@ -1744,8 +1745,10 @@ export function getDpsBreakdown(state: GameState): {
     * multipliers.mastery
     * multipliers.vipDamage
     * multipliers.uniqueRelics
-    * multipliers.temporaryBuff;
-  const finalDps = Math.max(1, (playerDps + heroDps) * totalMultiplier);
+    * multipliers.temporaryBuff,
+  );
+  const rawDps = (playerDps + heroDps) * totalMultiplier;
+  const finalDps = Number.isFinite(rawDps) ? Math.max(1, rawDps) : 1;
   return {
     playerBaseDps: Math.max(0, playerDps),
     heroBaseDps: Math.max(0, heroDps),
@@ -2022,7 +2025,7 @@ function normalizeHero(hero: HeroUnit): HeroUnit {
     ...hero,
     passiveTrait: hero.passiveTrait ?? defaultTraitForClass(hero.heroClass),
     activeSkillArchetype: hero.activeSkillArchetype ?? defaultActiveForClass(hero.heroClass),
-    rebirthStatMult: Number((Math.max(1, hero.rebirthStatMult ?? 1)).toFixed(4)),
+    rebirthStatMult: roundTo4(Math.max(1, hero.rebirthStatMult ?? 1)),
   };
 }
 
@@ -2188,7 +2191,7 @@ function sanitizeLoadedHero(raw: unknown, index: number): HeroUnit | null {
   const rank = clampInt(raw.rank, 1, 10, 1);
   const uid = clampString(raw.uid, `${template.id}_${index}`, 64) || `${template.id}_${index}`;
   const rarityMult = rarityConfig(rarity).boostMultiplier;
-  const baseBoost = Number((template.baseTeamBoost * rarityMult).toFixed(4));
+  const baseBoost = roundTo4(template.baseTeamBoost * rarityMult);
   const teamBoost = clampFloat(raw.teamBoost, baseBoost, 10, baseBoost);
   const rebirthStatMult = clampFloat(raw.rebirthStatMult, 1, 20, 1);
 
@@ -2198,8 +2201,8 @@ function sanitizeLoadedHero(raw: unknown, index: number): HeroUnit | null {
     rarity,
     level,
     rank,
-    teamBoost: Number(teamBoost.toFixed(4)),
-    rebirthStatMult: Number(rebirthStatMult.toFixed(4)),
+    teamBoost: roundTo4(teamBoost),
+    rebirthStatMult: roundTo4(rebirthStatMult),
   });
 }
 
@@ -3200,7 +3203,7 @@ function advanceCombatStep(state: GameState, elapsedMs: number): GameState {
   const dps = getDps(working);
   if (dps <= 0) return state;
   const affix = getMonsterAffixModifiers(working.wave);
-  const damage = (dps * (scaledElapsed / 1000)) / (affix.hpMult * weekly.enemyHpMultiplier);
+  const damage = safeDivide(dps * (scaledElapsed / 1000), affix.hpMult * weekly.enemyHpMultiplier, 0);
   const hp = working.monsterHp - damage;
 
   const enemyDmg = getMonsterDamage(working.wave) * affix.dmgMult * weekly.enemyDamageMultiplier;
@@ -3283,7 +3286,7 @@ function getOfflineStepElapsedMs(state: GameState, remainingMs: number): number 
   const weekly = getCurrentWeeklyEvent(withAutoTempo);
   const affix = getMonsterAffixModifiers(withAutoTempo.wave);
   const dps = Math.max(1, getDps(withAutoTempo));
-  const monsterHpPerMs = (dps * combatTempo) / (1000 * affix.hpMult * weekly.enemyHpMultiplier);
+  const monsterHpPerMs = safeDivide(dps * combatTempo, 1000 * affix.hpMult * weekly.enemyHpMultiplier, 0);
   const candidateWindows: number[] = [OFFLINE_SIM_MAX_SLICE_MS, remainingMs];
 
   if (monsterHpPerMs > 0) {
@@ -3611,7 +3614,7 @@ function reducer(state: GameState, action: Action): GameState {
         rarity,
         level: 1,
         rank: 1,
-        teamBoost: Number((template.baseTeamBoost * rarityMult).toFixed(4)),
+        teamBoost: roundTo4(template.baseTeamBoost * rarityMult),
       };
 
       const historyEntry: SummonHistoryEntry = {
@@ -3670,7 +3673,7 @@ function reducer(state: GameState, action: Action): GameState {
           rarity,
           level: 1,
           rank: 1,
-          teamBoost: Number((template.baseTeamBoost * rarityMult).toFixed(4)),
+          teamBoost: roundTo4(template.baseTeamBoost * rarityMult),
         };
         summoned.push(summonedHero);
         historyBatch.push({
@@ -3741,7 +3744,7 @@ function reducer(state: GameState, action: Action): GameState {
           rarity,
           level: 1,
           rank: 1,
-          teamBoost: Number((template.baseTeamBoost * rarityMult).toFixed(4)),
+          teamBoost: roundTo4(template.baseTeamBoost * rarityMult),
         };
         summoned.push(summonedHero);
         historyBatch.push({
