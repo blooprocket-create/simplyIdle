@@ -3,7 +3,7 @@ import { View, Pressable, Text, StyleSheet } from 'react-native';
 import { theme } from '../theme/colors';
 import { debugLog } from '../telemetry';
 
-export type MobileTab = 'warfront' | 'roster' | 'engine' | 'progress' | 'social';
+export type MobileTab = 'warfront' | 'warroom' | 'roster' | 'equipment' | 'engine' | 'progress' | 'social';
 
 interface MobileNavTab {
   id: MobileTab;

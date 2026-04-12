@@ -10,15 +10,25 @@ let cachedDb: Firestore | null = null;
 let cachedAnalytics: Analytics | null = null;
 let authPersistenceInitialized = false;
 
+function readEnvVar(baseKey: string, env: string): string {
+  const normalized = env.toUpperCase();
+  const envSpecific = process.env[`EXPO_PUBLIC_FIREBASE_${baseKey}_${normalized}` as keyof NodeJS.ProcessEnv];
+  const fallback = process.env[`EXPO_PUBLIC_FIREBASE_${baseKey}` as keyof NodeJS.ProcessEnv];
+  return (envSpecific ?? fallback ?? '').trim();
+}
+
 function readConfig() {
+  const appEnv = (process.env.EXPO_PUBLIC_APP_ENV ?? 'dev').toLowerCase();
+  const env = appEnv === 'staging' || appEnv === 'prod' ? appEnv : 'dev';
+
   return {
-    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? '',
-    authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? '',
-    projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? '',
-    storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ?? '',
-    messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? '',
-    appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? '',
-    measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID ?? '',
+    apiKey: readEnvVar('API_KEY', env),
+    authDomain: readEnvVar('AUTH_DOMAIN', env),
+    projectId: readEnvVar('PROJECT_ID', env),
+    storageBucket: readEnvVar('STORAGE_BUCKET', env),
+    messagingSenderId: readEnvVar('MESSAGING_SENDER_ID', env),
+    appId: readEnvVar('APP_ID', env),
+    measurementId: readEnvVar('MEASUREMENT_ID', env),
   };
 }
 
@@ -83,10 +93,7 @@ export async function initFirebaseAnalytics(): Promise<Analytics | null> {
   }
 }
 
-export function logFirebaseEvent(
-  name: string,
-  params?: Record<string, string | number | boolean | null>,
-): void {
+export function logFirebaseEvent(name: string, params?: Record<string, string | number | boolean | null>): void {
   if (!cachedAnalytics) return;
   try {
     logEvent(cachedAnalytics, name, params ?? {});

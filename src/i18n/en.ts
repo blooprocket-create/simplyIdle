@@ -179,6 +179,36 @@ const en = {
     goldShop: 'Gold Shop',
     dollarShop: 'Dollar Shop',
   },
+
+  // ── Mobile Screen ───────────────────────────────────────
+  mobile: {
+    loadingSocial: 'Loading Social...',
+    warroom: 'War Room',
+    openWarfront: 'Open Warfront',
+    rebirthNow: 'Rebirth Now',
+    rebirthAt: 'Rebirth @ W{{wave}}',
+    armory: 'Armory',
+    inventoryItems: 'Inventory items: {{count}}',
+    scrap: 'Scrap: {{value}}',
+    essence: 'Essence: {{value}}',
+    autoDismantle: 'Auto Dismantle',
+    openEngine: 'Open Engine',
+    mobileShop: 'Mobile Shop',
+    mobileSettings: 'Mobile Settings',
+    buyTrainingCacheGold: 'Buy Training Cache (Gold)',
+    buyFieldBundleGold: 'Buy Field Bundle (Gold)',
+    buyCoolantPack1: 'Buy Coolant Pack I (Diamonds)',
+    buyCoolantPack2: 'Buy Coolant Pack II (Diamonds)',
+    autoPotion: 'Auto Potion: {{state}}',
+    potionThresholdMinus: 'Potion Threshold -5%',
+    potionThresholdPlus: 'Potion Threshold +5%',
+    autoSummon: 'Auto Summon: {{state}}',
+    autoBurst: 'Auto Burst: {{state}}',
+    autoTempo: 'Auto Tempo: {{state}}',
+    autoTempoTarget: 'Auto Tempo Target: {{target}}x',
+    stateOn: 'ON',
+    stateOff: 'OFF',
+  },
 } as const;
 
 export type StringCatalog = typeof en;

@@ -314,7 +314,7 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - **Resolution**: Created lightweight i18n scaffold:
   - `src/i18n/en.ts` — English string catalog with expanded namespaces (header, tap, prestige, building, progress, engine, stats, common, title, auth, gameScreen).
   - `src/i18n/index.ts` — Core `t()` function with `{{variable}}` interpolation, type-safe dot-path keys, locale switching API.
-  - Integrated into `GameHeader.tsx` (resource/action accessibility labels and status labels), `TapButton.tsx` (attack label, damage text), `TitleScreen.tsx`, `AuthScreen.tsx`, and key `GameScreen.tsx` modal/overlay surfaces (story toast, campaign map, idle chest, shop labels).
+  - Integrated into `GameHeader.tsx` (resource/action accessibility labels and status labels), `TapButton.tsx` (attack label, damage text), `TitleScreen.tsx`, `AuthScreen.tsx`, key `GameScreen.tsx` modal/overlay surfaces (story toast, campaign map, idle chest, shop labels), and `MobileGameScreen.tsx` parity tabs/modals.
   - Remaining: migrate deeper tab-card copy and service-surfaced user messages.
 
 #### ~~4.4 No Loading/Error States for Several Flows~~ ✅ FIXED
@@ -336,14 +336,16 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~**AAA Standard**: Guided first-session questline → first summon → first boss → first rebirth.~~
 - **Resolution**: Added 6 progressive onboarding hints to the existing hint system: Welcome (wave 1-3), First Hero (wave 5+), Deploy Hero, Gear Up (wave 10+), Stat Points, and First Rebirth. Each triggers at the appropriate milestone and is dismissible. `useGameGuidance` hook also updated with early-game recruit guidance.
 
-#### 4.7 Mobile vs Web Layout Parity Gap — PARTIALLY ADDRESSED
+#### 4.7 Mobile vs Web Layout Parity Gap ✅ FIXED
 - ~~`MobileGameScreen.tsx` is a skeleton (110 lines, most handlers are `// TODO`).~~
 - Web has full 6,400-line GameScreen. Native mobile gets a fraction of the experience.
-- **Progress**:
+- **Resolution**:
   - Wired proper computed values: `monsterName` from `getMonsterForWave()`, `isBoss` wave check, `canBurst`/`burstCost`, `canRebirth`/`rebirthWavesLeft` from `getRebirthWaveRequirement()`, `dangerScore`/`dangerLabel`, formatted resources via `fmt()`.
   - Added 5th tab: Social (`SocialTabContent` lazy-loaded with `Suspense` fallback).
   - Updated `MobileNavigation` type to include `'social'` tab.
-  - Remaining: warroom tab, equipment tab, modal system, shop/settings panels.
+  - Added dedicated mobile tabs for War Room and Equipment in `MobileGameScreen.tsx` with operational actions (rebirth trigger, armory shortcuts, dismantle path).
+  - Added mobile modal system for Shop and Settings, wired to live game actions (gold/diamond purchases and automation toggles).
+  - Social tab now renders in preview-slot flow as well, so parity features are available without requiring class-selection state.
 
 ### MEDIUM
 
@@ -430,9 +432,9 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~No `.env.example` or environment variable documentation.~~
 - **Resolution**: Created `.env.example` with all required `EXPO_PUBLIC_*` variables. Created `.env.local` (gitignored) with actual values.
 
-#### 6.4 No Staging Environment
-- Production and development share the same Firebase project (implied by hardcoded config).
-- **AAA Standard**: Separate Firebase projects for dev/staging/prod.
+#### 6.4 No Staging Environment ✅ FIXED
+- ~~Production and development share the same Firebase project (implied by hardcoded config).~~
+- **Resolution**: Added environment-aware Firebase config resolution in `src/services/firebase.ts` using `EXPO_PUBLIC_APP_ENV` (`dev`/`staging`/`prod`) with per-environment override keys. Expanded `.env.example` with `*_STAGING` and `*_PROD` variables and added `STAGING_SETUP.md` with rollout instructions for separate Firebase projects and CI env selection.
 
 #### 6.5 No Crash Reporting ✅ FIXED
 - ~~No Sentry, Bugsnag, or Firebase Crashlytics integration.~~
@@ -586,7 +588,7 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 | 2 | ~~Fix color contrast to WCAG AA (4.5:1 minimum)~~ ✅ | P0 | 3h |
 | 3 | Implement i18n framework (react-i18next) | P1 | 12h |
 | 4 | Build guided first-session tutorial flow | P0 | 16h |
-| 5 | Complete MobileGameScreen parity | P1 | 20h |
+| 5 | ~~Complete MobileGameScreen parity~~ ✅ | P1 | ✅ Done |
 | 6 | Add loading states and error UI for all async operations | P1 | 8h |
 | 7 | Add offline mode indicator + queued actions | P2 | 4h |
 | 8 | Replace hardcoded hex colors with theme references | P2 | 4h |
@@ -598,7 +600,7 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 | # | Task | Priority | Effort |
 |---|------|:--------:|--------|
 | 1 | Create `.env.example` with all required variables | P0 | 1h |
-| 2 | Set up staging Firebase project (separate from prod) | P0 | 4h |
+| 2 | ~~Set up staging Firebase project (separate from prod)~~ ✅ | P0 | ✅ Done |
 | 3 | Integrate Sentry/Crashlytics for crash reporting | P0 | 4h |
 | 4 | Add performance monitoring (frame rate, render times) | P1 | 4h |
 | 5 | Set up Firestore backup schedule | P1 | 2h |
