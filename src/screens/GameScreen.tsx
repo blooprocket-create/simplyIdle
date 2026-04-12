@@ -87,11 +87,11 @@ const OperationsTabContent = React.lazy(() => import('./tabs/OperationsTabConten
 const SocialTabContent = React.lazy(() => import('./tabs/SocialTabContent').then(m => ({ default: m.SocialTabContent })));
 import { styles } from './GameScreen.styles';
 import { useRenderTracker } from '../hooks/useRenderTracker';
+import { useLeaderboard } from '../hooks/useLeaderboard';
+import { useDevConsole } from '../hooks/useDevConsole';
 import { isCurrentUserAdmin } from '../services/adminAccess';
 import { normalizeCharacterNameForCompare, releaseCharacterName, reserveCharacterName } from '../services/characterNameRegistry';
-import { fetchCurrentUserRank, fetchLeaderboardTop, isLiveLeaderboardAvailable, submitLeaderboardScore } from '../services/leaderboard';
 import { deleteOnlineSave, loadOnlineSave, loadOnlineSaveForUid, writeOnlineSaveForUid } from '../services/onlineSave';
-import { refreshCurrentUserPublicUsername } from '../services/publicProfile';
 import { fetchCloudMail, subscribeToCloudMail } from '../services/cloudMail';
 import { subscribePendingRequestCount } from '../services/friends';
 import { writePresenceHeartbeat } from '../services/presence';
@@ -293,14 +293,6 @@ interface CharacterSlotSummary {
   occupied: boolean;
 }
 
-interface LiveLeaderboardRow {
-  rank: number;
-  name: string;
-  score: number;
-  badge: string;
-  isYou: boolean;
-}
-
 async function loadLastCharacterSlot(uid: string): Promise<PlayerClass | null> {
   const db = getFirebaseFirestore();
   if (!db) return null;
@@ -436,8 +428,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [draftClass, setDraftClass] = useState<PlayerClass>('warrior');
   const [expandedHeroes, setExpandedHeroes] = useState<Set<string>>(new Set());
   const [recycleConfirmUid, setRecycleConfirmUid] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [adminCheckPending, setAdminCheckPending] = useState(true);
   const [selectedMailId, setSelectedMailId] = useState<string | null>(null);
   const [shopTab, setShopTab] = useState<ShopTab>('diamond');
   const [shopFlashActionId, setShopFlashActionId] = useState<string | null>(null);
@@ -454,8 +444,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   } = useLeaderboard({ state, accountName, activeModal });
   const [socialPendingCount, setSocialPendingCount] = useState(0);
   const [mailSyncError, setMailSyncError] = useState<string | null>(null);
-  const [devCommandInput, setDevCommandInput] = useState('');
-  const [devCommandOutput, setDevCommandOutput] = useState<string>('');
+  const {
+    isAdmin, adminCheckPending,
+    devCommandInput, setDevCommandInput,
+    devCommandOutput, runDevCommand,
+  } = useDevConsole({ accountName, publicUsername, selectedCharacterClass, state, appendMailboxMessages });
   const [compareItemId, setCompareItemId] = useState<string | null>(null);
   const [summonReveal, setSummonReveal] = useState<SummonReveal | null>(null);
   const [cinematicSummonPhase, setCinematicSummonPhase] = useState<'charge' | 'warp' | 'reveal'>('charge');
