@@ -325,9 +325,10 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~`/sendMsg`, `/clearSlot`, `/showOnlineUsersAndCharacters` admin commands available in game Settings.~~
 - **Resolution**: Dev console is already gated behind `isAdmin` state check (GameScreen.tsx). Only authenticated admin users can see or use admin commands.
 
-#### 4.11 Hero Portraits 77% Missing
-- Only 15/65 heroes (23%) have portrait images in `heroPortraits.ts`.
-- Missing portraits for all tier 1 heroes (h1-h10) — the first heroes players encounter.
+#### 4.11 Hero Portraits 75% Missing — PARTIALLY ADDRESSED
+- 16/65 heroes (25%) now have portrait images after mapping SeraphTheInfinite.png to h52.
+- Added `hasHeroPortrait()` helper and documented all heroes needing art in `heroPortraits.ts`.
+- Remaining 49 heroes still need portrait artwork — this is an art production task, not a code task.
 
 #### 4.12 Progress Bars Duplicated 20+ Times ✅ FIXED
 - Created shared `<ProgressBar>` component in `src/components/ProgressBar.tsx`.
@@ -403,11 +404,11 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~**AAA Standard**: Automated crash reporting with stack traces, breadcrumbs, and user context.~~
 - **Resolution**: Added `reportCrash()` to telemetry module—logs error details (message, stack, label, platform) as Firebase Analytics `app_crash` events. Wired into `ErrorBoundary.componentDidCatch` with label and component stack. Added global `window.addEventListener('error')` handler in App.tsx for unhandled errors.
 
-#### 6.6 No Performance Monitoring
-- No React render performance tracking.
-- No frame rate monitoring.
-- No Firestore read/write cost tracking.
-- **AAA Standard**: Performance budgets enforced via monitoring dashboards.
+#### ~~6.6 No Performance Monitoring~~ ✅ FIXED
+- ~~No React render performance tracking.~~
+- ~~No frame rate monitoring.~~
+- ~~No Firestore read/write cost tracking.~~
+- **Resolution**: Added `useRenderTracker` hook (`src/hooks/useRenderTracker.ts`) — tracks render count per component in dev mode, warns when exceeds threshold (default 60 renders/10s). Added `perfMark()` utility for measuring block execution time with configurable threshold. Wired `useRenderTracker('GameScreen')` into main component. Zero overhead in production (dev-only guards).
 
 ### MEDIUM
 
