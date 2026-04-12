@@ -127,6 +127,7 @@ import {
 } from '../services/characterNameRegistry';
 import { deleteOnlineSave, loadOnlineSave } from '../services/onlineSave';
 import { getFirebaseAuth } from '../services/firebase';
+import { t } from '../i18n';
 
 export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations' | 'social';
 type HeroesSubTab = 'summon' | 'roster' | 'batch';
@@ -2617,12 +2618,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         >
           <Text style={styles.rewardToastSparkle}>📖</Text>
           <View>
-            <Text style={styles.rewardToastTitle}>New Chronicle Unlocked</Text>
+            <Text style={styles.rewardToastTitle}>{t('gameScreen.newChronicleUnlocked')}</Text>
             <Text style={styles.rewardToastDetail}>
               {storyUnlockToast.chapter} - {storyUnlockToast.title}
             </Text>
           </View>
-          <Text style={styles.rewardToastSparkle}>View</Text>
+          <Text style={styles.rewardToastSparkle}>{t('gameScreen.view')}</Text>
         </Pressable>
       )}
 
@@ -2661,7 +2662,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         <View style={styles.modalOverlay}>
           <View style={styles.chapterMapModalBox}>
             <View style={styles.settingsHeaderRow}>
-              <Text style={styles.modalTitle}>🧭 Campaign Route</Text>
+              <Text style={styles.modalTitle}>🧭 {t('gameScreen.campaignRoute')}</Text>
               <Pressable
                 style={styles.settingsCloseBtn}
                 onPress={() => {
@@ -2669,11 +2670,15 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   setActiveModal(null);
                 }}
               >
-                <Text style={styles.settingsCloseBtnText}>Close</Text>
+                <Text style={styles.settingsCloseBtnText}>{t('common.close')}</Text>
               </Pressable>
             </View>
             <Text style={styles.chapterMapSubtitle}>
-              Chapter {campaignChapter} • Stage {campaignStage}/{campaignBossStage}
+              {t('gameScreen.chapterStage', {
+                chapter: campaignChapter,
+                stage: campaignStage,
+                bossStage: campaignBossStage,
+              })}
             </Text>
             <View style={styles.chapterNodesWrap}>
               {Array.from({ length: campaignBossStage }, (_, i) => i + 1).map(stage => {
@@ -2696,7 +2701,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 );
               })}
             </View>
-            <Text style={styles.chapterMapHint}>Every 5 stages: chest node • Stage 20: boss gate</Text>
+            <Text style={styles.chapterMapHint}>{t('gameScreen.chapterMapHint')}</Text>
           </View>
         </View>
       </Modal>
@@ -2714,8 +2719,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.idleChestModalBox}>
-            <Text style={styles.idleChestModalTitle}>🎁 Return Chest</Text>
-            <Text style={styles.idleChestModalLine}>{idleChestReward?.title ?? 'Offline Progress'}</Text>
+            <Text style={styles.idleChestModalTitle}>🎁 {t('gameScreen.returnChest')}</Text>
+            <Text style={styles.idleChestModalLine}>{idleChestReward?.title ?? t('gameScreen.offlineProgress')}</Text>
             <Text style={styles.idleChestModalLine}>{idleChestReward?.detail ?? ''}</Text>
             <Pressable
               style={styles.idleChestClaimBtn}
@@ -2726,7 +2731,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 clearRewardPopup();
               }}
             >
-              <Text style={styles.idleChestClaimText}>Claim Rewards</Text>
+              <Text style={styles.idleChestClaimText}>{t('gameScreen.claimRewards')}</Text>
             </Pressable>
           </View>
         </View>
@@ -2745,7 +2750,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         <View style={styles.bottomSheetOverlay}>
           <View style={[styles.eventsModalBox, styles.bottomSheetBox]}>
             <View style={styles.eventsHeaderRow}>
-              <Text style={styles.eventsModalTitle}>🛒 Shop</Text>
+              <Text style={styles.eventsModalTitle}>🛒 {t('gameScreen.shopTitle')}</Text>
               <Pressable
                 style={styles.settingsCloseBtn}
                 onPress={() => {
@@ -2753,14 +2758,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   setActiveModal(null);
                 }}
               >
-                <Text style={styles.settingsCloseBtnText}>Close</Text>
+                <Text style={styles.settingsCloseBtnText}>{t('common.close')}</Text>
               </Pressable>
             </View>
 
             {renderSubTabBar([
               {
                 id: 'diamond',
-                label: 'Diamond Shop',
+                label: t('gameScreen.diamondShop'),
                 active: shopTab === 'diamond',
                 onPress: () => {
                   debugLog('shop', 'Switch shop tab', { from: shopTab, to: 'diamond' });
@@ -2769,7 +2774,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               },
               {
                 id: 'gold',
-                label: 'Gold Shop',
+                label: t('gameScreen.goldShop'),
                 active: shopTab === 'gold',
                 onPress: () => {
                   debugLog('shop', 'Switch shop tab', { from: shopTab, to: 'gold' });
@@ -2778,7 +2783,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               },
               {
                 id: 'dollar',
-                label: 'Dollar Shop',
+                label: t('gameScreen.dollarShop'),
                 active: shopTab === 'dollar',
                 onPress: () => {
                   debugLog('shop', 'Switch shop tab', { from: shopTab, to: 'dollar' });

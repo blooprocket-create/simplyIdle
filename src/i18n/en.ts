@@ -70,19 +70,14 @@ const en = {
     publicUsernamePlaceholder: 'your_username',
     publicUsernameRange:
       '{{min}}-{{max}} characters, letters/numbers/underscores. This name is shown publicly on the leaderboard.',
-    publicUsernameGoogleRange:
-      '{{min}}-{{max}} characters. This name is your public identity online.',
+    publicUsernameGoogleRange: '{{min}}-{{max}} characters. This name is your public identity online.',
     submitPleaseWait: 'Please wait...',
     submitCreateAccount: 'Create Account',
-    supportingOnline:
-      'Sign in with your account to sync progress across devices.',
-    supportingOffline:
-      'Authentication not available. Please check your Firebase configuration.',
-    googleNoteWeb:
-      'Google sign-in uses the Firebase web popup flow configured in Firebase.',
+    supportingOnline: 'Sign in with your account to sync progress across devices.',
+    supportingOffline: 'Authentication not available. Please check your Firebase configuration.',
+    googleNoteWeb: 'Google sign-in uses the Firebase web popup flow configured in Firebase.',
     googleNoteNativeReady: 'Google sign-in is ready for this build.',
-    googleNoteNativeMissing:
-      'Google sign-in needs Expo Google client IDs in your public env vars for native builds.',
+    googleNoteNativeMissing: 'Google sign-in needs Expo Google client IDs in your public env vars for native builds.',
   },
 
   // ── Tap / Attack ─────────────────────────────────────────
@@ -101,10 +96,8 @@ const en = {
     rebirthCount: 'Rebirth Count',
     currentBonus: 'Current Bonus',
     newBonus: 'New Power Bonus',
-    bonusExplain:
-      'Bonus = {{multiplier}}× per rebirth, compounding. Applies to all DPS.',
-    notReady:
-      'Reach peak wave {{wave}} first! ({{remaining}} to go)',
+    bonusExplain: 'Bonus = {{multiplier}}× per rebirth, compounding. Applies to all DPS.',
+    notReady: 'Reach peak wave {{wave}} first! ({{remaining}} to go)',
     cancelButton: 'Not Yet',
     confirmButton: 'Ascend',
   },
@@ -169,6 +162,22 @@ const en = {
     ok: 'OK',
     yes: 'Yes',
     no: 'No',
+  },
+
+  // ── Game Screen ─────────────────────────────────────────
+  gameScreen: {
+    newChronicleUnlocked: 'New Chronicle Unlocked',
+    view: 'View',
+    campaignRoute: 'Campaign Route',
+    chapterStage: 'Chapter {{chapter}} - Stage {{stage}}/{{bossStage}}',
+    chapterMapHint: 'Every 5 stages: chest node - Stage 20: boss gate',
+    returnChest: 'Return Chest',
+    offlineProgress: 'Offline Progress',
+    claimRewards: 'Claim Rewards',
+    shopTitle: 'Shop',
+    diamondShop: 'Diamond Shop',
+    goldShop: 'Gold Shop',
+    dollarShop: 'Dollar Shop',
   },
 } as const;
 

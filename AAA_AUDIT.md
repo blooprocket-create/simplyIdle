@@ -312,10 +312,10 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~No i18n library (react-i18next, etc.).~~
 - **AAA Standard**: All user-facing strings externalized for localization.
 - **Resolution**: Created lightweight i18n scaffold:
-  - `src/i18n/en.ts` — English string catalog with expanded namespaces (header, tap, prestige, building, progress, engine, stats, common, title, auth).
+  - `src/i18n/en.ts` — English string catalog with expanded namespaces (header, tap, prestige, building, progress, engine, stats, common, title, auth, gameScreen).
   - `src/i18n/index.ts` — Core `t()` function with `{{variable}}` interpolation, type-safe dot-path keys, locale switching API.
-  - Integrated into `GameHeader.tsx` (resource/action accessibility labels and status labels), `TapButton.tsx` (attack label, damage text), `TitleScreen.tsx`, and `AuthScreen.tsx`.
-  - Remaining: migrate remaining hardcoded strings in deeper modal/tab content and service-surfaced user messages.
+  - Integrated into `GameHeader.tsx` (resource/action accessibility labels and status labels), `TapButton.tsx` (attack label, damage text), `TitleScreen.tsx`, `AuthScreen.tsx`, and key `GameScreen.tsx` modal/overlay surfaces (story toast, campaign map, idle chest, shop labels).
+  - Remaining: migrate deeper tab-card copy and service-surfaced user messages.
 
 #### ~~4.4 No Loading/Error States for Several Flows~~ ✅ FIXED
 - ~~Shop VIP loading: no indicator.~~
