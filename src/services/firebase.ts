@@ -20,28 +20,71 @@ function selectedAppEnv(): string {
   return appEnv === 'staging' || appEnv === 'prod' ? appEnv : 'dev';
 }
 
-function readEnvVar(baseKey: string, env: string): string {
-  const normalized = env.toUpperCase();
-  const envSpecificRaw = process.env[`EXPO_PUBLIC_FIREBASE_${baseKey}_${normalized}` as keyof NodeJS.ProcessEnv];
-  const fallbackRaw = process.env[`EXPO_PUBLIC_FIREBASE_${baseKey}` as keyof NodeJS.ProcessEnv];
+interface FirebaseConfigValues {
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  storageBucket: string;
+  messagingSenderId: string;
+  appId: string;
+  measurementId: string;
+}
 
-  const envSpecific = (envSpecificRaw ?? '').trim();
-  if (envSpecific) return envSpecific;
+function readStaticFirebaseVars(): {
+  base: FirebaseConfigValues;
+  staging: FirebaseConfigValues;
+  prod: FirebaseConfigValues;
+} {
+  const base: FirebaseConfigValues = {
+    apiKey: (process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? '').trim(),
+    authDomain: (process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? '').trim(),
+    projectId: (process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? '').trim(),
+    storageBucket: (process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ?? '').trim(),
+    messagingSenderId: (process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? '').trim(),
+    appId: (process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? '').trim(),
+    measurementId: (process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID ?? '').trim(),
+  };
 
-  return (fallbackRaw ?? '').trim();
+  const staging: FirebaseConfigValues = {
+    apiKey: (process.env.EXPO_PUBLIC_FIREBASE_API_KEY_STAGING ?? '').trim(),
+    authDomain: (process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN_STAGING ?? '').trim(),
+    projectId: (process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID_STAGING ?? '').trim(),
+    storageBucket: (process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET_STAGING ?? '').trim(),
+    messagingSenderId: (process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID_STAGING ?? '').trim(),
+    appId: (process.env.EXPO_PUBLIC_FIREBASE_APP_ID_STAGING ?? '').trim(),
+    measurementId: (process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID_STAGING ?? '').trim(),
+  };
+
+  const prod: FirebaseConfigValues = {
+    apiKey: (process.env.EXPO_PUBLIC_FIREBASE_API_KEY_PROD ?? '').trim(),
+    authDomain: (process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN_PROD ?? '').trim(),
+    projectId: (process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID_PROD ?? '').trim(),
+    storageBucket: (process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET_PROD ?? '').trim(),
+    messagingSenderId: (process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID_PROD ?? '').trim(),
+    appId: (process.env.EXPO_PUBLIC_FIREBASE_APP_ID_PROD ?? '').trim(),
+    measurementId: (process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID_PROD ?? '').trim(),
+  };
+
+  return { base, staging, prod };
+}
+
+function preferNonEmpty(preferred: string, fallback: string): string {
+  return preferred || fallback;
 }
 
 function readConfig() {
   const env = selectedAppEnv();
+  const vars = readStaticFirebaseVars();
+  const scoped = env === 'staging' ? vars.staging : env === 'prod' ? vars.prod : vars.base;
 
   return {
-    apiKey: readEnvVar('API_KEY', env),
-    authDomain: readEnvVar('AUTH_DOMAIN', env),
-    projectId: readEnvVar('PROJECT_ID', env),
-    storageBucket: readEnvVar('STORAGE_BUCKET', env),
-    messagingSenderId: readEnvVar('MESSAGING_SENDER_ID', env),
-    appId: readEnvVar('APP_ID', env),
-    measurementId: readEnvVar('MEASUREMENT_ID', env),
+    apiKey: preferNonEmpty(scoped.apiKey, vars.base.apiKey),
+    authDomain: preferNonEmpty(scoped.authDomain, vars.base.authDomain),
+    projectId: preferNonEmpty(scoped.projectId, vars.base.projectId),
+    storageBucket: preferNonEmpty(scoped.storageBucket, vars.base.storageBucket),
+    messagingSenderId: preferNonEmpty(scoped.messagingSenderId, vars.base.messagingSenderId),
+    appId: preferNonEmpty(scoped.appId, vars.base.appId),
+    measurementId: preferNonEmpty(scoped.measurementId, vars.base.measurementId),
   };
 }
 
