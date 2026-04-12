@@ -24,7 +24,7 @@ import {
   loginOnlineWithGoogleTokens,
   registerOnline,
 } from '../services/onlineAuth';
-import { getFirebaseAuth } from '../services/firebase';
+import { getFirebaseAuth, getFirebaseConfigDiagnostics } from '../services/firebase';
 import {
   isPublicUsernameAvailable,
   loadPublicUsername,
@@ -88,13 +88,7 @@ export async function getValidStoredSession(): Promise<string | null> {
   return null;
 }
 
-function NativeGoogleButton({
-  disabled,
-  googleConfig,
-  onSuccess,
-  onError,
-  onBusyChange,
-}: NativeGoogleButtonProps) {
+function NativeGoogleButton({ disabled, googleConfig, onSuccess, onError, onBusyChange }: NativeGoogleButtonProps) {
   const [request, response, promptAsync] = Google.useAuthRequest({
     clientId: googleConfig.expoClientId || googleConfig.androidClientId || googleConfig.iosClientId,
     androidClientId: googleConfig.androidClientId || undefined,
@@ -156,9 +150,14 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const onlineAuthEnabled = isOnlineAuthAvailable();
+  const firebaseConfigDiagnostics = getFirebaseConfigDiagnostics();
   const googleAuthEnabled = isGoogleAuthAvailable();
   const googleConfig = getGoogleAuthConfig();
-  const hasNativeGoogleConfig = !!(googleConfig.expoClientId || googleConfig.androidClientId || googleConfig.iosClientId);
+  const hasNativeGoogleConfig = !!(
+    googleConfig.expoClientId ||
+    googleConfig.androidClientId ||
+    googleConfig.iosClientId
+  );
 
   const cleanIdentifier = identifier.trim();
   const normalizedEmail = cleanIdentifier.toLowerCase();
@@ -175,16 +174,24 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     return true;
   }, [busy, onlineAuthEnabled, normalizedEmail, password, mode, confirmPassword, publicUsername]);
 
-  async function completeOnlineLogin(accountName: string, provider: 'email' | 'google', authMode: 'login' | 'register') {
+  async function completeOnlineLogin(
+    accountName: string,
+    provider: 'email' | 'google',
+    authMode: 'login' | 'register',
+  ) {
     const uid = getFirebaseAuth()?.currentUser?.uid;
     if (uid) {
       void loadPublicUsername(uid);
     }
     debugLog('auth', 'Online auth successful', { mode: authMode, provider, username: accountName });
-    void trackGameplayAction(authMode === 'register' ? 'auth_register_success' : 'auth_login_success', {
-      username: accountName,
-      provider,
-    }, 0);
+    void trackGameplayAction(
+      authMode === 'register' ? 'auth_register_success' : 'auth_login_success',
+      {
+        username: accountName,
+        provider,
+      },
+      0,
+    );
     void trackEvent('auth_success', {
       mode: authMode,
       provider,
@@ -276,9 +283,10 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           }
         }
 
-        const authenticatedName = mode === 'register'
-          ? await registerOnline(normalizedEmail, password)
-          : await loginOnline(normalizedEmail, password);
+        const authenticatedName =
+          mode === 'register'
+            ? await registerOnline(normalizedEmail, password)
+            : await loginOnline(normalizedEmail, password);
 
         if (mode === 'register') {
           const uid = getFirebaseAuth()?.currentUser?.uid;
@@ -295,7 +303,6 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
         await completeOnlineLogin(authenticatedName, 'email', mode);
         return;
       }
-
     } catch (submitError) {
       const mappedError = mapAuthError(submitError);
       setError(mappedError);
@@ -325,7 +332,9 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       }
 
       if (!hasNativeGoogleConfig) {
-        throw new Error('Google sign-in is not configured for this build. Add Google client IDs to Expo public env vars.');
+        throw new Error(
+          'Google sign-in is not configured for this build. Add Google client IDs to Expo public env vars.',
+        );
       }
 
       setBusy(false);
@@ -343,15 +352,21 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
 
   const identityLabel = t('auth.identityLabel');
   const identityPlaceholder = t('auth.identityPlaceholder');
-  const submitLabel = busy ? t('auth.submitPleaseWait') : mode === 'login' ? t('auth.modeLogin') : t('auth.submitCreateAccount');
-  const supportingNote = onlineAuthEnabled
-    ? t('auth.supportingOnline')
-    : t('auth.supportingOffline');
-  const googleNote = Platform.OS === 'web'
-    ? t('auth.googleNoteWeb')
-    : googleAuthEnabled
-      ? t('auth.googleNoteNativeReady')
-      : t('auth.googleNoteNativeMissing');
+  const submitLabel = busy
+    ? t('auth.submitPleaseWait')
+    : mode === 'login'
+      ? t('auth.modeLogin')
+      : t('auth.submitCreateAccount');
+  const supportingNote = onlineAuthEnabled ? t('auth.supportingOnline') : t('auth.supportingOffline');
+  const firebaseMissingNote = !onlineAuthEnabled
+    ? `Missing Firebase env keys for ${firebaseConfigDiagnostics.appEnv}: ${firebaseConfigDiagnostics.missingRequired.join(', ') || 'unknown'}`
+    : null;
+  const googleNote =
+    Platform.OS === 'web'
+      ? t('auth.googleNoteWeb')
+      : googleAuthEnabled
+        ? t('auth.googleNoteNativeReady')
+        : t('auth.googleNoteNativeMissing');
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -369,8 +384,11 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           <View style={styles.card}>
             <View style={styles.cardTopRow}>
               <View style={styles.cardCopy}>
-                <Text style={styles.cardTitle}>{mode === 'login' ? t('auth.returnToCommand') : t('auth.openNewLedger')}</Text>
+                <Text style={styles.cardTitle}>
+                  {mode === 'login' ? t('auth.returnToCommand') : t('auth.openNewLedger')}
+                </Text>
                 <Text style={styles.cardBody}>{supportingNote}</Text>
+                {firebaseMissingNote ? <Text style={styles.helperTextError}>{firebaseMissingNote}</Text> : null}
               </View>
               <View style={styles.statusPill}>
                 <Text style={styles.statusPillText}>{t('auth.statusFirebase')}</Text>
@@ -386,7 +404,9 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   setPublicUsername('');
                 }}
               >
-                <Text style={[styles.modeBtnText, mode === 'login' && styles.modeBtnTextActive]}>{t('auth.modeLogin')}</Text>
+                <Text style={[styles.modeBtnText, mode === 'login' && styles.modeBtnTextActive]}>
+                  {t('auth.modeLogin')}
+                </Text>
               </Pressable>
               <Pressable
                 style={[styles.modeBtn, mode === 'register' && styles.modeBtnActive]}
@@ -396,7 +416,9 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   setPublicUsername('');
                 }}
               >
-                <Text style={[styles.modeBtnText, mode === 'register' && styles.modeBtnTextActive]}>{t('auth.modeCreate')}</Text>
+                <Text style={[styles.modeBtnText, mode === 'register' && styles.modeBtnTextActive]}>
+                  {t('auth.modeCreate')}
+                </Text>
               </Pressable>
             </View>
 
@@ -404,11 +426,19 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               <>
                 {Platform.OS === 'web' || !hasNativeGoogleConfig ? (
                   <Pressable
-                    style={[styles.googleBtn, (busy || googleNeedsUsername || (Platform.OS !== 'web' && !hasNativeGoogleConfig)) && styles.buttonDisabled]}
+                    style={[
+                      styles.googleBtn,
+                      (busy || googleNeedsUsername || (Platform.OS !== 'web' && !hasNativeGoogleConfig)) &&
+                        styles.buttonDisabled,
+                    ]}
                     disabled={busy || googleNeedsUsername || (Platform.OS !== 'web' && !hasNativeGoogleConfig)}
                     onPress={handleGoogleContinue}
                   >
-                      {busy ? <ActivityIndicator color="#08131E" /> : <Text style={styles.googleBtnText}>{t('auth.continueWithGoogle')}</Text>}
+                    {busy ? (
+                      <ActivityIndicator color="#08131E" />
+                    ) : (
+                      <Text style={styles.googleBtnText}>{t('auth.continueWithGoogle')}</Text>
+                    )}
                   </Pressable>
                 ) : (
                   <NativeGoogleButton
@@ -436,17 +466,31 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                       placeholderTextColor="#6D7A90"
                       maxLength={PUBLIC_USERNAME_MAX}
                     />
-                    <Text style={[styles.helperText, publicUsername.length > 0 && validatePublicUsername(publicUsername) !== null && styles.helperTextError]}>
+                    <Text
+                      style={[
+                        styles.helperText,
+                        publicUsername.length > 0 &&
+                          validatePublicUsername(publicUsername) !== null &&
+                          styles.helperTextError,
+                      ]}
+                    >
                       {publicUsername.length > 0 && validatePublicUsername(publicUsername)
-                        ? validatePublicUsername(publicUsername) ?? ''
+                        ? (validatePublicUsername(publicUsername) ?? '')
                         : t('auth.publicUsernameGoogleRange', { min: PUBLIC_USERNAME_MIN, max: PUBLIC_USERNAME_MAX })}
                     </Text>
                     <Pressable
-                      style={[styles.submitBtn, (busy || validatePublicUsername(publicUsername) !== null) && styles.buttonDisabled]}
+                      style={[
+                        styles.submitBtn,
+                        (busy || validatePublicUsername(publicUsername) !== null) && styles.buttonDisabled,
+                      ]}
                       disabled={busy || validatePublicUsername(publicUsername) !== null}
                       onPress={handleCompleteGoogleUsername}
                     >
-                      {busy ? <ActivityIndicator color="#08131E" /> : <Text style={styles.submitBtnText}>{t('auth.finishGoogleSignup')}</Text>}
+                      {busy ? (
+                        <ActivityIndicator color="#08131E" />
+                      ) : (
+                        <Text style={styles.submitBtnText}>{t('auth.finishGoogleSignup')}</Text>
+                      )}
                     </Pressable>
                   </>
                 )}
@@ -465,13 +509,13 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               style={styles.input}
               autoCapitalize="none"
               autoCorrect={false}
-                autoComplete="email"
-                keyboardType="email-address"
+              autoComplete="email"
+              keyboardType="email-address"
               placeholder={identityPlaceholder}
               placeholderTextColor="#6D7A90"
-                maxLength={120}
+              maxLength={120}
             />
-              <Text style={styles.helperText}>{t('auth.identityHelper')}</Text>
+            <Text style={styles.helperText}>{t('auth.identityHelper')}</Text>
 
             <Text style={styles.fieldLabel}>{t('auth.passwordLabel')}</Text>
             <TextInput
@@ -501,7 +545,12 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   placeholderTextColor="#6D7A90"
                   maxLength={PASSWORD_MAX_LENGTH}
                 />
-                <Text style={[styles.helperText, confirmPassword.length > 0 && password !== confirmPassword && styles.helperTextError]}>
+                <Text
+                  style={[
+                    styles.helperText,
+                    confirmPassword.length > 0 && password !== confirmPassword && styles.helperTextError,
+                  ]}
+                >
                   {confirmPassword.length === 0 || password === confirmPassword
                     ? t('auth.confirmPasswordHelperOk')
                     : t('auth.confirmPasswordHelperMismatch')}
@@ -523,9 +572,16 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   placeholderTextColor="#6D7A90"
                   maxLength={PUBLIC_USERNAME_MAX}
                 />
-                <Text style={[styles.helperText, publicUsername.length > 0 && validatePublicUsername(publicUsername) !== null && styles.helperTextError]}>
+                <Text
+                  style={[
+                    styles.helperText,
+                    publicUsername.length > 0 &&
+                      validatePublicUsername(publicUsername) !== null &&
+                      styles.helperTextError,
+                  ]}
+                >
                   {publicUsername.length > 0 && validatePublicUsername(publicUsername)
-                    ? validatePublicUsername(publicUsername) ?? ''
+                    ? (validatePublicUsername(publicUsername) ?? '')
                     : t('auth.publicUsernameRange', { min: PUBLIC_USERNAME_MIN, max: PUBLIC_USERNAME_MAX })}
                 </Text>
               </>

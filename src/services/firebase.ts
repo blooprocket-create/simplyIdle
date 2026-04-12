@@ -10,6 +10,16 @@ let cachedDb: Firestore | null = null;
 let cachedAnalytics: Analytics | null = null;
 let authPersistenceInitialized = false;
 
+export interface FirebaseConfigDiagnostics {
+  appEnv: string;
+  missingRequired: string[];
+}
+
+function selectedAppEnv(): string {
+  const appEnv = (process.env.EXPO_PUBLIC_APP_ENV ?? 'dev').toLowerCase();
+  return appEnv === 'staging' || appEnv === 'prod' ? appEnv : 'dev';
+}
+
 function readEnvVar(baseKey: string, env: string): string {
   const normalized = env.toUpperCase();
   const envSpecificRaw = process.env[`EXPO_PUBLIC_FIREBASE_${baseKey}_${normalized}` as keyof NodeJS.ProcessEnv];
@@ -22,8 +32,7 @@ function readEnvVar(baseKey: string, env: string): string {
 }
 
 function readConfig() {
-  const appEnv = (process.env.EXPO_PUBLIC_APP_ENV ?? 'dev').toLowerCase();
-  const env = appEnv === 'staging' || appEnv === 'prod' ? appEnv : 'dev';
+  const env = selectedAppEnv();
 
   return {
     apiKey: readEnvVar('API_KEY', env),
@@ -33,6 +42,20 @@ function readConfig() {
     messagingSenderId: readEnvVar('MESSAGING_SENDER_ID', env),
     appId: readEnvVar('APP_ID', env),
     measurementId: readEnvVar('MEASUREMENT_ID', env),
+  };
+}
+
+export function getFirebaseConfigDiagnostics(): FirebaseConfigDiagnostics {
+  const cfg = readConfig();
+  const missingRequired: string[] = [];
+
+  if (!cfg.apiKey) missingRequired.push('EXPO_PUBLIC_FIREBASE_API_KEY');
+  if (!cfg.projectId) missingRequired.push('EXPO_PUBLIC_FIREBASE_PROJECT_ID');
+  if (!cfg.appId) missingRequired.push('EXPO_PUBLIC_FIREBASE_APP_ID');
+
+  return {
+    appEnv: selectedAppEnv(),
+    missingRequired,
   };
 }
 
