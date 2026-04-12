@@ -398,8 +398,8 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 #### 5.4 No Linting or Formatting ✅ FIXED
 - ~~No ESLint configuration.~~ → `eslint.config.mjs` with typescript-eslint, react-hooks, prettier.
 - ~~No Prettier configuration.~~ → `.prettierrc` with singleQuote, 120 printWidth.
-- No pre-commit hooks yet (Husky + lint-staged recommended as next step).
-- Scripts added: `lint`, `lint:fix`, `format`, `format:check`, `typecheck`.
+- **Resolution**: Added Husky + lint-staged pre-commit enforcement via `.husky/pre-commit` running `npm run lint-staged`, with staged `src/**/*.{ts,tsx}` files auto-run through `eslint --fix` and `prettier --write`.
+- Scripts added: `lint`, `lint:fix`, `format`, `format:check`, `typecheck`, `lint-staged`, `prepare`.
 
 #### 5.5 No Balance Simulation / Regression Tests ✅ FIXED
 - ~~No automated progression pacing checks.~~
