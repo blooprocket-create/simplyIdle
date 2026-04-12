@@ -6,7 +6,7 @@ title: Hero Database
 
 Status: Live
 
-Last reviewed: 2026-04-03
+Last reviewed: 2026-04-12
 
 Total heroes: 65
 
