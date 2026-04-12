@@ -51,7 +51,8 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
   - Extracted `useDevConsole` (admin gating + command execution).
   - Extracted `useSummonCinematic` (summon reveal/cinematic state machine).
   - Extracted `useSocialServices` (mail sync, pending requests, presence heartbeat).
-- **Remaining work**: Character-slot lifecycle and additional modal-domain hooks still live in `GameScreen.tsx`.
+  - Extracted `useCharacterSlots` (slot loading, last-used preference persistence, slot summary synchronization).
+- **Remaining work**: Additional modal-domain/UI extraction is still needed to bring `GameScreen.tsx` near AAA component size targets.
 
 #### ~~1.2 Monolithic Reducer: useGameState.ts (~3,100 lines)~~ ✅ FIXED
 - ~~**Problem**: Single reducer handles all game state — combat, economy, roster, meta, liveops. No domain isolation.~~

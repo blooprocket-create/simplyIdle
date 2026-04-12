@@ -91,10 +91,10 @@ import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useDevConsole } from '../hooks/useDevConsole';
 import { useSummonCinematic } from '../hooks/useSummonCinematic';
 import { useSocialServices } from '../hooks/useSocialServices';
+import { useCharacterSlots } from '../hooks/useCharacterSlots';
 import { normalizeCharacterNameForCompare, releaseCharacterName, reserveCharacterName } from '../services/characterNameRegistry';
 import { deleteOnlineSave, loadOnlineSave } from '../services/onlineSave';
-import { getFirebaseAuth, getFirebaseFirestore } from '../services/firebase';
-import { getDoc, doc as firestoreDoc, setDoc } from 'firebase/firestore';
+import { getFirebaseAuth } from '../services/firebase';
 
 export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations' | 'social';
 type HeroesSubTab = 'summon' | 'roster' | 'batch';
@@ -239,56 +239,9 @@ export function formatDurationShort(ms: number): string {
   return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
 }
 
-interface CharacterSlotSummary {
-  classId: PlayerClass;
-  playerName: string | null;
-  level: number;
-  highestWaveReached: number;
-  vipLevel: number;
-  occupied: boolean;
-}
-
-async function loadLastCharacterSlot(uid: string): Promise<PlayerClass | null> {
-  const db = getFirebaseFirestore();
-  if (!db) return null;
-  try {
-    const snap = await getDoc(firestoreDoc(db, 'userPreferences', uid));
-    if (!snap.exists()) return null;
-    const val = snap.data()?.lastCharacterSlot;
-    return typeof val === 'string' ? val as PlayerClass : null;
-  } catch {
-    return null;
-  }
-}
-
-async function saveLastCharacterSlot(uid: string, playerClass: PlayerClass | null): Promise<void> {
-  const db = getFirebaseFirestore();
-  if (!db) return;
-  try {
-    await setDoc(firestoreDoc(db, 'userPreferences', uid), { lastCharacterSlot: playerClass ?? null }, { merge: true });
-  } catch {
-    // non-critical; ignore
-  }
-}
-
-function getVipLevelFromPoints(points: number): number {
-  let level = 0;
-  for (let i = 0; i < VIP_LEVEL_THRESHOLDS.length; i += 1) {
-    if (points >= VIP_LEVEL_THRESHOLDS[i]) {
-      level = i;
-    } else {
-      break;
-    }
-  }
-  return Math.max(0, Math.min(10, level));
-}
-
 export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   useRenderTracker('GameScreen');
   const [selectedCharacterClass, setSelectedCharacterClass] = useState<PlayerClass | null>(null);
-  const [lastUsedCharacterClass, setLastUsedCharacterClass] = useState<PlayerClass | null>(null);
-  const [slotSummaries, setSlotSummaries] = useState<CharacterSlotSummary[]>([]);
-  const [slotListLoading, setSlotListLoading] = useState(true);
   const {
     hydrated,
     onlineSyncState,
@@ -374,6 +327,20 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     applyOfflineProgress,
     setLastActiveAt,
   } = useGameState(selectedCharacterClass ? getCharacterSaveSlot(accountName, selectedCharacterClass) : '__character_slot_preview__');
+
+  const {
+    lastUsedCharacterClass,
+    slotSummaries,
+    setSlotSummaries,
+    slotListLoading,
+    clearLastUsedClass,
+  } = useCharacterSlots({
+    accountName,
+    selectedCharacterClass,
+    setSelectedCharacterClass,
+    hydrated,
+    state,
+  });
 
   const [tab, setTab] = useState<Tab>('warroom');
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -514,97 +481,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     }
     appStateRef.current = nextState;
   };
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadCharacterSlots() {
-      setSlotListLoading(true);
-      const summaries = await Promise.all(CLASSES.map(async cls => {
-          const slotResult = await loadOnlineSave<Record<string, unknown>>(getCharacterSaveSlot(accountName, cls.id));
-          const parsed = slotResult.ok && slotResult.data ? slotResult.data.payload : null;
-          if (!parsed) {
-          return {
-            classId: cls.id,
-            playerName: null,
-            level: 1,
-            highestWaveReached: 1,
-            vipLevel: 0,
-            occupied: false,
-          } satisfies CharacterSlotSummary;
-        }
-
-          const playerName = typeof parsed.playerName === 'string' ? parsed.playerName.trim().slice(0, 24) : '';
-          const occupied = !!playerName && parsed.characterCreated === true;
-          const parsedVipPoints = typeof parsed.vipPoints === 'number' && Number.isFinite(parsed.vipPoints)
-            ? Math.max(0, Math.floor(parsed.vipPoints))
-            : 0;
-          const parsedVipLevel = typeof parsed.vipLevel === 'number' && Number.isFinite(parsed.vipLevel)
-            ? Math.max(0, Math.min(10, Math.floor(parsed.vipLevel)))
-            : getVipLevelFromPoints(parsedVipPoints);
-          return {
-            classId: cls.id,
-            playerName: occupied ? playerName : null,
-            level: typeof parsed.level === 'number' && Number.isFinite(parsed.level) ? Math.max(1, Math.floor(parsed.level)) : 1,
-            highestWaveReached: typeof parsed.highestWaveReached === 'number' && Number.isFinite(parsed.highestWaveReached)
-              ? Math.max(1, Math.floor(parsed.highestWaveReached))
-              : typeof parsed.wave === 'number' && Number.isFinite(parsed.wave)
-                ? Math.max(1, Math.floor(parsed.wave))
-                : 1,
-            vipLevel: occupied ? parsedVipLevel : 0,
-            occupied,
-          } satisfies CharacterSlotSummary;
-      }));
-
-      if (cancelled) return;
-      setSlotSummaries(summaries);
-
-      const occupiedClasses = summaries.filter(slot => slot.occupied).map(slot => slot.classId);
-        const uid = getFirebaseAuth()?.currentUser?.uid ?? '';
-        const lastSelected = uid ? await loadLastCharacterSlot(uid) : null;
-        const normalizedLastSelected = lastSelected && CLASSES.some(cls => cls.id === lastSelected)
-          ? lastSelected
-        : null;
-      setLastUsedCharacterClass(normalizedLastSelected);
-      if (cancelled) return;
-
-      if (normalizedLastSelected && occupiedClasses.includes(normalizedLastSelected)) {
-        setSelectedCharacterClass(normalizedLastSelected);
-      } else if (occupiedClasses.length === 1) {
-        setSelectedCharacterClass(occupiedClasses[0]);
-      } else {
-        setSelectedCharacterClass(null);
-      }
-
-      setSlotListLoading(false);
-    }
-
-    void loadCharacterSlots();
-    return () => {
-      cancelled = true;
-    };
-  }, [accountName]);
-
-  useEffect(() => {
-    if (!selectedCharacterClass) return;
-    setLastUsedCharacterClass(selectedCharacterClass);
-      const uid = getFirebaseAuth()?.currentUser?.uid ?? '';
-      if (uid) void saveLastCharacterSlot(uid, selectedCharacterClass);
-    }, [accountName, selectedCharacterClass]);
-
-  useEffect(() => {
-    if (!selectedCharacterClass || !hydrated || !state.characterCreated) return;
-    setSlotSummaries(prev => prev.map(slot => slot.classId === selectedCharacterClass
-      ? {
-        ...slot,
-        occupied: true,
-        playerName: state.playerName,
-        level: state.level,
-        highestWaveReached: state.highestWaveReached,
-          vipLevel: Math.max(0, Math.min(10, state.vipLevel ?? 0)),
-      }
-      : slot));
-        }, [hydrated, selectedCharacterClass, state.characterCreated, state.highestWaveReached, state.level, state.playerName, state.vipLevel]);
 
   useEffect(() => {
     if (!selectedCharacterClass) return;
@@ -1686,12 +1562,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       await releaseCharacterName(removedCharacterName);
     }
 
-      const uid = getFirebaseAuth()?.currentUser?.uid ?? '';
-      const lastSelected = uid ? await loadLastCharacterSlot(uid) : null;
-      if (lastSelected === playerClass) {
-        if (uid) await saveLastCharacterSlot(uid, null);
-      setLastUsedCharacterClass(null);
-    }
+    await clearLastUsedClass(playerClass);
 
     setSlotSummaries(prev => prev.map(slot => (
       slot.classId === playerClass
