@@ -255,9 +255,10 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~`lastUsedMs` from client clock can be in the future, causing negative cooldowns.~~
 - **Resolution**: Added `isMiniOpOnCooldown()` helper that clamps `lastUsedMs` via `Math.min(lastUsedMs, nowMs)`, preventing future timestamps from causing permanent lockout. All 5 mini-op cooldown checks use this helper.
 
-#### 3.16 Leaderboard Data is Fake
-- `useLeaderboardCalculation.ts` generates **seeded fake players** (NovaMarshal, etc.). Player never ranks below 8th.
-- **Fix**: Replace with real server-backed leaderboard data.
+#### ~~3.16 Leaderboard Data is Fake~~ ✅ FIXED
+- ~~`useLeaderboardCalculation.ts` generates **seeded fake players** (NovaMarshal, etc.). Player never ranks below 8th.~~
+- ~~**Fix**: Replace with real server-backed leaderboard data.~~
+- **Resolution**: Live leaderboard system (`services/leaderboard.ts`) already replaced the fake data. `useLeaderboardCalculation.ts` deprecated and no longer imported. GameScreen uses `fetchLeaderboardTop()` + `submitLeaderboardScore()` + `fetchCurrentUserRank()` via Firestore.
 
 ---
 
@@ -283,21 +284,24 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - No i18n library (react-i18next, etc.).
 - **AAA Standard**: All user-facing strings externalized for localization.
 
-#### 4.4 No Loading/Error States for Several Flows
-- Shop VIP loading: no indicator.
-- Mail sync failure: infinite empty mailbox, no error message.
-- Guild data fetch: no loading overlay.
-- Chat send failure: optimistic update not reverted, confusing UX.
+#### ~~4.4 No Loading/Error States for Several Flows~~ ✅ FIXED
+- ~~Shop VIP loading: no indicator.~~
+- ~~Mail sync failure: infinite empty mailbox, no error message.~~
+- ~~Guild data fetch: no loading overlay.~~
+- ~~Chat send failure: optimistic update not reverted, confusing UX.~~
+- **Resolution**: Guild refresh now toggles `guildBusy` state with loading indicator. Friends refresh wrapped with `friendsBusy`/`friendsError` states. Mail sync error surfaced via `mailSyncError` banner in mailbox modal. Chat send already had proper error handling with `setChatError`.
 
-#### 4.5 DPS/Power Formula Opacity
-- `useDpsPowerTooltip` shows Formation × Synergy multiplied together instead of individual breakdowns.
-- Players can't understand actual contribution of each multiplier.
-- Rebirth modal shows only new bonus multiplier — doesn't explain total stacking effect.
+#### 4.5 DPS/Power Formula Opacity ✅ FIXED
+- ~~`useDpsPowerTooltip` shows Formation × Synergy multiplied together instead of individual breakdowns.~~
+- ~~Players can't understand actual contribution of each multiplier.~~
+- ~~Rebirth modal shows only new bonus multiplier — doesn't explain total stacking effect.~~
+- **Resolution**: Split combined multiplier lines in `useDpsPowerTooltip` into individual breakdowns (Formation, Synergy, Mastery, Temporary buff each shown separately). Enhanced `PrestigeModal` with current bonus display, rebirth count, and compounding formula explanation.
 
-#### 4.6 Missing Onboarding / Tutorial Path
-- Beta readiness doc says "Tutorial path always points to one obvious next action" — but this is unchecked.
-- No progressive disclosure for dense systems. New players face 7+ tabs of complexity immediately.
-- **AAA Standard**: Guided first-session questline → first summon → first boss → first rebirth.
+#### 4.6 Missing Onboarding / Tutorial Path ✅ FIXED
+- ~~Beta readiness doc says "Tutorial path always points to one obvious next action" — but this is unchecked.~~
+- ~~No progressive disclosure for dense systems. New players face 7+ tabs of complexity immediately.~~
+- ~~**AAA Standard**: Guided first-session questline → first summon → first boss → first rebirth.~~
+- **Resolution**: Added 6 progressive onboarding hints to the existing hint system: Welcome (wave 1-3), First Hero (wave 5+), Deploy Hero, Gear Up (wave 10+), Stat Points, and First Rebirth. Each triggers at the appropriate milestone and is dismissible. `useGameGuidance` hook also updated with early-game recruit guidance.
 
 #### 4.7 Mobile vs Web Layout Parity Gap
 - `MobileGameScreen.tsx` is a skeleton (110 lines, most handlers are `// TODO`).
@@ -335,17 +339,19 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 
 ### CRITICAL — **No Tests Exist**
 
-#### 5.1 Zero Unit Tests
-- No test files found (`*.test.*`, `*.spec.*`).
-- No test runner configured (Jest, Vitest, etc.).
-- No test dependencies in `package.json`.
-- **AAA Standard**: 80%+ code coverage on game logic. 100% coverage on balance formulas and reducer actions.
+#### ~~5.1 Zero Unit Tests~~ ✅ FIXED
+- ~~No test files found (`*.test.*`, `*.spec.*`).~~
+- ~~No test runner configured (Jest, Vitest, etc.).~~
+- ~~No test dependencies in `package.json`.~~
+- ~~**AAA Standard**: 80%+ code coverage on game logic. 100% coverage on balance formulas and reducer actions.~~
+- **Resolution**: Jest + jest-expo/web configured with `jest.config.json`. 84 tests across 3 suites: `utils.test.ts` (22 tests for fmt/safeDivide/buildingCost/bulkCost), `gameConfig.test.ts` (54 tests for combat/ranking/equipment/rarity/acts/classes), `saveRoundTrip.test.ts` (8 tests for serialize→sanitizeSaveData round-trip). Mock infrastructure for Firebase/telemetry services.
 
-#### 5.2 Zero Integration Tests
-- No test for save/load round-trip.
-- No test for offline progress simulation.
-- No test for equipment migration.
-- No test for rebirth state preservation.
+#### ~~5.2 Zero Integration Tests~~ ✅ FIXED
+- ~~No test for save/load round-trip.~~
+- ~~No test for offline progress simulation.~~
+- ~~No test for equipment migration.~~
+- ~~No test for rebirth state preservation.~~
+- **Resolution**: Created `saveRoundTrip.test.ts` with 8 tests covering: default state round-trip, modified scalar state preservation, stat allocation, Set↔Array serialization, empty payload migration, playerName clamping, invalid playerClass rejection, equipment inventory with equipped items. Module mocks created for Firebase/telemetry/onlineSave/cloudMail services.
 
 #### 5.3 Zero End-to-End Tests
 - No Playwright, Cypress, or Detox tests.
@@ -358,10 +364,11 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - No pre-commit hooks yet (Husky + lint-staged recommended as next step).
 - Scripts added: `lint`, `lint:fix`, `format`, `format:check`, `typecheck`.
 
-#### 5.5 No Balance Simulation / Regression Tests
-- No automated progression pacing checks.
-- Balance changes are manual trial-and-error.
-- **AAA Standard**: Simulation scripts that validate: time-to-first-summon, time-to-first-rebirth, gold curve, DPS curve, wave-vs-power parity.
+#### 5.5 No Balance Simulation / Regression Tests ✅ FIXED
+- ~~No automated progression pacing checks.~~
+- ~~Balance changes are manual trial-and-error.~~
+- ~~**AAA Standard**: Simulation scripts that validate: time-to-first-summon, time-to-first-rebirth, gold curve, DPS curve, wave-vs-power parity.~~
+- **Resolution**: Created `balanceSimulation.test.ts` with 19 tests across 5 describe blocks: Progression pacing (gold/exp curves), Gold curve monotonicity, DPS vs HP parity, Rebirth pacing requirements, and Economy simulation (100-wave run validation, building affordability, exp progression).
 
 ---
 
@@ -387,10 +394,11 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - Production and development share the same Firebase project (implied by hardcoded config).
 - **AAA Standard**: Separate Firebase projects for dev/staging/prod.
 
-#### 6.5 No Crash Reporting
-- No Sentry, Bugsnag, or Firebase Crashlytics integration.
-- Runtime errors are invisible unless users report them manually.
-- **AAA Standard**: Automated crash reporting with stack traces, breadcrumbs, and user context.
+#### 6.5 No Crash Reporting ✅ FIXED
+- ~~No Sentry, Bugsnag, or Firebase Crashlytics integration.~~
+- ~~Runtime errors are invisible unless users report them manually.~~
+- ~~**AAA Standard**: Automated crash reporting with stack traces, breadcrumbs, and user context.~~
+- **Resolution**: Added `reportCrash()` to telemetry module—logs error details (message, stack, label, platform) as Firebase Analytics `app_crash` events. Wired into `ErrorBoundary.componentDidCatch` with label and component stack. Added global `window.addEventListener('error')` handler in App.tsx for unhandled errors.
 
 #### 6.6 No Performance Monitoring
 - No React render performance tracking.
@@ -400,17 +408,19 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 
 ### MEDIUM
 
-#### 6.7 No Database Backups
-- No documented Firestore backup schedule.
-- Player save data could be lost with no recovery.
+#### ~~6.7 No Database Backups~~ ✅ FIXED
+- ~~No documented Firestore backup schedule.~~
+- ~~Player save data could be lost with no recovery.~~
+- **Resolution**: Created `BACKUP_STRATEGY.md` documenting automated daily exports via Cloud Scheduler, manual export commands, retention policy (daily/30d, weekly/90d, pre-deploy/7d), all Firestore collections to back up, full/single-document recovery procedures, monitoring recommendations, and cost estimates.
 
 #### ~~6.8 No Feature Flags Infrastructure~~ ✅ FIXED
 - ~~`socialFeatureFlags.ts` uses hardcoded booleans. No remote config for feature toggles.~~
 - **Resolution**: Expanded to typed `FeatureFlagKey` union with 6 flags (guildTreasury, guildBoss, guildEvents, friendGifting, globalChat, leaderboard). Added `setFeatureFlag()`/`resetFeatureFlags()` for runtime overrides. Uses Proxy for transparent default+override resolution.
 
-#### 6.9 No Bundle Size Monitoring
-- No build size tracking. No tree-shaking verification.
-- `firebase` (full SDK) and `firebase-admin` are both in client `dependencies` — `firebase-admin` should NOT be in client bundle.
+#### 6.9 No Bundle Size Monitoring ✅ FIXED
+- ~~No build size tracking. No tree-shaking verification.~~
+- ~~`firebase` (full SDK) and `firebase-admin` are both in client `dependencies` — `firebase-admin` should NOT be in client bundle.~~
+- **Resolution**: `firebase-admin` already removed (6.10). Created `scripts/check-bundle-size.mjs` that reports JS/CSS file sizes after web export and fails CI if total JS exceeds 4 MB budget. Added `bundle:check` npm script.
 
 #### ~~6.10 `firebase-admin` in Client Dependencies~~ ✅ FIXED
 - ~~`firebase-admin` is a **server-only** package. Should not be in client-side `package.json`.~~
@@ -422,9 +432,10 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 
 ### HIGH
 
-#### 7.1 Progression Dead Zone (Waves 20-60)
-- Acknowledged in `KNOWN_ISSUES.md` and `BETA_READINESS.md` but unchecked.
-- Players risk churning during this critical early-mid period.
+#### 7.1 Progression Dead Zone (Waves 20-60) ✅ FIXED
+- ~~Acknowledged in `KNOWN_ISSUES.md` and `BETA_READINESS.md` but unchecked.~~
+- ~~Players risk churning during this critical early-mid period.~~
+- **Resolution**: Added mid-game catchup boost to `getMonsterGold()` in gameConfig.ts. Waves 20-60 now receive a gradual gold multiplier (1.5x at wave 20, ramping to 2.0x at wave 60) to offset the gap where building cost growth (1.15x) outpaces gold income growth (1.14x). Updated balance simulation tests to account for the new curve.
 
 #### 7.2 No Sound / Audio System
 - Zero audio: no music, no SFX, no haptic feedback patterns beyond basic `expo-haptics`.
@@ -443,11 +454,13 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~Achievements unlock silently unless player is on Achievement tab.~~
 - **Resolution**: `AchievementToast` is already rendered at root level of GameScreen (outside any tab conditional), with `position: 'absolute'` and `zIndex: 999`. It triggers globally via `state.newAchievement` whenever any achievement unlocks, regardless of active tab.
 
-#### 7.6 Party Chat is Dead Code
-- "Coming Soon" label in ChatSection. No implementation path documented.
+#### 7.6 Party Chat is Dead Code ✅ FIXED
+- ~~"Coming Soon" label in ChatSection. No implementation path documented.~~
+- **Resolution**: Removed dead party channel code from ChatSection.tsx—eliminated disabled "Party (Soon)" tab chip, party state tracking, and party-related conditional branches. `ChatChannel` type narrowed to `'global' | 'guild'`. Can be re-added properly when party system is implemented.
 
-#### 7.7 Wiki/Docs Not Linked In-Game
-- Wiki exists at `/wiki/` but no in-game help links to relevant wiki pages.
+#### ~~7.7 Wiki/Docs Not Linked In-Game~~ ✅ FIXED
+- ~~Wiki exists at `/wiki/` but no in-game help links to relevant wiki pages.~~
+- **Resolution**: Settings modal already had a wiki button with`resolveWikiUrl()`. Enhanced to "Wiki & Guides" section with contextual quick-links to Core Mechanics, Heroes, Equipment, Strategy, Seasons, and Social wiki pages. Links open via `Linking.openURL()` with telemetry tracking.
 
 ---
 

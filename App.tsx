@@ -5,7 +5,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import GameScreen from './src/screens/GameScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
-import { debugLog, identifyTelemetryDevice, initTelemetry, trackEvent, trackTelemetryHeartbeat } from './src/telemetry';
+import { debugLog, identifyTelemetryDevice, initTelemetry, reportCrash, trackEvent, trackTelemetryHeartbeat } from './src/telemetry';
 import { getValidOnlineSession, isOnlineAuthAvailable, logoutOnline } from './src/services/onlineAuth';
 import { getFirebaseAuth } from './src/services/firebase';
 import { markPresenceOffline, startPresenceHeartbeat } from './src/services/presence';
@@ -21,6 +21,17 @@ export default function App() {
       source: 'App.tsx',
     });
     void trackTelemetryHeartbeat('app_boot');
+
+    // Global unhandled error reporting
+    const handler = (event: ErrorEvent) => {
+      reportCrash(event.error instanceof Error ? event.error : new Error(String(event.message)), {
+        label: 'global_unhandled',
+      });
+    };
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.addEventListener('error', handler);
+      return () => window.removeEventListener('error', handler);
+    }
   }, []);
 
   useEffect(() => {

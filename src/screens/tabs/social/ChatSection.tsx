@@ -4,7 +4,7 @@ import { GlobalChatMessage } from '../../../services/chat';
 import { GuildChatMessage } from '../../../services/guild';
 import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
 
-type ChatChannel = 'global' | 'guild' | 'party';
+type ChatChannel = 'global' | 'guild';
 
 type ChatListRow =
   | { key: string; type: 'day'; label: string }
@@ -99,13 +99,11 @@ export function ChatSection({
   const prevCountByChannelRef = useRef<Record<ChatChannel, number>>({
     global: messages.length,
     guild: guildMessages.length,
-    party: 0,
   });
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [unreadByChannel, setUnreadByChannel] = useState<Record<ChatChannel, number>>({
     global: 0,
     guild: 0,
-    party: 0,
   });
 
   const activeSourceMessages = useMemo<ChatRenderMessage[]>(() => {
@@ -118,7 +116,7 @@ export function ChatSection({
         sentAt: message.sentAt,
       }));
     }
-    if (activeChannel === 'party') return [];
+
     return messages.map(message => ({
       id: message.id,
       uid: message.uid,
@@ -268,7 +266,6 @@ export function ChatSection({
       void onSendGuild();
       return;
     }
-    if (activeChannel === 'party') return;
     void onSend();
   };
 
@@ -356,9 +353,6 @@ export function ChatSection({
                 <Text style={styles.chatChannelBadgeText}>{unreadByChannel.guild}</Text>
               </View>
             )}
-          </Pressable>
-          <Pressable style={[styles.chatChannelChip, styles.sendBtnDisabled]} disabled>
-            <Text style={styles.chatChannelChipText}>Party (Soon)</Text>
           </Pressable>
         </View>
 
@@ -524,7 +518,7 @@ export function ChatSection({
               styles={styles}
               label={activeSending ? '...' : 'Send'}
               onPress={sendActiveMessage}
-              disabled={activeSending || !activeDraft.trim() || (activeChannel === 'guild' && !hasGuild) || activeChannel === 'party'}
+              disabled={activeSending || !activeDraft.trim() || (activeChannel === 'guild' && !hasGuild)}
             />
           </View>
           <SocialAsyncState styles={styles} error={activeError} variant="inline" />

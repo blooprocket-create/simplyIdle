@@ -697,21 +697,64 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   const hintCandidates = useMemo(() => {
     const list: Array<{ id: string; title: string; detail: string }> = [];
-    if (!state.seenHintIds.includes('hint_mission_board')) {
+    const seen = state.seenHintIds;
+    const h = (id: string) => seen.includes(id);
+
+    // --- Onboarding hints (progressive, ordered by milestone) ---
+    if (state.wave <= 3 && !h('hint_onboard_welcome')) {
+      list.push({
+        id: 'hint_onboard_welcome',
+        title: 'Welcome, Commander',
+        detail: 'Tap the battle area to deal damage. Earn gold from defeated enemies and spend it on buildings in the Engine tab.',
+      });
+    } else if (state.wave >= 5 && state.heroRoster.length === 0 && !h('hint_onboard_summon')) {
+      list.push({
+        id: 'hint_onboard_summon',
+        title: 'Recruit Your First Hero',
+        detail: 'Open the Heroes tab and summon a hero. Heroes deal automatic DPS so you don\'t have to tap forever.',
+      });
+    } else if (state.heroRoster.length >= 1 && state.activeTeamHeroIds.length === 0 && !h('hint_onboard_equip_hero')) {
+      list.push({
+        id: 'hint_onboard_equip_hero',
+        title: 'Deploy Your Hero',
+        detail: 'You summoned a hero! Now add them to your active team in the Heroes tab to start dealing automatic damage.',
+      });
+    } else if (state.wave >= 10 && Object.keys(state.equipmentInventory).length === 0 && !h('hint_onboard_equipment')) {
+      list.push({
+        id: 'hint_onboard_equipment',
+        title: 'Gear Up',
+        detail: 'Check the Equipment tab — equip weapons and armor to boost your team\'s stats significantly.',
+      });
+    } else if (state.wave >= 10 && state.unspentStatPoints > 0 && !h('hint_onboard_stats')) {
+      list.push({
+        id: 'hint_onboard_stats',
+        title: 'Spend Stat Points',
+        detail: 'You have unspent stat points! Open the Stats tab to allocate them and power up your commander.',
+      });
+    } else if (state.highestWaveReached >= getRebirthWaveRequirement(state.prestigeCount) && state.prestigeCount === 0 && !h('hint_onboard_rebirth')) {
+      list.push({
+        id: 'hint_onboard_rebirth',
+        title: 'First Rebirth Available',
+        detail: 'You can now Rebirth in the War Room! This resets progress but grants a permanent DPS multiplier. It\'s worth it.',
+      });
+    }
+
+    // --- Feature unlock hints ---
+    if (!h('hint_mission_board')) {
       list.push({
         id: 'hint_mission_board',
         title: 'Mission Board Online',
         detail: 'Check Achievements for short/medium/long goals and claim rewards when complete.',
       });
     }
-    if (state.permanentUnlocks.includes('advanced_consumables') && !state.seenHintIds.includes('hint_consumables')) {
+    if (state.permanentUnlocks.includes('advanced_consumables') && !h('hint_consumables')) {
       list.push({
         id: 'hint_consumables',
         title: 'Advanced Consumables Unlocked',
         detail: 'New consumables now drop in battles. Use them from the Battle tab.',
       });
     }
-    if (state.permanentUnlocks.includes('mythic_equipment') && !state.seenHintIds.includes('hint_mythic_tier')) {
+    if (state.permanentUnlocks.includes('mythic_equipment') && !h('hint_mythic_tier')) {
       list.push({
         id: 'hint_mythic_tier',
         title: 'Mythic Tier Online',
@@ -719,7 +762,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       });
     }
     return list;
-  }, [state.permanentUnlocks, state.seenHintIds]);
+  }, [state.permanentUnlocks, state.seenHintIds, state.wave, state.heroRoster.length, state.activeTeamHeroIds.length, state.equipmentInventory, state.unspentStatPoints, state.prestigeCount, state.highestWaveReached]);
   const activeHint = hintCandidates[0] ?? null;
 
   const rewardPopup = state.rewardQueue[0] ?? null;

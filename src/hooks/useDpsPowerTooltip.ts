@@ -71,9 +71,11 @@ export function useDpsPowerTooltip(
           multLine('Rebirth damage branch', dpsBreakdown.multipliers.rebirthDamagePath),
           multLine('Class passive', dpsBreakdown.multipliers.classPassive),
           multLine('Hero passives', dpsBreakdown.multipliers.heroPassives),
-          multLine('Formation + synergy', dpsBreakdown.multipliers.formation * dpsBreakdown.multipliers.synergy),
+          multLine('Formation', dpsBreakdown.multipliers.formation),
+          multLine('Synergy', dpsBreakdown.multipliers.synergy),
           multLine('VIP protocol', dpsBreakdown.multipliers.vipDamage),
-          multLine('Mastery + temporary buff', dpsBreakdown.multipliers.mastery * dpsBreakdown.multipliers.temporaryBuff),
+          multLine('Mastery', dpsBreakdown.multipliers.mastery),
+          multLine('Temporary buff', dpsBreakdown.multipliers.temporaryBuff),
         ],
       };
     }

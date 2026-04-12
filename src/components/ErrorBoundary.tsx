@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { reportCrash } from '../telemetry';
 
 interface Props {
   children: React.ReactNode;
@@ -31,6 +32,10 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    reportCrash(error, {
+      label: this.props.label,
+      componentStack: errorInfo.componentStack?.slice(0, 500),
+    });
     this.props.onError?.(error, errorInfo);
   }
 

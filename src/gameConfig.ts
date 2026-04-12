@@ -1377,7 +1377,15 @@ export function getMonsterMaxHp(wave: number): number {
 
 export function getMonsterGold(wave: number): number {
   const isBoss = wave % 10 === 0;
-  const base = Math.max(8, Math.floor(8 * Math.pow(1.14, wave - 1)));
+  let base = Math.max(8, Math.floor(8 * Math.pow(1.14, wave - 1)));
+  // Mid-game catchup: gradual 1.5x–2x gold boost for waves 20-60
+  // to smooth the progression dead zone where building costs (1.15x)
+  // outpace gold income (1.14x).
+  if (wave >= 20 && wave <= 60) {
+    const t = (wave - 20) / 40; // 0 at wave 20, 1 at wave 60
+    const boost = 1.5 + 0.5 * t; // ramps from 1.5x to 2.0x
+    base = Math.floor(base * boost);
+  }
   return isBoss ? base * 7 : base;
 }
 

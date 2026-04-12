@@ -14,6 +14,7 @@ interface Props {
 
 export default function RebirthModal({ visible, wave, highestWave, requiredWave, prestigeCount, onConfirm, onCancel }: Props) {
   const canRebirth = highestWave >= requiredWave;
+  const currentBonus = prestigeCount > 0 ? Math.pow(REBIRTH_BONUS, prestigeCount).toFixed(2) : '1.00';
   const nextBonus = Math.pow(REBIRTH_BONUS, prestigeCount + 1).toFixed(2);
 
   return (
@@ -36,9 +37,20 @@ export default function RebirthModal({ visible, wave, highestWave, requiredWave,
             <Text style={styles.statVal}>Wave {requiredWave}</Text>
           </View>
           <View style={styles.stat}>
+            <Text style={styles.statLabel}>Rebirth Count</Text>
+            <Text style={styles.statVal}>{prestigeCount}</Text>
+          </View>
+          <View style={styles.stat}>
+            <Text style={styles.statLabel}>Current Bonus</Text>
+            <Text style={styles.statVal}>{currentBonus}×</Text>
+          </View>
+          <View style={styles.stat}>
             <Text style={styles.statLabel}>New Power Bonus</Text>
             <Text style={[styles.statVal, styles.golden]}>{nextBonus}×</Text>
           </View>
+          <Text style={{ color: '#9AAABE', fontSize: 11, textAlign: 'center', marginTop: 4 }}>
+            Bonus = {REBIRTH_BONUS}× per rebirth, compounding. Applies to all DPS.
+          </Text>
 
           {!canRebirth && (
             <Text style={styles.warning}>

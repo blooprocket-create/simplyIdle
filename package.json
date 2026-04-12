@@ -21,7 +21,8 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "bundle:check": "node scripts/check-bundle-size.mjs"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

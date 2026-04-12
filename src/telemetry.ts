@@ -114,3 +114,23 @@ export async function trackGameplayAction(
   }
   await trackEvent(eventName, payload);
 }
+
+/**
+ * Report a caught error for crash-reporting purposes.
+ * Uses Firebase Analytics as the transport until a dedicated service
+ * (Sentry / Crashlytics) is integrated.
+ */
+export function reportCrash(
+  error: Error,
+  context?: { label?: string; componentStack?: string },
+): void {
+  const message = error.message?.slice(0, 200) ?? 'Unknown error';
+  const stack = (error.stack ?? '').slice(0, 500);
+  debugLog('crash', message, { stack, ...context });
+  void trackEvent('app_crash', {
+    message,
+    stack: stack.slice(0, 200),
+    label: context?.label ?? 'unknown',
+    platform: Platform.OS,
+  });
+}
