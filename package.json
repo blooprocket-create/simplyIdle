@@ -22,6 +22,9 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:coverage": "jest --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:install": "playwright install chromium",
     "bundle:check": "node scripts/check-bundle-size.mjs"
   },
   "dependencies": {
@@ -42,6 +45,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.59.1",
     "@types/jest": "^30.0.0",
     "@types/react": "~19.2.2",
     "eslint": "^10.2.0",

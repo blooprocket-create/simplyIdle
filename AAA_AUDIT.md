@@ -389,10 +389,11 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~No test for rebirth state preservation.~~
 - **Resolution**: Created `saveRoundTrip.test.ts` with 8 tests covering: default state round-trip, modified scalar state preservation, stat allocation, Set↔Array serialization, empty payload migration, playerName clamping, invalid playerClass rejection, equipment inventory with equipped items. Module mocks created for Firebase/telemetry/onlineSave/cloudMail services.
 
-#### 5.3 Zero End-to-End Tests
-- No Playwright, Cypress, or Detox tests.
-- No automated first-session smoke test.
-- **AAA Standard**: E2E tests covering critical user journeys (create character → push waves → summon → rebirth).
+#### ~~5.3 Zero End-to-End Tests~~ ✅ FIXED
+- ~~No Playwright, Cypress, or Detox tests.~~
+- ~~No automated first-session smoke test.~~
+- **Resolution**: Added Playwright E2E harness with Chromium project (`playwright.config.ts`) and first-session smoke test (`e2e/title-auth.smoke.spec.ts`) covering title screen -> auth screen transition and register-form readiness. Added scripts: `test:e2e`, `test:e2e:headed`, `test:e2e:install`. Verified passing locally.
+- **AAA Standard**: Continue expanding E2E coverage to full critical journeys (create character -> push waves -> summon -> rebirth).
 
 #### 5.4 No Linting or Formatting ✅ FIXED
 - ~~No ESLint configuration.~~ → `eslint.config.mjs` with typescript-eslint, react-hooks, prettier.
