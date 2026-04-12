@@ -72,6 +72,8 @@ import { minigamesReducer, MINIGAME_ACTION_TYPES } from './reducers/minigamesRed
 import type { MinigameAction } from './reducers/minigamesReducer';
 import { progressionReducer, PROGRESSION_ACTION_TYPES } from './reducers/progressionReducer';
 import type { ProgressionAction } from './reducers/progressionReducer';
+import { rosterReducer, ROSTER_ACTION_TYPES } from './reducers/rosterReducer';
+import type { RosterAction } from './reducers/rosterReducer';
 import { getFirebaseAuth } from './services/firebase';
 
 const TICK_MS = 100;
@@ -3524,6 +3526,18 @@ function reducer(state: GameState, action: Action): GameState {
     if (result) return result;
   }
 
+  // Delegate roster actions to extracted slice
+  if (ROSTER_ACTION_TYPES.has(action.type)) {
+    const result = rosterReducer(state, action as RosterAction, {
+      withAchievement,
+      getTeamMaxHp,
+      normalizeTeamSelection: normalizeTeamSelectionByRules,
+      getCurrentWeeklyEvent,
+      getEquipmentEntry,
+    });
+    if (result) return result;
+  }
+
   switch (action.type) {
     case 'CREATE_CHARACTER': {
       if (state.characterCreated) return state;
@@ -3602,337 +3616,10 @@ function reducer(state: GameState, action: Action): GameState {
 
     // ALLOCATE_STAT, ALLOCATE_STAT_MAX, ALLOCATE_STAT_N handled by progressionReducer
 
-    case 'EQUIP_ITEM': {
-      if (!state.playerClass) return state;
-      const item = getEquipmentEntry(state, action.itemId);
-      if (!item) return state;
-      if (!item.allowedClasses.includes(state.playerClass)) return state;
-      if (!state.inventoryItemIds.includes(action.itemId)) return state;
-
-      return {
-        ...state,
-        equippedItems: {
-          ...state.equippedItems,
-          [item.slot]: action.itemId,
-        },
-      };
-    }
-
-    case 'SUMMON_HERO': {
-      const canUseFree = state.freeSummonCharges > 0;
-      if (!canUseFree && state.bossTears < 1) return state;
-      const postgameUnlocked = isPostgameSummonUnlocked(state);
-
-      const template = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
-      const roll = rollRarityWithPity(state.gachaPityCounter, postgameUnlocked);
-      const rarity = roll.rarity;
-      const rarityMult = rarityConfig(rarity).boostMultiplier;
-      const uid = `${template.id}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-      const hero: HeroUnit = {
-        ...template,
-        uid,
-        rarity,
-        level: 1,
-        rank: 1,
-        teamBoost: roundTo4(template.baseTeamBoost * rarityMult),
-      };
-
-      const historyEntry: SummonHistoryEntry = {
-        id: `hist_${uid}`,
-        heroName: hero.name,
-        heroEmoji: hero.emoji,
-        rarity: hero.rarity,
-        ts: Date.now(),
-        pityTriggered: roll.pityTriggered,
-      };
-
-      let nextState = withAchievement(({
-        ...state,
-        bossTears: canUseFree ? state.bossTears : state.bossTears - 1,
-        heroRoster: [hero, ...state.heroRoster],
-        summonHistory: [historyEntry, ...state.summonHistory].slice(0, MAX_SAVE_SUMMON_HISTORY),
-        totalSummons: state.totalSummons + 1,
-        freeSummonCharges: canUseFree ? state.freeSummonCharges - 1 : state.freeSummonCharges,
-        gachaPityCounter: roll.nextCounter,
-      }));
-      nextState = syncUniqueWeaponAssignmentForHero(nextState, hero.id);
-      nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.06);
-      if (roll.pityTriggered) {
-        nextState = queueReward(nextState, {
-          id: `pity_single_${Date.now()}`,
-          kind: 'system',
-          title: 'Pity Triggered',
-          detail: `${hero.emoji} ${hero.name} arrived at ${rarity.toUpperCase()}!`,
-        });
-      }
-      return nextState;
-    }
-
-    case 'SUMMON_HERO_X10': {
-      const totalPulls = 10;
-      const freeUses = Math.min(state.freeSummonCharges, totalPulls);
-      const paidUses = totalPulls - freeUses;
-      if (state.bossTears < paidUses) return state;
-      const postgameUnlocked = isPostgameSummonUnlocked(state);
-
-      const summoned: HeroUnit[] = [];
-      const historyBatch: SummonHistoryEntry[] = [];
-      let pityCounter = state.gachaPityCounter;
-      let pityHits = 0;
-      for (let i = 0; i < totalPulls; i++) {
-        const template = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
-        const roll = rollRarityWithPity(pityCounter, postgameUnlocked);
-        pityCounter = roll.nextCounter;
-        if (roll.pityTriggered) pityHits++;
-        const rarity = roll.rarity;
-        const rarityMult = rarityConfig(rarity).boostMultiplier;
-        const uid = `${template.id}_${Date.now()}_${i}_${Math.floor(Math.random() * 10000)}`;
-        const summonedHero: HeroUnit = {
-          ...template,
-          uid,
-          rarity,
-          level: 1,
-          rank: 1,
-          teamBoost: roundTo4(template.baseTeamBoost * rarityMult),
-        };
-        summoned.push(summonedHero);
-        historyBatch.push({
-          id: `hist_${uid}`,
-          heroName: summonedHero.name,
-          heroEmoji: summonedHero.emoji,
-          rarity: summonedHero.rarity,
-          ts: Date.now(),
-          pityTriggered: roll.pityTriggered,
-        });
-      }
-
-      let nextState = withAchievement(({
-        ...state,
-        bossTears: state.bossTears - paidUses,
-        heroRoster: [...summoned, ...state.heroRoster],
-        summonHistory: [...historyBatch, ...state.summonHistory].slice(0, MAX_SAVE_SUMMON_HISTORY),
-        totalSummons: state.totalSummons + totalPulls,
-        freeSummonCharges: state.freeSummonCharges - freeUses,
-        gachaPityCounter: pityCounter,
-      }));
-      for (const hero of summoned) {
-        nextState = syncUniqueWeaponAssignmentForHero(nextState, hero.id);
-      }
-      for (const hero of summoned) {
-        nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.08);
-      }
-      if (pityHits > 0) {
-        nextState = queueReward(nextState, {
-          id: `pity_x10_${Date.now()}`,
-          kind: 'system',
-          title: 'Pity Triggered',
-          detail: `${pityHits} pity hit${pityHits > 1 ? 's' : ''} in this x10 summon.`,
-        });
-      }
-      return nextState;
-    }
-
-    case 'SUMMON_HERO_X10_CINEMATIC': {
-      const totalPulls = 10;
-      const freeUses = Math.min(state.freeSummonCharges, totalPulls);
-      const paidUses = totalPulls - freeUses;
-      if (state.bossTears < paidUses) return state;
-      const postgameUnlocked = isPostgameSummonUnlocked(state);
-      const highestRarity = getHighestAvailableSummonRarity(postgameUnlocked);
-      const featuredTemplate = action.featuredHeroId
-        ? HERO_POOL.find(hero => hero.id === action.featuredHeroId) ?? null
-        : null;
-
-      const summoned: HeroUnit[] = [];
-      const historyBatch: SummonHistoryEntry[] = [];
-      let pityCounter = state.gachaPityCounter;
-      let pityHits = 0;
-      for (let i = 0; i < totalPulls; i++) {
-        const roll = rollRarityWithPity(pityCounter, postgameUnlocked);
-        pityCounter = roll.nextCounter;
-        if (roll.pityTriggered) pityHits++;
-        const rarity = roll.rarity;
-        const shouldFeature = !!featuredTemplate && rarity === highestRarity && Math.random() < 0.65;
-        const template = shouldFeature
-          ? featuredTemplate
-          : HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
-        const rarityMult = rarityConfig(rarity).boostMultiplier;
-        const uid = `${template.id}_${Date.now()}_${i}_${Math.floor(Math.random() * 10000)}`;
-        const summonedHero: HeroUnit = {
-          ...template,
-          uid,
-          rarity,
-          level: 1,
-          rank: 1,
-          teamBoost: roundTo4(template.baseTeamBoost * rarityMult),
-        };
-        summoned.push(summonedHero);
-        historyBatch.push({
-          id: `hist_${uid}`,
-          heroName: summonedHero.name,
-          heroEmoji: summonedHero.emoji,
-          rarity: summonedHero.rarity,
-          ts: Date.now(),
-          pityTriggered: roll.pityTriggered,
-        });
-      }
-
-      let nextState = withAchievement(({
-        ...state,
-        bossTears: state.bossTears - paidUses,
-        heroRoster: [...summoned, ...state.heroRoster],
-        summonHistory: [...historyBatch, ...state.summonHistory].slice(0, MAX_SAVE_SUMMON_HISTORY),
-        totalSummons: state.totalSummons + totalPulls,
-        freeSummonCharges: state.freeSummonCharges - freeUses + 1,
-        gachaPityCounter: pityCounter,
-      }));
-      for (const hero of summoned) {
-        nextState = syncUniqueWeaponAssignmentForHero(nextState, hero.id);
-      }
-      for (const hero of summoned) {
-        nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.12);
-      }
-      if (pityHits > 0) {
-        nextState = queueReward(nextState, {
-          id: `pity_x10_${Date.now()}`,
-          kind: 'system',
-          title: 'Pity Triggered',
-          detail: `${pityHits} pity hit${pityHits > 1 ? 's' : ''} in this x10 summon.`,
-        });
-      }
-      nextState = queueReward(nextState, {
-        id: `cinematic_bonus_${Date.now()}`,
-        kind: 'system',
-        title: 'Cinematic Bonus',
-        detail: '+1 free summon charge awarded.',
-      });
-      return nextState;
-    }
-
-    case 'AUTO_EQUIP_BEST_HEROES': {
-      const sorted = [...state.heroRoster].sort((a, b) => {
-        const rarityDiff = rarityRank(b.rarity) - rarityRank(a.rarity);
-        if (rarityDiff !== 0) return rarityDiff;
-        const statMultDiff = (b.rebirthStatMult ?? 1) - (a.rebirthStatMult ?? 1);
-        if (Math.abs(statMultDiff) > 0.0001) return statMultDiff;
-        if (b.level !== a.level) return b.level - a.level;
-        return b.teamBoost - a.teamBoost;
-      });
-      const newTeam = normalizeTeamSelectionByRules(state, sorted.map(h => h.uid));
-      const newMaxHp = getTeamMaxHp({ ...state, activeTeamHeroIds: newTeam });
-      return ({
-        ...state,
-        activeTeamHeroIds: newTeam,
-        teamMaxHp: newMaxHp,
-        teamHp: Math.min(state.teamHp, newMaxHp),
-      });
-    }
-
-    case 'SAVE_TEAM_LOADOUT': {
-      const slot = Math.max(0, Math.min(2, action.slot));
-      const next = [...state.teamLoadouts];
-      next[slot] = [...state.activeTeamHeroIds];
-      return queueReward({
-        ...state,
-        teamLoadouts: next,
-      }, {
-        id: `save_loadout_${slot}_${Date.now()}`,
-        kind: 'system',
-        title: `Saved Loadout ${slot + 1}`,
-        detail: `${next[slot].length} heroes saved`,
-      });
-    }
-
-    case 'LOAD_TEAM_LOADOUT': {
-      const slot = Math.max(0, Math.min(2, action.slot));
-      const source = state.teamLoadouts[slot] ?? [];
-      const validIds = normalizeTeamSelectionByRules(state, source);
-      const newMaxHp = getTeamMaxHp({ ...state, activeTeamHeroIds: validIds });
-      return queueReward(({
-        ...state,
-        activeTeamHeroIds: validIds,
-        teamMaxHp: newMaxHp,
-        teamHp: Math.min(state.teamHp, newMaxHp),
-      }), {
-        id: `load_loadout_${slot}_${Date.now()}`,
-        kind: 'system',
-        title: `Loaded Loadout ${slot + 1}`,
-        detail: `${validIds.length} heroes equipped`,
-      });
-    }
-
-    case 'UNLOCK_TEAM_SLOT': {
-      const currentSlots = getUnlockedTeamSlotCap(state);
-      if (currentSlots >= ACTIVE_TEAM_SIZE) return state;
-
-      const targetSlots = currentSlots + 1;
-      const req = getTeamSlotUnlockRequirement(targetSlots);
-      if (!req) return state;
-      if (state.highestWaveReached < req.requiredWave) return state;
-      if (state.gold < req.goldCost || state.heroShards < req.shardCost) return state;
-
-      return queueReward({
-        ...state,
-        teamSlotsUnlocked: targetSlots,
-        gold: state.gold - req.goldCost,
-        heroShards: state.heroShards - req.shardCost,
-      }, {
-        id: `team_slot_unlock_${targetSlots}_${Date.now()}`,
-        kind: 'system',
-        title: `Team Slot ${targetSlots} Unlocked`,
-        detail: `-${req.goldCost} gold, -${req.shardCost} shards`,
-      });
-    }
-
-    case 'TOGGLE_EQUIP_HERO': {
-      const exists = state.heroRoster.some(h => h.uid === action.uid);
-      if (!exists) return state;
-      const active = state.activeTeamHeroIds;
-      let newTeam: string[];
-      if (active.includes(action.uid)) {
-        newTeam = active.filter(id => id !== action.uid);
-      } else {
-        const roleCounts = getTeamRoleCounts(state, active);
-        const hero = state.heroRoster.find(h => h.uid === action.uid);
-        if (!hero) return state;
-        const role = state.heroFormationByUid[action.uid] ?? defaultFormationForClass(hero.heroClass);
-        if (active.length >= getUnlockedTeamSlotCap(state)) {
-          return queueReward(state, {
-            id: `team_cap_${Date.now()}`,
-            kind: 'system',
-            title: 'Team Slot Locked',
-            detail: 'Unlock additional slots in the War Room roster panel.',
-          });
-        }
-        if (roleCounts[role] >= MAX_FORMATION_ROLE_HEROES) {
-          return queueReward(state, {
-            id: `formation_cap_${Date.now()}`,
-            kind: 'system',
-            title: 'Formation Limit Reached',
-            detail: `Maximum ${MAX_FORMATION_ROLE_HEROES} heroes in ${role.toUpperCase()} line.`,
-          });
-        }
-        newTeam = [...active, action.uid];
-      }
-      const newMaxHp = getTeamMaxHp({ ...state, activeTeamHeroIds: newTeam });
-      return withAchievement(({
-        ...state,
-        activeTeamHeroIds: newTeam,
-        teamMaxHp: newMaxHp,
-        teamHp: Math.min(state.teamHp, newMaxHp),
-      }));
-    }
-
-    case 'SET_ACTIVE_TEAM': {
-      const validIds = normalizeTeamSelectionByRules(state, action.heroIds);
-      const newMaxHp = getTeamMaxHp({ ...state, activeTeamHeroIds: validIds });
-      return ({
-        ...state,
-        activeTeamHeroIds: validIds,
-        teamMaxHp: newMaxHp,
-        teamHp: Math.min(state.teamHp, newMaxHp),  // Cap current HP at new max
-      });
-    }
+    // EQUIP_ITEM, SUMMON_HERO, SUMMON_HERO_X10, SUMMON_HERO_X10_CINEMATIC,
+    // AUTO_EQUIP_BEST_HEROES, SAVE_TEAM_LOADOUT, LOAD_TEAM_LOADOUT,
+    // UNLOCK_TEAM_SLOT, TOGGLE_EQUIP_HERO, SET_ACTIVE_TEAM
+    // handled by rosterReducer
 
     case 'USE_USABLE_ITEM': {
       const qty = state.usableItemCounts[action.itemId] ?? 0;
@@ -4306,73 +3993,7 @@ function reducer(state: GameState, action: Action): GameState {
     // APPLY_DAILY_LOGIN, REBIRTH, CLEAR_ACHIEVEMENT, CLEAR_REWARD_POPUP
     // handled by progressionReducer
 
-    case 'RECYCLE_HERO': {
-      const hero = state.heroRoster.find(h => h.uid === action.uid);
-      if (!hero) return state;
-      if (hasEquippedUniqueWeaponOnHero(state, hero)) return state;
-      
-      // Calculate shard reward and remove hero from roster
-      const weekly = getCurrentWeeklyEvent(state);
-      const shardReward = Math.ceil(calculateShardReward(hero.rarity, hero.level) * weekly.shardMultiplier);
-      const newRoster = state.heroRoster.filter(h => h.uid !== action.uid);
-      const newActiveTeam = state.activeTeamHeroIds.filter(id => id !== action.uid);
-      const newMaxHp = getTeamMaxHp({ ...state, heroRoster: newRoster, activeTeamHeroIds: newActiveTeam });
-      const heroFormationByUid = Object.fromEntries(
-        Object.entries(state.heroFormationByUid).filter(([uid]) => uid !== action.uid),
-      ) as Record<string, HeroFormationRole>;
-      const heroActiveCdMs = Object.fromEntries(
-        Object.entries(state.heroActiveCdMs).filter(([uid]) => uid !== action.uid),
-      ) as Record<string, number>;
-      
-      return {
-        ...state,
-        heroRoster: newRoster,
-        activeTeamHeroIds: newActiveTeam,
-        heroFormationByUid,
-        heroActiveCdMs,
-        heroShards: state.heroShards + shardReward,
-        teamMaxHp: newMaxHp,
-        teamHp: Math.min(state.teamHp, newMaxHp),
-      };
-    }
-
-    case 'AUTO_RECYCLE_HEROES': {
-      const activeTeam = new Set(state.activeTeamHeroIds);
-      const maxRank = rarityRank(state.autoRecycleMaxRarity);
-      const toRecycle = state.heroRoster.filter(
-        h => !activeTeam.has(h.uid) && rarityRank(h.rarity) <= maxRank && !hasEquippedUniqueWeaponOnHero(state, h),
-      );
-      if (toRecycle.length === 0) return state;
-
-      const recycledIds = new Set(toRecycle.map(h => h.uid));
-      const weekly = getCurrentWeeklyEvent(state);
-      const shardReward = Math.ceil(toRecycle.reduce((sum, hero) => sum + calculateShardReward(hero.rarity, hero.level), 0) * weekly.shardMultiplier);
-      const newRoster = state.heroRoster.filter(h => !recycledIds.has(h.uid));
-      const newMaxHp = getTeamMaxHp({ ...state, heroRoster: newRoster });
-      const heroFormationByUid = Object.fromEntries(
-        Object.entries(state.heroFormationByUid).filter(([uid]) => !recycledIds.has(uid)),
-      ) as Record<string, HeroFormationRole>;
-      const heroActiveCdMs = Object.fromEntries(
-        Object.entries(state.heroActiveCdMs).filter(([uid]) => !recycledIds.has(uid)),
-      ) as Record<string, number>;
-
-      const nextState: GameState = {
-        ...state,
-        heroRoster: newRoster,
-        heroFormationByUid,
-        heroActiveCdMs,
-        heroShards: state.heroShards + shardReward,
-        teamMaxHp: newMaxHp,
-        teamHp: Math.min(state.teamHp, newMaxHp),
-      };
-
-      return queueReward(nextState, {
-        id: `auto_recycle_${Date.now()}`,
-        kind: 'shard',
-        title: 'Auto Recycle Complete',
-        detail: `+${shardReward} shards from ${toRecycle.length} heroes (${state.autoRecycleMaxRarity} and below)`,
-      });
-    }
+    // RECYCLE_HERO, AUTO_RECYCLE_HEROES handled by rosterReducer
 
     case 'SET_AUTO_RECYCLE_MAX_RARITY': {
       return {
@@ -4381,96 +4002,14 @@ function reducer(state: GameState, action: Action): GameState {
       };
     }
 
-    case 'SET_HERO_FORMATION': {
-      const hero = state.heroRoster.find(h => h.uid === action.uid);
-      if (!hero) return state;
-      // Reject roles that aren't valid for this hero's class
-      const validRoles = VALID_FORMATION_ROLES_FOR_CLASS[hero.heroClass];
-      if (!validRoles.includes(action.role)) return state;
-      const activeTeamSet = new Set(state.activeTeamHeroIds);
-      if (activeTeamSet.has(action.uid)) {
-        const nextRoleCounts = getTeamRoleCounts(state, state.activeTeamHeroIds.filter(id => id !== action.uid));
-        if (nextRoleCounts[action.role] >= MAX_FORMATION_ROLE_HEROES) {
-          return queueReward(state, {
-            id: `formation_swap_blocked_${Date.now()}`,
-            kind: 'system',
-            title: 'Formation Limit Reached',
-            detail: `Maximum ${MAX_FORMATION_ROLE_HEROES} heroes in ${action.role.toUpperCase()} line.`,
-          });
-        }
-      }
-      return {
-        ...state,
-        heroFormationByUid: {
-          ...state.heroFormationByUid,
-          [action.uid]: action.role,
-        },
-      };
-    }
+    case 'SET_HERO_FORMATION': // handled by rosterReducer
+    case 'BATCH_LEVEL_HEROES': // handled by rosterReducer
+      return state; // delegation above will have already handled these
 
     // Minigame cases (PLAY_DICE_ROLL, PLAY_RECON_SWEEP, PLAY_LOCKPICK_CACHE,
     // PLAY_TARGET_PRACTICE, START_MINI_BOUNTY_DRAFT, CLAIM_MINI_BOUNTY_DRAFT,
     // RUN_RIFT_DUNGEON, RUN_TREASURY_RAID) are handled by minigamesReducer
     // via delegation above the switch.
-
-    case 'BATCH_LEVEL_HEROES': {
-      const selected = new Set(action.heroIds);
-      if (selected.size === 0) return state;
-
-      const levelsByUid: Record<string, number> = {};
-      for (const hero of state.heroRoster) {
-        if (selected.has(hero.uid)) {
-          levelsByUid[hero.uid] = hero.level;
-        }
-      }
-
-      let gold = state.gold;
-
-      if (action.addLevels === 'max') {
-        // Greedy strategy: always buy the cheapest next level among selected heroes.
-        while (true) {
-          let cheapestUid: string | null = null;
-          let cheapestCost = Number.POSITIVE_INFINITY;
-
-          for (const uid of Object.keys(levelsByUid)) {
-            const lvl = levelsByUid[uid];
-            if (lvl >= HERO_LEVEL_CAP) continue;
-            const nextCost = getHeroGoldLevelCost(lvl);
-            if (nextCost < cheapestCost) {
-              cheapestCost = nextCost;
-              cheapestUid = uid;
-            }
-          }
-
-          if (!cheapestUid || !Number.isFinite(cheapestCost) || gold < cheapestCost) break;
-          gold -= cheapestCost;
-          levelsByUid[cheapestUid] += 1;
-        }
-      } else {
-        const steps = Math.max(0, Math.floor(action.addLevels));
-        for (let step = 0; step < steps; step++) {
-          for (const uid of Object.keys(levelsByUid)) {
-            const lvl = levelsByUid[uid];
-            if (lvl >= HERO_LEVEL_CAP) continue;
-            const cost = getHeroGoldLevelCost(lvl);
-            if (gold < cost) continue;
-            gold -= cost;
-            levelsByUid[uid] = lvl + 1;
-          }
-        }
-      }
-
-      const heroRoster = state.heroRoster.map(hero => {
-        const nextLevel = levelsByUid[hero.uid];
-        return nextLevel == null ? hero : { ...hero, level: nextLevel };
-      });
-
-      return {
-        ...state,
-        gold,
-        heroRoster,
-      };
-    }
 
     case 'UPGRADE_FACILITY': {
       const facility = state.guildhallFacilities[action.facilityId];
@@ -4586,93 +4125,8 @@ function reducer(state: GameState, action: Action): GameState {
       };
     }
 
-    case 'TOGGLE_HERO_UNIQUE_WEAPON': {
-      const hero = state.heroRoster.find(entry => entry.uid === action.heroUid);
-      if (!hero || !VALID_HERO_TEMPLATE_IDS.has(hero.id)) return state;
-      const current = state.heroUniqueGearByHeroId[hero.id];
-      if (!current || current.rank <= 0) return state;
-
-      const copies = state.heroRoster.filter(copy => copy.id === hero.id);
-      const eligibleBearer = copies.reduce<HeroUnit | null>((best, copy) => {
-        if (!best || isPreferredUniqueBearer(copy, best)) return copy;
-        return best;
-      }, null);
-      if (!eligibleBearer) return state;
-
-      const isCurrentlyEquipped = current.equippedByUid === eligibleBearer.uid;
-      return {
-        ...state,
-        heroUniqueGearByHeroId: {
-          ...state.heroUniqueGearByHeroId,
-          [hero.id]: {
-            ...current,
-            equippedByUid: isCurrentlyEquipped ? null : eligibleBearer.uid,
-          },
-        },
-      };
-    }
-
-    case 'RANK_UP_HERO': {
-      const hero = state.heroRoster.find(h => h.uid === action.uid);
-      if (!hero || hero.rank >= 10) return state;
-      
-      const nextRankCost = getRankUpShardCost(hero.rarity, hero.rank + 1);
-      if (!Number.isFinite(nextRankCost) || state.heroShards < nextRankCost) return state;
-      
-      // Rank up the hero
-      const updatedHero = { ...hero, rank: hero.rank + 1 };
-      const newRoster = state.heroRoster.map(h => h.uid === action.uid ? updatedHero : h);
-      
-      return {
-        ...state,
-        heroRoster: newRoster,
-        heroShards: state.heroShards - nextRankCost,
-      };
-    }
-
-    case 'LEVEL_UP_HERO_GOLD': {
-      const hero = state.heroRoster.find(h => h.uid === action.uid);
-      if (!hero || hero.level >= HERO_LEVEL_CAP) return state;
-      const cost = getHeroGoldLevelCost(hero.level);
-      if (state.gold < cost) return state;
-      const newRoster = state.heroRoster.map(h =>
-        h.uid === action.uid ? { ...h, level: h.level + 1 } : h
-      );
-      return {
-        ...state,
-        gold: state.gold - cost,
-        heroRoster: newRoster,
-      };
-    }
-
-    case 'REBIRTH_HERO': {
-      const hero = state.heroRoster.find(h => h.uid === action.uid);
-      if (!hero || hero.rank < 10 || hero.level < HERO_LEVEL_CAP) return state;
-
-      const rebirthPlan = getHeroRebirthPlan(hero);
-      const shardCost = rebirthPlan.shardCost;
-      const essenceCost = rebirthPlan.essenceCost;
-      if (state.heroShards < shardCost || state.essence < essenceCost) return state;
-
-      const updatedHero = normalizeHero({
-        ...hero,
-        level: 1,
-        rank: 1,
-        rebirthStatMult: rebirthPlan.nextStatMultiplier,
-      });
-
-      return queueReward({
-        ...state,
-        heroShards: state.heroShards - shardCost,
-        essence: state.essence - essenceCost,
-        heroRoster: state.heroRoster.map(h => h.uid === action.uid ? updatedHero : h),
-      }, {
-        id: `hero_rebirth_${hero.uid}_${Date.now()}`,
-        kind: 'system',
-        title: `${hero.name} Reborn`,
-        detail: `-${shardCost} shards, -${essenceCost} essence • +${rebirthPlan.statGainPct}% hero stat gain • stat multiplier x${(updatedHero.rebirthStatMult ?? 1).toFixed(2)}`,
-      });
-    }
+    // TOGGLE_HERO_UNIQUE_WEAPON, RANK_UP_HERO, LEVEL_UP_HERO_GOLD,
+    // REBIRTH_HERO handled by rosterReducer
 
     case 'CONVERT_SCRAP_TO_ESSENCE': {
       const cost = getScrapToEssenceCost(state);
