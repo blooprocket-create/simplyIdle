@@ -1068,8 +1068,13 @@ export function getRankStatMultiplier(rank: number, rarity: Rarity): number {
   const r = Math.max(1, rank);
   const rarityPower = RARITY_RANK_POWER_MULT[rarity] ?? 1;
   const additiveGrowth = (r - 1) * 0.015 * rarityPower;
-  const acceleratedGrowth = Math.pow(r - 1, 1.22) * 0.018 * rarityPower;
-  return Number((1 + additiveGrowth + acceleratedGrowth).toFixed(4));
+  // Diminishing returns: high-rarity power tapers after rank 5
+  const diminishingFactor = rarityPower > 1.4 && r > 5
+    ? 1 - (rarityPower - 1.4) * 0.15 * (r - 5)
+    : 1;
+  const effectivePower = rarityPower * Math.max(0.5, diminishingFactor);
+  const acceleratedGrowth = Math.pow(r - 1, 1.22) * 0.018 * effectivePower;
+  return Math.round((1 + additiveGrowth + acceleratedGrowth) * 10000) / 10000;
 }
 
 // Calculate shards earned when recycling a hero
@@ -1866,6 +1871,16 @@ export interface MissionBoardGoal {
   rewardDiamonds?: number;
 }
 
+/**
+ * Reward scaling formula by horizon tier.
+ * Base gold scales with target difficulty; shards and diamonds follow tier brackets.
+ */
+const HORIZON_REWARD_SCALE = {
+  short:  { goldPerDifficulty: 60, shardBase: 80,  diamondBase: 2 },
+  medium: { goldPerDifficulty: 40, shardBase: 200, diamondBase: 5 },
+  long:   { goldPerDifficulty: 30, shardBase: 500, diamondBase: 12 },
+} as const;
+
 export const MISSION_BOARD_GOALS: MissionBoardGoal[] = [
   // ── Short-term missions (can complete in a single run) ──────────────
   {
@@ -1886,9 +1901,9 @@ export const MISSION_BOARD_GOALS: MissionBoardGoal[] = [
     description: 'Reach Wave 50 this run.',
     metric: 'wave',
     target: 50,
-    rewardGold: 3500,
-    rewardShards: 200,
-    rewardDiamonds: 5,
+    rewardGold: 3000,
+    rewardShards: 150,
+    rewardDiamonds: 4,
   },
   {
     id: 'm_short_team_4',
@@ -1897,7 +1912,9 @@ export const MISSION_BOARD_GOALS: MissionBoardGoal[] = [
     description: 'Field 4 heroes in your active team.',
     metric: 'active_team',
     target: 4,
-    rewardGold: 900,
+    rewardGold: 1000,
+    rewardShards: 60,
+    rewardDiamonds: 1,
   },
   {
     id: 'm_short_kills_100',
@@ -1906,8 +1923,9 @@ export const MISSION_BOARD_GOALS: MissionBoardGoal[] = [
     description: 'Defeat 100 monsters this run.',
     metric: 'kills',
     target: 100,
-    rewardGold: 2000,
-    rewardShards: 120,
+    rewardGold: 1800,
+    rewardShards: 100,
+    rewardDiamonds: 2,
   },
   {
     id: 'm_short_summon_10',
@@ -1918,6 +1936,7 @@ export const MISSION_BOARD_GOALS: MissionBoardGoal[] = [
     target: 10,
     rewardGold: 1500,
     rewardShards: 100,
+    rewardDiamonds: 2,
   },
   // ── Medium-term missions (multi-day/run goals) ───────────────────
   {

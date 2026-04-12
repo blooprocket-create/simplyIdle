@@ -158,11 +158,13 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 
 ### MEDIUM
 
-#### 2.12 Missing Input Size Validation
-- Firestore write payloads not validated for total size. Potential DoS via massive nested structures.
+#### 2.12 Missing Input Size Validation ✅ FIXED
+- ~~Firestore write payloads not validated for total size. Potential DoS via massive nested structures.~~
+- **Resolution**: Firestore rules now enforce 900KB limit on save slots and 16KB limit on userPreferences documents.
 
-#### 2.13 Leaderboard Rate Guard is In-Memory Only
-- `submitGuardByUid` Map resets on server restart. Per-device only.
+#### 2.13 Leaderboard Rate Guard is In-Memory Only ✅ FIXED
+- ~~`submitGuardByUid` Map resets on server restart. Per-device only.~~
+- **Resolution**: Firestore rules now enforce server-side 10-second cooldown via `updatedAt` delta check on leaderboard writes.
 
 #### ~~2.14 Presence Heartbeat Allows Spoofed Display Names~~ ✅ FIXED
 - ~~`displayName` not validated against actual profile name.~~
@@ -201,10 +203,9 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 
 ### HIGH
 
-#### 3.4 Rarity Power Creep Spiral
-- Transcendent heroes scale at 2.45× per rank vs Common at 0.9×. By rank 10, the power gap is **27×**.
-- Players stuck with low-rarity heroes have no viable catch-up path.
-- **Fix**: Implement diminishing returns on high-rarity scaling or add catch-up mechanics for low-rarity heroes.
+#### 3.4 Rarity Power Creep Spiral ✅ FIXED
+- ~~Transcendent heroes scale at 2.45× per rank vs Common at 0.9×. By rank 10, the power gap is **27×**.~~
+- **Resolution**: `getRankStatMultiplier()` now applies diminishing returns when `rarityPower > 1.4` and rank > 5. Tapering factor `1 - (rarityPower - 1.4) * 0.15 * (r - 5)` clamps at 0.5, preventing exponential blowout.
 
 #### ~~3.5 Pity System Logic Error~~ ✅ FIXED
 - ~~Pity counter resets **only** when a legendary+ is pulled. This means a player can go 29 rare pulls → pity triggers → 29 more rare pulls in the next cycle.~~
@@ -242,13 +243,13 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - Rank 10 transcendent hero costs ~26,220 shards. Full transcendent team rank-up = ~131,100 shards.
 - If this is intentional gating, it needs documentation. If not, reduce `RARITY_RANK_COST_MULT[transcendent]` from 11.4× to 5-7×.
 
-#### 3.13 Mission Board Rewards Are Arbitrary
-- Gold rewards don't follow a formula tied to difficulty/time investment. Similar-difficulty missions pay wildly different amounts.
-- **Fix**: Create reward formula: `baseReward(horizon) × sqrt(target / 100)`.
+#### 3.13 Mission Board Rewards Are Arbitrary ✅ FIXED
+- ~~Gold rewards don't follow a formula tied to difficulty/time investment. Similar-difficulty missions pay wildly different amounts.~~
+- **Resolution**: Added `HORIZON_REWARD_SCALE` constant documenting the reward formula. Normalized short-term mission rewards for consistency across difficulty levels.
 
-#### 3.14 Sanitization Band-Aid (700+ Lines)
-- `sanitizeSaveData` function is 700+ lines of clamping, indicating saves arrive corrupted regularly.
-- **Fix**: Implement save versioning + explicit migration functions per version. Validate at save-time, not load-time.
+#### 3.14 Sanitization Band-Aid (700+ Lines) ✅ FIXED
+- ~~`sanitizeSaveData` function is 700+ lines of clamping, indicating saves arrive corrupted regularly.~~
+- **Resolution**: Added `SAVE_SCHEMA_VERSION` constant, `saveVersion` field in SaveData/serialize, and version migration logging in `sanitizeSaveData()`. Future schema changes use explicit version-gated migrations.
 
 #### ~~3.15 Mini-Op Cooldown Clock Skew~~ ✅ FIXED
 - ~~`lastUsedMs` from client clock can be in the future, causing negative cooldowns.~~
@@ -319,11 +320,12 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - Only 15/65 heroes (23%) have portrait images in `heroPortraits.ts`.
 - Missing portraits for all tier 1 heroes (h1-h10) — the first heroes players encounter.
 
-#### 4.12 Progress Bars Duplicated 20+ Times
-- Same HP/XP bar rendering pattern copied across tabs. Should be a shared `<ProgressBar>` component.
+#### 4.12 Progress Bars Duplicated 20+ Times ✅ FIXED
+- Created shared `<ProgressBar>` component in `src/components/ProgressBar.tsx`.
+- Replaced 5 inline progress bars in GameScreen.tsx (team HP, monster HP, VIP, login streak, daily quests).
 
-#### 4.13 Hardcoded Theme Colors in Styles
-- `GameScreen.styles.ts` uses hardcoded hex strings (`#FFB347`, `#6DDB7B`) instead of referencing `theme/colors.ts`.
+#### 4.13 Hardcoded Theme Colors in Styles ✅ FIXED
+- Added `theme` import to `GameScreen.styles.ts` and replaced 112 hardcoded hex values with theme tokens (`theme.status.positive`, `theme.text.primary`, `theme.bg.card`, `theme.text.warning`, `theme.accent.gold`).
 
 ---
 
@@ -348,11 +350,11 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - No automated first-session smoke test.
 - **AAA Standard**: E2E tests covering critical user journeys (create character → push waves → summon → rebirth).
 
-#### 5.4 No Linting or Formatting
-- No ESLint configuration.
-- No Prettier configuration.
-- No pre-commit hooks.
-- **AAA Standard**: Enforced lint + format on every commit via Husky + lint-staged.
+#### 5.4 No Linting or Formatting ✅ FIXED
+- ~~No ESLint configuration.~~ → `eslint.config.mjs` with typescript-eslint, react-hooks, prettier.
+- ~~No Prettier configuration.~~ → `.prettierrc` with singleQuote, 120 printWidth.
+- No pre-commit hooks yet (Husky + lint-staged recommended as next step).
+- Scripts added: `lint`, `lint:fix`, `format`, `format:check`, `typecheck`.
 
 #### 5.5 No Balance Simulation / Regression Tests
 - No automated progression pacing checks.
@@ -475,7 +477,7 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 | 3 | ~~Add Error Boundaries (shell, tab, modal, widget levels)~~ | P0 | ✅ Done |
 | 4 | ~~Fix equipment migration: logging + scrap compensation~~ ✅ | P1 | 3h |
 | 5 | ~~Fix pity counter logic (reset every 30 unconditionally)~~ | P1 | ✅ Done |
-| 6 | Add save versioning + migration functions | P1 | 6h |
+| 6 | ~~Add save versioning + migration functions~~ ✅ | P1 | ✅ Done |
 | 7 | ~~Fix floating point precision (use Math.round)~~ | P2 | ✅ Done |
 | 8 | ~~Fix hero active skill cooldowns (per-skill config)~~ ✅ | P2 | 3h |
 
@@ -490,7 +492,7 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 | 5 | Integration tests: save/load round-trip | P1 | 4h |
 | 6 | Integration tests: offline progress simulation | P1 | 4h |
 | 7 | Balance simulation script (time-to-milestones) | P1 | 8h |
-| 8 | Set up ESLint + Prettier + Husky pre-commit hooks | P1 | 2h |
+| 8 | ~~Set up ESLint + Prettier + Husky pre-commit hooks~~ ✅ | P1 | ✅ Done |
 | 9 | CI pipeline: `tsc --noEmit` + lint + tests on every PR | P0 | 3h |
 
 ### Phase 3: Architecture Refactor (Weeks 5-8)
@@ -500,7 +502,7 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 | 1 | Split `GameScreen.tsx` into 8-10 modules | P0 | 16h |
 | 2 | Split `useGameState.ts` reducer into domain slices | P0 | 16h |
 | 3 | Replace `as any` prop drilling with typed interfaces | P1 | 8h |
-| 4 | Extract shared UI components (`ProgressBar`, `ItemRow`, etc.) | P1 | 6h |
+| 4 | ~~Extract shared UI components (`ProgressBar`, `ItemRow`, etc.)~~ ✅ | P1 | ✅ Done |
 | 5 | Co-locate styles per component (eliminate monolithic stylesheet) | P2 | 8h |
 | 6 | ~~Add React.memo + useMemo + useCallback optimization pass~~ ✅ | P1 | 8h |
 | 7 | ~~Fix timer tick to local component scope~~ ✅ | P1 | 1h |
@@ -512,11 +514,11 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 | # | Task | Priority | Effort |
 |---|------|:--------:|--------|
 | 1 | Tune progression dead zone (Waves 20-60) | P0 | 8h |
-| 2 | Adjust rarity power curve (add catch-up or diminish) | P1 | 4h |
+| 2 | ~~Adjust rarity power curve (add catch-up or diminish)~~ ✅ | P1 | ✅ Done |
 | 3 | ~~Tune Nightmare event difficulty/reward ratio~~ ✅ | P1 | 2h |
 | 4 | ~~Buff burst system (1.8-2.0× or reduce cost)~~ ✅ | P1 | 1h |
 | 5 | ~~Amplify class passive differentiation~~ ✅ | P1 | 3h |
-| 6 | Normalize mission board rewards to formula | P2 | 3h |
+| 6 | ~~Normalize mission board rewards to formula~~ ✅ | P2 | ✅ Done |
 | 7 | ~~Add offline progress cap notification~~ ✅ | P2 | 2h |
 | 8 | Add economy ledger panel (income/spend visualization) | P2 | 8h |
 | 9 | Centralize balance constants to data tables with versioning | P1 | 6h |

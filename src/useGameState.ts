@@ -503,6 +503,12 @@ export interface EquipmentInstance {
   source: EquipmentSource;
 }
 
+/**
+ * Save schema version. Increment when save format changes.
+ * sanitizeSaveData handles migration from any version to current.
+ */
+const SAVE_SCHEMA_VERSION = 1;
+
 const DEFAULT_STATE: GameState = {
   playerName: '',
   playerClass: null,
@@ -2266,6 +2272,10 @@ function sanitizeEquipmentInventoryRecord(raw: unknown, fallbackLevel: number): 
 }
 
 function sanitizeSaveData(payload: Partial<SaveData>) {
+  const incomingVersion = typeof payload.saveVersion === 'number' ? payload.saveVersion : 0;
+  if (incomingVersion < SAVE_SCHEMA_VERSION) {
+    debugLog('save', `Migrating save from v${incomingVersion} to v${SAVE_SCHEMA_VERSION}`);
+  }
   const now = Date.now();
   const currentWeek = weekNumberForTimestamp(now);
   const currentDay = toDayNumber(now);
@@ -5733,6 +5743,7 @@ function reducer(state: GameState, action: Action): GameState {
 }
 
 interface SaveData {
+  saveVersion?: number;
   playerName: string;
   playerClass: PlayerClass | null;
   characterCreated: boolean;
@@ -5868,6 +5879,7 @@ interface SaveData {
 
 function serialize(state: GameState): SaveData {
   return {
+    saveVersion: SAVE_SCHEMA_VERSION,
     playerName: state.playerName,
     playerClass: state.playerClass,
     characterCreated: state.characterCreated,

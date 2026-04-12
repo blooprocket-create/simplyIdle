@@ -63,6 +63,7 @@ import RebirthModal from '../components/PrestigeModal';
 import BottomNavigation, { BottomTabType } from '../components/BottomNavigation';
 import GameHeader from '../components/GameHeader';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { ProgressBar } from '../components/ProgressBar';
 import {
   BattleTabContent,
   WarroomTabContent,
@@ -2785,17 +2786,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           <View style={styles.hpSection}>
             <View style={styles.hpRow}>
               <Text style={styles.hpLabel}>💪 Team</Text>
-              <View style={styles.hpBarBg}>
-                <View
-                  style={[
-                    styles.hpBarFill,
-                    {
-                      width: `${teamHpPct}%`,
-                      backgroundColor: teamHpPct > 30 ? '#33CC55' : '#EE3333',
-                    },
-                  ]}
-                />
-              </View>
+              <ProgressBar
+                percent={teamHpPct}
+                color={teamHpPct > 30 ? '#33CC55' : '#EE3333'}
+              />
               <Text style={styles.hpText}>{Math.ceil(state.teamHp)}/{Math.ceil(state.teamMaxHp)}</Text>
             </View>
           </View>
@@ -2806,17 +2800,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             {isBossImminent && !isBoss && <Text style={styles.bossImminentText}>⚠️ Boss Approaching</Text>}
             <Text style={styles.monsterEmoji}>{monster.emoji}</Text>
             <Text style={styles.monsterName}>{monster.name}</Text>
-            <View style={styles.monsterHpBarBg}>
-              <View
-                style={[
-                  styles.hpBarFill,
-                  {
-                    width: `${monsterHpPct}%`,
-                    backgroundColor: monsterHpPct > 50 ? '#33CC55' : monsterHpPct > 25 ? '#FFCC00' : '#EE3333',
-                  },
-                ]}
-              />
-            </View>
+            <ProgressBar
+              percent={monsterHpPct}
+              color={monsterHpPct > 50 ? '#33CC55' : monsterHpPct > 25 ? '#FFCC00' : '#EE3333'}
+              style={{ width: '88%', maxWidth: 460, marginTop: 6 }}
+            />
             <Text style={styles.hpText}>{Math.ceil(state.monsterHp)}/{Math.ceil(state.monsterMaxHp)} HP</Text>
             <View style={styles.affixRow}>
               {monsterAffixes.map(affix => (
@@ -3301,9 +3289,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Text style={styles.eventsCardTitle}>👑 VIP Status</Text>
                 <Text style={styles.eventsStatLine}>Level: {vipLevel}/10 • Points: {fmt(vipPoints)}</Text>
                 <Text style={styles.eventsStatLine}>Bonuses: +{stats.vipDamageBonusPct.toFixed(1)}% DPS • +{stats.vipGoldBonusPct.toFixed(1)}% Gold • +{stats.vipExpBonusPct.toFixed(1)}% EXP</Text>
-                <View style={styles.hpBarBg}>
-                  <View style={[styles.hpBarFill, { width: `${vipProgressPct}%`, backgroundColor: '#FFE07A' }]} />
-                </View>
+                <ProgressBar percent={vipProgressPct} color="#FFE07A" />
                 <Text style={styles.eventsHint}>
                   {vipLevel >= 10
                     ? 'MAX VIP reached.'
@@ -3560,9 +3546,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Text style={styles.eventsCardTitle}>🔥 Login Streak</Text>
                 <Text style={styles.eventsStatLine}>Current Streak: {state.dailyLoginStreak ?? 0} days</Text>
                 <Text style={styles.eventsStatLine}>Streak Insurance Charges: {state.streakInsuranceCharges}</Text>
-                <View style={styles.hpBarBg}>
-                  <View style={[styles.hpBarFill, { width: `${Math.min(100, ((state.dailyLoginStreak ?? 0) / 30) * 100)}%`, backgroundColor: '#FFB347' }]} />
-                </View>
+                <ProgressBar percent={Math.min(100, ((state.dailyLoginStreak ?? 0) / 30) * 100)} color="#FFB347" />
                 <Text style={styles.eventsHint}>{Math.max(0, 30 - (state.dailyLoginStreak ?? 0))} days to streak milestone (30 days). Gain +1 insurance every 7-day streak.</Text>
               </View>
 
@@ -3583,9 +3567,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                         <Text style={styles.dailyQuestTitle}>{q.title}</Text>
                         <Text style={styles.dailyQuestDesc}>{q.desc}</Text>
                         <Text style={styles.dailyQuestProgress}>{Math.min(q.progress, q.target)}/{q.target}</Text>
-                        <View style={styles.hpBarBg}>
-                          <View style={[styles.hpBarFill, { width: `${Math.min(100, (q.progress / q.target) * 100)}%`, backgroundColor: done ? '#6DDB7B' : '#5DA8FF' }]} />
-                        </View>
+                        <ProgressBar percent={Math.min(100, (q.progress / q.target) * 100)} color={done ? '#6DDB7B' : '#5DA8FF'} />
                       </View>
                       <Text style={styles.dailyQuestReward}>{q.reward}</Text>
                     </View>

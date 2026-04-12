@@ -1,4 +1,5 @@
 import { Platform, StyleSheet } from 'react-native';
+import { theme } from '../theme/colors';
 
 export const styles = StyleSheet.create({
   safe: {
@@ -187,7 +188,7 @@ export const styles = StyleSheet.create({
   createTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#FFF',
+    color: theme.text.primary,
     marginBottom: 8,
   },
   createSubtitle: {
@@ -226,7 +227,7 @@ export const styles = StyleSheet.create({
     gap: 4,
   },
   characterSlotCardFilled: {
-    borderColor: '#6DDB7B',
+    borderColor: theme.status.positive,
     backgroundColor: '#17231C',
   },
   characterSlotHeader: {
@@ -243,7 +244,7 @@ export const styles = StyleSheet.create({
   characterSlotTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFF',
+    color: theme.text.primary,
   },
   characterSlotBadge: {
     fontSize: 10,
@@ -255,7 +256,7 @@ export const styles = StyleSheet.create({
   },
   characterSlotBadgeFilled: {
     color: '#041108',
-    backgroundColor: '#6DDB7B',
+    backgroundColor: theme.status.positive,
   },
   characterSlotBadgeEmpty: {
     color: '#D2D8E8',
@@ -320,8 +321,8 @@ export const styles = StyleSheet.create({
     borderColor: '#4A4A7A',
     borderRadius: 8,
     padding: 12,
-    backgroundColor: '#15151F',
-    color: '#FFF',
+    backgroundColor: theme.bg.card,
+    color: theme.text.primary,
     fontSize: 16,
     marginBottom: 8,
   },
@@ -333,17 +334,17 @@ export const styles = StyleSheet.create({
     borderColor: '#4A4A7A',
     borderRadius: 8,
     padding: 12,
-    backgroundColor: '#15151F',
+    backgroundColor: theme.bg.card,
     marginBottom: 8,
   },
   classCardSelected: {
-    borderColor: '#6DDB7B',
+    borderColor: theme.status.positive,
     backgroundColor: '#1a2a20',
   },
   className: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFF',
+    color: theme.text.primary,
     marginBottom: 4,
   },
   classFantasy: {
@@ -360,7 +361,7 @@ export const styles = StyleSheet.create({
     marginTop: 20,
     paddingVertical: 14,
     paddingHorizontal: 20,
-    backgroundColor: '#6DDB7B',
+    backgroundColor: theme.status.positive,
     borderRadius: 8,
     alignItems: 'center',
   },
@@ -534,7 +535,7 @@ export const styles = StyleSheet.create({
   gold: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#FFD700',
+    color: theme.accent.gold,
     marginBottom: 2,
   },
   shardLabel: {
@@ -558,7 +559,7 @@ export const styles = StyleSheet.create({
   playerLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFF',
+    color: theme.text.primary,
   },
   buffText: {
     marginTop: 6,
@@ -570,7 +571,7 @@ export const styles = StyleSheet.create({
     color: '#8BDB9D',
   },
   dangerHigh: {
-    color: '#FFB347',
+    color: theme.text.warning,
   },
   dangerCritical: {
     color: '#FF6B86',
@@ -590,7 +591,7 @@ export const styles = StyleSheet.create({
   },
   accountLabel: {
     fontSize: 10,
-    color: '#6DDB7B',
+    color: theme.status.positive,
     marginBottom: 2,
   },
   headerStat: {
@@ -601,7 +602,7 @@ export const styles = StyleSheet.create({
   headerHighlight: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#FFB347',
+    color: theme.text.warning,
   },
   logoutBtn: {
     marginTop: 4,
@@ -612,7 +613,7 @@ export const styles = StyleSheet.create({
   },
   logoutBtnText: {
     fontSize: 10,
-    color: '#FFF',
+    color: theme.text.primary,
     fontWeight: '600',
   },
   settingsBtn: {
@@ -663,7 +664,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 8,
     borderLeftWidth: 3,
-    borderLeftColor: '#6DDB7B',
+    borderLeftColor: theme.status.positive,
     backgroundColor: '#131D1A',
   },
   questBannerHeader: {
@@ -674,7 +675,7 @@ export const styles = StyleSheet.create({
   },
   questBannerTitle: {
     fontSize: 11,
-    color: '#6DDB7B',
+    color: theme.status.positive,
     fontWeight: '700',
   },
   questProgress: {
@@ -683,7 +684,7 @@ export const styles = StyleSheet.create({
   },
   questName: {
     fontSize: 13,
-    color: '#FFF',
+    color: theme.text.primary,
     fontWeight: '700',
     marginBottom: 2,
   },
@@ -694,7 +695,7 @@ export const styles = StyleSheet.create({
   },
   questHint: {
     fontSize: 10,
-    color: '#6DDB7B',
+    color: theme.status.positive,
     marginTop: 4,
   },
   questForceHint: {
@@ -926,7 +927,7 @@ export const styles = StyleSheet.create({
   hpLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#FFF',
+    color: theme.text.primary,
     minWidth: 50,
   },
   hpBarBg: {
@@ -987,7 +988,7 @@ export const styles = StyleSheet.create({
   monsterName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFF',
+    color: theme.text.primary,
     marginBottom: 8,
   },
   monsterBuffFloatWrap: {
@@ -1019,7 +1020,7 @@ export const styles = StyleSheet.create({
   teamInfo: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#15151F',
+    backgroundColor: theme.bg.card,
     marginBottom: 8,
     borderRadius: 8,
     marginHorizontal: 12,
@@ -1038,7 +1039,7 @@ export const styles = StyleSheet.create({
   teamTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#FFF',
+    color: theme.text.primary,
   },
   editBtn: {
     paddingHorizontal: 12,
@@ -1049,7 +1050,7 @@ export const styles = StyleSheet.create({
   editBtnText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#FFF',
+    color: theme.text.primary,
   },
   teamCollapseBtn: {
     paddingHorizontal: 12,
@@ -1091,7 +1092,7 @@ export const styles = StyleSheet.create({
   },
   heroSelectCardSelected: {
     backgroundColor: '#1a2a20',
-    borderColor: '#6DDB7B',
+    borderColor: theme.status.positive,
   },
   selectCheckbox: {
     width: 16,
@@ -1102,8 +1103,8 @@ export const styles = StyleSheet.create({
     marginRight: 8,
   },
   selectCheckboxChecked: {
-    backgroundColor: '#6DDB7B',
-    borderColor: '#6DDB7B',
+    backgroundColor: theme.status.positive,
+    borderColor: theme.status.positive,
   },
   heroSelectInfo: {
     flex: 1,
@@ -1111,12 +1112,12 @@ export const styles = StyleSheet.create({
   heroSelectName: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#FFF',
+    color: theme.text.primary,
   },
   confirmBtn: {
     paddingVertical: 10,
     paddingHorizontal: 12,
-    backgroundColor: '#6DDB7B',
+    backgroundColor: theme.status.positive,
     borderRadius: 4,
     alignItems: 'center',
   },
@@ -1143,12 +1144,12 @@ export const styles = StyleSheet.create({
     backgroundColor: '#0A0A18',
     borderRadius: 4,
     borderLeftWidth: 3,
-    borderLeftColor: '#FFB347',
+    borderLeftColor: theme.text.warning,
   },
   slotIdx: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#FFB347',
+    color: theme.text.warning,
     marginRight: 8,
     minWidth: 20,
   },
@@ -1158,7 +1159,7 @@ export const styles = StyleSheet.create({
   activeTeamHeroName: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#FFF',
+    color: theme.text.primary,
     marginBottom: 2,
   },
   activeTeamHeroClass: {
@@ -1706,11 +1707,11 @@ export const styles = StyleSheet.create({
     backgroundColor: '#3a2a1a',
     borderRadius: 6,
     borderLeftWidth: 3,
-    borderLeftColor: '#FFB347',
+    borderLeftColor: theme.text.warning,
   },
   warningText: {
     fontSize: 12,
-    color: '#FFB347',
+    color: theme.text.warning,
     lineHeight: 18,
   },
   usableRow: {
@@ -1773,7 +1774,7 @@ export const styles = StyleSheet.create({
     backgroundColor: '#1A2230',
   },
   autoPotionToggleActive: {
-    borderColor: '#6DDB7B',
+    borderColor: theme.status.positive,
     backgroundColor: '#1f3a2a',
   },
   autoPotionToggleText: {
@@ -1813,7 +1814,7 @@ export const styles = StyleSheet.create({
   gachaSection: {
     paddingVertical: 12,
     paddingHorizontal: 12,
-    backgroundColor: '#15151F',
+    backgroundColor: theme.bg.card,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#4A4A7A',
@@ -1821,13 +1822,13 @@ export const styles = StyleSheet.create({
   gachaCost: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#FFD700',
+    color: theme.accent.gold,
     marginBottom: 8,
   },
   gachaFree: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#6DDB7B',
+    color: theme.status.positive,
     marginBottom: 8,
   },
   pityLabel: {
@@ -1844,7 +1845,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#6DDB7B',
+    backgroundColor: theme.status.positive,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2019,7 +2020,7 @@ export const styles = StyleSheet.create({
     marginBottom: 8,
   },
   autoEquipBtnText: {
-    color: '#FFF',
+    color: theme.text.primary,
     fontSize: 10,
     fontWeight: '700',
   },
@@ -2299,7 +2300,7 @@ export const styles = StyleSheet.create({
   },
   heroCard: {
     flexDirection: 'row',
-    backgroundColor: '#15151F',
+    backgroundColor: theme.bg.card,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#2A2A4A',
@@ -2307,7 +2308,7 @@ export const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   heroCardActive: {
-    borderColor: '#6DDB7B',
+    borderColor: theme.status.positive,
     backgroundColor: '#1a2a20',
   },
   heroCardMobile: {
@@ -2549,7 +2550,7 @@ export const styles = StyleSheet.create({
   heroLevel: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#FFB347',
+    color: theme.text.warning,
   },
   heroStatsRow: {
     flexDirection: 'row',
@@ -2574,7 +2575,7 @@ export const styles = StyleSheet.create({
   heroStatBadgeValue: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#FFF',
+    color: theme.text.primary,
     marginTop: 1,
   },
   expandBtn: {
@@ -2623,12 +2624,12 @@ export const styles = StyleSheet.create({
   heroStatItemLabel: {
     fontSize: 9,
     fontWeight: '700',
-    color: '#6DDB7B',
+    color: theme.status.positive,
   },
   heroStatItemValue: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#FFF',
+    color: theme.text.primary,
     marginTop: 2,
   },
   heroEmoji: {
@@ -2637,7 +2638,7 @@ export const styles = StyleSheet.create({
   heroName: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#FFF',
+    color: theme.text.primary,
     marginBottom: 2,
   },
   heroDetail: {
@@ -2651,12 +2652,12 @@ export const styles = StyleSheet.create({
     borderRadius: 4,
   },
   toggleBtnActive: {
-    backgroundColor: '#6DDB7B',
+    backgroundColor: theme.status.positive,
   },
   toggleBtnText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#FFF',
+    color: theme.text.primary,
   },
 
   // Stats Tab
@@ -2671,7 +2672,7 @@ export const styles = StyleSheet.create({
   unspentCount: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#FFB347',
+    color: theme.text.warning,
   },
   statsGrid: {
     gap: 8,
@@ -2679,7 +2680,7 @@ export const styles = StyleSheet.create({
   statRow: {
     paddingVertical: 10,
     paddingHorizontal: 10,
-    backgroundColor: '#15151F',
+    backgroundColor: theme.bg.card,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#2A2A4A',
@@ -2717,7 +2718,7 @@ export const styles = StyleSheet.create({
   statValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFF',
+    color: theme.text.primary,
     marginTop: 2,
   },
   statValueRow: {
@@ -2755,15 +2756,15 @@ export const styles = StyleSheet.create({
   statBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#FFF',
+    color: theme.text.primary,
   },
   heroBoostBox: {
     paddingVertical: 12,
     paddingHorizontal: 12,
-    backgroundColor: '#15151F',
+    backgroundColor: theme.bg.card,
     borderRadius: 6,
     borderLeftWidth: 3,
-    borderLeftColor: '#FFB347',
+    borderLeftColor: theme.text.warning,
   },
   heroBoostLabel: {
     fontSize: 11,
@@ -2773,7 +2774,7 @@ export const styles = StyleSheet.create({
   heroBoostValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFB347',
+    color: theme.text.warning,
   },
   metaBox: {
     paddingVertical: 12,
@@ -2876,7 +2877,7 @@ export const styles = StyleSheet.create({
   equipmentBox: {
     paddingVertical: 12,
     paddingHorizontal: 12,
-    backgroundColor: '#15151F',
+    backgroundColor: theme.bg.card,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#2A2A4A',
@@ -2896,7 +2897,7 @@ export const styles = StyleSheet.create({
   equipSlotTitle: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#6DDB7B',
+    color: theme.status.positive,
   },
   equipSlotCurrent: {
     fontSize: 11,
@@ -2914,7 +2915,7 @@ export const styles = StyleSheet.create({
     backgroundColor: '#10101C',
   },
   equipChoiceBtnActive: {
-    borderColor: '#6DDB7B',
+    borderColor: theme.status.positive,
     backgroundColor: '#1a2a20',
   },
   equipChoiceText: {
@@ -3217,7 +3218,7 @@ export const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#1A2A1F',
     borderLeftWidth: 3,
-    borderLeftColor: '#6DDB7B',
+    borderLeftColor: theme.status.positive,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
@@ -3225,7 +3226,7 @@ export const styles = StyleSheet.create({
     pointerEvents: 'box-none',
   },
   rewardToastActive: {
-    shadowColor: '#6DDB7B',
+    shadowColor: theme.status.positive,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 8,
@@ -3324,7 +3325,7 @@ export const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFF',
+    color: theme.text.primary,
     marginBottom: 8,
   },
   sectionDesc: {
@@ -3346,13 +3347,13 @@ export const styles = StyleSheet.create({
   battleSectionTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#6DDB7B',
+    color: theme.status.positive,
     marginBottom: 8,
   },
   battleMonsterName: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFF',
+    color: theme.text.primary,
     marginBottom: 4,
   },
   battleMonsterWave: {
@@ -3432,13 +3433,13 @@ export const styles = StyleSheet.create({
   battleHeroSlot: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#FFB347',
+    color: theme.text.warning,
     minWidth: 25,
   },
   battleHeroInfo: {
     flex: 1,
     fontSize: 11,
-    color: '#FFF',
+    color: theme.text.primary,
   },
   battleHeroStats: {
     fontSize: 10,
@@ -3447,7 +3448,7 @@ export const styles = StyleSheet.create({
   battleHeroDps: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#6DDB7B',
+    color: theme.status.positive,
     minWidth: 55,
     textAlign: 'right',
   },
@@ -3463,7 +3464,7 @@ export const styles = StyleSheet.create({
   battleStatValue: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#FFF',
+    color: theme.text.primary,
   },
   battleRewardLabel: {
     fontSize: 11,
@@ -3678,7 +3679,7 @@ export const styles = StyleSheet.create({
   },
   invEquipCard: {
     flexDirection: 'row',
-    backgroundColor: '#15151F',
+    backgroundColor: theme.bg.card,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#2A2A4A',
@@ -3686,7 +3687,7 @@ export const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   invEquipCardEquipped: {
-    borderColor: '#6DDB7B',
+    borderColor: theme.status.positive,
     backgroundColor: '#1a2a20',
   },
   invEquipRarity: {
@@ -3706,7 +3707,7 @@ export const styles = StyleSheet.create({
   invEquipName: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#FFF',
+    color: theme.text.primary,
   },
   invEquipRarity2: {
     fontSize: 10,
@@ -3721,12 +3722,12 @@ export const styles = StyleSheet.create({
   },
   invEquipBonus: {
     fontSize: 11,
-    color: '#6DDB7B',
+    color: theme.status.positive,
     marginBottom: 4,
   },
   invEquipActive: {
     fontSize: 10,
-    color: '#6DDB7B',
+    color: theme.status.positive,
     fontWeight: '700',
   },
   equipActionRow: {
@@ -3786,7 +3787,7 @@ export const styles = StyleSheet.create({
   // Hero Card Extensions
   heroRank: {
     fontSize: 10,
-    color: '#FFB347',
+    color: theme.text.warning,
     marginTop: 2,
   },
   rankUpSection: {
@@ -3802,7 +3803,7 @@ export const styles = StyleSheet.create({
     marginBottom: 6,
   },
   rankUpBtn: {
-    backgroundColor: '#FFB347',
+    backgroundColor: theme.text.warning,
     borderRadius: 4,
     paddingVertical: 6,
     paddingHorizontal: 10,
@@ -3836,7 +3837,7 @@ export const styles = StyleSheet.create({
   },
   maxRankMsg: {
     fontSize: 11,
-    color: '#6DDB7B',
+    color: theme.status.positive,
     fontWeight: '700',
     marginBottom: 8,
   },
@@ -3848,12 +3849,12 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#6DDB7B',
+    borderColor: theme.status.positive,
   },
   recycleBtnText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#6DDB7B',
+    color: theme.status.positive,
   },
 
   // Modal
@@ -3882,7 +3883,7 @@ export const styles = StyleSheet.create({
     paddingBottom: Platform.OS === 'ios' ? 18 : 12,
   },
   modalBox: {
-    backgroundColor: '#15151F',
+    backgroundColor: theme.bg.card,
     borderRadius: 12,
     paddingVertical: 20,
     paddingHorizontal: 20,
@@ -3893,7 +3894,7 @@ export const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFF',
+    color: theme.text.primary,
     marginBottom: 12,
     textAlign: 'center',
   },
@@ -3937,7 +3938,7 @@ export const styles = StyleSheet.create({
   modalBtnTextConfirm: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#FFF',
+    color: theme.text.primary,
   },
   settingsModalBox: {
     backgroundColor: '#121A26',
@@ -4280,7 +4281,7 @@ export const styles = StyleSheet.create({
   eventsModalTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFF',
+    color: theme.text.primary,
   },
   eventsScroll: {
     flex: 1,
@@ -4830,7 +4831,7 @@ export const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: '#ff3b30',
     borderWidth: 1,
-    borderColor: '#fff',
+    borderColor: theme.text.primary,
   },
   codexHeroPortrait: {
     width: 28,
@@ -4945,7 +4946,7 @@ export const styles = StyleSheet.create({
 
   // Dice Roll Modal
   diceRollModalContent: {
-    backgroundColor: '#15151F',
+    backgroundColor: theme.bg.card,
     borderRadius: 16,
     paddingVertical: 32,
     paddingHorizontal: 24,
@@ -4958,7 +4959,7 @@ export const styles = StyleSheet.create({
   diceRollTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#FFF',
+    color: theme.text.primary,
     marginBottom: 20,
   },
   diceRollHint: {
@@ -5000,7 +5001,7 @@ export const styles = StyleSheet.create({
   },
   diceRollingText: {
     fontSize: 14,
-    color: '#6DDB7B',
+    color: theme.status.positive,
     fontWeight: '700',
     marginTop: 8,
   },
@@ -5011,7 +5012,7 @@ export const styles = StyleSheet.create({
   diceResultNumber: {
     fontSize: 72,
     fontWeight: '700',
-    color: '#FFD700',
+    color: theme.accent.gold,
   },
   diceResultLabel: {
     fontSize: 18,
@@ -5019,7 +5020,7 @@ export const styles = StyleSheet.create({
     marginTop: -8,
   },
   miniGameModalContent: {
-    backgroundColor: '#15151F',
+    backgroundColor: theme.bg.card,
     borderRadius: 16,
     paddingVertical: 24,
     paddingHorizontal: 20,
@@ -5064,7 +5065,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   reconChoiceCardPicked: {
-    borderColor: '#6DDB7B',
+    borderColor: theme.status.positive,
     backgroundColor: '#173426',
   },
   reconChoiceCardDanger: {
@@ -5139,7 +5140,7 @@ export const styles = StyleSheet.create({
     backgroundColor: 'rgba(109, 219, 123, 0.35)',
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    borderColor: '#6DDB7B',
+    borderColor: theme.status.positive,
   },
   targetMarker: {
     position: 'absolute',
@@ -5153,7 +5154,7 @@ export const styles = StyleSheet.create({
 
   // Rift Dungeon Modal
   riftModalContent: {
-    backgroundColor: '#15151F',
+    backgroundColor: theme.bg.card,
     borderRadius: 16,
     paddingVertical: 32,
     paddingHorizontal: 24,
@@ -5166,7 +5167,7 @@ export const styles = StyleSheet.create({
   riftTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#FFF',
+    color: theme.text.primary,
     marginBottom: 20,
   },
   riftSimulationHint: {
@@ -5229,7 +5230,7 @@ export const styles = StyleSheet.create({
   },
   riftWavePredictionFeedback: {
     fontSize: 12,
-    color: '#FFD700',
+    color: theme.accent.gold,
     fontWeight: '700',
     marginTop: 8,
     textAlign: 'center',
@@ -5249,13 +5250,13 @@ export const styles = StyleSheet.create({
     borderColor: '#5BB58F',
   },
   waveBarActive: {
-    backgroundColor: '#6DDB7B',
+    backgroundColor: theme.status.positive,
     borderColor: '#A8FF6B',
   },
   waveBarLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#FFF',
+    color: theme.text.primary,
   },
   wavesClearedContainer: {
     alignItems: 'center',
@@ -5297,10 +5298,10 @@ export const styles = StyleSheet.create({
   rewardValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFD700',
+    color: theme.accent.gold,
   },
   modalCloseBtn: {
-    backgroundColor: '#6DDB7B',
+    backgroundColor: theme.status.positive,
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 24,
@@ -5312,7 +5313,7 @@ export const styles = StyleSheet.create({
     color: '#000',
   },
   startSimulationBtn: {
-    backgroundColor: '#6DDB7B',
+    backgroundColor: theme.status.positive,
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 24,
@@ -5365,8 +5366,8 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   levelBtnActive: {
-    backgroundColor: '#6DDB7B',
-    borderColor: '#6DDB7B',
+    backgroundColor: theme.status.positive,
+    borderColor: theme.status.positive,
   },
   levelBtnText: {
     fontSize: 11,
@@ -5405,7 +5406,7 @@ export const styles = StyleSheet.create({
     gap: 10,
   },
   batchHeroCardSelected: {
-    borderColor: '#6DDB7B',
+    borderColor: theme.status.positive,
     backgroundColor: 'rgba(109, 219, 123, 0.08)',
   },
   batchHeroCheckbox: {
@@ -5421,7 +5422,7 @@ export const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 2,
-    backgroundColor: '#6DDB7B',
+    backgroundColor: theme.status.positive,
   },
   batchHeroInfo: {
     flex: 1,
@@ -5516,15 +5517,15 @@ export const styles = StyleSheet.create({
   batchHeroTeamTag: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#6DDB7B',
+    color: theme.status.positive,
   },
   batchHerosCost: {
     fontSize: 11,
-    color: '#FFD700',
+    color: theme.accent.gold,
     fontWeight: '700',
   },
   batchLevelConfirmBtn: {
-    backgroundColor: '#6DDB7B',
+    backgroundColor: theme.status.positive,
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -5589,7 +5590,7 @@ export const styles = StyleSheet.create({
     backgroundColor: '#21364A',
   },
   facilityBonusSegmentActive: {
-    backgroundColor: '#6DDB7B',
+    backgroundColor: theme.status.positive,
   },
   facilityBonusText: {
     fontSize: 11,
@@ -5671,7 +5672,7 @@ export const styles = StyleSheet.create({
   expeditionProgressFill: {
     height: '100%',
     borderRadius: 6,
-    backgroundColor: '#6DDB7B',
+    backgroundColor: theme.status.positive,
   },
   expeditionTimeRemaining: {
     fontSize: 11,
@@ -5679,7 +5680,7 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   expeditionClaimBtn: {
-    backgroundColor: '#6DDB7B',
+    backgroundColor: theme.status.positive,
     borderRadius: 6,
     paddingVertical: 8,
     paddingHorizontal: 10,
@@ -5759,7 +5760,7 @@ export const styles = StyleSheet.create({
   },
   expeditionStartCardRewards: {
     fontSize: 10,
-    color: '#FFD700',
+    color: theme.accent.gold,
     fontWeight: '600',
   },
   expeditionStartCardRight: {
@@ -5769,7 +5770,7 @@ export const styles = StyleSheet.create({
   expeditionStartCardCost: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#FFD700',
+    color: theme.accent.gold,
   },
   expeditionStartCardCostDisabled: {
     color: '#7F6B47',
@@ -5777,7 +5778,7 @@ export const styles = StyleSheet.create({
   expeditionStartCardStatus: {
     fontSize: 9,
     fontWeight: '700',
-    color: '#6DDB7B',
+    color: theme.status.positive,
   },
   expeditionStartCardStatusDisabled: {
     color: '#7F6B47',
