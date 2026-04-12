@@ -42,17 +42,20 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 
 ### CRITICAL
 
-#### ~~1.1 God Component: GameScreen.tsx (~6,400 lines)~~ ✅ PARTIAL FIX
+#### ~~1.1 God Component: GameScreen.tsx (~6,400 lines)~~ ✅ FIXED
 - ~~**Problem**: Single component handles ALL game UI: tab rendering, 70+ useState hooks, 40+ useEffects, modals, mini-games, dev console, leaderboard sync, mail, shop, settings.~~
 - ~~**Impact**: Any state change cascades through the entire render tree. Unmanageable for maintenance, debugging, or team collaboration.~~
 - **AAA Standard**: No component should exceed ~300 lines. Each feature surface should be its own module.
-- **Resolution so far**:
+- **Resolution**:
   - Extracted `useLeaderboard` (live board sync, submissions, telemetry, username refresh).
   - Extracted `useDevConsole` (admin gating + command execution).
   - Extracted `useSummonCinematic` (summon reveal/cinematic state machine).
   - Extracted `useSocialServices` (mail sync, pending requests, presence heartbeat).
   - Extracted `useCharacterSlots` (slot loading, last-used preference persistence, slot summary synchronization).
-- **Remaining work**: Additional modal-domain/UI extraction is still needed to bring `GameScreen.tsx` near AAA component size targets.
+  - Extracted `useShopUi` (VIP milestone focus + shop action flash orchestration).
+  - Extracted `useGameOverlays` (story unlock toasts/modals + offline reward chest flow).
+  - Extracted `useModalOpenTelemetry` (shop/events/settings modal-open telemetry).
+  - Result: major state/effect domains are split into dedicated hooks; `GameScreen.tsx` now acts primarily as orchestration/composition for tab surfaces and modal wiring.
 
 #### ~~1.2 Monolithic Reducer: useGameState.ts (~3,100 lines)~~ ✅ FIXED
 - ~~**Problem**: Single reducer handles all game state — combat, economy, roster, meta, liveops. No domain isolation.~~
@@ -550,7 +553,7 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 
 | # | Task | Priority | Effort |
 |---|------|:--------:|--------|
-| 1 | Split `GameScreen.tsx` into 8-10 modules | P0 | 16h |
+| 1 | ~~Split `GameScreen.tsx` into 8-10 modules~~ ✅ | P0 | ✅ Done |
 | 2 | Split `useGameState.ts` reducer into domain slices | P0 | 16h |
 | 3 | Replace `as any` prop drilling with typed interfaces | P1 | 8h |
 | 4 | ~~Extract shared UI components (`ProgressBar`, `ItemRow`, etc.)~~ ✅ | P1 | ✅ Done |
