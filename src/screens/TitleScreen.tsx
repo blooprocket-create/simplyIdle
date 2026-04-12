@@ -1,19 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated, useWindowDimensions } from 'react-native';
+import { t } from '../i18n';
 
 interface TitleScreenProps {
   onStart: () => void;
 }
 
-const LORE_LINES = [
-  'The frontier beacons relight after years of silence.',
-  'Your command seal activates.',
-  'Old war machines answer your name.',
-];
-
 export default function TitleScreen({ onStart }: TitleScreenProps) {
   const { width } = useWindowDimensions();
   const isPhone = width < 600;
+  const loreLines = [
+    t('title.line1'),
+    t('title.line2'),
+    t('title.line3'),
+  ];
 
   // Fade-in animations
   const titleOpacity = useRef(new Animated.Value(0)).current;
@@ -56,13 +56,13 @@ export default function TitleScreen({ onStart }: TitleScreenProps) {
         Animated.delay(1800),
         Animated.timing(loreLineOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
       ]).start(() => {
-        setLoreIndex(prev => (prev + 1) % LORE_LINES.length);
+        setLoreIndex(prev => (prev + 1) % loreLines.length);
       });
     };
 
     const timer = setTimeout(showLine, 2200); // Start after title fades in
     return () => clearTimeout(timer);
-  }, [loreIndex, loreLineOpacity]);
+  }, [loreIndex, loreLineOpacity, loreLines.length]);
 
   return (
     <View style={styles.root}>
@@ -78,13 +78,13 @@ export default function TitleScreen({ onStart }: TitleScreenProps) {
 
         {/* Subtitle */}
         <Animated.View style={{ opacity: subtitleOpacity }}>
-          <Text style={[styles.subtitle, isPhone && styles.subtitlePhone]}>Command. Conquer. Ascend.</Text>
+          <Text style={[styles.subtitle, isPhone && styles.subtitlePhone]}>{t('title.subtitle')}</Text>
         </Animated.View>
 
         {/* Lore crawl */}
         <Animated.View style={[styles.loreContainer, { opacity: loreOpacity }]}>
           <Animated.Text style={[styles.loreText, { opacity: loreLineOpacity }]}>
-            {LORE_LINES[loreIndex]}
+            {loreLines[loreIndex]}
           </Animated.Text>
         </Animated.View>
 
@@ -94,15 +94,15 @@ export default function TitleScreen({ onStart }: TitleScreenProps) {
             style={styles.startBtn}
             onPress={onStart}
             accessibilityRole="button"
-            accessibilityLabel="Begin campaign"
+            accessibilityLabel={t('title.beginCampaignA11y')}
           >
-            <Text style={styles.startBtnText}>BEGIN CAMPAIGN</Text>
+            <Text style={styles.startBtnText}>{t('title.beginCampaign')}</Text>
           </Pressable>
         </Animated.View>
       </View>
 
       {/* Version */}
-      <Text style={styles.version}>v1.0</Text>
+      <Text style={styles.version}>{t('title.version', { version: '1.0' })}</Text>
     </View>
   );
 }

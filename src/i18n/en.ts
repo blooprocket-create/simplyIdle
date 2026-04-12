@@ -11,7 +11,6 @@ const en = {
     dpsLabel: 'DPS:',
     power: 'Power',
     powerLabel: 'Power:',
-    goldA11y: 'Gold: {{amount}}',
     cloudSyncedNow: 'Cloud Synced just now',
     cloudSyncedAgo: 'Cloud Synced {{seconds}}s ago',
     cloudSyncing: 'Cloud Syncing...',
@@ -21,6 +20,69 @@ const en = {
     expProgress: 'EXP {{current}}/{{required}}',
     offlineBanner: 'Offline — progress saved locally',
     syncErrorBanner: 'Cloud sync error — playing offline',
+    goldA11y: 'Gold: {{amount}}',
+    diamondsA11y: 'Diamonds: {{amount}}',
+    bossTearsA11y: 'Boss Tears: {{amount}}',
+    heroShardsA11y: 'Hero Shards: {{amount}}',
+    essenceA11y: 'Essence: {{amount}}',
+    settingsA11y: 'Settings',
+    mailA11y: 'Mail{{unreadSuffix}}',
+    dpsA11y: 'DPS: {{amount}}. Tap for combat stats',
+  },
+
+  // ── Title Screen ────────────────────────────────────────
+  title: {
+    line1: 'The frontier beacons relight after years of silence.',
+    line2: 'Your command seal activates.',
+    line3: 'Old war machines answer your name.',
+    subtitle: 'Command. Conquer. Ascend.',
+    beginCampaign: 'BEGIN CAMPAIGN',
+    beginCampaignA11y: 'Begin campaign',
+    version: 'v{{version}}',
+  },
+
+  // ── Auth Screen ─────────────────────────────────────────
+  auth: {
+    onlineCommandAccess: 'Online Command Access',
+    appName: 'SimplyIdle',
+    heroSubtitle:
+      'Use real Firebase auth, keep progress tied to your account, and let players enter with Google or email instead of the old local-only form.',
+    returnToCommand: 'Return to Command',
+    openNewLedger: 'Open a New Ledger',
+    statusFirebase: 'Firebase',
+    modeLogin: 'Log In',
+    modeCreate: 'Create',
+    continueWithGoogle: 'Continue with Google',
+    choosePublicUsername: 'Choose Public Username',
+    finishGoogleSignup: 'Finish Google Signup',
+    orUseEmail: 'or use email',
+    identityLabel: 'Email',
+    identityPlaceholder: 'commander@domain.com',
+    identityHelper: 'Use the same email whenever you log in or sign up.',
+    passwordLabel: 'Password',
+    passwordPlaceholder: 'Enter password',
+    passwordHelper: 'Password: minimum {{min}} characters.',
+    confirmPasswordLabel: 'Confirm Password',
+    confirmPasswordPlaceholder: 'Repeat password',
+    confirmPasswordHelperOk: 'Confirmation must match exactly.',
+    confirmPasswordHelperMismatch: 'Passwords do not match.',
+    publicUsernameLabel: 'Public Username',
+    publicUsernamePlaceholder: 'your_username',
+    publicUsernameRange:
+      '{{min}}-{{max}} characters, letters/numbers/underscores. This name is shown publicly on the leaderboard.',
+    publicUsernameGoogleRange:
+      '{{min}}-{{max}} characters. This name is your public identity online.',
+    submitPleaseWait: 'Please wait...',
+    submitCreateAccount: 'Create Account',
+    supportingOnline:
+      'Sign in with your account to sync progress across devices.',
+    supportingOffline:
+      'Authentication not available. Please check your Firebase configuration.',
+    googleNoteWeb:
+      'Google sign-in uses the Firebase web popup flow configured in Firebase.',
+    googleNoteNativeReady: 'Google sign-in is ready for this build.',
+    googleNoteNativeMissing:
+      'Google sign-in needs Expo Google client IDs in your public env vars for native builds.',
   },
 
   // ── Tap / Attack ─────────────────────────────────────────

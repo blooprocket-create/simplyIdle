@@ -92,25 +92,25 @@ export default function GameHeader({
         {twoRowResources ? (
           <>
             <View style={styles.resourceRow}>
-              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Gold: ${formatNumber(gold)}`}>
+              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.goldA11y', { amount: formatNumber(gold) })}>
                 <Text style={styles.resourceIcon}>💰</Text>
                 <Text style={styles.resourceValue}>{formatNumber(gold)}</Text>
               </Pressable>
-              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Diamonds: ${formatNumber(diamonds)}`}>
+              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.diamondsA11y', { amount: formatNumber(diamonds) })}>
                 <Text style={styles.resourceIcon}>💎</Text>
                 <Text style={styles.resourceValue}>{formatNumber(diamonds)}</Text>
               </Pressable>
-              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Boss Tears: ${formatNumber(bossTearsOrdered)}`}>
+              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.bossTearsA11y', { amount: formatNumber(bossTearsOrdered) })}>
                 <Text style={styles.resourceIcon}>💧</Text>
                 <Text style={styles.resourceValue}>{formatNumber(bossTearsOrdered)}</Text>
               </Pressable>
             </View>
             <View style={styles.resourceRow}>
-              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Hero Shards: ${formatNumber(heroShards)}`}>
+              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.heroShardsA11y', { amount: formatNumber(heroShards) })}>
                 <Text style={styles.resourceIcon}>💠</Text>
                 <Text style={styles.resourceValue}>{formatNumber(heroShards)}</Text>
               </Pressable>
-              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Essence: ${formatNumber(essence)}`}>
+              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.essenceA11y', { amount: formatNumber(essence) })}>
                 <Text style={styles.resourceIcon}>✨</Text>
                 <Text style={styles.resourceValue}>{formatNumber(essence)}</Text>
               </Pressable>
@@ -118,23 +118,23 @@ export default function GameHeader({
           </>
         ) : (
           <>
-            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Gold: ${formatNumber(gold)}`}>
+            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.goldA11y', { amount: formatNumber(gold) })}>
               <Text style={styles.resourceIcon}>💰</Text>
               <Text style={styles.resourceValue}>{formatNumber(gold)}</Text>
             </Pressable>
-            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Diamonds: ${formatNumber(diamonds)}`}>
+            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.diamondsA11y', { amount: formatNumber(diamonds) })}>
               <Text style={styles.resourceIcon}>💎</Text>
               <Text style={styles.resourceValue}>{formatNumber(diamonds)}</Text>
             </Pressable>
-            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Boss Tears: ${formatNumber(bossTearsOrdered)}`}>
+            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.bossTearsA11y', { amount: formatNumber(bossTearsOrdered) })}>
               <Text style={styles.resourceIcon}>💧</Text>
               <Text style={styles.resourceValue}>{formatNumber(bossTearsOrdered)}</Text>
             </Pressable>
-            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Hero Shards: ${formatNumber(heroShards)}`}>
+            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.heroShardsA11y', { amount: formatNumber(heroShards) })}>
               <Text style={styles.resourceIcon}>💠</Text>
               <Text style={styles.resourceValue}>{formatNumber(heroShards)}</Text>
             </Pressable>
-            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Essence: ${formatNumber(essence)}`}>
+            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.essenceA11y', { amount: formatNumber(essence) })}>
               <Text style={styles.resourceIcon}>✨</Text>
               <Text style={styles.resourceValue}>{formatNumber(essence)}</Text>
             </Pressable>
@@ -151,7 +151,7 @@ export default function GameHeader({
             onActionPress('settings');
           }}
           accessibilityRole="button"
-          accessibilityLabel="Settings"
+          accessibilityLabel={t('header.settingsA11y')}
         >
           <Text style={styles.actionIcon}>⚙️</Text>
         </Pressable>
@@ -163,7 +163,9 @@ export default function GameHeader({
             onActionPress('mail');
           }}
           accessibilityRole="button"
-          accessibilityLabel={`Mail${mailUnreadCount > 0 ? `, ${mailUnreadCount} unread` : ''}`}
+          accessibilityLabel={t('header.mailA11y', {
+            unreadSuffix: mailUnreadCount > 0 ? `, ${mailUnreadCount} unread` : '',
+          })}
         >
           <Text style={styles.actionIcon}>✉️</Text>
           {mailUnreadCount > 0 && (
@@ -180,7 +182,7 @@ export default function GameHeader({
             setShowStatTip(!showStatTip);
           }}
           accessibilityRole="button"
-          accessibilityLabel={`DPS: ${formatNumber(dps)}. Tap for combat stats`}
+          accessibilityLabel={t('header.dpsA11y', { amount: formatNumber(dps) })}
         >
           <View style={styles.statRow}>
             <Text style={styles.statLabel}>{t('header.dps')}</Text>

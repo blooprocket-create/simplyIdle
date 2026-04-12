@@ -34,6 +34,7 @@ import {
   reservePublicUsername,
   validatePublicUsername,
 } from '../services/publicProfile';
+import { t } from '../i18n';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -340,17 +341,17 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     }
   }
 
-  const identityLabel = 'Email';
-  const identityPlaceholder = 'commander@domain.com';
-  const submitLabel = busy ? 'Please wait...' : mode === 'login' ? 'Log In' : 'Create Account';
+  const identityLabel = t('auth.identityLabel');
+  const identityPlaceholder = t('auth.identityPlaceholder');
+  const submitLabel = busy ? t('auth.submitPleaseWait') : mode === 'login' ? t('auth.modeLogin') : t('auth.submitCreateAccount');
   const supportingNote = onlineAuthEnabled
-    ? 'Sign in with your account to sync progress across devices.'
-    : 'Authentication not available. Please check your Firebase configuration.';
+    ? t('auth.supportingOnline')
+    : t('auth.supportingOffline');
   const googleNote = Platform.OS === 'web'
-    ? 'Google sign-in uses the Firebase web popup flow configured in Firebase.'
+    ? t('auth.googleNoteWeb')
     : googleAuthEnabled
-      ? 'Google sign-in is ready for this build.'
-      : 'Google sign-in needs Expo Google client IDs in your public env vars for native builds.';
+      ? t('auth.googleNoteNativeReady')
+      : t('auth.googleNoteNativeMissing');
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -360,19 +361,19 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.heroBlock}>
-            <Text style={styles.eyebrow}>Online Command Access</Text>
-            <Text style={styles.title}>SimplyIdle</Text>
-            <Text style={styles.subtitle}>Use real Firebase auth, keep progress tied to your account, and let players enter with Google or email instead of the old local-only form.</Text>
+            <Text style={styles.eyebrow}>{t('auth.onlineCommandAccess')}</Text>
+            <Text style={styles.title}>{t('auth.appName')}</Text>
+            <Text style={styles.subtitle}>{t('auth.heroSubtitle')}</Text>
           </View>
 
           <View style={styles.card}>
             <View style={styles.cardTopRow}>
               <View style={styles.cardCopy}>
-                <Text style={styles.cardTitle}>{mode === 'login' ? 'Return to Command' : 'Open a New Ledger'}</Text>
+                <Text style={styles.cardTitle}>{mode === 'login' ? t('auth.returnToCommand') : t('auth.openNewLedger')}</Text>
                 <Text style={styles.cardBody}>{supportingNote}</Text>
               </View>
               <View style={styles.statusPill}>
-                <Text style={styles.statusPillText}>Firebase</Text>
+                <Text style={styles.statusPillText}>{t('auth.statusFirebase')}</Text>
               </View>
             </View>
 
@@ -385,7 +386,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   setPublicUsername('');
                 }}
               >
-                <Text style={[styles.modeBtnText, mode === 'login' && styles.modeBtnTextActive]}>Log In</Text>
+                <Text style={[styles.modeBtnText, mode === 'login' && styles.modeBtnTextActive]}>{t('auth.modeLogin')}</Text>
               </Pressable>
               <Pressable
                 style={[styles.modeBtn, mode === 'register' && styles.modeBtnActive]}
@@ -395,7 +396,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   setPublicUsername('');
                 }}
               >
-                <Text style={[styles.modeBtnText, mode === 'register' && styles.modeBtnTextActive]}>Create</Text>
+                <Text style={[styles.modeBtnText, mode === 'register' && styles.modeBtnTextActive]}>{t('auth.modeCreate')}</Text>
               </Pressable>
             </View>
 
@@ -407,7 +408,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                     disabled={busy || googleNeedsUsername || (Platform.OS !== 'web' && !hasNativeGoogleConfig)}
                     onPress={handleGoogleContinue}
                   >
-                    {busy ? <ActivityIndicator color="#08131E" /> : <Text style={styles.googleBtnText}>Continue with Google</Text>}
+                      {busy ? <ActivityIndicator color="#08131E" /> : <Text style={styles.googleBtnText}>{t('auth.continueWithGoogle')}</Text>}
                   </Pressable>
                 ) : (
                   <NativeGoogleButton
@@ -423,7 +424,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                 <Text style={styles.helperText}>{googleNote}</Text>
                 {googleNeedsUsername && (
                   <>
-                    <Text style={styles.fieldLabel}>Choose Public Username</Text>
+                    <Text style={styles.fieldLabel}>{t('auth.choosePublicUsername')}</Text>
                     <TextInput
                       value={publicUsername}
                       onChangeText={setPublicUsername}
@@ -438,20 +439,20 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                     <Text style={[styles.helperText, publicUsername.length > 0 && validatePublicUsername(publicUsername) !== null && styles.helperTextError]}>
                       {publicUsername.length > 0 && validatePublicUsername(publicUsername)
                         ? validatePublicUsername(publicUsername) ?? ''
-                        : `${PUBLIC_USERNAME_MIN}-${PUBLIC_USERNAME_MAX} characters. This name is your public identity online.`}
+                        : t('auth.publicUsernameGoogleRange', { min: PUBLIC_USERNAME_MIN, max: PUBLIC_USERNAME_MAX })}
                     </Text>
                     <Pressable
                       style={[styles.submitBtn, (busy || validatePublicUsername(publicUsername) !== null) && styles.buttonDisabled]}
                       disabled={busy || validatePublicUsername(publicUsername) !== null}
                       onPress={handleCompleteGoogleUsername}
                     >
-                      {busy ? <ActivityIndicator color="#08131E" /> : <Text style={styles.submitBtnText}>Finish Google Signup</Text>}
+                      {busy ? <ActivityIndicator color="#08131E" /> : <Text style={styles.submitBtnText}>{t('auth.finishGoogleSignup')}</Text>}
                     </Pressable>
                   </>
                 )}
                 <View style={styles.dividerRow}>
                   <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>or use email</Text>
+                  <Text style={styles.dividerText}>{t('auth.orUseEmail')}</Text>
                   <View style={styles.dividerLine} />
                 </View>
               </>
@@ -470,9 +471,9 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               placeholderTextColor="#6D7A90"
                 maxLength={120}
             />
-              <Text style={styles.helperText}>Use the same email whenever you log in or sign up.</Text>
+              <Text style={styles.helperText}>{t('auth.identityHelper')}</Text>
 
-            <Text style={styles.fieldLabel}>Password</Text>
+            <Text style={styles.fieldLabel}>{t('auth.passwordLabel')}</Text>
             <TextInput
               value={password}
               onChangeText={setPassword}
@@ -480,15 +481,15 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               secureTextEntry
               autoCapitalize="none"
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              placeholder="Enter password"
+              placeholder={t('auth.passwordPlaceholder')}
               placeholderTextColor="#6D7A90"
               maxLength={PASSWORD_MAX_LENGTH}
             />
-            <Text style={styles.helperText}>Password: minimum {PASSWORD_MIN_LENGTH} characters.</Text>
+            <Text style={styles.helperText}>{t('auth.passwordHelper', { min: PASSWORD_MIN_LENGTH })}</Text>
 
             {mode === 'register' && (
               <>
-                <Text style={styles.fieldLabel}>Confirm Password</Text>
+                <Text style={styles.fieldLabel}>{t('auth.confirmPasswordLabel')}</Text>
                 <TextInput
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
@@ -496,21 +497,21 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   secureTextEntry
                   autoCapitalize="none"
                   autoComplete="new-password"
-                  placeholder="Repeat password"
+                  placeholder={t('auth.confirmPasswordPlaceholder')}
                   placeholderTextColor="#6D7A90"
                   maxLength={PASSWORD_MAX_LENGTH}
                 />
                 <Text style={[styles.helperText, confirmPassword.length > 0 && password !== confirmPassword && styles.helperTextError]}>
                   {confirmPassword.length === 0 || password === confirmPassword
-                    ? 'Confirmation must match exactly.'
-                    : 'Passwords do not match.'}
+                    ? t('auth.confirmPasswordHelperOk')
+                    : t('auth.confirmPasswordHelperMismatch')}
                 </Text>
               </>
             )}
 
             {mode === 'register' && onlineAuthEnabled && (
               <>
-                <Text style={styles.fieldLabel}>Public Username</Text>
+                <Text style={styles.fieldLabel}>{t('auth.publicUsernameLabel')}</Text>
                 <TextInput
                   value={publicUsername}
                   onChangeText={setPublicUsername}
@@ -518,14 +519,14 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   autoCapitalize="none"
                   autoCorrect={false}
                   autoComplete="username"
-                  placeholder="your_username"
+                  placeholder={t('auth.publicUsernamePlaceholder')}
                   placeholderTextColor="#6D7A90"
                   maxLength={PUBLIC_USERNAME_MAX}
                 />
                 <Text style={[styles.helperText, publicUsername.length > 0 && validatePublicUsername(publicUsername) !== null && styles.helperTextError]}>
                   {publicUsername.length > 0 && validatePublicUsername(publicUsername)
                     ? validatePublicUsername(publicUsername) ?? ''
-                    : `${PUBLIC_USERNAME_MIN}–${PUBLIC_USERNAME_MAX} characters, letters/numbers/underscores. This name is shown publicly on the leaderboard.`}
+                    : t('auth.publicUsernameRange', { min: PUBLIC_USERNAME_MIN, max: PUBLIC_USERNAME_MAX })}
                 </Text>
               </>
             )}
