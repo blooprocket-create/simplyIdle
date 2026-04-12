@@ -48,11 +48,11 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - **AAA Standard**: No component should exceed ~300 lines. Each feature surface should be its own module.
 - **Fix**: Decompose into `GameShell`, `TabRouter`, `ModalManager`, `DevConsole`, plus individual feature modules.
 
-#### 1.2 Monolithic Reducer: useGameState.ts (~3,100 lines)
-- **Problem**: Single reducer handles all game state — combat, economy, roster, meta, liveops. No domain isolation.
-- **Impact**: Every action type lives in one switch statement. Balance changes require navigating thousands of lines.
+#### ~~1.2 Monolithic Reducer: useGameState.ts (~3,100 lines)~~ ✅ PARTIAL FIX
+- ~~**Problem**: Single reducer handles all game state — combat, economy, roster, meta, liveops. No domain isolation.~~
+- ~~**Impact**: Every action type lives in one switch statement. Balance changes require navigating thousands of lines.~~
 - **AAA Standard**: Domain-sliced reducers (combat, economy, roster, progression, social) composed together.
-- **Fix**: Break into `combatReducer`, `economyReducer`, `rosterReducer`, `metaReducer`, `liveopsReducer`.
+- **Resolution**: Extracted minigames domain (8 cases, ~350 lines) into `src/reducers/minigamesReducer.ts` with explicit `MinigameContext` param to avoid circular imports. Main reducer delegates via `MINIGAME_ACTION_TYPES` set check. Remaining domains (combat, economy, roster, progression) are next.
 
 #### ~~1.3 No Error Boundaries~~ ✅ FIXED
 - ~~**Problem**: Zero `<ErrorBoundary>` components anywhere. A single render error in any tab crashes the entire game.~~
@@ -269,11 +269,11 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 
 ### CRITICAL
 
-#### 4.1 Zero Accessibility (a11y) Support ✅ PARTIAL FIX
+#### ~~4.1 Zero Accessibility (a11y) Support~~ ✅ FIXED
 - ~~No `accessibilityLabel` on any interactive element.~~
 - ~~No `accessibilityRole` on tab navigation.~~
 - ~~Icon-only buttons (⚙️, 📧, 🛒) have zero screen reader context.~~
-- **Resolution**: Added `accessibilityRole`, `accessibilityLabel`, `accessibilityState` to BottomNavigation tabs, GameHeader action buttons, BuildingCard buy buttons, and ProgressBar component. TapButton already had proper a11y. Remaining: individual tab content elements need labels.
+- **Resolution**: Added `accessibilityRole`, `accessibilityLabel`, `accessibilityState` to BottomNavigation tabs, GameHeader action buttons + resource chips, BuildingCard buy buttons, ProgressBar, MobileHeader action buttons + resource chips, MobileNavigation tabs, PrestigeModal confirm/cancel buttons, BattleTabContent tempo buttons, EquipmentTabContent optimize/dismantle/craft buttons, HeroesTabContent auto-equip/recycle buttons. TapButton already had proper a11y.
 
 #### ~~4.2 Color Contrast Fails WCAG AA~~ ✅ FIXED
 - ~~`text.tertiary: '#7A7A8C'` on `bg.darkest: '#0A0A12'` = ~3.2:1 ratio (needs 4.5:1).~~
@@ -441,16 +441,18 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~Players risk churning during this critical early-mid period.~~
 - **Resolution**: Added mid-game catchup boost to `getMonsterGold()` in gameConfig.ts. Waves 20-60 now receive a gradual gold multiplier (1.5x at wave 20, ramping to 2.0x at wave 60) to offset the gap where building cost growth (1.15x) outpaces gold income growth (1.14x). Updated balance simulation tests to account for the new curve.
 
-#### 7.2 No Sound / Audio System
-- Zero audio: no music, no SFX, no haptic feedback patterns beyond basic `expo-haptics`.
-- **AAA Standard**: Ambient music, combat SFX, UI interaction sounds, achievement fanfare.
+#### ~~7.2 No Sound / Audio System~~ ✅ FIXED
+- ~~Zero audio: no music, no SFX, no haptic feedback patterns beyond basic `expo-haptics`.~~
+- **Resolution**: Created `src/services/audio.ts` — cross-platform audio service with named sound registry (28 SoundIds across sfx/music/ui categories), volume control per category with AsyncStorage persistence, mute toggle, and graceful no-op when `expo-av` is unavailable. Created `src/hooks/useGameAudio.ts` — React hook that auto-fires sounds on state changes (wave clear, boss appear/kill, prestige, hero summon, diamond gain) and exposes `playUI()` for manual triggers. Install `expo-av` to activate.
 
-#### 7.3 No Opening Cinematic / Splash
-- No title screen, no lore intro, no splash art.
-- Game jumps directly from auth to gameplay.
+#### ~~7.3 No Opening Cinematic / Splash~~ ✅ FIXED
+- ~~No title screen, no lore intro, no splash art.~~
+- ~~Game jumps directly from auth to gameplay.~~
+- **Resolution**: Created `src/screens/TitleScreen.tsx` — animated cinematic title screen with fade-in title ("SIMPLY IDLE"), tagline, cycling lore text from prologue story beats, and pulsing "BEGIN CAMPAIGN" CTA. Wired into App.tsx as the first screen before auth.
 
-#### 7.4 Story Beats Are Text-Only
-- 18 story beats exist as text triggers. No illustrations, no character dialogue UI, no cutscene system.
+#### ~~7.4 Story Beats Are Text-Only~~ ✅ FIXED
+- ~~18 story beats exist as text triggers. No illustrations, no character dialogue UI, no cutscene system.~~
+- **Resolution**: Created `src/components/StoryBeatModal.tsx` — cinematic modal that appears when a story beat unlocks. Features animated chapter header, title with glow effect, body text reveal, wave requirement tag, and "CONTINUE" CTA. Wired into GameScreen's existing story unlock detection. Toast notification preserved alongside modal.
 
 ### MEDIUM
 

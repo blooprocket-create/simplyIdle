@@ -127,10 +127,10 @@ export const EquipmentTabContent = React.memo<EquipmentTabContentProps>(({
           </Text>
           {equipmentSubTab === 'inventory' && (
             <View style={styles.equipOptimizeRow}>
-              <Pressable style={styles.equipOptimizeBtn} onPress={optimizeEquipment}>
+              <Pressable style={styles.equipOptimizeBtn} onPress={optimizeEquipment} accessibilityRole="button" accessibilityLabel="Optimize gear, equip highest-scoring items">
                 <Text style={styles.equipOptimizeBtnText}>⚡ Optimize Gear</Text>
               </Pressable>
-              <Pressable style={styles.equipDismantleBtn} onPress={autoDismantleEquipment}>
+              <Pressable style={styles.equipDismantleBtn} onPress={autoDismantleEquipment} accessibilityRole="button" accessibilityLabel="Auto dismantle, scrap all unequipped items">
                 <Text style={styles.equipDismantleBtnText}>🧰 Auto Dismantle</Text>
               </Pressable>
               <Text style={styles.equipOptimizeHint}>Optimize equips the highest-scoring rolled item per slot for your class. Auto dismantle scraps all unequipped items.</Text>
@@ -147,6 +147,8 @@ export const EquipmentTabContent = React.memo<EquipmentTabContentProps>(({
                     style={[styles.craftBtn, !canCraft && styles.craftBtnDisabled]}
                     disabled={!canCraft}
                     onPress={() => craftEquipment(slot)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Craft ${slot}${!canCraft ? ', insufficient resources' : ''}`}
                   >
                     <Text style={styles.craftBtnText}>{slot.toUpperCase()}</Text>
                     <Text style={styles.craftCostText}>{cost.scrap}🔩 • {fmt(cost.gold)}g</Text>

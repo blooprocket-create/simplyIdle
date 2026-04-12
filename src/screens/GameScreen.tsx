@@ -58,6 +58,7 @@ import {
 } from '../gameConfig';
 import { getHeroPortraitSource } from '../heroPortraits';
 import { fmt } from '../utils';
+import StoryBeatModal from '../components/StoryBeatModal';
 import AchievementToast from '../components/AchievementToast';
 import RebirthModal from '../components/PrestigeModal';
 import BottomNavigation, { BottomTabType } from '../components/BottomNavigation';
@@ -461,6 +462,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [idleChestReady, setIdleChestReady] = useState(false);
   const [idleChestReward, setIdleChestReward] = useState<{ title: string; detail: string } | null>(null);
   const [storyUnlockToast, setStoryUnlockToast] = useState<{ id: string; title: string; chapter: string } | null>(null);
+  const [storyBeatModal, setStoryBeatModal] = useState<{ chapter: string; title: string; body: string; wave: number } | null>(null);
   const [hoveredTopChipId, setHoveredTopChipId] = useState<'dps' | 'power' | 'gear' | null>(null);
   const [activeAffixTooltipId, setActiveAffixTooltipId] = useState<string | null>(null);
   const [topChipTooltipAnchor, setTopChipTooltipAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -1140,6 +1142,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         id: latestEntry.id,
         title: latestEntry.title,
         chapter: latestEntry.chapter,
+      });
+      setStoryBeatModal({
+        chapter: latestEntry.chapter,
+        title: latestEntry.title,
+        body: latestEntry.body,
+        wave: latestEntry.unlockWave,
       });
     }
   }, [storyEntries]);
@@ -3221,6 +3229,15 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           <Text style={styles.rewardToastSparkle}>View</Text>
         </Pressable>
       )}
+
+      <StoryBeatModal
+        visible={!!storyBeatModal}
+        chapter={storyBeatModal?.chapter ?? ''}
+        title={storyBeatModal?.title ?? ''}
+        body={storyBeatModal?.body ?? ''}
+        wave={storyBeatModal?.wave ?? 0}
+        onDismiss={() => setStoryBeatModal(null)}
+      />
 
       {rewardPopup && !idleChestReady && !isOfflineRewardPopup && (
         <Pressable style={[styles.rewardToast, styles.rewardToastActive]} onPress={clearRewardPopup}>

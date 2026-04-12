@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, Platform } from 'react-native';
 import { onAuthStateChanged } from 'firebase/auth';
 import GameScreen from './src/screens/GameScreen';
 import AuthScreen from './src/screens/AuthScreen';
+import TitleScreen from './src/screens/TitleScreen';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { debugLog, identifyTelemetryDevice, initTelemetry, reportCrash, trackEvent, trackTelemetryHeartbeat } from './src/telemetry';
 import { getValidOnlineSession, isOnlineAuthAvailable, logoutOnline } from './src/services/onlineAuth';
@@ -13,6 +14,7 @@ import { markPresenceOffline, startPresenceHeartbeat } from './src/services/pres
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [accountName, setAccountName] = useState<string | null>(null);
+  const [showTitle, setShowTitle] = useState(true);
 
   useEffect(() => {
     initTelemetry();
@@ -111,6 +113,12 @@ export default function App() {
       <View style={styles.loadingWrap}>
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
+    );
+  }
+
+  if (showTitle) {
+    return (
+      <TitleScreen onStart={() => setShowTitle(false)} />
     );
   }
 

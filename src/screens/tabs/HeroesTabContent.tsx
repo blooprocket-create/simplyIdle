@@ -307,10 +307,10 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(({
               <View style={[styles.heroRosterHeader, isPhoneWidth && styles.heroRosterHeaderStacked]}>
                 <Text style={styles.sectionTitle}>👥 Roster Command</Text>
                 <View style={[styles.heroRosterActions, isPhoneWidth && styles.heroRosterActionsStacked]}>
-                  <Pressable style={styles.autoEquipBtn} onPress={autoEquipBestHeroes}>
+                  <Pressable style={styles.autoEquipBtn} onPress={autoEquipBestHeroes} accessibilityRole="button" accessibilityLabel="Auto equip best heroes">
                     <Text style={styles.autoEquipBtnText}>⚡ Auto Equip</Text>
                   </Pressable>
-                  <Pressable style={styles.autoRecycleBtn} onPress={autoRecycleHeroes}>
+                  <Pressable style={styles.autoRecycleBtn} onPress={autoRecycleHeroes} accessibilityRole="button" accessibilityLabel="Auto recycle low-tier heroes">
                     <Text style={styles.autoRecycleBtnText}>♻ Auto Recycle</Text>
                   </Pressable>
                 </View>

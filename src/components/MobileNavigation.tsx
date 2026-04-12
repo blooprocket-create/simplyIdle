@@ -32,6 +32,9 @@ export default function MobileNavigation({ currentTab, onTabChange, tabs }: Mobi
                 debugLog('nav', 'Mobile tab pressed', { from: currentTab, to: tab.id });
                 onTabChange(tab.id);
               }}
+              accessibilityRole="tab"
+              accessibilityLabel={`${tab.label}${tab.badge ? `, ${tab.badge} notifications` : ''}`}
+              accessibilityState={{ selected: isActive }}
             >
               <Text style={[styles.tabIcon, isActive && styles.tabIconActive]}>{tab.icon}</Text>
               <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>{tab.label}</Text>

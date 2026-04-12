@@ -91,6 +91,8 @@ export const BattleTabContent = React.memo<BattleTabContentProps>(({
                       ]}
                       onPress={() => setCombatTempo(mult)}
                       disabled={locked}
+                      accessibilityRole="button"
+                      accessibilityLabel={locked ? `${mult}x speed, requires VIP 1` : `Set combat speed to ${mult}x${battleSpeed === mult ? ', currently active' : ''}`}
                     >
                       <Text style={[styles.battleTempoBtnText, battleSpeed === mult && styles.battleTempoBtnTextActive]}>
                         {mult === 4 && locked ? '4x VIP1' : `${mult}x`}

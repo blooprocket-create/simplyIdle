@@ -89,25 +89,25 @@ export default function GameHeader({
         {twoRowResources ? (
           <>
             <View style={styles.resourceRow}>
-              <Pressable style={styles.resourceChip} onPress={() => {}}>
+              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Gold: ${formatNumber(gold)}`}>
                 <Text style={styles.resourceIcon}>💰</Text>
                 <Text style={styles.resourceValue}>{formatNumber(gold)}</Text>
               </Pressable>
-              <Pressable style={styles.resourceChip} onPress={() => {}}>
+              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Diamonds: ${formatNumber(diamonds)}`}>
                 <Text style={styles.resourceIcon}>💎</Text>
                 <Text style={styles.resourceValue}>{formatNumber(diamonds)}</Text>
               </Pressable>
-              <Pressable style={styles.resourceChip} onPress={() => {}}>
+              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Boss Tears: ${formatNumber(bossTearsOrdered)}`}>
                 <Text style={styles.resourceIcon}>💧</Text>
                 <Text style={styles.resourceValue}>{formatNumber(bossTearsOrdered)}</Text>
               </Pressable>
             </View>
             <View style={styles.resourceRow}>
-              <Pressable style={styles.resourceChip} onPress={() => {}}>
+              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Hero Shards: ${formatNumber(heroShards)}`}>
                 <Text style={styles.resourceIcon}>💠</Text>
                 <Text style={styles.resourceValue}>{formatNumber(heroShards)}</Text>
               </Pressable>
-              <Pressable style={styles.resourceChip} onPress={() => {}}>
+              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Essence: ${formatNumber(essence)}`}>
                 <Text style={styles.resourceIcon}>✨</Text>
                 <Text style={styles.resourceValue}>{formatNumber(essence)}</Text>
               </Pressable>
@@ -115,23 +115,23 @@ export default function GameHeader({
           </>
         ) : (
           <>
-            <Pressable style={styles.resourceChip} onPress={() => {}}>
+            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Gold: ${formatNumber(gold)}`}>
               <Text style={styles.resourceIcon}>💰</Text>
               <Text style={styles.resourceValue}>{formatNumber(gold)}</Text>
             </Pressable>
-            <Pressable style={styles.resourceChip} onPress={() => {}}>
+            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Diamonds: ${formatNumber(diamonds)}`}>
               <Text style={styles.resourceIcon}>💎</Text>
               <Text style={styles.resourceValue}>{formatNumber(diamonds)}</Text>
             </Pressable>
-            <Pressable style={styles.resourceChip} onPress={() => {}}>
+            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Boss Tears: ${formatNumber(bossTearsOrdered)}`}>
               <Text style={styles.resourceIcon}>💧</Text>
               <Text style={styles.resourceValue}>{formatNumber(bossTearsOrdered)}</Text>
             </Pressable>
-            <Pressable style={styles.resourceChip} onPress={() => {}}>
+            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Hero Shards: ${formatNumber(heroShards)}`}>
               <Text style={styles.resourceIcon}>💠</Text>
               <Text style={styles.resourceValue}>{formatNumber(heroShards)}</Text>
             </Pressable>
-            <Pressable style={styles.resourceChip} onPress={() => {}}>
+            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={`Essence: ${formatNumber(essence)}`}>
               <Text style={styles.resourceIcon}>✨</Text>
               <Text style={styles.resourceValue}>{formatNumber(essence)}</Text>
             </Pressable>
