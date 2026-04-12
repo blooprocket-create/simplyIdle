@@ -12,9 +12,13 @@ let authPersistenceInitialized = false;
 
 function readEnvVar(baseKey: string, env: string): string {
   const normalized = env.toUpperCase();
-  const envSpecific = process.env[`EXPO_PUBLIC_FIREBASE_${baseKey}_${normalized}` as keyof NodeJS.ProcessEnv];
-  const fallback = process.env[`EXPO_PUBLIC_FIREBASE_${baseKey}` as keyof NodeJS.ProcessEnv];
-  return (envSpecific ?? fallback ?? '').trim();
+  const envSpecificRaw = process.env[`EXPO_PUBLIC_FIREBASE_${baseKey}_${normalized}` as keyof NodeJS.ProcessEnv];
+  const fallbackRaw = process.env[`EXPO_PUBLIC_FIREBASE_${baseKey}` as keyof NodeJS.ProcessEnv];
+
+  const envSpecific = (envSpecificRaw ?? '').trim();
+  if (envSpecific) return envSpecific;
+
+  return (fallbackRaw ?? '').trim();
 }
 
 function readConfig() {
