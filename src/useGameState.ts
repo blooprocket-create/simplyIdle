@@ -74,6 +74,8 @@ import { progressionReducer, PROGRESSION_ACTION_TYPES } from './reducers/progres
 import type { ProgressionAction } from './reducers/progressionReducer';
 import { rosterReducer, ROSTER_ACTION_TYPES } from './reducers/rosterReducer';
 import type { RosterAction } from './reducers/rosterReducer';
+import { economyReducer, ECONOMY_ACTION_TYPES } from './reducers/economyReducer';
+import type { EconomyAction } from './reducers/economyReducer';
 import { getFirebaseAuth } from './services/firebase';
 
 const TICK_MS = 100;
@@ -3538,6 +3540,31 @@ function reducer(state: GameState, action: Action): GameState {
     if (result) return result;
   }
 
+  // Delegate economy actions to extracted slice
+  if (ECONOMY_ACTION_TYPES.has(action.type)) {
+    const result = economyReducer(state, action as EconomyAction, {
+      withAchievement,
+      getEquipmentEntry,
+      getEquipmentUpgradePlan,
+      createEquipmentInstance,
+      hasUnlock,
+      getForgeStatMultiplier,
+      processLevelUp,
+      addUsableItemCount,
+      getVipLevelFromPoints,
+      getVipDamageMultiplier,
+      getVipGoldMultiplier,
+      getVipExpMultiplier,
+      maybeAutoRefreshExpeditionContracts,
+      rollExpeditionContractOffers,
+      getScrapToEssenceCost,
+      getScrapToShardCost,
+      getMaxHeatForLevel,
+      clampInt,
+    });
+    if (result) return result;
+  }
+
   switch (action.type) {
     case 'CREATE_CHARACTER': {
       if (state.characterCreated) return state;
@@ -3594,25 +3621,7 @@ function reducer(state: GameState, action: Action): GameState {
       return applyBurst(state, action.hits);
     }
 
-    case 'BUY_PARTY': {
-      const cfg = PARTY.find(p => p.id === action.id);
-      if (!cfg) return state;
-      const owned = state.party[action.id] ?? 0;
-      const cost = action.amount === 1
-        ? buildingCost(cfg.baseCost, owned, COST_SCALE)
-        : bulkCost(cfg.baseCost, owned, action.amount, COST_SCALE);
-      if (state.gold < cost) return state;
-      const party = { ...state.party, [action.id]: owned + action.amount };
-      return { ...state, gold: state.gold - cost, party };
-    }
-
-    case 'BUY_SKILL': {
-      const skill = SKILLS.find(s => s.id === action.id);
-      if (!skill || state.skills.has(skill.id) || state.gold < skill.cost) return state;
-      const skills = new Set(state.skills);
-      skills.add(skill.id);
-      return { ...state, gold: state.gold - skill.cost, skills };
-    }
+    // BUY_PARTY, BUY_SKILL handled by economyReducer
 
     // ALLOCATE_STAT, ALLOCATE_STAT_MAX, ALLOCATE_STAT_N handled by progressionReducer
 
@@ -3621,259 +3630,8 @@ function reducer(state: GameState, action: Action): GameState {
     // UNLOCK_TEAM_SLOT, TOGGLE_EQUIP_HERO, SET_ACTIVE_TEAM
     // handled by rosterReducer
 
-    case 'USE_USABLE_ITEM': {
-      const qty = state.usableItemCounts[action.itemId] ?? 0;
-      if (qty <= 0) return state;
-
-      const requestedUses = action.amount === 'all'
-        ? qty
-        : clampInt(action.amount, 1, qty, 1);
-      if (requestedUses <= 0) return state;
-
-      const item = getUsableItem(action.itemId);
-      if (!item) return state;
-
-      let nextState: GameState = {
-        ...state,
-        usableItemCounts: addUsableItemCount(state.usableItemCounts, action.itemId, -requestedUses),
-      };
-      const useSuffix = requestedUses > 1 ? ` x${requestedUses}` : '';
-
-      if (item.effect === 'heal_team_percent') {
-        const healed = Math.ceil(nextState.teamMaxHp * item.value) * requestedUses;
-        nextState = queueReward({
-          ...nextState,
-          teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + healed),
-        }, {
-          id: `use_${item.id}_${Date.now()}`,
-          kind: 'item',
-          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
-          detail: `Restored ${healed} team HP`,
-        });
-      }
-
-      if (item.effect === 'gain_gold_flat') {
-        const gainPerUse = getScaledUsableGoldGain(nextState, item.value, item.itemType);
-        const rawGain = gainPerUse * requestedUses;
-        const gain = Number.isFinite(rawGain) ? Math.max(0, Math.floor(rawGain)) : 0;
-        const safeCurrentGold = Number.isFinite(nextState.gold) ? nextState.gold : 0;
-        const safeTotalGold = Number.isFinite(nextState.totalGold) ? nextState.totalGold : 0;
-        nextState = queueReward({
-          ...nextState,
-          gold: safeCurrentGold + gain,
-          totalGold: safeTotalGold + gain,
-        }, {
-          id: `use_${item.id}_${Date.now()}`,
-          kind: 'gold',
-          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
-          detail: `+${gain} gold`,
-        });
-      }
-
-      if (item.effect === 'gain_exp_flat') {
-        const gainPerUse = getScaledUsableExpGain(nextState, item.value, item.itemType);
-        const rawGain = gainPerUse * requestedUses;
-        const gain = Number.isFinite(rawGain) ? Math.max(0, Math.floor(rawGain)) : 0;
-        const safeCurrentExp = Number.isFinite(nextState.exp) ? nextState.exp : 0;
-        const safeTotalExp = Number.isFinite(nextState.totalExp) ? nextState.totalExp : 0;
-        const lvl = processLevelUp(safeCurrentExp + gain, nextState.level);
-        nextState = queueReward({
-          ...nextState,
-          exp: lvl.exp,
-          totalExp: safeTotalExp + gain,
-          level: lvl.level,
-          unspentStatPoints: nextState.unspentStatPoints + lvl.gainedLevels * STAT_POINTS_PER_LEVEL,
-        }, {
-          id: `use_${item.id}_${Date.now()}`,
-          kind: 'item',
-          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
-          detail: `+${gain} EXP`,
-        });
-      }
-
-      if (item.effect === 'gain_shards_flat') {
-        const gainPerUse = getScaledUsableShardGain(nextState, item.value, item.itemType);
-        const rawGain = gainPerUse * requestedUses;
-        const gain = Number.isFinite(rawGain) ? Math.max(0, Math.floor(rawGain)) : 0;
-        const safeCurrentShards = Number.isFinite(nextState.heroShards) ? nextState.heroShards : 0;
-        nextState = queueReward({
-          ...nextState,
-          heroShards: safeCurrentShards + gain,
-        }, {
-          id: `use_${item.id}_${Date.now()}`,
-          kind: 'shard',
-          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
-          detail: `+${gain} shards`,
-        });
-      }
-
-      if (item.effect === 'reduce_heat_flat') {
-        const reducePerUse = getScaledUsableHeatReduction(nextState, item.value, item.itemType);
-        const reduced = Math.max(0, nextState.combatHeat - reducePerUse * requestedUses);
-        nextState = queueReward({
-          ...nextState,
-          combatHeat: reduced,
-        }, {
-          id: `use_${item.id}_${Date.now()}`,
-          kind: 'system',
-          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
-          detail: `Heat ${Math.ceil(nextState.combatHeat)} -> ${Math.ceil(reduced)} (${Math.ceil(reducePerUse)} each)`,
-        });
-      }
-
-      if (item.effect === 'gain_vip_points_flat') {
-        const gainPerUse = Math.max(
-          Math.ceil(item.value * (1 + nextState.prestigeCount * 0.08)),
-          Math.ceil(Math.log10(Math.max(10, nextState.highestWaveReached + 9)) * 4),
-        );
-        const gain = gainPerUse * requestedUses;
-        const nextPoints = nextState.vipPoints + gain;
-        const nextLevel = getVipLevelFromPoints(nextPoints);
-        const leveledUp = nextLevel > nextState.vipLevel;
-
-        nextState = queueReward({
-          ...nextState,
-          vipPoints: nextPoints,
-          vipLevel: nextLevel,
-        }, {
-          id: `use_${item.id}_${Date.now()}`,
-          kind: 'system',
-          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
-          detail: `+${gain} VIP points`,
-        });
-
-        if (leveledUp) {
-          nextState = queueReward(nextState, {
-            id: `vip_item_level_${nextLevel}_${Date.now()}`,
-            kind: 'system',
-            title: `VIP Level Up: ${nextLevel}`,
-            detail: `Bonuses now: +${Math.round((getVipDamageMultiplier({ ...nextState, vipLevel: nextLevel }) - 1) * 100)}% DPS, +${Math.round((getVipGoldMultiplier({ ...nextState, vipLevel: nextLevel }) - 1) * 100)}% gold, +${Math.round((getVipExpMultiplier({ ...nextState, vipLevel: nextLevel }) - 1) * 100)}% EXP`,
-          });
-        }
-      }
-
-      return withAchievement((nextState));
-    }
-
-    case 'DISMANTLE_EQUIPMENT': {
-      if (!state.inventoryItemIds.includes(action.itemId)) return state;
-      if (Object.values(state.equippedItems).includes(action.itemId)) return state;
-      const item = getEquipmentEntry(state, action.itemId);
-      if (!item) return state;
-      if ('source' in item && item.source === 'hero_unique') return state;
-      const gain = getEquipmentScrapGain(item);
-      const nextEquipmentInventory = { ...state.equipmentInventory };
-      delete nextEquipmentInventory[action.itemId];
-      return queueReward({
-        ...state,
-        inventoryItemIds: state.inventoryItemIds.filter(id => id !== action.itemId),
-        equipmentInventory: nextEquipmentInventory,
-        equipmentScrap: state.equipmentScrap + gain,
-      }, {
-        id: `dismantle_${action.itemId}_${Date.now()}`,
-        kind: 'item',
-        title: `Dismantled ${item.emoji} ${item.name}`,
-        detail: `+${gain} scrap`,
-      });
-    }
-
-    case 'AUTO_DISMANTLE_EQUIPMENT': {
-      const equippedIds = new Set(
-        Object.values(state.equippedItems).filter((id): id is string => !!id),
-      );
-      const candidates = state.inventoryItemIds
-        .filter(itemId => !equippedIds.has(itemId))
-        .map(itemId => ({ itemId, item: getEquipmentEntry(state, itemId) }))
-        .filter((entry): entry is { itemId: string; item: EquipmentInstance | EquipmentItem } => (
-          !!entry.item && (!('source' in entry.item) || entry.item.source !== 'hero_unique')
-        ));
-      if (candidates.length === 0) return state;
-
-      const dismantleIds = new Set(candidates.map(entry => entry.itemId));
-      const gain = candidates.reduce((sum, entry) => sum + getEquipmentScrapGain(entry.item), 0);
-      const nextEquipmentInventory = { ...state.equipmentInventory };
-      for (const itemId of dismantleIds) delete nextEquipmentInventory[itemId];
-      return queueReward({
-        ...state,
-        inventoryItemIds: state.inventoryItemIds.filter(id => !dismantleIds.has(id)),
-        equipmentInventory: nextEquipmentInventory,
-        equipmentScrap: state.equipmentScrap + gain,
-      }, {
-        id: `auto_dismantle_${Date.now()}`,
-        kind: 'item',
-        title: 'Auto Dismantle Complete',
-        detail: `+${gain} scrap from ${candidates.length} unequipped items`,
-      });
-    }
-
-    case 'CRAFT_EQUIPMENT': {
-      if (!state.playerClass) return state;
-      const cost = getEquipmentCraftCost(action.slot);
-      if (state.equipmentScrap < cost.scrap || state.gold < cost.gold) return state;
-
-      const classSlotItems = EQUIPMENT_CATALOG.filter(item =>
-        item.allowedClasses.includes(state.playerClass as PlayerClass) && item.slot === action.slot,
-      );
-      if (classSlotItems.length === 0) return state;
-
-      const rolledRarity = rollEquipmentRarityByTier(Math.random(), hasUnlock(state, 'mythic_equipment'));
-      const rarityPool = classSlotItems.filter(i => i.rarity === rolledRarity);
-      const source = rarityPool.length > 0 ? rarityPool : classSlotItems;
-      const forgeMult = getForgeStatMultiplier(state.guildhallFacilities.forge.level);
-      const item = createEquipmentInstance(source[Math.floor(Math.random() * source.length)], Math.max(1, state.level), 'craft', forgeMult);
-
-      return queueReward({
-        ...state,
-        equipmentScrap: state.equipmentScrap - cost.scrap,
-        gold: state.gold - cost.gold,
-        equipmentInventory: {
-          ...state.equipmentInventory,
-          [item.id]: item,
-        },
-        inventoryItemIds: [...state.inventoryItemIds, item.id],
-      }, {
-        id: `craft_${item.id}_${Date.now()}`,
-        kind: 'item',
-        title: `Crafted ${item.emoji} ${item.name}`,
-        detail: `${equipmentRarityConfig(item.rarity).label} ${item.slot} • iLv ${item.itemLevel} • -${cost.gold} gold`,
-      });
-    }
-
-    case 'UPGRADE_EQUIPMENT_RARITY': {
-      if (!state.inventoryItemIds.includes(action.itemId)) return state;
-      const ownedItem = getEquipmentEntry(state, action.itemId);
-      const item = ownedItem && 'baseItemId' in ownedItem ? getEquipmentItem(ownedItem.baseItemId) : ownedItem;
-      if (!item || !ownedItem) return state;
-      const plan = getEquipmentUpgradePlan(state, action.itemId);
-      if (!plan.targetItemId || !plan.targetRarity) return state;
-      if (state.equipmentScrap < plan.scrapCost || state.essence < plan.essenceCost || state.gold < plan.goldCost) return state;
-      const target = getEquipmentItem(plan.targetItemId);
-      if (!target) return state;
-
-      const upgradedItem = createEquipmentInstance(target, 'itemLevel' in ownedItem ? ownedItem.itemLevel + 2 : Math.max(1, state.level), 'upgrade');
-      const withReplacedInventory = state.inventoryItemIds.filter(id => id !== action.itemId);
-      const nextInventory = [...withReplacedInventory, upgradedItem.id];
-      const nextEquipmentInventory = { ...state.equipmentInventory };
-      delete nextEquipmentInventory[action.itemId];
-      nextEquipmentInventory[upgradedItem.id] = upgradedItem;
-
-      return queueReward({
-        ...state,
-        inventoryItemIds: nextInventory,
-        equipmentInventory: nextEquipmentInventory,
-        equipmentScrap: state.equipmentScrap - plan.scrapCost,
-        essence: state.essence - plan.essenceCost,
-        gold: state.gold - plan.goldCost,
-        equippedItems: Object.fromEntries(
-          Object.entries(state.equippedItems).map(([slot, equippedId]) => [slot, equippedId === action.itemId ? upgradedItem.id : equippedId]),
-        ) as Record<EquipmentSlot, string | null>,
-      }, {
-        id: `upgrade_${action.itemId}_${Date.now()}`,
-        kind: 'item',
-        title: `Upgraded ${item.name}`,
-        detail: `Now ${target.emoji} ${target.name} (${plan.targetRarity.toUpperCase()}) • iLv ${upgradedItem.itemLevel} • -${plan.goldCost} gold`,
-      });
-    }
+    // USE_USABLE_ITEM, DISMANTLE_EQUIPMENT, AUTO_DISMANTLE_EQUIPMENT,
+    // CRAFT_EQUIPMENT, UPGRADE_EQUIPMENT_RARITY handled by economyReducer
 
     case 'SET_AUTO_USE_POTION': {
       return {
@@ -3941,13 +3699,7 @@ function reducer(state: GameState, action: Action): GameState {
       };
     }
 
-    case 'CLAIM_MAIL_ATTACHMENT': {
-      return claimMailAttachments(state, action.mailId, [action.attachment]);
-    }
-
-    case 'CLAIM_ALL_MAIL_ATTACHMENTS': {
-      return claimAllMailAttachments(state);
-    }
+    // CLAIM_MAIL_ATTACHMENT, CLAIM_ALL_MAIL_ATTACHMENTS handled by economyReducer
 
     case 'APPLY_OFFLINE_PROGRESS': {
       if (!state.characterCreated) return state;
@@ -4011,112 +3763,8 @@ function reducer(state: GameState, action: Action): GameState {
     // RUN_RIFT_DUNGEON, RUN_TREASURY_RAID) are handled by minigamesReducer
     // via delegation above the switch.
 
-    case 'UPGRADE_FACILITY': {
-      const facility = state.guildhallFacilities[action.facilityId];
-      const currentLevel = facility.level;
-      const cost = getFacilityUpgradeCost(action.facilityId, currentLevel);
-      if (currentLevel >= FACILITY_MAX_LEVEL || state.gold < cost) return state;
-
-      return {
-        ...state,
-        gold: state.gold - cost,
-        guildhallFacilities: {
-          ...state.guildhallFacilities,
-          [action.facilityId]: { level: currentLevel + 1 },
-        },
-      };
-    }
-
-    case 'START_EXPEDITION': {
-      const refreshedState = maybeAutoRefreshExpeditionContracts(state, Date.now());
-
-      const rarityPool = ['common', 'rare', 'epic', 'legendary', 'godly'] as const;
-      const rarity = action.offeredRarity && rarityPool.includes(action.offeredRarity)
-        ? action.offeredRarity
-        : refreshedState.expeditionContractOffers[action.expeditionType] ?? rarityPool[Math.floor(Math.random() * rarityPool.length)];
-
-      const configByRarity: Record<typeof rarityPool[number], { goldCost: number; durationMs: number; reward: { diamonds: number; shards: number; essence: number; artifacts: number } }> = {
-        common: {
-          goldCost: 25_000,
-          durationMs: 5 * 60 * 1000,
-          reward: { diamonds: 35, shards: 150, essence: 0, artifacts: 0 },
-        },
-        rare: {
-          goldCost: 75_000,
-          durationMs: 20 * 60 * 1000,
-          reward: { diamonds: 75, shards: 320, essence: 0, artifacts: 1 },
-        },
-        epic: {
-          goldCost: 220_000,
-          durationMs: 90 * 60 * 1000,
-          reward: { diamonds: 140, shards: 700, essence: 1, artifacts: 2 },
-        },
-        legendary: {
-          goldCost: 500_000,
-          durationMs: 4 * 60 * 60 * 1000,
-          reward: { diamonds: 240, shards: 1300, essence: 2, artifacts: 4 },
-        },
-        godly: {
-          goldCost: 1_000_000,
-          durationMs: 8 * 60 * 60 * 1000,
-          reward: { diamonds: 400, shards: 2400, essence: 4, artifacts: 8 },
-        },
-      };
-
-      const config = configByRarity[rarity];
-      if (!config || refreshedState.gold < config.goldCost) return refreshedState;
-
-      const expeditionId = `exp_${action.expeditionType}_${Date.now()}`;
-
-      return {
-        ...refreshedState,
-        gold: refreshedState.gold - config.goldCost,
-        expeditionQueue: [
-          ...refreshedState.expeditionQueue,
-          {
-            id: expeditionId,
-            type: action.expeditionType as any,
-            rarity,
-            startTime: Date.now(),
-            durationMs: config.durationMs,
-            reward: config.reward,
-          },
-        ],
-      };
-    }
-
-    case 'REFRESH_EXPEDITION_CONTRACTS': {
-      const refreshedState = maybeAutoRefreshExpeditionContracts(state, Date.now());
-      if (refreshedState.gold < EXPEDITION_CONTRACT_REFRESH_GOLD_COST) return refreshedState;
-
-      return {
-        ...refreshedState,
-        gold: refreshedState.gold - EXPEDITION_CONTRACT_REFRESH_GOLD_COST,
-        expeditionContractOffers: rollExpeditionContractOffers(),
-        expeditionContractsRefreshedAt: Date.now(),
-      };
-    }
-
-    case 'COMPLETE_EXPEDITION': {
-      const expIndex = state.expeditionQueue.findIndex(e => e.id === action.expeditionId);
-      if (expIndex === -1) return state;
-
-      const expedition = state.expeditionQueue[expIndex];
-      const newQueue = state.expeditionQueue.filter((_, i) => i !== expIndex);
-
-      return queueReward({
-        ...state,
-        diamonds: state.diamonds + expedition.reward.diamonds,
-        heroShards: state.heroShards + expedition.reward.shards,
-        essence: state.essence + expedition.reward.essence,
-        expeditionQueue: newQueue,
-      }, {
-        id: `expedition_${expedition.id}`,
-        kind: 'system',
-        title: 'Expedition Complete',
-        detail: `${expedition.type} returned +${expedition.reward.diamonds} diamonds, +${expedition.reward.shards} shards${expedition.reward.essence > 0 ? `, +${expedition.reward.essence} essence` : ''}`,
-      });
-    }
+    // UPGRADE_FACILITY, START_EXPEDITION, REFRESH_EXPEDITION_CONTRACTS,
+    // COMPLETE_EXPEDITION handled by economyReducer
 
     case 'SET_AUTO_RECYCLE_ENABLED': {
       return {
@@ -4128,35 +3776,7 @@ function reducer(state: GameState, action: Action): GameState {
     // TOGGLE_HERO_UNIQUE_WEAPON, RANK_UP_HERO, LEVEL_UP_HERO_GOLD,
     // REBIRTH_HERO handled by rosterReducer
 
-    case 'CONVERT_SCRAP_TO_ESSENCE': {
-      const cost = getScrapToEssenceCost(state);
-      if (state.equipmentScrap < cost) return state;
-      return queueReward({
-        ...state,
-        equipmentScrap: state.equipmentScrap - cost,
-        essence: state.essence + 1,
-      }, {
-        id: `scrap_to_essence_${Date.now()}`,
-        kind: 'system',
-        title: 'Essence Forge',
-        detail: `Refined ${cost} scrap into +1 essence`,
-      });
-    }
-
-    case 'CONVERT_SCRAP_TO_SHARDS': {
-      const cost = getScrapToShardCost();
-      if (state.equipmentScrap < cost) return state;
-      return queueReward({
-        ...state,
-        equipmentScrap: state.equipmentScrap - cost,
-        heroShards: state.heroShards + 140,
-      }, {
-        id: `scrap_to_shards_${Date.now()}`,
-        kind: 'system',
-        title: 'Shard Forge',
-        detail: `Refined ${cost} scrap into +140 shards`,
-      });
-    }
+    // CONVERT_SCRAP_TO_ESSENCE, CONVERT_SCRAP_TO_SHARDS handled by economyReducer
 
     // SPEND_REBIRTH_CORE handled by progressionReducer
 
@@ -4209,175 +3829,11 @@ function reducer(state: GameState, action: Action): GameState {
       };
     }
 
-    case 'BUY_GOLD_SHOP_ITEM': {
-      const cost = GOLD_SHOP_COSTS[action.offerId];
-      if (state.gold < cost) return state;
-
-      if (action.offerId === 'exp_cache') {
-        const nextState = {
-          ...state,
-          gold: state.gold - cost,
-          usableItemCounts: addUsableItemCount(state.usableItemCounts, 'exp_scroll', 6),
-        };
-        return queueReward(nextState, {
-          id: `shop_gold_exp_${Date.now()}`,
-          kind: 'item',
-          title: 'Gold Shop Purchase: Training Cache',
-          detail: `-${cost} gold, +6 Training Scrolls`,
-        });
-      }
-
-      if (action.offerId === 'potion_bundle') {
-        let counts = addUsableItemCount(state.usableItemCounts, 'small_potion', 3);
-        counts = addUsableItemCount(counts, 'grand_potion', 1);
-        counts = addUsableItemCount(counts, 'gold_cache', 2);
-        const nextState = {
-          ...state,
-          gold: state.gold - cost,
-          usableItemCounts: counts,
-        };
-        return queueReward(nextState, {
-          id: `shop_gold_potion_${Date.now()}`,
-          kind: 'item',
-          title: 'Gold Shop Purchase: Field Bundle',
-          detail: `-${cost} gold, +3 Small Potions, +1 Grand Potion, +2 Gold Cache`,
-        });
-      }
-
-      if (!state.playerClass) return state;
-      const classItems = EQUIPMENT_CATALOG.filter(item => item.allowedClasses.includes(state.playerClass as PlayerClass));
-      if (classItems.length === 0) return state;
-      const rolledRarity = rollEquipmentRarityByTier(Math.random(), hasUnlock(state, 'mythic_equipment'));
-      const rarityPool = classItems.filter(item => item.rarity === rolledRarity);
-      const source = rarityPool.length > 0 ? rarityPool : classItems;
-      const item = createEquipmentInstance(source[Math.floor(Math.random() * source.length)], Math.max(1, state.level), 'crate');
-      if (!item) return state;
-
-      return queueReward({
-        ...state,
-        gold: state.gold - cost,
-        equipmentInventory: {
-          ...state.equipmentInventory,
-          [item.id]: item,
-        },
-        inventoryItemIds: [...state.inventoryItemIds, item.id],
-      }, {
-        id: `shop_gold_gear_${Date.now()}`,
-        kind: 'item',
-        title: `Gold Shop Purchase: ${item.emoji} ${item.name}`,
-        detail: `${equipmentRarityConfig(item.rarity).label} gear • iLv ${item.itemLevel} • -${cost} gold`,
-      });
-    }
-
-    case 'BUY_DIAMOND_SHOP_ITEM': {
-      const cost = DIAMOND_SHOP_COSTS[action.offerId];
-      if (state.diamonds < cost) return state;
-
-      let counts = state.usableItemCounts;
-      let detail = '';
-      if (action.offerId === 'coolant_i_pack') {
-        counts = addUsableItemCount(counts, 'coolant_mk1', 4);
-        detail = `-${cost} diamonds, +4 Coolant Capsule I`;
-      } else if (action.offerId === 'coolant_ii_pack') {
-        counts = addUsableItemCount(counts, 'coolant_mk2', 3);
-        detail = `-${cost} diamonds, +3 Coolant Capsule II`;
-      } else if (action.offerId === 'rift_raid_ticket') {
-        return queueReward({
-          ...state,
-          diamonds: state.diamonds - cost,
-          riftRaidTickets: state.riftRaidTickets + 1,
-        }, {
-          id: `shop_diamond_rift_ticket_${Date.now()}`,
-          kind: 'item',
-          title: 'Diamond Shop Purchase: Dungeon Raid Ticket',
-          detail: `-${cost} diamonds, +1 Dungeon Raid Ticket`,
-        });
-      } else {
-        counts = addUsableItemCount(counts, 'coolant_mk1', 5);
-        counts = addUsableItemCount(counts, 'coolant_mk2', 3);
-        counts = addUsableItemCount(counts, 'grand_potion', 2);
-        detail = `-${cost} diamonds, +5 Coolant I, +3 Coolant II, +2 Grand Potions`;
-      }
-
-      return queueReward({
-        ...state,
-        diamonds: state.diamonds - cost,
-        usableItemCounts: counts,
-      }, {
-        id: `shop_diamond_${action.offerId}_${Date.now()}`,
-        kind: 'system',
-        title: 'Diamond Shop Purchase Complete',
-        detail,
-      });
-    }
-
-    case 'SIMULATE_DOLLAR_PURCHASE': {
-      if (!ENABLE_SIMULATED_DOLLAR_PURCHASES) return state;
-      const pack = DOLLAR_SHOP_PACKS[action.offerId];
-      if (!pack) return state;
-      const firstPurchaseActive = !state.dollarFirstPurchaseClaimedOfferIds.includes(action.offerId);
-
-      const pointsGain = Math.max(1, Math.round(pack.usdCents / 10));
-      const nextPoints = state.vipPoints + pointsGain;
-      const nextLevel = getVipLevelFromPoints(nextPoints);
-      const leveledUp = nextLevel > state.vipLevel;
-      const priceLabel = `$${(pack.usdCents / 100).toFixed(2)}`;
-      const bonusDiamonds = firstPurchaseActive ? pack.diamonds : 0;
-
-      const purchasedState = queueReward({
-        ...state,
-        diamonds: state.diamonds + pack.diamonds + bonusDiamonds,
-        vipPoints: nextPoints,
-        vipLevel: nextLevel,
-        dollarFirstPurchaseClaimedOfferIds: firstPurchaseActive
-          ? [...state.dollarFirstPurchaseClaimedOfferIds, action.offerId]
-          : state.dollarFirstPurchaseClaimedOfferIds,
-      }, {
-        id: `shop_cash_${action.offerId}_${Date.now()}`,
-        kind: 'system',
-        title: 'Dollar Shop Purchase (Simulated)',
-        detail: `${priceLabel} pack: +${pack.diamonds + bonusDiamonds} diamonds${firstPurchaseActive ? ' (first purchase x2 bonus)' : ''}, +${pointsGain} VIP points`,
-      });
-
-      const withFirstBonus = firstPurchaseActive
-        ? queueReward(purchasedState, {
-          id: `shop_cash_first_bonus_${action.offerId}_${Date.now()}`,
-          kind: 'system',
-          title: 'First Purchase Bonus',
-          detail: `+${bonusDiamonds} bonus diamonds (one-time for this pack)`,
-        })
-        : purchasedState;
-
-      if (!leveledUp) return withFirstBonus;
-      return queueReward(withFirstBonus, {
-        id: `vip_level_${nextLevel}_${Date.now()}`,
-        kind: 'system',
-        title: `VIP Level Up: ${nextLevel}`,
-        detail: `Bonuses now: +${Math.round((getVipDamageMultiplier({ ...state, vipLevel: nextLevel }) - 1) * 100)}% DPS, +${Math.round((getVipGoldMultiplier({ ...state, vipLevel: nextLevel }) - 1) * 100)}% gold, +${Math.round((getVipExpMultiplier({ ...state, vipLevel: nextLevel }) - 1) * 100)}% EXP`,
-      });
-    }
+    // BUY_GOLD_SHOP_ITEM, BUY_DIAMOND_SHOP_ITEM, SIMULATE_DOLLAR_PURCHASE,
+    // BUY_PREMIUM_COOLANT handled by economyReducer
 
     // CLAIM_VIP_REWARD, CLAIM_CODEX_HERO_VIP, CLAIM_CODEX_UNIQUE_VIP
     // handled by progressionReducer
-
-    case 'BUY_PREMIUM_COOLANT': {
-      const unitCost = PREMIUM_COOLANT_COSTS[action.itemId];
-      const amount = clampInt(action.amount, 1, 99, 1);
-      const cost = unitCost * amount;
-      if (state.diamonds < cost) return state;
-      const item = getUsableItem(action.itemId);
-      if (!item) return state;
-      return queueReward({
-        ...state,
-        diamonds: state.diamonds - cost,
-        usableItemCounts: addUsableItemCount(state.usableItemCounts, action.itemId, amount),
-      }, {
-        id: `buy_${action.itemId}_${Date.now()}`,
-        kind: 'system',
-        title: `Purchased ${item.emoji} ${item.name}`,
-        detail: `-${cost} diamonds • +${amount}`,
-      });
-    }
 
     case 'LOAD': {
       const p = sanitizeSaveData(action.payload);
