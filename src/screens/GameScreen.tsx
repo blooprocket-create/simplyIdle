@@ -89,14 +89,12 @@ import { styles } from './GameScreen.styles';
 import { useRenderTracker } from '../hooks/useRenderTracker';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useDevConsole } from '../hooks/useDevConsole';
-import { isCurrentUserAdmin } from '../services/adminAccess';
+import { useSummonCinematic } from '../hooks/useSummonCinematic';
+import { useSocialServices } from '../hooks/useSocialServices';
 import { normalizeCharacterNameForCompare, releaseCharacterName, reserveCharacterName } from '../services/characterNameRegistry';
-import { deleteOnlineSave, loadOnlineSave, loadOnlineSaveForUid, writeOnlineSaveForUid } from '../services/onlineSave';
-import { fetchCloudMail, subscribeToCloudMail } from '../services/cloudMail';
-import { subscribePendingRequestCount } from '../services/friends';
-import { writePresenceHeartbeat } from '../services/presence';
+import { deleteOnlineSave, loadOnlineSave } from '../services/onlineSave';
 import { getFirebaseAuth, getFirebaseFirestore } from '../services/firebase';
-import { collectionGroup, getDocs, getDoc, doc as firestoreDoc, setDoc } from 'firebase/firestore';
+import { getDoc, doc as firestoreDoc, setDoc } from 'firebase/firestore';
 
 export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations' | 'social';
 type HeroesSubTab = 'summon' | 'roster' | 'batch';
@@ -111,14 +109,6 @@ type ActiveModal =
   | 'lockpickGame' | 'targetPracticeGame' | null;
 export type ExpeditionType = 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss';
 export type ExpeditionRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
-
-type SummonReveal = {
-  id: string;
-  heroId: string | null;
-  heroName: string;
-  emoji: string;
-  rarity: Rarity;
-};
 
 type RiftBuffChoice = {
   id: string;
@@ -151,41 +141,6 @@ const FEEDBACK_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSf6txIw9UL-F
 const HAS_BETA_FEEDBACK_FORM = !FEEDBACK_FORM_URL.includes('replace-with-your-beta-form');
 const FALLBACK_WIKI_URL = 'https://wiki.simplyidle.com/';
 const GEAR_RARITY_POINTS: Record<string, number> = { common: 40, rare: 90, epic: 170, legendary: 280, mythic: 430, transcendent: 680 };
-const ONLINE_WINDOW_MS = 5 * 60 * 1000;
-
-type CharacterSnapshot = {
-  account: string;
-  uid: string;
-  saveSlotId: string;
-  classId: PlayerClass;
-  playerName: string;
-  level: number;
-  highestWaveReached: number;
-  lastActiveAt: number;
-  isOnline: boolean;
-};
-
-type SaveMailboxEntry = {
-  id: string;
-  subject: string;
-  message: string;
-  from: string;
-  sentAt: number;
-  attachments: {
-    shards: number;
-    gold: number;
-    diamonds: number;
-    tears: number;
-    essence: number;
-  };
-  claimedAttachments?: {
-    shards: number;
-    gold: number;
-    diamonds: number;
-    tears: number;
-    essence: number;
-  };
-};
 
 function scoreEquipmentForClass(item: { rarity: string; bonus: Record<string, number | undefined | null> }, playerClass: PlayerClass | null): number {
   const cls = getClassConfig(playerClass ?? 'warrior');
@@ -437,22 +392,29 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [achievementsSubTab, setAchievementsSubTab] = useState<AchievementsSubTab>('overview');
   const [operationsSubTab, setOperationsSubTab] = useState<OperationsSubTab>('facilities');
   const {
-    publicUsername, setPublicUsername,
+    publicUsername,
     liveLeaderboardRows, liveLeaderboardRank,
     liveLeaderboardLoading, liveLeaderboardError,
     playerBoardScore,
   } = useLeaderboard({ state, accountName, activeModal });
-  const [socialPendingCount, setSocialPendingCount] = useState(0);
-  const [mailSyncError, setMailSyncError] = useState<string | null>(null);
+  const {
+    socialPendingCount,
+    setSocialPendingCount,
+    mailSyncError,
+  } = useSocialServices({
+    characterCreated: state.characterCreated,
+    playerName: state.playerName,
+    level: state.level,
+    accountName,
+    publicUsername,
+    appendMailboxMessages,
+  });
   const {
     isAdmin, adminCheckPending,
     devCommandInput, setDevCommandInput,
-    devCommandOutput, runDevCommand,
+    devCommandOutput, collectCharacterSnapshots, runDevCommand,
   } = useDevConsole({ accountName, publicUsername, selectedCharacterClass, state, appendMailboxMessages });
   const [compareItemId, setCompareItemId] = useState<string | null>(null);
-  const [summonReveal, setSummonReveal] = useState<SummonReveal | null>(null);
-  const [cinematicSummonPhase, setCinematicSummonPhase] = useState<'charge' | 'warp' | 'reveal'>('charge');
-  const [cinematicSummonResults, setCinematicSummonResults] = useState<SummonReveal[]>([]);
   const [idleChestReady, setIdleChestReady] = useState(false);
   const [idleChestReward, setIdleChestReward] = useState<{ title: string; detail: string } | null>(null);
   const [storyUnlockToast, setStoryUnlockToast] = useState<{ id: string; title: string; chapter: string } | null>(null);
@@ -461,11 +423,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [activeAffixTooltipId, setActiveAffixTooltipId] = useState<string | null>(null);
   const [topChipTooltipAnchor, setTopChipTooltipAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
-  const lastSummonIdRef = useRef<string | null>(null);
-  const pendingCinematicSummonRef = useRef(false);
-  const cinematicTimersRef = useRef<number[]>([]);
-  const cinematicPulse = useRef(new Animated.Value(0)).current;
-  const cinematicRevealScale = useRef(new Animated.Value(0.8)).current;
   const shopFlashAnim = useRef(new Animated.Value(0)).current;
   const topChipRefs = useRef<Record<'dps' | 'power' | 'gear', View | null>>({ dps: null, power: null, gear: null });
   const storyUnlockInitRef = useRef(false);
@@ -1174,78 +1131,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   }, [rewardPopup]);
 
   useEffect(() => {
-    if (activeModal !== 'cinematicSummon') {
-      cinematicPulse.stopAnimation();
-      cinematicPulse.setValue(0);
-      return;
-    }
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(cinematicPulse, {
-          toValue: 1,
-          duration: 700,
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(cinematicPulse, {
-          toValue: 0,
-          duration: 700,
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]),
-    ).start();
-  }, [cinematicPulse, activeModal === 'cinematicSummon']);
-
-  useEffect(() => {
-    if (cinematicSummonPhase !== 'reveal') return;
-    cinematicRevealScale.setValue(0.8);
-    Animated.spring(cinematicRevealScale, {
-      toValue: 1,
-      friction: 7,
-      tension: 90,
-      useNativeDriver: true,
-    }).start();
-  }, [cinematicRevealScale, cinematicSummonPhase]);
-
-  useEffect(() => {
-    return () => {
-      cinematicTimersRef.current.forEach(timer => clearTimeout(timer));
-      cinematicTimersRef.current = [];
-    };
-  }, []);
-
-  useEffect(() => {
-    const latest = state.summonHistory[0];
-    if (!latest) return;
-    if (lastSummonIdRef.current === latest.id) return;
-    lastSummonIdRef.current = latest.id;
-    if (pendingCinematicSummonRef.current) {
-      pendingCinematicSummonRef.current = false;
-      const latestTen = state.summonHistory.slice(0, 10).map(entry => ({
-        id: entry.id,
-        heroId: heroTemplateIdByName.get(entry.heroName) ?? null,
-        heroName: entry.heroName,
-        emoji: entry.heroEmoji,
-        rarity: entry.rarity,
-      }));
-      setCinematicSummonResults(latestTen);
-      setCinematicSummonPhase('reveal');
-      return;
-    }
-    if (activeModal === 'cinematicSummon') return;
-    setSummonReveal({
-      id: latest.id,
-      heroId: heroTemplateIdByName.get(latest.heroName) ?? null,
-      heroName: latest.heroName,
-      emoji: latest.heroEmoji,
-      rarity: latest.rarity,
-    });
-    const timer = setTimeout(() => setSummonReveal(null), 2000);
-    return () => clearTimeout(timer);
-  }, [activeModal === 'cinematicSummon', heroTemplateIdByName, state.summonHistory]);
-
-  useEffect(() => {
     if (!rewardPopup && activeModal !== 'idleChest') {
       setIdleChestReady(false);
       setIdleChestReward(null);
@@ -1618,43 +1503,23 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     };
   }, [state.highestWaveReached]);
 
-
-  const triggerCinematicSummon = () => {
-    if (!canGachaX10 || activeModal === 'cinematicSummon') return;
-    cinematicTimersRef.current.forEach(timer => clearTimeout(timer));
-    cinematicTimersRef.current = [];
-    setCinematicSummonResults([]);
-    setActiveModal('cinematicSummon');
-    setCinematicSummonPhase('charge');
-
-    const phaseWarp = setTimeout(() => {
-      setCinematicSummonPhase('warp');
-      pendingCinematicSummonRef.current = true;
-      summonHeroX10Cinematic(featuredSummonBanner.featuredHeroId);
-    }, 850);
-
-    const fallbackReveal = setTimeout(() => {
-      if (!pendingCinematicSummonRef.current) return;
-      pendingCinematicSummonRef.current = false;
-      const latestTen = state.summonHistory.slice(0, 10).map(entry => ({
-        id: entry.id,
-        heroId: heroTemplateIdByName.get(entry.heroName) ?? null,
-        heroName: entry.heroName,
-        emoji: entry.heroEmoji,
-        rarity: entry.rarity,
-      }));
-      setCinematicSummonResults(latestTen);
-      setCinematicSummonPhase('reveal');
-    }, 2600);
-
-    const autoClose = setTimeout(() => {
-      setActiveModal(null);
-      setCinematicSummonResults([]);
-      setCinematicSummonPhase('charge');
-    }, 6800);
-
-    cinematicTimersRef.current.push(phaseWarp as unknown as number, fallbackReveal as unknown as number, autoClose as unknown as number);
-  };
+  const {
+    summonReveal,
+    cinematicSummonPhase,
+    cinematicSummonResults,
+    cinematicPulse,
+    cinematicRevealScale,
+    triggerCinematicSummon,
+    closeCinematicSummon,
+  } = useSummonCinematic({
+    activeModal,
+    setActiveModal,
+    canGachaX10,
+    summonHistory: state.summonHistory,
+    heroTemplateIdByName,
+    featuredHeroId: featuredSummonBanner.featuredHeroId,
+    summonHeroX10Cinematic,
+  });
 
   const renderSummonPortrait = (heroId: string | null, emoji: string, large = false) => {
     const portraitSource = heroId ? getHeroPortraitSource(heroId) : null;
@@ -1924,413 +1789,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     }
   }
 
-  const collectCharacterSnapshots = useCallback(async (): Promise<CharacterSnapshot[]> => {
-    const db = getFirebaseFirestore();
-    if (!db) return [];
-
-    const now = Date.now();
-
-    let allDocs: Awaited<ReturnType<typeof getDocs>>;
-    try {
-      allDocs = await getDocs(collectionGroup(db, 'saveSlots'));
-    } catch {
-      return [];
-    }
-
-    // Collect unique UIDs so we can resolve public usernames
-    const uids = new Set<string>();
-    for (const docSnap of allDocs.docs) {
-      const uid = docSnap.ref.parent.parent?.id;
-      if (uid) uids.add(uid);
-    }
-
-    // Batch-read userProfiles for display names
-    const uidToUsername = new Map<string, string>();
-    await Promise.all(Array.from(uids).map(async uid => {
-      try {
-        const profileSnap = await getDoc(firestoreDoc(db, 'userProfiles', uid));
-        if (profileSnap.exists()) {
-          const u = profileSnap.data()?.publicUsername;
-          if (typeof u === 'string' && u) uidToUsername.set(uid, u);
-        }
-      } catch {
-        // leave unmapped; will fall back to uid prefix
-      }
-    }));
-
-    const snapshots: CharacterSnapshot[] = [];
-    for (const docSnap of allDocs.docs) {
-      const data = docSnap.data() as Record<string, unknown>;
-      const payload = (data.payload ?? {}) as Record<string, unknown>;
-      if (payload.characterCreated !== true) continue;
-
-      const playerName = typeof payload.playerName === 'string' ? payload.playerName.trim().slice(0, 24) : '';
-      if (!playerName) continue;
-
-      const classId = typeof payload.playerClass === 'string' ? payload.playerClass.trim() : '';
-      if (!classId || !CLASSES.some(c => c.id === classId)) continue;
-
-      const uid = docSnap.ref.parent.parent?.id ?? '';
-      const account = uidToUsername.get(uid) ?? uid.slice(0, 12);
-
-      const level = typeof payload.level === 'number' && Number.isFinite(payload.level)
-        ? Math.max(1, Math.floor(payload.level))
-        : 1;
-      const highestWaveReached = typeof payload.highestWaveReached === 'number' && Number.isFinite(payload.highestWaveReached)
-        ? Math.max(1, Math.floor(payload.highestWaveReached))
-        : 1;
-      const lastActiveAt = typeof payload.lastActiveAt === 'number' && Number.isFinite(payload.lastActiveAt)
-        ? Math.max(0, Math.floor(payload.lastActiveAt))
-        : (typeof data.updatedAt === 'number' ? (data.updatedAt as number) : 0);
-      const isOnline = (now - lastActiveAt) <= ONLINE_WINDOW_MS;
-
-      snapshots.push({ account, uid, saveSlotId: docSnap.id, classId: classId as PlayerClass, playerName, level, highestWaveReached, lastActiveAt, isOnline });
-    }
-
-    return snapshots.sort((a, b) => {
-      if (a.account !== b.account) return a.account.localeCompare(b.account);
-      if (a.playerName !== b.playerName) return a.playerName.localeCompare(b.playerName);
-      return a.classId.localeCompare(b.classId);
-    });
-  }, []);
-
-  const runDevCommand = useCallback(async () => {
-    if (!isAdmin) {
-      setDevCommandOutput('Admin access required.');
-      return;
-    }
-
-    const rawCommand = devCommandInput.trim();
-    if (!rawCommand) {
-      setDevCommandOutput('Enter a command first.');
-      return;
-    }
-
-    const tokens = rawCommand.split(/\s+/);
-    const command = (tokens[0] ?? '').toLowerCase();
-    const currentUid = getFirebaseAuth()?.currentUser?.uid ?? '';
-    const validClasses: PlayerClass[] = ['warrior', 'berserker', 'archer', 'mage', 'monk'];
-    const currentSnapshot = (state.characterCreated && selectedCharacterClass)
-      ? {
-        account: publicUsername || accountName,
-        uid: currentUid,
-        saveSlotId: getCharacterSaveSlot(accountName, selectedCharacterClass),
-        classId: selectedCharacterClass,
-        playerName: state.playerName,
-        level: state.level,
-        highestWaveReached: state.highestWaveReached,
-        lastActiveAt: Date.now(),
-        isOnline: true,
-      } as CharacterSnapshot
-      : null;
-
-    if (command === '/devhelp') {
-      setDevCommandOutput([
-        'Dev commands:',
-        '/showOnlineUsersAndCharacters',
-        '/sendMsg (sendAll|User|User+CharName) #subject# ##message## $shard X, $gold X, $diamond X, $tears X, $essence X',
-        '/clearSlot <classId>',
-        '/whoAmI',
-        '/showSlot <classId>',
-        '/devDiag',
-      ].join('\n'));
-      return;
-    }
-
-    if (command === '/whoami') {
-      setDevCommandOutput([
-        `uid: ${currentUid || '(none)'}`,
-        `account: ${publicUsername || accountName}`,
-        `admin: ${isAdmin ? 'yes' : 'no'}`,
-        `activeClass: ${selectedCharacterClass ?? '(none)'}`,
-      ].join('\n'));
-      return;
-    }
-
-    if (command === '/showslot') {
-      const classArg = (tokens[1] ?? '').trim().toLowerCase() as PlayerClass;
-      if (!classArg || !validClasses.includes(classArg)) {
-        setDevCommandOutput(`Usage: /showSlot <classId>\nValid classes: ${validClasses.join(', ')}`);
-        return;
-      }
-
-      const slotId = getCharacterSaveSlot(accountName, classArg);
-      const slotResult = await loadOnlineSave<Record<string, unknown>>(slotId);
-      if (!slotResult.ok) {
-        setDevCommandOutput(`showSlot failed (${slotResult.errorCode ?? 'unknown'}) for ${classArg}.`);
-        return;
-      }
-
-      if (!slotResult.data) {
-        setDevCommandOutput(`Slot ${classArg} is empty in Firestore (slotId: ${slotId}).`);
-        return;
-      }
-
-      const payload = slotResult.data.payload;
-      const playerName = typeof payload.playerName === 'string' ? payload.playerName : '(none)';
-      const level = typeof payload.level === 'number' ? Math.floor(payload.level) : 1;
-      const wave = typeof payload.highestWaveReached === 'number' ? Math.floor(payload.highestWaveReached) : 1;
-      const created = payload.characterCreated === true ? 'yes' : 'no';
-      setDevCommandOutput([
-        `showSlot ${classArg}`,
-        `slotId: ${slotId}`,
-        `characterCreated: ${created}`,
-        `playerName: ${playerName}`,
-        `level: ${level}`,
-        `highestWaveReached: ${wave}`,
-        `revision: ${slotResult.data.revision}`,
-        `updatedAt: ${new Date(slotResult.data.updatedAt).toISOString()}`,
-      ].join('\n'));
-      return;
-    }
-
-    if (command === '/devdiag') {
-      const db = getFirebaseFirestore();
-      if (!db) {
-        setDevCommandOutput('devDiag: Firestore is not configured.');
-        return;
-      }
-
-      try {
-        const allDocs = await getDocs(collectionGroup(db, 'saveSlots'));
-        setDevCommandOutput([
-          'devDiag',
-          `uid: ${currentUid || '(none)'}`,
-          `isAdmin: ${isAdmin ? 'yes' : 'no'}`,
-          `saveSlotDocsReadable: ${allDocs.size}`,
-          `hasCurrentSnapshotFallback: ${currentSnapshot ? 'yes' : 'no'}`,
-        ].join('\n'));
-      } catch (error) {
-        const errorCode = typeof error === 'object' && error && 'code' in error
-          ? String((error as { code: unknown }).code)
-          : 'unknown';
-        setDevCommandOutput(`devDiag query failed (${errorCode}). Check Firestore admin rules and auth token refresh.`);
-      }
-      return;
-    }
-
-    if (command === '/showonlineusersandcharacters') {
-      const snapshots = await collectCharacterSnapshots();
-      const allSnapshots = currentSnapshot && !snapshots.some(snapshot => snapshot.uid === currentUid && snapshot.classId === currentSnapshot.classId)
-        ? [currentSnapshot, ...snapshots]
-        : snapshots;
-
-      if (allSnapshots.length === 0) {
-        setDevCommandOutput('No characters found in Firestore, and no active local character is loaded.');
-        return;
-      }
-
-      const onlineCount = allSnapshots.filter(s => s.isOnline).length;
-      const lines = allSnapshots.map(snapshot => `${snapshot.isOnline ? 'ONLINE' : 'offline'} • ${snapshot.account} • ${snapshot.playerName} (${snapshot.classId}) • Lv ${snapshot.level} • Wave ${snapshot.highestWaveReached}`);
-      setDevCommandOutput(`Users+Characters (${onlineCount}/${allSnapshots.length} online)\n${lines.join('\n')}`);
-      return;
-    }
-
-    if (command === '/sendmsg') {
-      const parsed = rawCommand.match(/^\/sendMsg\s+(\S+)\s+#([^#]+)#\s+##([\s\S]*?)##\s*(.*)$/i);
-      if (!parsed) {
-        setDevCommandOutput('Usage: /sendMsg (sendAll|User|User+CharName) #subject# ##message## $shard X, $gold X, $diamond X, $tears X, $essence X');
-        return;
-      }
-
-      const targetSpec = (parsed[1] ?? '').trim();
-      const subject = (parsed[2] ?? '').trim();
-      const message = (parsed[3] ?? '').trim();
-      const attachmentText = (parsed[4] ?? '').trim();
-      if (!subject || !message) {
-        setDevCommandOutput('Subject and message are required.');
-        return;
-      }
-
-      const attachments: SaveMailboxEntry['attachments'] = { shards: 0, gold: 0, diamonds: 0, tears: 0, essence: 0 };
-      const regex = /\$(shard|gold|diamond|tears|essence)\s+(\d+)/gi;
-      let match: RegExpExecArray | null = regex.exec(attachmentText);
-      while (match) {
-        const key = (match[1] ?? '').toLowerCase();
-        const amount = Math.max(0, Math.floor(Number(match[2])));
-        if (Number.isFinite(amount) && amount > 0) {
-          if (key === 'shard') attachments.shards += amount;
-          if (key === 'gold') attachments.gold += amount;
-          if (key === 'diamond') attachments.diamonds += amount;
-          if (key === 'tears') attachments.tears += amount;
-          if (key === 'essence') attachments.essence += amount;
-        }
-        match = regex.exec(attachmentText);
-      }
-
-      const senderName = state.playerName || 'Dev Team';
-      const buildMail = (): SaveMailboxEntry => ({
-        id: `mail_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-        subject: subject.slice(0, 80),
-        message: message.slice(0, 280),
-        from: senderName,
-        sentAt: Date.now(),
-        attachments: {
-          shards: attachments.shards,
-          gold: attachments.gold,
-          diamonds: attachments.diamonds,
-          tears: attachments.tears,
-          essence: attachments.essence,
-        },
-      });
-
-      const appendMailToSnapshot = async (snapshot: CharacterSnapshot): Promise<SaveMailboxEntry | null> => {
-        const loadResult = await loadOnlineSaveForUid<Record<string, unknown>>(snapshot.uid, snapshot.saveSlotId);
-        if (!loadResult.ok || !loadResult.data) return null;
-        const savePayload = { ...loadResult.data.payload };
-        const mailbox = Array.isArray(savePayload.mailbox)
-          ? savePayload.mailbox.filter(entry => !!entry && typeof entry === 'object') as SaveMailboxEntry[]
-          : [];
-        const outgoingMail = buildMail();
-        mailbox.push(outgoingMail);
-        savePayload.mailbox = mailbox.slice(-100);
-        const writeResult = await writeOnlineSaveForUid(snapshot.uid, snapshot.saveSlotId, savePayload);
-        if (!writeResult.ok) return null;
-        return outgoingMail;
-      };
-
-      const snapshots = await collectCharacterSnapshots();
-      const allSnapshots = currentSnapshot && !snapshots.some(snapshot => snapshot.uid === currentUid && snapshot.classId === currentSnapshot.classId)
-        ? [currentSnapshot, ...snapshots]
-        : snapshots;
-
-      if (allSnapshots.length === 0) {
-        setDevCommandOutput('No character targets found.');
-        return;
-      }
-
-      let targets: CharacterSnapshot[] = [];
-      if (targetSpec.toLowerCase() === 'sendall') {
-        targets = allSnapshots;
-      } else if (targetSpec.includes('+')) {
-        const [userRaw, charRaw] = targetSpec.split('+');
-        const user = (userRaw ?? '').trim().toLowerCase();
-        const char = (charRaw ?? '').trim().toLowerCase();
-        targets = allSnapshots.filter(snapshot =>
-          snapshot.account.trim().toLowerCase() === user
-          && (snapshot.classId.toLowerCase() === char || snapshot.playerName.trim().toLowerCase() === char),
-        );
-      } else {
-        const user = targetSpec.trim().toLowerCase();
-        targets = allSnapshots.filter(snapshot => snapshot.account.trim().toLowerCase() === user);
-      }
-
-      if (targets.length === 0) {
-        setDevCommandOutput(`No matching targets for "${targetSpec}".`);
-        return;
-      }
-
-      let delivered = 0;
-      const localMails: SaveMailboxEntry[] = [];
-      for (const target of targets) {
-        const createdMail = await appendMailToSnapshot(target);
-        if (createdMail) {
-          delivered += 1;
-          if (target.uid === currentUid && target.classId === selectedCharacterClass) {
-            localMails.push(createdMail);
-          }
-        }
-      }
-
-      if (localMails.length > 0) {
-        appendMailboxMessages(localMails);
-      }
-
-      setDevCommandOutput(`Mail sent to ${delivered}/${targets.length} target character(s). Subject: ${subject}`);
-      return;
-    }
-
-    if (command === '/clearslot') {
-      // Usage: /clearslot <classId>
-      // Wipes the current user's Firestore save slot.
-      const classArg = (tokens[1] ?? '').trim().toLowerCase() as PlayerClass;
-      if (!classArg || !validClasses.includes(classArg)) {
-        setDevCommandOutput(`Usage: /clearslot <classId>\nValid classes: ${validClasses.join(', ')}`);
-        return;
-      }
-
-      const targetSlot = getCharacterSaveSlot(accountName, classArg);
-      const remoteResult = await deleteOnlineSave(targetSlot);
-
-      if (remoteResult.ok) {
-        setDevCommandOutput(`Cleared Firestore save for ${accountName} / ${classArg}.\nReload the page to start fresh.`);
-      } else {
-        setDevCommandOutput(`Firestore delete failed (${remoteResult.errorCode ?? 'unknown'}) — it may have already been empty.`);
-      }
-      return;
-    }
-
-    setDevCommandOutput(`Unknown command: ${tokens[0]}. Use /devHelp for available commands.`);
-  }, [accountName, appendMailboxMessages, collectCharacterSnapshots, devCommandInput, isAdmin, publicUsername, selectedCharacterClass, state.characterCreated, state.highestWaveReached, state.level, state.playerName]);
-
-  useEffect(() => {
-    if (!state.characterCreated) return;
-    const uid = getFirebaseAuth()?.currentUser?.uid;
-    if (!uid) return;
-
-    void fetchCloudMail(uid).then(mails => {
-      const mapped = mails.map(mail => ({
-        id: mail.id,
-        subject: mail.subject,
-        message: mail.message,
-        from: mail.from,
-        sentAt: mail.sentAt,
-        attachments: mail.attachments,
-      }));
-      appendMailboxMessages(mapped);
-      setMailSyncError(null);
-    }).catch(() => {
-      setMailSyncError('Mail sync failed. Your mailbox may be incomplete.');
-    });
-
-    return subscribeToCloudMail(uid, mails => {
-      const mapped = mails.map(mail => ({
-        id: mail.id,
-        subject: mail.subject,
-        message: mail.message,
-        from: mail.from,
-        sentAt: mail.sentAt,
-        attachments: mail.attachments,
-      }));
-      appendMailboxMessages(mapped);
-    });
-  }, [appendMailboxMessages, state.characterCreated]);
-
-  useEffect(() => {
-    if (!state.characterCreated) return;
-    const uid = getFirebaseAuth()?.currentUser?.uid;
-    if (!uid) return;
-    return subscribePendingRequestCount(uid, setSocialPendingCount);
-  }, [state.characterCreated]);
-
-  useEffect(() => {
-    if (!state.characterCreated) return;
-    const uid = getFirebaseAuth()?.currentUser?.uid;
-    if (!uid) return;
-    const display = (publicUsername || state.playerName || accountName).trim() || accountName;
-    void writePresenceHeartbeat(uid, display, state.level).catch(() => {});
-  }, [accountName, publicUsername, state.characterCreated, state.level, state.playerName]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setAdminCheckPending(true);
-
-    void (async () => {
-      const allowed = await isCurrentUserAdmin();
-      if (cancelled) return;
-      setIsAdmin(allowed);
-      setAdminCheckPending(false);
-      if (!allowed) {
-        setDevCommandInput('');
-        setDevCommandOutput('');
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [accountName]);
-
   if (slotListLoading) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -2552,9 +2010,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   style={styles.cinematicSummonCloseBtn}
                   onPress={() => {
                     debugLog('summon', 'Close cinematic summon results', { entries: cinematicSummonResults.length });
-                    setActiveModal(null);
-                    setCinematicSummonResults([]);
-                    setCinematicSummonPhase('charge');
+                    closeCinematicSummon();
                   }}
                 >
                   <Text style={styles.cinematicSummonCloseText}>Continue</Text>

@@ -42,23 +42,29 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 
 ### CRITICAL
 
-#### 1.1 God Component: GameScreen.tsx (~6,400 lines)
-- **Problem**: Single component handles ALL game UI: tab rendering, 70+ useState hooks, 40+ useEffects, modals, mini-games, dev console, leaderboard sync, mail, shop, settings.
-- **Impact**: Any state change cascades through the entire render tree. Unmanageable for maintenance, debugging, or team collaboration.
+#### ~~1.1 God Component: GameScreen.tsx (~6,400 lines)~~ ✅ PARTIAL FIX
+- ~~**Problem**: Single component handles ALL game UI: tab rendering, 70+ useState hooks, 40+ useEffects, modals, mini-games, dev console, leaderboard sync, mail, shop, settings.~~
+- ~~**Impact**: Any state change cascades through the entire render tree. Unmanageable for maintenance, debugging, or team collaboration.~~
 - **AAA Standard**: No component should exceed ~300 lines. Each feature surface should be its own module.
-- **Fix**: Decompose into `GameShell`, `TabRouter`, `ModalManager`, `DevConsole`, plus individual feature modules.
+- **Resolution so far**:
+  - Extracted `useLeaderboard` (live board sync, submissions, telemetry, username refresh).
+  - Extracted `useDevConsole` (admin gating + command execution).
+  - Extracted `useSummonCinematic` (summon reveal/cinematic state machine).
+  - Extracted `useSocialServices` (mail sync, pending requests, presence heartbeat).
+- **Remaining work**: Character-slot lifecycle and additional modal-domain hooks still live in `GameScreen.tsx`.
 
-#### ~~1.2 Monolithic Reducer: useGameState.ts (~3,100 lines)~~ ✅ PARTIAL FIX
+#### ~~1.2 Monolithic Reducer: useGameState.ts (~3,100 lines)~~ ✅ FIXED
 - ~~**Problem**: Single reducer handles all game state — combat, economy, roster, meta, liveops. No domain isolation.~~
 - ~~**Impact**: Every action type lives in one switch statement. Balance changes require navigating thousands of lines.~~
 - **AAA Standard**: Domain-sliced reducers (combat, economy, roster, progression, social) composed together.
-- **Resolution**: Extracted 5 domain slices so far:
+- **Resolution**: Extracted 5 domain slices:
   - Minigames (8 cases, ~350 lines) → `src/reducers/minigamesReducer.ts`
   - Progression (15 cases, ~366 lines) → `src/reducers/progressionReducer.ts`
   - Roster (18 cases, ~600 lines) → `src/reducers/rosterReducer.ts`
   - Economy (19 cases, ~650 lines) → `src/reducers/economyReducer.ts`
   - Settings (15 cases, ~165 lines) → `src/reducers/settingsReducer.ts`
-  - Total: 75 cases / ~2,131 lines extracted. Only 6 cases remain in main switch (CREATE_CHARACTER, TICK, ATTACK, BURST, APPLY_OFFLINE_PROGRESS, LOAD) + 2 stub pass-throughs.
+  - Total: 75 cases / ~2,131 lines extracted.
+  - Remaining integrated core loop cases are intentionally centralized (CREATE_CHARACTER, TICK, ATTACK, BURST, APPLY_OFFLINE_PROGRESS, LOAD) because they share tightly-coupled combat/offline simulation helpers and are not practical slice boundaries.
 
 #### ~~1.3 No Error Boundaries~~ ✅ FIXED
 - ~~**Problem**: Zero `<ErrorBoundary>` components anywhere. A single render error in any tab crashes the entire game.~~

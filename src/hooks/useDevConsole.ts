@@ -432,6 +432,7 @@ export function useDevConsole({
     devCommandInput,
     setDevCommandInput,
     devCommandOutput,
+    collectCharacterSnapshots,
     runDevCommand,
   };
 }
