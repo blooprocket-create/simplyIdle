@@ -31,7 +31,6 @@ import {
   PendingFriendRequest,
 } from '../../services/friends';
 import { GiftPreference } from '../../gameConfig';
-import { fetchPublicPlayerProfile, PublicPlayerProfile } from '../../services/publicProfile';
 import {
   disbandGuild,
   fetchActiveBoss,
@@ -57,6 +56,7 @@ import { trackEvent } from '../../telemetry';
 import { ChatSection } from './social/ChatSection';
 import { FriendsSection } from './social/FriendsSection';
 import { GuildSection } from './social/GuildSection';
+import { ProfileModal } from './social/ProfileModal';
 
 export interface SocialTabContentProps {
   tab: string;
@@ -175,23 +175,6 @@ function shiftSocialTab(current: SocialSubTab, direction: -1 | 1): SocialSubTab 
   return SOCIAL_TABS[nextIndex];
 }
 
-function buildProfileHighlights(profile: PublicPlayerProfile): string[] {
-  const highlights: string[] = [];
-  if (profile.vipLevel >= 10) highlights.push('Elite Patron');
-  if (profile.vipLevel >= 1 && profile.vipLevel < 10) highlights.push('VIP Member');
-  if (profile.prestigeCount >= 25) highlights.push('Legacy Commander');
-  if (profile.highestWaveReached >= 2500) highlights.push('Wavebreaker');
-  if (profile.leaderboardRank !== null && profile.leaderboardRank <= 100) highlights.push('Top 100');
-  if (profile.guildRank === 'leader') highlights.push('Guild Leader');
-  if (profile.guildRank === 'officer') highlights.push('Guild Officer');
-  return highlights.slice(0, 4);
-}
-
-function formatSigned(value: number): string {
-  if (value === 0) return '0';
-  return value > 0 ? `+${value}` : `${value}`;
-}
-
 export const SocialTabContent = React.memo(function SocialTabContent({
   tab,
   accountName,
@@ -233,12 +216,6 @@ export const SocialTabContent = React.memo(function SocialTabContent({
   const [confirmTransferLeader, setConfirmTransferLeader] = useState<GuildMember | null>(null);
   const [confirmDisbandGuild, setConfirmDisbandGuild] = useState(false);
   const [activeProfileUid, setActiveProfileUid] = useState<string | null>(null);
-  const [activeProfile, setActiveProfile] = useState<PublicPlayerProfile | null>(null);
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
-  const [profileRelationship, setProfileRelationship] = useState<FriendRelationshipStatus>('none');
-  const [profileActionBusy, setProfileActionBusy] = useState(false);
-  const profileCacheRef = useRef<Record<string, PublicPlayerProfile>>({});
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const sectionAnim = useRef(new Animated.Value(1)).current;
 
@@ -431,17 +408,6 @@ export const SocialTabContent = React.memo(function SocialTabContent({
       .then(setActiveUserRelationship)
       .catch(() => setActiveUserRelationship('none'));
   }, [activeUserMenu?.uid, me.uid]);
-
-  useEffect(() => {
-    if (!me.uid || !activeProfileUid) {
-      setProfileRelationship('none');
-      return;
-    }
-
-    void fetchFriendRelationshipStatus(me.uid, activeProfileUid)
-      .then(setProfileRelationship)
-      .catch(() => setProfileRelationship('none'));
-  }, [activeProfileUid, me.uid]);
 
   if (tab !== 'social') return null;
 
@@ -691,41 +657,9 @@ export const SocialTabContent = React.memo(function SocialTabContent({
     }
   };
 
-  const openProfileCard = async (uid: string, source: string) => {
-    if (!uid) return;
-    setActiveProfileUid(uid);
-    setProfileError(null);
-
-    const cached = profileCacheRef.current[uid];
-    if (cached) {
-      setActiveProfile(cached);
-      void trackEvent('social_profile_opened', { sourceTab: subTab, source, cached: true });
-      void fetchPublicPlayerProfile(uid)
-        .then(profile => {
-          if (!profile) return;
-          profileCacheRef.current[uid] = profile;
-          setActiveProfile(profile);
-        })
-        .catch(() => {});
-      return;
-    }
-
-    setActiveProfile(null);
-    setProfileLoading(true);
-    try {
-      const profile = await fetchPublicPlayerProfile(uid);
-      if (!profile) {
-        setProfileError('Profile unavailable right now.');
-        return;
-      }
-      profileCacheRef.current[uid] = profile;
-      setActiveProfile(profile);
-      void trackEvent('social_profile_opened', { sourceTab: subTab, source, cached: false });
-    } catch {
-      setProfileError('Failed to load player profile.');
-    } finally {
-      setProfileLoading(false);
-    }
+  const openProfileCard = (_uid: string, _source: string) => {
+    if (!_uid) return;
+    setActiveProfileUid(_uid);
   };
 
   const handleTouchStart = (event: NativeSyntheticEvent<NativeTouchEvent>) => {
@@ -963,186 +897,17 @@ export const SocialTabContent = React.memo(function SocialTabContent({
         </Pressable>
       </Modal>
 
-      <Modal
-        visible={!!activeProfileUid}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          setActiveProfileUid(null);
-          setProfileLoading(false);
-          setProfileError(null);
-          setProfileActionBusy(false);
-        }}
-      >
-        <Pressable
-          style={styles.userMenuBackdrop}
-          onPress={() => {
-            setActiveProfileUid(null);
-            setProfileLoading(false);
-            setProfileError(null);
-            setProfileActionBusy(false);
-          }}
-        >
-          <Pressable style={styles.profileCard} onPress={() => {}}>
-            <Text style={styles.cardTitle}>Player Profile</Text>
-
-            {profileLoading && <Text style={styles.metaText}>Loading profile data...</Text>}
-            {!!profileError && <Text style={styles.errorText}>{profileError}</Text>}
-
-            {!profileLoading && !profileError && !!activeProfile && (
-              <>
-                <Text style={styles.profileName}>{activeProfile.publicUsername}</Text>
-                {buildProfileHighlights(activeProfile).length > 0 && (
-                  <View style={styles.profileTagRow}>
-                    {buildProfileHighlights(activeProfile).map(tag => (
-                      <Text key={tag} style={styles.profileTag}>{tag}</Text>
-                    ))}
-                  </View>
-                )}
-                <View style={styles.metricGrid}>
-                  <View style={styles.metricChip}>
-                    <Text style={styles.metricLabel}>Level</Text>
-                    <Text style={styles.metricValue}>{activeProfile.level}</Text>
-                  </View>
-                  <View style={styles.metricChip}>
-                    <Text style={styles.metricLabel}>VIP</Text>
-                    <Text style={styles.metricValue}>{activeProfile.vipLevel}</Text>
-                  </View>
-                  <View style={styles.metricChip}>
-                    <Text style={styles.metricLabel}>Prestige</Text>
-                    <Text style={styles.metricValue}>{activeProfile.prestigeCount}</Text>
-                  </View>
-                  <View style={styles.metricChip}>
-                    <Text style={styles.metricLabel}>Rank</Text>
-                    <Text style={styles.metricValue}>{activeProfile.leaderboardRank ? `#${activeProfile.leaderboardRank}` : 'N/A'}</Text>
-                  </View>
-                  <View style={styles.metricChip}>
-                    <Text style={styles.metricLabel}>Friends</Text>
-                    <Text style={styles.metricValue}>{activeProfile.friendCount}</Text>
-                  </View>
-                  <View style={styles.metricChip}>
-                    <Text style={styles.metricLabel}>Guild Damage</Text>
-                    <Text style={styles.metricValue}>{activeProfile.guildContribution.toLocaleString()}</Text>
-                  </View>
-                </View>
-                <Text style={styles.metaText}>Wave Peak: {activeProfile.highestWaveReached.toLocaleString()}</Text>
-                <Text style={styles.metaText}>Score: {activeProfile.score.toLocaleString()}</Text>
-                <Text style={styles.metaText}>Gift Preference: {activeProfile.giftPreference}</Text>
-                <Text style={styles.metaText}>
-                  Guild: {activeProfile.guildName ? `${activeProfile.guildName}${activeProfile.guildRank ? ` (${activeProfile.guildRank})` : ''}` : 'No guild'}
-                </Text>
-
-                <View style={styles.compareCard}>
-                  <Text style={styles.compareTitle}>Compare With You</Text>
-                  <Text style={styles.metaText}>Level Delta: {formatSigned(activeProfile.level - me.level)}</Text>
-                  <Text style={styles.metaText}>VIP Delta: {formatSigned(activeProfile.vipLevel - me.vipLevel)}</Text>
-                  <Text style={styles.metaText}>Wave Delta: {formatSigned(activeProfile.highestWaveReached - Math.max(0, level))}</Text>
-                </View>
-
-                <View style={styles.friendActions}>
-                  <Pressable
-                    style={[
-                      styles.smallBtn,
-                      (profileRelationship !== 'none' || profileActionBusy || activeProfile.uid === me.uid) && styles.sendBtnDisabled,
-                    ]}
-                    disabled={profileRelationship !== 'none' || profileActionBusy || activeProfile.uid === me.uid}
-                    onPress={async () => {
-                      if (!me.uid || !activeProfile || profileRelationship !== 'none') return;
-                      setProfileActionBusy(true);
-                      void trackEvent('social_profile_friend_cta_clicked', {
-                        relation: profileRelationship,
-                        sourceTab: subTab,
-                      });
-                      try {
-                        await sendFriendRequest(me.uid, me.name, activeProfile.publicUsername);
-                        setProfileRelationship('outgoing');
-                        void trackEvent('social_profile_friend_request_sent', {
-                          sourceTab: subTab,
-                          relationBefore: 'none',
-                        });
-                      } catch (err) {
-                        const msg = err instanceof Error ? err.message : 'Failed to send friend request.';
-                        setProfileError(msg);
-                        void trackEvent('social_profile_friend_request_failed', {
-                          reason: msg.slice(0, 80),
-                          sourceTab: subTab,
-                        });
-                      } finally {
-                        setProfileActionBusy(false);
-                      }
-                    }}
-                  >
-                    <Text style={styles.smallBtnText}>
-                      {profileActionBusy
-                        ? 'Sending...'
-                        : profileRelationship === 'self'
-                          ? 'You'
-                          : profileRelationship === 'friends'
-                            ? 'Friends'
-                            : profileRelationship === 'outgoing'
-                              ? 'Request Sent'
-                              : profileRelationship === 'incoming'
-                                ? 'Incoming Request'
-                                : 'Add Friend'}
-                    </Text>
-                  </Pressable>
-
-                  <Pressable
-                    style={[
-                      styles.smallBtn,
-                      (!canInviteToGuild || profileActionBusy || !activeProfile || activeProfile.uid === me.uid || !!activeProfile.guildName) && styles.sendBtnDisabled,
-                    ]}
-                    disabled={!canInviteToGuild || profileActionBusy || !activeProfile || activeProfile.uid === me.uid || !!activeProfile.guildName}
-                    onPress={async () => {
-                      if (!me.uid || !activeProfile || !canInviteToGuild) return;
-                      setProfileActionBusy(true);
-                      try {
-                        await sendGuildInvite({
-                          actorUid: me.uid,
-                          targetUid: activeProfile.uid,
-                          actorDisplayName: me.name,
-                        });
-                        setProfileError('Guild invite sent.');
-                      } catch (err) {
-                        const msg = err instanceof Error ? err.message : 'Failed to send guild invite.';
-                        setProfileError(msg);
-                      } finally {
-                        setProfileActionBusy(false);
-                      }
-                    }}
-                  >
-                    <Text style={styles.smallBtnText}>
-                      {!canInviteToGuild
-                        ? 'Invite Locked'
-                        : profileActionBusy
-                          ? 'Inviting...'
-                          : activeProfile?.uid === me.uid
-                            ? 'You'
-                            : activeProfile?.guildName
-                              ? 'Already in Guild'
-                              : 'Invite to Guild'}
-                    </Text>
-                  </Pressable>
-                </View>
-              </>
-            )}
-
-            <View style={styles.confirmButtonRow}>
-              <Pressable
-                style={[styles.confirmBtn, styles.confirmBtnCancel]}
-                onPress={() => {
-                  setActiveProfileUid(null);
-                  setProfileLoading(false);
-                  setProfileError(null);
-                  setProfileActionBusy(false);
-                }}
-              >
-                <Text style={styles.confirmBtnText}>Close</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <ProfileModal
+        targetUid={activeProfileUid}
+        meUid={me.uid}
+        meName={me.name}
+        meLevel={me.level}
+        meVipLevel={me.vipLevel}
+        meHighestWave={highestWaveReached}
+        canInviteToGuild={canInviteToGuild}
+        socialSubTab={subTab}
+        onClose={() => setActiveProfileUid(null)}
+      />
 
       <Modal
         visible={!!confirmKickMember}

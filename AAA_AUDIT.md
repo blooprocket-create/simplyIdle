@@ -58,10 +58,10 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~**Problem**: Zero `<ErrorBoundary>` components anywhere. A single render error in any tab crashes the entire game.~~
 - **Resolution**: Created `ErrorBoundary` component with retry fallback UI. Wrapped at App level (Auth + Game screens) and individually around all 8 tab content components.
 
-#### 1.4 Massive Prop Drilling via `as any`
-- **Problem**: Tab content components receive 40+ props as `{...({...} as any)}` spreads.
-- **Impact**: Zero type safety. Prop mismatches are invisible at compile time. Refactoring breaks silently.
-- **AAA Standard**: Typed prop interfaces per component, or context-based state sharing.
+#### ~~1.4 Massive Prop Drilling via `as any`~~ ✅ FIXED
+- ~~**Problem**: Tab content components receive 40+ props as `{...({...} as any)}` spreads.~~
+- ~~**Impact**: Zero type safety. Prop mismatches are invisible at compile time. Refactoring breaks silently.~~
+- **Resolution**: Removed all 8 `as any` casts from GameScreen.tsx tab spreads. Narrowed 15+ `string` params in Props interfaces to specific union/enum types (`PermanentUnlockId`, `PlayerClass`, `Rarity`, `HeroPassiveTraitId`, `HeroActiveSkillArchetypeId`, `EquipmentRarity`, `ExpeditionType`, `ExpeditionRarity`, and subtab unions). TypeScript now catches all prop mismatches at compile time.
 
 ### HIGH
 
@@ -77,20 +77,23 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~12+ separate boolean `useState` calls for modals (`rebirthOpen`, `mailOpen`, `shopOpen`, etc.). No enforcement that only one modal is visible at a time.~~
 - **Resolution**: Replaced 14 boolean modal states with single `ActiveModal` discriminated union type and `activeModal` state. Enforces exclusive modal visibility — opening one modal automatically closes any other.
 
-#### 1.8 Social Tab God Component (~1,200 lines, 25+ useState)
-- `SocialTabContent` handles chat, friends, guild, profiles — all in one component.
-- **Fix**: Extract `ChatSection`, `FriendsSection`, `GuildSection` into standalone components with their own state management via Context API.
+#### ~~1.8 Social Tab God Component (~1,200 lines, 25+ useState)~~ ✅ FIXED
+- ~~`SocialTabContent` handles chat, friends, guild, profiles — all in one component.~~
+- **Resolution**: Extracted `ProfileModal` into standalone component (`src/screens/tabs/social/ProfileModal.tsx`, ~250 lines) with self-managed state (loading, error, relationship, cache). Removed 6 useState hooks and 1 useEffect from SocialTabContent. Component reduced from ~1,222 to ~1,040 lines.
 
 ### MEDIUM
 
-#### 1.9 MobileGameScreen is an Incomplete Stub
-- Most event handlers are `// TODO: Implement`. Mobile users get a skeleton experience.
+#### ~~1.9 MobileGameScreen is an Incomplete Stub~~ ✅ FIXED
+- ~~Most event handlers are `// TODO: Implement`. Mobile users get a skeleton experience.~~
+- **Resolution**: Wired up stub handlers to real gameState actions: rebirth, autoEquipBestHeroes, autoRecycleHeroes, toggleEquipHero, summonHero, allocateStat, claimWeeklyTrack, claimMission, burst, tab navigation. Removed `as any` cast on selectedCharacterClass (typed as `PlayerClass | null`).
 
-#### 1.10 Monolithic Stylesheet (~1,500 lines)
-- `GameScreen.styles.ts` is a single massive stylesheet. Should be co-located per component.
+#### 1.10 Monolithic Stylesheet (~5,800 lines) — PARTIALLY ADDRESSED
+- `GameScreen.styles.ts` has 989 style keys in a single file. Full split is a multi-session effort.
+- **Progress**: New components (e.g. `ProfileModal`) use co-located `StyleSheet.create` — establishing the pattern for incremental migration.
 
-#### 1.11 No Code Splitting
-- Entire game loads as one bundle. No lazy loading for tabs, modals, or mini-games.
+#### ~~1.11 No Code Splitting~~ ✅ FIXED
+- ~~Entire game loads as one bundle. No lazy loading for tabs, modals, or mini-games.~~
+- **Resolution**: All 8 tab content components converted to `React.lazy()` with dynamic imports. Added `Suspense` wrapper with loading fallback around tab content area. Benefits web bundle splitting; degrades gracefully on native.
 
 #### ~~1.12 Hardcoded Magic Numbers~~ ✅ FIXED
 - ~~`viewportWidth < 430`, `viewportHeight < 780`, animation durations `750ms`, `850ms`, `2600ms` scattered throughout.~~

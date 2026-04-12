@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
-import { EquipmentSlot, getHeroBackstory, getHeroUniqueEffectFamilyLabel, getHeroUniqueSkillDescription, getHeroUniqueWeaponName, RARITIES } from '../../gameConfig';
+import { EquipmentSlot, EquipmentRarity, getHeroBackstory, getHeroUniqueEffectFamilyLabel, getHeroUniqueSkillDescription, getHeroUniqueWeaponName, RARITIES } from '../../gameConfig';
 import { fmt } from '../../utils';
 import { styles } from '../GameScreen';
 
@@ -10,14 +10,14 @@ export interface EquipmentTabContentProps {
   state: GameState;
   stats: Stats;
   equipmentSubTab: string;
-  setEquipmentSubTab: (tab: string) => void;
+  setEquipmentSubTab: (tab: 'inventory' | 'craft' | 'forge' | 'armory') => void;
   compareItemId: string | null;
   setCompareItemId: (id: string | null) => void;
   shardForgeCosts: any;
   getEquipmentCraftCost: (slot: EquipmentSlot) => any;
   getEquipmentItem: (itemId: string) => any;
   getUpgradePlan: (itemId: string) => any;
-  equipmentRarityConfig: (rarity: string) => any;
+  equipmentRarityConfig: (rarity: EquipmentRarity) => any;
   optimizeEquipment: () => void;
   autoDismantleEquipment: () => void;
   craftEquipment: (slot: EquipmentSlot) => void;

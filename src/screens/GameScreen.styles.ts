@@ -5796,5 +5796,15 @@ export const styles = StyleSheet.create({
   expeditionStartCardStatusDisabled: {
     color: '#7F6B47',
   },
+  tabLoadingFallback: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingVertical: 64,
+  },
+  tabLoadingText: {
+    color: '#aaa',
+    fontSize: 14,
+  },
 });
 

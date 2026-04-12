@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
+import { PermanentUnlockId, EquipmentSlot } from '../../gameConfig';
 import { fmt } from '../../utils';
-import { styles } from '../GameScreen';
+import { styles, Tab } from '../GameScreen';
 
 export interface WarroomTabContentProps {
   tab: string;
@@ -23,7 +24,7 @@ export interface WarroomTabContentProps {
   currentAct: any;
   actProgressPct: number;
   nextBossUnlock: any;
-  unlockLabel: (unlock: string) => string;
+  unlockLabel: (unlock: PermanentUnlockId) => string;
   dangerLabel: string;
   dangerScore: number;
   teamSlotCap: number;
@@ -38,13 +39,13 @@ export interface WarroomTabContentProps {
   prestige25Done: boolean;
   prestige50Done: boolean;
   warPanels: Record<string, boolean>;
-  toggleWarPanel: (panel: string) => void;
-  onTabChange: (tab: string) => void;
-  setAchievementsSubTab: (tab: string) => void;
+  toggleWarPanel: (panel: 'frontline' | 'prestige' | 'roster' | 'armory' | 'growth' | 'objectives') => void;
+  onTabChange: (tab: Tab) => void;
+  setAchievementsSubTab: (tab: 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex') => void;
   setRebirthOpen: (open: boolean) => void;
   autoEquipBestHeroes: () => void;
   claimAllRewards: () => void;
-  craftEquipment: (slot: string) => void;
+  craftEquipment: (slot: EquipmentSlot) => void;
 }
 
 export const WarroomTabContent = React.memo<WarroomTabContentProps>(({

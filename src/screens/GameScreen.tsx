@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Constants from 'expo-constants';
 import {
   View,
@@ -64,17 +64,28 @@ import BottomNavigation, { BottomTabType } from '../components/BottomNavigation'
 import GameHeader from '../components/GameHeader';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ProgressBar } from '../components/ProgressBar';
-import {
-  BattleTabContent,
-  WarroomTabContent,
-  HeroesTabContent,
-  StatsTabContent,
-  EquipmentTabContent,
-  AchievementsTabContent,
-  OperationsTabContent,
-  SocialTabContent,
+import type {
+  BattleTabContentProps,
+  WarroomTabContentProps,
+  HeroesTabContentProps,
+  StatsTabContentProps,
+  EquipmentTabContentProps,
+  AchievementsTabContentProps,
+  OperationsTabContentProps,
+  SocialTabContentProps,
 } from './tabs';
+
+// Lazy-load tab content components for code-splitting (benefits web bundle)
+const WarroomTabContent = React.lazy(() => import('./tabs/WarroomTabContent').then(m => ({ default: m.WarroomTabContent })));
+const BattleTabContent = React.lazy(() => import('./tabs/BattleTabContent').then(m => ({ default: m.BattleTabContent })));
+const HeroesTabContent = React.lazy(() => import('./tabs/HeroesTabContent').then(m => ({ default: m.HeroesTabContent })));
+const StatsTabContent = React.lazy(() => import('./tabs/StatsTabContent').then(m => ({ default: m.StatsTabContent })));
+const EquipmentTabContent = React.lazy(() => import('./tabs/EquipmentTabContent').then(m => ({ default: m.EquipmentTabContent })));
+const AchievementsTabContent = React.lazy(() => import('./tabs/AchievementsTabContent').then(m => ({ default: m.AchievementsTabContent })));
+const OperationsTabContent = React.lazy(() => import('./tabs/OperationsTabContent').then(m => ({ default: m.OperationsTabContent })));
+const SocialTabContent = React.lazy(() => import('./tabs/SocialTabContent').then(m => ({ default: m.SocialTabContent })));
 import { styles } from './GameScreen.styles';
+import { useRenderTracker } from '../hooks/useRenderTracker';
 import { isCurrentUserAdmin } from '../services/adminAccess';
 import { normalizeCharacterNameForCompare, releaseCharacterName, reserveCharacterName } from '../services/characterNameRegistry';
 import { fetchCurrentUserRank, fetchLeaderboardTop, isLiveLeaderboardAvailable, submitLeaderboardScore } from '../services/leaderboard';
@@ -88,7 +99,7 @@ import { collectionGroup, getDocs, getDoc, doc as firestoreDoc, setDoc } from 'f
 
 export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations' | 'social';
 type HeroesSubTab = 'summon' | 'roster' | 'batch';
-type EquipmentSubTab = 'inventory' | 'craft' | 'forge';
+type EquipmentSubTab = 'inventory' | 'armory' | 'craft' | 'forge';
 type AchievementsSubTab = 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex';
 type OperationsSubTab = 'facilities' | 'expeditions' | 'miniops' | 'dungeonops';
 type ShopTab = 'diamond' | 'gold' | 'dollar';
@@ -325,6 +336,7 @@ function getVipLevelFromPoints(points: number): number {
 }
 
 export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
+  useRenderTracker('GameScreen');
   const [selectedCharacterClass, setSelectedCharacterClass] = useState<PlayerClass | null>(null);
   const [lastUsedCharacterClass, setLastUsedCharacterClass] = useState<PlayerClass | null>(null);
   const [slotSummaries, setSlotSummaries] = useState<CharacterSlotSummary[]>([]);
@@ -2921,9 +2933,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         ]}
       >
 
+        <Suspense fallback={<View style={styles.tabLoadingFallback}><Text style={styles.tabLoadingText}>Loading…</Text></View>}>
         <ErrorBoundary label="War Room">
         <WarroomTabContent
-          {...({
+          {...{
             tab,
             state,
             stats,
@@ -2964,13 +2977,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             autoEquipBestHeroes,
             claimAllRewards,
             craftEquipment,
-          } as any)}
+          }}
         />
         </ErrorBoundary>
 
         <ErrorBoundary label="Battle">
         <BattleTabContent
-          {...({
+          {...{
             tab,
             state,
             stats,
@@ -2987,12 +3000,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             burst,
             buyPremiumCoolant,
             useUsableItem,
-          } as any)}
+          }}
         />
         </ErrorBoundary>
         <ErrorBoundary label="Heroes">
         <HeroesTabContent
-          {...({
+          {...{
             tab,
             state,
             stats,
@@ -3037,13 +3050,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             batchLevelHeroes,
             setRecycleConfirmUid,
             renderSubTabBar,
-          } as any)}
+          }}
         />
         </ErrorBoundary>
 
         <ErrorBoundary label="Stats">
         <StatsTabContent
-          {...({
+          {...{
             tab,
             state,
             stats,
@@ -3061,13 +3074,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             allocateStatMax,
             spendEssenceUpgrade,
             spendRebirthCore,
-          } as any)}
+          }}
         />
         </ErrorBoundary>
 
         <ErrorBoundary label="Equipment">
         <EquipmentTabContent
-          {...({
+          {...{
             tab,
             state,
             stats,
@@ -3090,13 +3103,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             convertScrapToEssence,
             convertScrapToShards,
             renderSubTabBar,
-          } as any)}
+          }}
         />
         </ErrorBoundary>
 
         <ErrorBoundary label="Achievements">
         <AchievementsTabContent
-          {...({
+          {...{
             tab,
             state,
             stats,
@@ -3115,13 +3128,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             claimCodexUniqueVip,
             claimAllRewards,
             renderSubTabBar,
-          } as any)}
+          }}
         />
         </ErrorBoundary>
 
         <ErrorBoundary label="Operations">
         <OperationsTabContent
-          {...({
+          {...{
             tab,
             state,
             stats,
@@ -3165,13 +3178,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             completeExpedition,
             refreshExpeditionContracts,
             renderSubTabBar,
-          } as any)}
+          }}
         />
         </ErrorBoundary>
 
         <ErrorBoundary label="Social">
         <SocialTabContent
-          {...({
+          {...{
             tab,
             accountName,
             publicUsername,
@@ -3182,9 +3195,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             saveSlotId: selectedCharacterClass ? getCharacterSaveSlot(accountName, selectedCharacterClass) : '',
             isAdmin,
             onPendingRequestsCountChange: setSocialPendingCount,
-          } as any)}
+          }}
         />
         </ErrorBoundary>
+        </Suspense>
       </ScrollView>
 
       {/* Bottom Navigation */}

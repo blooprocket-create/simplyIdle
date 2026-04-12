@@ -10,7 +10,7 @@ export interface OperationsTabContentProps {
   state: GameState;
   stats: Stats;
   operationsSubTab: string;
-  setOperationsSubTab: (tab: string) => void;
+  setOperationsSubTab: (tab: 'facilities' | 'expeditions' | 'miniops' | 'dungeonops') => void;
   canPlayDiceToday: boolean;
   canPlayReconToday: boolean;
   canPlayLockpickToday: boolean;
@@ -44,8 +44,8 @@ export interface OperationsTabContentProps {
   startMiniBountyDraft: (draftType: 'assault' | 'push' | 'recruit') => void;
   claimMiniBountyDraft: () => void;
   openRiftChallenge: (useRaidTicket?: boolean) => void;
-  upgradeFacility: (facility: string) => void;
-  startExpedition: (type: string, rarity: string) => void;
+  upgradeFacility: (facility: 'training' | 'treasury' | 'forge' | 'tactics') => void;
+  startExpedition: (type: ExpeditionType, rarity: ExpeditionRarity) => void;
   completeExpedition: (expeditionId: string) => void;
   refreshExpeditionContracts: () => void;
   renderSubTabBar: (tabs: any[]) => React.ReactNode;

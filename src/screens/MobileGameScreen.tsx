@@ -8,6 +8,7 @@ import RosterTab from './tabs/RosterTab';
 import EngineTab from './tabs/EngineTab';
 import ProgressTab from './tabs/ProgressTab';
 import { useGameState, getCharacterSaveSlot } from '../useGameState';
+import { PlayerClass } from '../gameConfig';
 
 interface MobileGameScreenProps {
   accountName: string;
@@ -19,16 +20,16 @@ export default function MobileGameScreen({
   onLogout: _onLogout,
 }: MobileGameScreenProps) {
   const [currentTab, setCurrentTab] = useState<MobileTab>('warfront');
-  const [selectedCharacterClass] = useState<string | null>(null);
+  const [selectedCharacterClass] = useState<PlayerClass | null>(null);
 
   // Load game state
   const gameState = useGameState(
     selectedCharacterClass
-      ? getCharacterSaveSlot(accountName, selectedCharacterClass as any)
+      ? getCharacterSaveSlot(accountName, selectedCharacterClass)
       : '__character_slot_preview__'
   );
 
-  const { state, stats, burst } = gameState;
+  const { state, stats, burst, rebirth, autoEquipBestHeroes, autoRecycleHeroes, toggleEquipHero, summonHero, allocateStat, claimWeeklyTrack, claimMission } = gameState;
   const teamSlotCap = Math.max(4, Math.min(6, state.teamSlotsUnlocked ?? 4));
 
   // Prepare navigation tabs with badges
@@ -148,8 +149,8 @@ export default function MobileGameScreen({
             activeTeamCount={state.activeTeamHeroIds?.length || 0}
             teamSlotCap={teamSlotCap}
             onBurst={() => burst(4)}
-            onRebirth={() => {}}
-            onEditTeam={() => {}}
+            onRebirth={() => rebirth()}
+            onEditTeam={() => setCurrentTab('roster')}
             onOpenStats={() => setCurrentTab('engine')}
             combatLog={state.combatLog?.slice(0, 5) || []}
           />
@@ -173,11 +174,11 @@ export default function MobileGameScreen({
                 inActiveTeam: state.activeTeamHeroIds?.includes(hero.uid) || false,
               })) || []
             }
-            onAutoEquip={() => {}}
-            onAutoRecycle={() => {}}
-            onToggleHero={() => {}}
-            onEditTeam={() => {}}
-            onSummon={() => {}}
+            onAutoEquip={() => autoEquipBestHeroes()}
+            onAutoRecycle={() => autoRecycleHeroes()}
+            onToggleHero={(heroId: string) => toggleEquipHero(heroId)}
+            onEditTeam={() => setCurrentTab('warfront')}
+            onSummon={() => summonHero()}
             canSummon={true}
             summonCostType="free"
             summonCost={1}
@@ -193,7 +194,7 @@ export default function MobileGameScreen({
             essence={state.essence || 0}
             equipmentItemCount={state.inventoryItemIds?.length || 0}
             expeditions={[]}
-            onAllocateStat={() => {}}
+            onAllocateStat={(stat: string) => allocateStat(stat as any)}
             onAllocateMaxStats={() => {}}
             onOpenEquipment={() => {}}
             onOpenFacilities={() => {}}
@@ -215,8 +216,8 @@ export default function MobileGameScreen({
             totalKills={state.totalKills || 0}
             vipLevel={state.vipLevel || 0}
             vipProgress={0}
-            onClaimWeekly={() => {}}
-            onClaimMission={() => {}}
+            onClaimWeekly={(ms: number) => claimWeeklyTrack(ms)}
+            onClaimMission={(missionId: string) => claimMission(missionId)}
           />
         )}
       </View>

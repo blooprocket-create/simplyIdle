@@ -11,7 +11,7 @@ export interface AchievementsTabContentProps {
   state: GameState;
   stats: Stats;
   achievementsSubTab: string;
-  setAchievementsSubTab: (tab: string) => void;
+  setAchievementsSubTab: (tab: 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex') => void;
   missionCards: any[];
   claimableWeeklyMilestones: any[];
   claimableMissionIds: any[];

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Alert, Platform, View, Text, Pressable } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
-import { rarityConfig } from '../../gameConfig';
+import { PlayerClass, rarityConfig } from '../../gameConfig';
 import { styles } from '../GameScreen';
 
 export interface BattleTabContentProps {
@@ -15,11 +15,11 @@ export interface BattleTabContentProps {
   burstCost: number;
   burstChargePct: number;
   teamSlotCap: number;
-  getClassConfig: (heroClass: string) => any;
+  getClassConfig: (heroClass: PlayerClass) => any;
   usableInventory: any[];
-  setCombatTempo: (tempo: number) => void;
+  setCombatTempo: (tempo: 1 | 2 | 4) => void;
   burst: (hits: number) => void;
-  buyPremiumCoolant: (itemId: string, amount?: number) => void;
+  buyPremiumCoolant: (itemId: 'coolant_mk1' | 'coolant_mk2', amount?: number) => void;
   useUsableItem: (itemId: string, amount?: number | 'all') => void;
 }
 

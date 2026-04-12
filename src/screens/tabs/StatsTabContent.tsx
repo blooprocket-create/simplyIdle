@@ -22,8 +22,8 @@ export interface StatsTabContentProps {
   allocateStat: (stat: StatKey) => void;
   allocateStatN: (stat: StatKey, n: number) => void;
   allocateStatMax: (stat: StatKey) => void;
-  spendEssenceUpgrade: (path: string) => void;
-  spendRebirthCore: (path: string) => void;
+  spendEssenceUpgrade: (path: 'damage' | 'economy' | 'survival') => void;
+  spendRebirthCore: (path: 'damage' | 'economy' | 'survival') => void;
 }
 
 export const StatsTabContent = React.memo<StatsTabContentProps>(({
