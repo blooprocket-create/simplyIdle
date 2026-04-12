@@ -34,6 +34,9 @@ export default function PartyCard({ config, owned, cost, canAfford, onBuy }: Pro
               onPress={() => onBuy(amt)}
               disabled={!canAfford}
               android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
+              accessibilityRole="button"
+              accessibilityLabel={`Buy ${amt} ${config.name} for ${fmt(cost)} gold`}
+              accessibilityState={{ disabled: !canAfford }}
             >
               <Text style={styles.buyBtnText}>×{amt}</Text>
             </Pressable>

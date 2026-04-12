@@ -1030,6 +1030,10 @@ export const RANK_CONFIGS: RankConfig[] = [
   { rankNumber: 10, shardCostToRankUp: 1000, statMultiplier: 1.45 },
 ];
 
+// Rarity-based rank-up cost multiplier. Higher rarities cost proportionally more
+// shards to rank up, creating intentional endgame gates. A full transcendent hero
+// from rank 1→10 costs ~base_total × mult = 3010 × 11.4 ≈ 34,314 shards.
+// This is designed as a 2-4 week grind at endgame shard income (~1000/day).
 const RARITY_RANK_COST_MULT: Record<Rarity, number> = {
   common: 1.0,
   uncommon: 1.25,

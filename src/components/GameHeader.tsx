@@ -147,6 +147,8 @@ export default function GameHeader({
             debugLog('header', 'Settings action pressed');
             onActionPress('settings');
           }}
+          accessibilityRole="button"
+          accessibilityLabel="Settings"
         >
           <Text style={styles.actionIcon}>⚙️</Text>
         </Pressable>
@@ -157,6 +159,8 @@ export default function GameHeader({
             debugLog('header', 'Mail action pressed');
             onActionPress('mail');
           }}
+          accessibilityRole="button"
+          accessibilityLabel={`Mail${mailUnreadCount > 0 ? `, ${mailUnreadCount} unread` : ''}`}
         >
           <Text style={styles.actionIcon}>✉️</Text>
           {mailUnreadCount > 0 && (
@@ -172,6 +176,8 @@ export default function GameHeader({
             debugLog('header', 'Stat tooltip toggled', { nextOpen: !showStatTip });
             setShowStatTip(!showStatTip);
           }}
+          accessibilityRole="button"
+          accessibilityLabel={`DPS: ${formatNumber(dps)}. Tap for combat stats`}
         >
           <View style={styles.statRow}>
             <Text style={styles.statLabel}>DPS</Text>

@@ -636,6 +636,19 @@ export const styles = StyleSheet.create({
     paddingTop: 6,
     paddingBottom: 4,
   },
+  offlineBanner: {
+    backgroundColor: '#3A1A00',
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#5A3000',
+  },
+  offlineBannerText: {
+    color: theme.text.warning,
+    fontSize: 12,
+    fontWeight: '600',
+  },
   headerQuickActionBtn: {
     flex: 1,
     alignItems: 'center',

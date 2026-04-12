@@ -92,6 +92,11 @@ type EquipmentSubTab = 'inventory' | 'craft' | 'forge';
 type AchievementsSubTab = 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex';
 type OperationsSubTab = 'facilities' | 'expeditions' | 'miniops' | 'dungeonops';
 type ShopTab = 'diamond' | 'gold' | 'dollar';
+type ActiveModal =
+  | 'rebirth' | 'smartCoolantConfirm' | 'settings' | 'mail'
+  | 'shop' | 'events' | 'chapterMap' | 'cinematicSummon'
+  | 'idleChest' | 'diceRoll' | 'riftDungeon' | 'reconGame'
+  | 'lockpickGame' | 'targetPracticeGame' | null;
 export type ExpeditionType = 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss';
 export type ExpeditionRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
 
@@ -411,20 +416,16 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   } = useGameState(selectedCharacterClass ? getCharacterSaveSlot(accountName, selectedCharacterClass) : '__character_slot_preview__');
 
   const [tab, setTab] = useState<Tab>('warroom');
-  const [rebirthOpen, setRebirthOpen] = useState(false);
+  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [draftName, setDraftName] = useState('');
   const [characterNameError, setCharacterNameError] = useState<string | null>(null);
   const [characterCreatePending, setCharacterCreatePending] = useState(false);
   const [draftClass, setDraftClass] = useState<PlayerClass>('warrior');
   const [expandedHeroes, setExpandedHeroes] = useState<Set<string>>(new Set());
   const [recycleConfirmUid, setRecycleConfirmUid] = useState<string | null>(null);
-  const [smartCoolantConfirmOpen, setSmartCoolantConfirmOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminCheckPending, setAdminCheckPending] = useState(true);
-  const [mailOpen, setMailOpen] = useState(false);
   const [selectedMailId, setSelectedMailId] = useState<string | null>(null);
-  const [shopOpen, setShopOpen] = useState(false);
   const [shopTab, setShopTab] = useState<ShopTab>('diamond');
   const [shopFlashActionId, setShopFlashActionId] = useState<string | null>(null);
   const [vipMilestoneIndex, setVipMilestoneIndex] = useState(0);
@@ -432,7 +433,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [equipmentSubTab, setEquipmentSubTab] = useState<EquipmentSubTab>('inventory');
   const [achievementsSubTab, setAchievementsSubTab] = useState<AchievementsSubTab>('overview');
   const [operationsSubTab, setOperationsSubTab] = useState<OperationsSubTab>('facilities');
-  const [eventsOpen, setEventsOpen] = useState(false);
   const [publicUsername, setPublicUsername] = useState('');
   const [liveLeaderboardRows, setLiveLeaderboardRows] = useState<LiveLeaderboardRow[]>([]);
   const [liveLeaderboardRank, setLiveLeaderboardRank] = useState<number | null>(null);
@@ -441,14 +441,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [socialPendingCount, setSocialPendingCount] = useState(0);
   const [devCommandInput, setDevCommandInput] = useState('');
   const [devCommandOutput, setDevCommandOutput] = useState<string>('');
-  const [chapterMapOpen, setChapterMapOpen] = useState(false);
   const [compareItemId, setCompareItemId] = useState<string | null>(null);
   const [summonReveal, setSummonReveal] = useState<SummonReveal | null>(null);
-  const [cinematicSummonOpen, setCinematicSummonOpen] = useState(false);
   const [cinematicSummonPhase, setCinematicSummonPhase] = useState<'charge' | 'warp' | 'reveal'>('charge');
   const [cinematicSummonResults, setCinematicSummonResults] = useState<SummonReveal[]>([]);
   const [idleChestReady, setIdleChestReady] = useState(false);
-  const [idleChestOpen, setIdleChestOpen] = useState(false);
   const [idleChestReward, setIdleChestReward] = useState<{ title: string; detail: string } | null>(null);
   const [storyUnlockToast, setStoryUnlockToast] = useState<{ id: string; title: string; chapter: string } | null>(null);
   const [hoveredTopChipId, setHoveredTopChipId] = useState<'dps' | 'power' | 'gear' | null>(null);
@@ -482,18 +479,15 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     prestige: false,
   });
 
-  const [diceRollModalOpen, setDiceRollModalOpen] = useState(false);
   const [diceRollResult, setDiceRollResult] = useState<{ roll: number; diamonds: number; shards: number } | null>(null);
   const [diceIsRolling, setDiceIsRolling] = useState(false);
   const diceTranslateY = useRef(new Animated.Value(0)).current;
   const diceRotate = useRef(new Animated.Value(0)).current;
   const [diceFace, setDiceFace] = useState<number>(1);
 
-  const [riftDungeonModalOpen, setRiftDungeonModalOpen] = useState(false);
   const [riftDungeonResult, setRiftDungeonResult] = useState<{ waves: number; diamonds: number; shards: number; essence: number } | null>(null);
   const [riftIsSimulating, setRiftIsSimulating] = useState(false);
 
-  const [reconGameOpen, setReconGameOpen] = useState(false);
   const [reconChoices, setReconChoices] = useState<ReconSweepOutcome[]>([]);
   const [reconPickedIndex, setReconPickedIndex] = useState<number | null>(null);
   const [reconRevealInProgress, setReconRevealInProgress] = useState(false);
@@ -506,14 +500,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   ]).current;
   const reconSelectedScale = useRef(new Animated.Value(1)).current;
 
-  const [lockpickGameOpen, setLockpickGameOpen] = useState(false);
   const [lockpickTargetCode, setLockpickTargetCode] = useState<number>(0);
   const [lockpickGuessInput, setLockpickGuessInput] = useState('');
   const [lockpickAttemptsUsed, setLockpickAttemptsUsed] = useState(0);
   const [lockpickHintText, setLockpickHintText] = useState<string | null>(null);
   const [lockpickSolved, setLockpickSolved] = useState<boolean | null>(null);
 
-  const [targetPracticeGameOpen, setTargetPracticeGameOpen] = useState(false);
   const [targetPracticeMeter, setTargetPracticeMeter] = useState<{ position: number; direction: 1 | -1 }>({ position: 8, direction: 1 });
   const [targetPracticeScore, setTargetPracticeScore] = useState<number | null>(null);
 
@@ -903,7 +895,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   }, [shopFlashAnim]);
 
   useEffect(() => {
-    if (!shopOpen) return;
+    if (activeModal !== 'shop') return;
     const firstClaimable = VIP_REWARD_MILESTONES.findIndex(row => vipLevel >= row.level && !vipClaimedLevels.includes(row.level));
     if (firstClaimable >= 0) {
       setVipMilestoneIndex(firstClaimable);
@@ -915,7 +907,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       return;
     }
     setVipMilestoneIndex(VIP_REWARD_MILESTONES.length - 1);
-  }, [shopOpen, vipLevel, vipClaimedLevels]);
+  }, [activeModal === 'shop', vipLevel, vipClaimedLevels]);
   const storyEntries = useMemo(
     () => STORY_BEATS.map(beat => {
       const waveReady = state.highestWaveReached >= beat.unlockWave;
@@ -1118,13 +1110,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     if (t.includes('offline progress')) {
       setIdleChestReward(rewardPopup);
       setIdleChestReady(false);
-      setIdleChestOpen(true);
+      setActiveModal('idleChest');
       return;
     }
   }, [rewardPopup]);
 
   useEffect(() => {
-    if (!cinematicSummonOpen) {
+    if (activeModal !== 'cinematicSummon') {
       cinematicPulse.stopAnimation();
       cinematicPulse.setValue(0);
       return;
@@ -1145,7 +1137,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         }),
       ]),
     ).start();
-  }, [cinematicPulse, cinematicSummonOpen]);
+  }, [cinematicPulse, activeModal === 'cinematicSummon']);
 
   useEffect(() => {
     if (cinematicSummonPhase !== 'reveal') return;
@@ -1183,7 +1175,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       setCinematicSummonPhase('reveal');
       return;
     }
-    if (cinematicSummonOpen) return;
+    if (activeModal === 'cinematicSummon') return;
     setSummonReveal({
       id: latest.id,
       heroId: heroTemplateIdByName.get(latest.heroName) ?? null,
@@ -1193,14 +1185,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     });
     const timer = setTimeout(() => setSummonReveal(null), 2000);
     return () => clearTimeout(timer);
-  }, [cinematicSummonOpen, heroTemplateIdByName, state.summonHistory]);
+  }, [activeModal === 'cinematicSummon', heroTemplateIdByName, state.summonHistory]);
 
   useEffect(() => {
-    if (!rewardPopup && !idleChestOpen) {
+    if (!rewardPopup && activeModal !== 'idleChest') {
       setIdleChestReady(false);
       setIdleChestReward(null);
     }
-  }, [rewardPopup, idleChestOpen]);
+  }, [rewardPopup, activeModal === 'idleChest']);
 
   const onTabChange = (nextTab: Tab) => {
     debugLog('ui', 'Tab changed', { from: tab, to: nextTab, wave: state.wave });
@@ -1209,22 +1201,22 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   };
 
   useEffect(() => {
-    if (!eventsOpen) return;
+    if (activeModal !== 'events') return;
     debugLog('ui', 'Events panel opened', { wave: state.wave, seasonPoints: state.seasonPoints });
     void trackGameplayAction('ui_events_opened', { wave: state.wave, seasonPoints: state.seasonPoints }, 1000);
-  }, [eventsOpen, state.wave, state.seasonPoints]);
+  }, [activeModal === 'events', state.wave, state.seasonPoints]);
 
   useEffect(() => {
-    if (!shopOpen) return;
+    if (activeModal !== 'shop') return;
     debugLog('ui', 'Shop opened', { shopTab, diamonds: state.diamonds, gold: state.gold });
     void trackGameplayAction('ui_shop_opened', { shopTab, diamonds: state.diamonds, gold: state.gold }, 1000);
-  }, [shopOpen, shopTab, state.diamonds, state.gold]);
+  }, [activeModal === 'shop', shopTab, state.diamonds, state.gold]);
 
   useEffect(() => {
-    if (!settingsOpen) return;
+    if (activeModal !== 'settings') return;
     debugLog('ui', 'Settings opened', { wave: state.wave, level: state.level });
     void trackGameplayAction('ui_settings_opened', { wave: state.wave, level: state.level }, 1000);
-  }, [settingsOpen, state.wave, state.level]);
+  }, [activeModal === 'settings', state.wave, state.level]);
 
   const getDiceOutcome = (roll: number) => {
     // Exact same formula as reducer for consistency
@@ -1295,7 +1287,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   };
 
   const resetReconGame = () => {
-    setReconGameOpen(false);
+    setActiveModal(null);
     setReconChoices([]);
     setReconPickedIndex(null);
     setReconRevealInProgress(false);
@@ -1320,7 +1312,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setReconCardsRevealed([false, false, false]);
     reconFlipAnims.forEach(anim => anim.setValue(0));
     reconSelectedScale.setValue(1);
-    setReconGameOpen(true);
+    setActiveModal('reconGame');
   };
 
   const revealReconChoice = (pickIndex: number) => {
@@ -1385,7 +1377,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setLockpickAttemptsUsed(0);
     setLockpickHintText('Enter a 2-digit code. You get 3 attempts.');
     setLockpickSolved(null);
-    setLockpickGameOpen(true);
+    setActiveModal('lockpickGame');
   };
 
   const submitLockpickGuess = () => {
@@ -1424,7 +1416,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     if (lockpickSolved == null) return;
     debugLog('gameplay', 'Claim Lockpick Cache', { solved: lockpickSolved });
     playLockpickCache(lockpickSolved);
-    setLockpickGameOpen(false);
+    setActiveModal(null);
     setLockpickHintText(null);
   };
 
@@ -1433,7 +1425,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     debugLog('gameplay', 'Open Target Practice', { wave: state.wave });
     setTargetPracticeMeter({ position: 8, direction: 1 });
     setTargetPracticeScore(null);
-    setTargetPracticeGameOpen(true);
+    setActiveModal('targetPracticeGame');
   };
 
   const stopTargetPractice = () => {
@@ -1447,12 +1439,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     if (targetPracticeScore == null) return;
     debugLog('gameplay', 'Claim Target Practice', { score: targetPracticeScore });
     playTargetPractice(targetPracticeScore);
-    setTargetPracticeGameOpen(false);
+    setActiveModal(null);
     setTargetPracticeScore(null);
   };
 
   useEffect(() => {
-    if (!targetPracticeGameOpen || targetPracticeScore != null) return;
+    if (activeModal !== 'targetPracticeGame' || targetPracticeScore != null) return;
     const timer = setInterval(() => {
       setTargetPracticeMeter(prev => {
         const nextPosition = prev.position + prev.direction * 3;
@@ -1467,7 +1459,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     }, 45);
 
     return () => clearInterval(timer);
-  }, [targetPracticeGameOpen, targetPracticeScore]);
+  }, [activeModal === 'targetPracticeGame', targetPracticeScore]);
 
   const chooseRiftBuff = (choice: RiftBuffChoice) => {
     if (riftDungeonResult || riftIsSimulating) return;
@@ -1570,11 +1562,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
 
   const triggerCinematicSummon = () => {
-    if (!canGachaX10 || cinematicSummonOpen) return;
+    if (!canGachaX10 || activeModal === 'cinematicSummon') return;
     cinematicTimersRef.current.forEach(timer => clearTimeout(timer));
     cinematicTimersRef.current = [];
     setCinematicSummonResults([]);
-    setCinematicSummonOpen(true);
+    setActiveModal('cinematicSummon');
     setCinematicSummonPhase('charge');
 
     const phaseWarp = setTimeout(() => {
@@ -1598,7 +1590,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     }, 2600);
 
     const autoClose = setTimeout(() => {
-      setCinematicSummonOpen(false);
+      setActiveModal(null);
       setCinematicSummonResults([]);
       setCinematicSummonPhase('charge');
     }, 6800);
@@ -1732,7 +1724,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const powerTier = teamPowerIndex < 12000 ? 'Recruit' : teamPowerIndex < 55000 ? 'Elite' : teamPowerIndex < 180000 ? 'Mythic' : 'Ascendant';
   const guildRank = state.totalKills < 500 ? 'Bronze Order' : state.totalKills < 2500 ? 'Silver Order' : state.totalKills < 9000 ? 'Gold Order' : 'Eternal Order';
   useEffect(() => {
-    if (!eventsOpen) return;
+    if (activeModal !== 'events') return;
     void trackEvent('leaderboard_viewed', {
       rank: liveLeaderboardRank ?? 0,
       score: playerBoardScore,
@@ -1741,7 +1733,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       rank: liveLeaderboardRank ?? 0,
       score: playerBoardScore,
     });
-  }, [eventsOpen, liveLeaderboardRank, playerBoardScore]);
+  }, [activeModal === 'events', liveLeaderboardRank, playerBoardScore]);
 
   useEffect(() => {
     if (!state.characterCreated) return;
@@ -1780,7 +1772,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   ]);
 
   useEffect(() => {
-    if (!eventsOpen || !state.characterCreated) return;
+    if (activeModal !== 'events' || !state.characterCreated) return;
 
     let cancelled = false;
     setLiveLeaderboardLoading(true);
@@ -1840,7 +1832,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       cancelled = true;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventsOpen, state.characterCreated, accountName, publicUsername, playerBoardScore, state.highestWaveReached, state.prestigeCount]);
+  }, [activeModal === 'events', state.characterCreated, accountName, publicUsername, playerBoardScore, state.highestWaveReached, state.prestigeCount]);
 
   const isBossImminent = state.wave % 10 >= 8;
   const burstCost = 20;
@@ -1937,7 +1929,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
   function returnToCharacterSelect() {
     debugLog('character', 'Return to character select');
-    setSettingsOpen(false);
+    setActiveModal(null);
     setDraftName('');
     setCharacterNameError(null);
     setSelectedCharacterClass(null);
@@ -2565,9 +2557,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
       <Modal
         transparent
-        visible={cinematicSummonOpen}
+        visible={activeModal === 'cinematicSummon'}
         animationType="fade"
-        onRequestClose={() => setCinematicSummonOpen(false)}
+        onRequestClose={() => setActiveModal(null)}
       >
         <View style={styles.cinematicSummonOverlay}>
           <Animated.View
@@ -2624,7 +2616,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   style={styles.cinematicSummonCloseBtn}
                   onPress={() => {
                     debugLog('summon', 'Close cinematic summon results', { entries: cinematicSummonResults.length });
-                    setCinematicSummonOpen(false);
+                    setActiveModal(null);
                     setCinematicSummonResults([]);
                     setCinematicSummonPhase('charge');
                   }}
@@ -2656,15 +2648,15 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         mailUnreadCount={unreadMailCount}
         onActionPress={(action) => {
           debugLog('ui', 'Header action pressed', { action });
-          if (action === 'settings') setSettingsOpen(true);
+          if (action === 'settings') setActiveModal('settings');
           else if (action === 'mail') {
-            setMailOpen(true);
+            setActiveModal('mail');
             if (!selectedMailId && state.mailbox.length > 0) {
               setSelectedMailId(state.mailbox[0].id);
             }
           }
-          else if (action === 'shop') setShopOpen(true);
-          else if (action === 'events') setEventsOpen(true);
+          else if (action === 'shop') setActiveModal('shop');
+          else if (action === 'events') setActiveModal('events');
           else if (action === 'stats') {
             onTabChange('stats');
             setAchievementsSubTab('overview');
@@ -2672,12 +2664,20 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         }}
       />
 
+      {(onlineSyncState === 'local-only' || onlineSyncState === 'error') && (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineBannerText}>
+            {onlineSyncState === 'error' ? '⚠️ Cloud sync error — playing offline' : '📡 Offline — progress saved locally'}
+          </Text>
+        </View>
+      )}
+
       <View style={styles.headerQuickActionsRow}>
         <Pressable
           style={styles.headerQuickActionBtn}
           onPress={() => {
             debugLog('ui', 'Header quick action pressed', { action: 'events' });
-            setEventsOpen(true);
+            setActiveModal('events');
           }}
         >
           <Text style={styles.headerQuickActionText}>🗓️ Events</Text>
@@ -2686,7 +2686,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           style={styles.headerQuickActionBtn}
           onPress={() => {
             debugLog('ui', 'Header quick action pressed', { action: 'shop' });
-            setShopOpen(true);
+            setActiveModal('shop');
           }}
         >
           <Text style={styles.headerQuickActionText}>🛒 Shop</Text>
@@ -2774,7 +2774,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           <Text style={styles.metaChipLabel}>Peak Progress</Text>
           <Text style={styles.metaChipValue}>{getActForWave(state.highestWaveReached).emoji} W{state.highestWaveReached}</Text>
         </View>
-        <Pressable style={[styles.metaChip, styles.metaChipAction]} onPress={() => setChapterMapOpen(true)}>
+        <Pressable style={[styles.metaChip, styles.metaChipAction]} onPress={() => setActiveModal('chapterMap')}>
           <Text style={styles.metaChipLabel}>Campaign Map</Text>
           <Text style={styles.metaChipValue}>Open Route</Text>
         </Pressable>
@@ -2913,7 +2913,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             toggleWarPanel,
             onTabChange,
             setAchievementsSubTab,
-            setRebirthOpen,
+            setRebirthOpen: () => setActiveModal('rebirth'),
             autoEquipBestHeroes,
             claimAllRewards,
             craftEquipment,
@@ -3106,7 +3106,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             openTreasuryRaid,
             setDiceRollResult,
             setDiceIsRolling,
-            setDiceRollModalOpen,
+            setDiceRollModalOpen: (v: boolean) => v ? setActiveModal('diceRoll') : setActiveModal(null),
             openReconSweepGame,
             openLockpickCacheGame,
             openTargetPracticeGame,
@@ -3179,12 +3179,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       />
 
       <Modal
-        visible={chapterMapOpen}
+        visible={activeModal === 'chapterMap'}
         transparent={true}
         animationType="fade"
         onRequestClose={() => {
           debugLog('ui', 'Close campaign map modal');
-          setChapterMapOpen(false);
+          setActiveModal(null);
         }}
       >
         <View style={styles.modalOverlay}>
@@ -3193,7 +3193,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <Text style={styles.modalTitle}>🧭 Campaign Route</Text>
               <Pressable style={styles.settingsCloseBtn} onPress={() => {
                 debugLog('ui', 'Close campaign map modal');
-                setChapterMapOpen(false);
+                setActiveModal(null);
               }}>
                 <Text style={styles.settingsCloseBtnText}>Close</Text>
               </Pressable>
@@ -3226,12 +3226,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       </Modal>
 
       <Modal
-        visible={idleChestOpen}
+        visible={activeModal === 'idleChest'}
         transparent={true}
         animationType="fade"
         onRequestClose={() => {
           debugLog('ui', 'Close idle chest modal');
-          setIdleChestOpen(false);
+          setActiveModal(null);
           setIdleChestReward(null);
           clearRewardPopup();
         }}
@@ -3245,7 +3245,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               style={styles.idleChestClaimBtn}
               onPress={() => {
                 debugLog('reward', 'Claim idle chest');
-                setIdleChestOpen(false);
+                setActiveModal(null);
                 setIdleChestReward(null);
                 clearRewardPopup();
               }}
@@ -3258,12 +3258,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
       {/* Shop Modal */}
       <Modal
-        visible={shopOpen}
+        visible={activeModal === 'shop'}
         transparent={true}
         animationType="slide"
         onRequestClose={() => {
           debugLog('ui', 'Close shop modal', { tab: shopTab });
-          setShopOpen(false);
+          setActiveModal(null);
         }}
       >
         <View style={styles.bottomSheetOverlay}>
@@ -3272,7 +3272,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <Text style={styles.eventsModalTitle}>🛒 Shop</Text>
               <Pressable style={styles.settingsCloseBtn} onPress={() => {
                 debugLog('ui', 'Close shop modal from button', { tab: shopTab });
-                setShopOpen(false);
+                setActiveModal(null);
               }}>
                 <Text style={styles.settingsCloseBtnText}>Close</Text>
               </Pressable>
@@ -3520,12 +3520,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
       {/* Events Modal */}
       <Modal
-        visible={eventsOpen}
+        visible={activeModal === 'events'}
         transparent={true}
         animationType="slide"
         onRequestClose={() => {
           debugLog('ui', 'Close events modal');
-          setEventsOpen(false);
+          setActiveModal(null);
         }}
       >
         <View style={styles.bottomSheetOverlay}>
@@ -3534,7 +3534,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <Text style={styles.eventsModalTitle}>🗓️ Events & Seasons</Text>
               <Pressable style={styles.settingsCloseBtn} onPress={() => {
                 debugLog('ui', 'Close events modal from button');
-                setEventsOpen(false);
+                setActiveModal(null);
               }}>
                 <Text style={styles.settingsCloseBtnText}>Close</Text>
               </Pressable>
@@ -3583,7 +3583,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Text style={styles.eventsHint}>Earn kills to claim milestone rewards on the Achievements tab.</Text>
                 <Pressable style={styles.eventsActionBtn} onPress={() => { 
                   debugLog('ui', 'Navigate to weekly achievements from events');
-                  setEventsOpen(false); 
+                  setActiveModal(null); 
                   onTabChange('achievements'); 
                   setAchievementsSubTab('weekly'); 
                 }}>
@@ -3722,12 +3722,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       })()}
 
       <Modal
-        visible={smartCoolantConfirmOpen}
+        visible={activeModal === 'smartCoolantConfirm'}
         transparent={true}
         animationType="fade"
         onRequestClose={() => {
           debugLog('ui', 'Close smart coolant confirm modal');
-          setSmartCoolantConfirmOpen(false);
+          setActiveModal(null);
         }}
       >
         <View style={styles.modalOverlay}>
@@ -3744,7 +3744,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 style={[styles.modalBtn, styles.modalBtnCancel]}
                 onPress={() => {
                   debugLog('ui', 'Cancel smart coolant enable');
-                  setSmartCoolantConfirmOpen(false);
+                  setActiveModal(null);
                 }}
               >
                 <Text style={styles.modalBtnText}>Cancel</Text>
@@ -3755,7 +3755,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   debugLog('settings', 'Enable smart coolant');
                   void trackGameplayAction('smart_coolant_enabled', {}, 0);
                   setAutoUseCoolant(true);
-                  setSmartCoolantConfirmOpen(false);
+                  setActiveModal(null);
                 }}
               >
                 <Text style={styles.modalBtnTextConfirm}>Enable</Text>
@@ -3766,12 +3766,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       </Modal>
 
       <Modal
-        visible={settingsOpen}
+        visible={activeModal === 'settings'}
         transparent={true}
         animationType="slide"
         onRequestClose={() => {
           debugLog('ui', 'Close settings modal');
-          setSettingsOpen(false);
+          setActiveModal(null);
         }}
       >
         <View style={styles.bottomSheetOverlay}>
@@ -3780,7 +3780,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               <Text style={styles.modalTitle}>⚙️ Settings & Automation</Text>
               <Pressable style={styles.settingsCloseBtn} onPress={() => {
                 debugLog('ui', 'Close settings modal from button');
-                setSettingsOpen(false);
+                setActiveModal(null);
               }}>
                 <Text style={styles.settingsCloseBtnText}>Close</Text>
               </Pressable>
@@ -3924,8 +3924,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                           return;
                         }
                         debugLog('settings', 'Open smart coolant confirmation');
-                        setSettingsOpen(false);
-                        setSmartCoolantConfirmOpen(true);
+                        setActiveModal(null);
+                        setActiveModal('smartCoolantConfirm');
                       }}
                     >
                       <Text style={styles.settingsToggleText}>{state.autoUseCoolantEnabled ? 'ON' : 'OFF'}</Text>
@@ -4034,19 +4034,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       </Modal>
 
       <Modal
-        visible={mailOpen}
+        visible={activeModal === 'mail'}
         transparent={true}
         animationType="slide"
         onRequestClose={() => {
           debugLog('ui', 'Close mail modal');
-          setMailOpen(false);
+          setActiveModal(null);
         }}
       >
         <View style={styles.bottomSheetOverlay}>
           <View style={[styles.settingsModalBox, styles.bottomSheetBox]}>
             <View style={styles.settingsHeaderRow}>
               <Text style={styles.modalTitle}>✉️ Mailbox</Text>
-              <Pressable style={styles.settingsCloseBtn} onPress={() => setMailOpen(false)}>
+              <Pressable style={styles.settingsCloseBtn} onPress={() => setActiveModal(null)}>
                 <Text style={styles.settingsCloseBtnText}>Close</Text>
               </Pressable>
             </View>
@@ -4151,12 +4151,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
       {/* Dice Roll Modal */}
       <Modal
-        visible={diceRollModalOpen}
+        visible={activeModal === 'diceRoll'}
         transparent
         animationType="fade"
         onRequestClose={() => {
           if (!diceIsRolling) {
-            setDiceRollModalOpen(false);
+            setActiveModal(null);
             setDiceRollResult(null);
           }
         }}
@@ -4186,7 +4186,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   style={styles.modalCloseBtn}
                   onPress={() => {
                     playDiceRoll(diceRollResult.roll);
-                    setDiceRollModalOpen(false);
+                    setActiveModal(null);
                     setDiceRollResult(null);
                   }}
                 >
@@ -4225,12 +4225,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
       {/* Rift Dungeon Modal */}
       <Modal
-        visible={riftDungeonModalOpen}
+        visible={activeModal === 'riftDungeon'}
         transparent
         animationType="fade"
         onRequestClose={() => {
           if (!riftIsSimulating) {
-            setRiftDungeonModalOpen(false);
+            setActiveModal(null);
             setRiftDungeonResult(null);
             setRiftSelectedBonuses([]);
             setRiftCurrentBonuses([]);
@@ -4268,7 +4268,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   style={styles.modalCloseBtn}
                   onPress={() => {
                     runRiftDungeon(false);
-                    setRiftDungeonModalOpen(false);
+                    setActiveModal(null);
                     setRiftDungeonResult(null);
                     setRiftSelectedBonuses([]);
                     setRiftCurrentBonuses([]);
@@ -4341,7 +4341,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       </Modal>
 
       <Modal
-        visible={reconGameOpen}
+        visible={activeModal === 'reconGame'}
         transparent
         animationType="fade"
         onRequestClose={resetReconGame}
@@ -4413,10 +4413,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       </Modal>
 
       <Modal
-        visible={lockpickGameOpen}
+        visible={activeModal === 'lockpickGame'}
         transparent
         animationType="fade"
-        onRequestClose={() => setLockpickGameOpen(false)}
+        onRequestClose={() => setActiveModal(null)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.miniGameModalContent}>
@@ -4440,7 +4440,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Pressable style={styles.warPanelActionBtn} onPress={submitLockpickGuess}>
                   <Text style={styles.warPanelActionText}>Submit Guess</Text>
                 </Pressable>
-                <Pressable style={styles.modalBtn} onPress={() => setLockpickGameOpen(false)}>
+                <Pressable style={styles.modalBtn} onPress={() => setActiveModal(null)}>
                   <Text style={styles.modalBtnText}>Cancel</Text>
                 </Pressable>
               </View>
@@ -4454,11 +4454,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       </Modal>
 
       <Modal
-        visible={targetPracticeGameOpen}
+        visible={activeModal === 'targetPracticeGame'}
         transparent
         animationType="fade"
         onRequestClose={() => {
-          setTargetPracticeGameOpen(false);
+          setActiveModal(null);
           setTargetPracticeScore(null);
         }}
       >
@@ -4491,13 +4491,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
       {/* Rebirth Modal */}
       <RebirthModal
-        visible={rebirthOpen}
+        visible={activeModal === 'rebirth'}
         wave={state.wave}
         highestWave={state.highestWaveReached}
         requiredWave={rebirthWaveRequirement}
         prestigeCount={state.prestigeCount}
         onConfirm={rebirth}
-        onCancel={() => setRebirthOpen(false)}
+        onCancel={() => setActiveModal(null)}
       />
     </SafeAreaView>
   );

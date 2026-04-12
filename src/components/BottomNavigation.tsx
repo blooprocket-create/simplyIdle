@@ -38,6 +38,9 @@ export default function BottomNavigation({ activeTab, onTabChange, notifications
               debugLog('nav', 'Bottom tab pressed', { from: activeTab, to: tab });
               onTabChange(tab);
             }}
+            accessibilityRole="tab"
+            accessibilityLabel={`${TAB_CONFIG[tab].label} tab`}
+            accessibilityState={{ selected: isActive }}
           >
             <View style={styles.tabIconWrap}>
               <Text style={[styles.tabIcon, isActive && styles.tabIconActive]}>{icon}</Text>
