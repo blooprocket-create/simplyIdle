@@ -1,3 +1,8 @@
+/**
+ * @deprecated This hook generates seeded fake leaderboard data and is no longer used.
+ * The live leaderboard system in services/leaderboard.ts + GameScreen.tsx has replaced it.
+ * Kept only as a fallback reference. Do not use in new code.
+ */
 import { useMemo } from 'react';
 
 interface GameState {

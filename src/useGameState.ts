@@ -509,7 +509,7 @@ export interface EquipmentInstance {
  */
 const SAVE_SCHEMA_VERSION = 1;
 
-const DEFAULT_STATE: GameState = {
+export const DEFAULT_STATE: GameState = {
   playerName: '',
   playerClass: null,
   characterCreated: false,
@@ -2271,7 +2271,7 @@ function sanitizeEquipmentInventoryRecord(raw: unknown, fallbackLevel: number): 
   return inventory;
 }
 
-function sanitizeSaveData(payload: Partial<SaveData>) {
+export function sanitizeSaveData(payload: Partial<SaveData>) {
   const incomingVersion = typeof payload.saveVersion === 'number' ? payload.saveVersion : 0;
   if (incomingVersion < SAVE_SCHEMA_VERSION) {
     debugLog('save', `Migrating save from v${incomingVersion} to v${SAVE_SCHEMA_VERSION}`);
@@ -5742,7 +5742,7 @@ function reducer(state: GameState, action: Action): GameState {
   }
 }
 
-interface SaveData {
+export interface SaveData {
   saveVersion?: number;
   playerName: string;
   playerClass: PlayerClass | null;
@@ -5877,7 +5877,7 @@ interface SaveData {
   giftPreference?: 'gold' | 'shards' | 'essence';
 }
 
-function serialize(state: GameState): SaveData {
+export function serialize(state: GameState): SaveData {
   return {
     saveVersion: SAVE_SCHEMA_VERSION,
     playerName: state.playerName,

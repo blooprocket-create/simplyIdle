@@ -439,6 +439,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [liveLeaderboardLoading, setLiveLeaderboardLoading] = useState(false);
   const [liveLeaderboardError, setLiveLeaderboardError] = useState<string | null>(null);
   const [socialPendingCount, setSocialPendingCount] = useState(0);
+  const [mailSyncError, setMailSyncError] = useState<string | null>(null);
   const [devCommandInput, setDevCommandInput] = useState('');
   const [devCommandOutput, setDevCommandOutput] = useState<string>('');
   const [compareItemId, setCompareItemId] = useState<string | null>(null);
@@ -2345,7 +2346,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         attachments: mail.attachments,
       }));
       appendMailboxMessages(mapped);
-    }).catch(() => {});
+      setMailSyncError(null);
+    }).catch(() => {
+      setMailSyncError('Mail sync failed. Your mailbox may be incomplete.');
+    });
 
     return subscribeToCloudMail(uid, mails => {
       const mapped = mails.map(mail => ({
@@ -3821,7 +3825,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               </View>
 
               <View style={styles.settingsCard}>
-                <Text style={styles.settingsCardTitle}>Wiki</Text>
+                <Text style={styles.settingsCardTitle}>Wiki & Guides</Text>
                 <Text style={styles.settingsLabel}>
                   {HAS_WIKI_URL
                     ? 'Open the official SimplyIdle wiki for guides, formulas, and system references.'
@@ -3837,8 +3841,32 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     void Linking.openURL(wikiUrl);
                   }}
                 >
-                  <Text style={styles.settingsCycleBtnText}>{HAS_WIKI_URL ? 'Open Wiki' : 'Wiki Coming Soon'}</Text>
+                  <Text style={styles.settingsCycleBtnText}>{HAS_WIKI_URL ? 'Open Wiki Home' : 'Wiki Coming Soon'}</Text>
                 </Pressable>
+                {HAS_WIKI_URL && (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                    {[
+                      { label: '⚙️ Core Mechanics', path: 'core-mechanics' },
+                      { label: '🦸 Heroes', path: 'heroes' },
+                      { label: '🎒 Equipment', path: 'equipment' },
+                      { label: '📈 Strategy', path: 'strategy' },
+                      { label: '🏆 Seasons', path: 'seasons-leaderboard' },
+                      { label: '👥 Social', path: 'social' },
+                    ].map(link => (
+                      <Pressable
+                        key={link.path}
+                        style={{ backgroundColor: '#1a2a3a', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}
+                        onPress={() => {
+                          const url = `${resolveWikiUrl()}${link.path}`;
+                          void trackEvent('wiki_link_opened', { source: 'settings_quick', page: link.path });
+                          void Linking.openURL(url);
+                        }}
+                      >
+                        <Text style={{ color: '#8BB8E8', fontSize: 12 }}>{link.label}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
               </View>
 
               {isAdmin ? (
@@ -4060,6 +4088,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 <Text style={styles.settingsCycleBtnText}>Quick Claim All</Text>
               </Pressable>
             </View>
+
+            {mailSyncError && (
+              <View style={{ backgroundColor: '#3a1c1c', padding: 8, borderRadius: 6, marginBottom: 6 }}>
+                <Text style={{ color: '#ff6b6b', fontSize: 12, textAlign: 'center' }}>{mailSyncError}</Text>
+              </View>
+            )}
 
             <View style={styles.mailboxBodyRow}>
               <ScrollView style={styles.mailboxListPane}>

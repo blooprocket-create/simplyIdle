@@ -1,0 +1,25 @@
+{
+  "preset": "jest-expo/web",
+  "transform": {
+    "^.+\\.(ts|tsx)$": ["babel-jest", { "presets": ["babel-preset-expo"] }]
+  },
+  "transformIgnorePatterns": [
+    "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|firebase)"
+  ],
+  "testMatch": [
+    "**/__tests__/**/*.test.ts",
+    "**/__tests__/**/*.test.tsx"
+  ],
+  "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json"],
+  "collectCoverageFrom": [
+    "src/**/*.{ts,tsx}",
+    "!src/**/*.d.ts",
+    "!src/screens/**"
+  ],
+  "moduleNameMapper": {
+    "^\\./services/firebase$": "<rootDir>/__mocks__/services/firebase.ts",
+    "^\\./services/onlineSave$": "<rootDir>/__mocks__/services/onlineSave.ts",
+    "^\\./services/cloudMail$": "<rootDir>/__mocks__/services/cloudMail.ts",
+    "^\\./telemetry$": "<rootDir>/__mocks__/telemetry.ts"
+  }
+}

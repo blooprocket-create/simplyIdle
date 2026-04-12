@@ -378,6 +378,8 @@ export const SocialTabContent = React.memo(function SocialTabContent({
     if (tab !== 'social' || subTab !== 'guild' || !me.uid) return;
 
     const refresh = async () => {
+      setGuildBusy(true);
+      setGuildError(null);
       try {
         const guildInfo = myGuild;
         const browseRows = await fetchGuildBrowse(guildSearchInput);
@@ -401,6 +403,7 @@ export const SocialTabContent = React.memo(function SocialTabContent({
       } catch {
         setGuildError('Failed to load guild data.');
       } finally {
+        setGuildBusy(false);
         setGuildLoadedOnce(true);
       }
     };
@@ -527,14 +530,22 @@ export const SocialTabContent = React.memo(function SocialTabContent({
 
   const refreshFriendsData = async () => {
     if (!me.uid) return;
-    const [friendRows, pendingRows, cooldownRows] = await Promise.all([
-      fetchFriends(me.uid),
-      fetchPendingRequests(me.uid),
-      fetchGiftCooldowns(me.uid),
-    ]);
-    setFriends(friendRows);
-    setPendingRequests(pendingRows);
-    setGiftCooldowns(cooldownRows);
+    setFriendsBusy(true);
+    setFriendsError(null);
+    try {
+      const [friendRows, pendingRows, cooldownRows] = await Promise.all([
+        fetchFriends(me.uid),
+        fetchPendingRequests(me.uid),
+        fetchGiftCooldowns(me.uid),
+      ]);
+      setFriends(friendRows);
+      setPendingRequests(pendingRows);
+      setGiftCooldowns(cooldownRows);
+    } catch {
+      setFriendsError('Failed to load friends data.');
+    } finally {
+      setFriendsBusy(false);
+    }
   };
 
   const sendRequest = async () => {

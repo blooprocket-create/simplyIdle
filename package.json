@@ -19,7 +19,9 @@
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -39,11 +41,15 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.2.2",
     "eslint": "^10.2.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.0.1",
+    "jest": "^30.3.0",
+    "jest-expo": "^55.0.15",
     "prettier": "^3.8.2",
+    "ts-jest": "^29.4.9",
     "typescript": "~5.9.2",
     "typescript-eslint": "^8.58.1"
   },
