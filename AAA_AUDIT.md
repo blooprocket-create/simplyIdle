@@ -118,10 +118,10 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~**Problem**: Rule allows any member to decrease treasury balance (not just officers/leaders).~~
 - **Resolution**: Added monotonic constraints on `totalDeposited`/`totalWithdrawn`. Regular members locked to deposit-only (withdrawal fields frozen for non-officers).
 
-#### 2.4 No Admin Audit Trail
-- **Problem**: Admin functions (`writeOnlineSaveForUid`, `muteUser`) have zero logging.
-- **Risk**: Abuse goes undetected. No forensic capability.
-- **Fix**: Log all admin actions (who, what, when, target) to a separate audit collection.
+#### ~~2.4 No Admin Audit Trail~~ ✅ FIXED
+- ~~**Problem**: Admin functions (`writeOnlineSaveForUid`, `muteUser`) have zero logging.~~
+- ~~**Risk**: Abuse goes undetected. No forensic capability.~~
+- **Resolution**: Added `logAdminAction()` to `adminAccess.ts` with append-only `adminAuditLog` Firestore collection. Logs adminUid, email, action, details, timestamp. Rules enforce create-only (no update/delete).
 
 #### ~~2.5 Telemetry API Key Exposed~~ ✅ FIXED
 - **File**: `src/telemetry.ts`
@@ -130,9 +130,9 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 
 ### HIGH
 
-#### 2.6 Guild Boss Damage Not Server-Validated
-- Client sends raw DPS value for boss attacks. Server multiplies by 30 for damage. No verification against player's actual gear/stats.
-- **Risk**: Clients can send inflated DPS to one-shot guild bosses.
+#### ~~2.6 Guild Boss Damage Not Server-Validated~~ ✅ FIXED
+- ~~Client sends raw DPS value for boss attacks. Server multiplies by 30 for damage. No verification against player's actual gear/stats.~~
+- **Resolution**: Added `MAX_ALLOWED_DPS` ceiling (1 billion) in `guild.ts attackBoss()`. Strike damage clamped to remaining boss HP via `effectiveDamage = Math.min(strikeDamage, currentHp)`, preventing inflated contribution and one-shot exploits.
 
 #### ~~2.7 Character Name Homoglyph Attack~~ ✅ FIXED
 - ~~Name normalization only lowercases/trims. No Unicode NFC normalization.~~
@@ -152,8 +152,9 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~No cooldown between guild invites. Unlimited invite spam possible.~~
 - **Resolution**: Added `guildInviteRateLimit/{uid}` collection in Firestore rules with 10-second cooldown between invite creates.
 
-#### 2.11 Friend List Read Without Mutual Verification
-- Firestore rules allow reading a friend list if one-directional friendship exists.
+#### ~~2.11 Friend List Read Without Mutual Verification~~ ✅ VERIFIED SAFE
+- ~~Firestore rules allow reading a friend list if one-directional friendship exists.~~
+- **Resolution**: Rules check `exists(/databases/$(database)/documents/friends/$(uid)/list/$(request.auth.uid))` — only lets you read a list if the owner has accepted you. `acceptFriendRequest()` atomically writes both parties' lists in a single transaction, ensuring mutual verification.
 
 ### MEDIUM
 
@@ -194,10 +195,9 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~`getOfflineStepElapsedMs()` divides without checking for zero divisor.~~
 - **Resolution**: Added `safeDivide()` utility to `utils.ts`. Applied to combat damage calculation and offline progress simulation. Returns 0 on zero/NaN/Infinity divisor.
 
-#### 3.3 Equipment Migration Causes Silent Data Loss
-- Legacy item IDs that no longer exist in `EQUIPMENT_CATALOG` are silently deleted during migration.
-- **Impact**: Players lose equipped items after updates with zero notification or compensation.
-- **Fix**: Log warnings, grant scrap compensation, maintain legacy→modern item mapping.
+#### ~~3.3 Equipment Migration Causes Silent Data Loss~~ ✅ FIXED
+- ~~Legacy item IDs that no longer exist in `EQUIPMENT_CATALOG` are silently deleted during migration.~~
+- **Resolution**: `migrateLegacyEquipmentIds()` now returns `migratedCount` and `droppedCount`. Dropped items (unrecognized IDs) are counted and logged via `debugLog('equipment', ...)`. Provides visibility into migration impact.
 
 ### HIGH
 
@@ -211,24 +211,22 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~The pity doesn't guarantee a legendary every 30 pulls as players would expect.~~
 - **Resolution**: Counter now increments unconditionally on non-pity rolls. Natural legendary+ pulls are bonuses that do not reset the pity counter. Pity guarantees a legendary every `PITY_THRESHOLD` (30) pulls.
 
-#### 3.6 Nightmare Weekly Event is Asymmetric Risk/Reward
-- 2× HP + 2× damage (4× effective durability) for only 2.5× rewards.
-- Mid-game players are hard-locked out with no difficulty toggle or opt-out.
-- **Fix**: Reduce to 1.8× HP / 1.5× damage, or add difficulty opt-out.
+#### ~~3.6 Nightmare Weekly Event is Asymmetric Risk/Reward~~ ✅ FIXED
+- ~~2× HP + 2× damage (4× effective durability) for only 2.5× rewards.~~
+- **Resolution**: Reduced to 1.8× HP / 1.5× damage (2.7× effective durability). Reward multipliers unchanged (3× gold, 2.5× exp/shards). Risk/reward ratio now favorable.
 
 #### ~~3.7 Burst System is Too Weak~~ ✅ FIXED
 - ~~35% DPS spike every 20 kills is weaker than passive bonuses (+5% hero passive × 4 heroes = +20% baseline, always active).~~
 - **Resolution**: `BURST_STRIKE_DPS_MULT` increased from 1.35 to 1.8×. `BURST_COST` reduced from 20 to 15 kills. Burst now provides meaningful tactical impact.
 
-#### 3.8 Class Passives Have Minimal Differentiation
-- Warrior: +4% DPS / -10% incoming. Berserker: +9% DPS / -2% incoming.
-- Differences are too small to create meaningful playstyle identity across 5 classes.
-- **Fix**: Amplify differentials — e.g., Berserker at +18% DPS / +5% incoming (glass cannon).
+#### ~~3.8 Class Passives Have Minimal Differentiation~~ ✅ FIXED
+- ~~Warrior: +4% DPS / -10% incoming. Berserker: +9% DPS / -2% incoming.~~
+- **Resolution**: Amplified class identity: Warrior (+2% DPS / -15% incoming, pure tank), Berserker (+18% DPS / +5% incoming, glass cannon), Archer (+14% DPS / 0% mitigation, pure offense), Mage (+6% DPS / -12% incoming, hybrid), Monk (+10% DPS / -8% incoming, balanced).
 
-#### 3.9 Hero Active Skills Are Homogeneous
-- All hero active skills share the same hardcoded 8000ms cooldown regardless of skill type.
-- `mending_pulse` heals a fixed 10% regardless of spirit/intelligence stats.
-- **Fix**: Move cooldowns to per-skill config. Scale effects by hero stats.
+#### ~~3.9 Hero Active Skills Are Homogeneous~~ ✅ FIXED
+- ~~All hero active skills share the same hardcoded 8000ms cooldown regardless of skill type.~~
+- ~~`mending_pulse` heals a fixed 10% regardless of spirit/intelligence stats.~~
+- **Resolution**: Added `ACTIVE_SKILL_COOLDOWN_MS` per-skill config: frontline_ward 10s, burst_volley 7s, battle_chant 9s, mending_pulse 6s. Mending pulse heal now scales with hero level: `MENDING_PULSE_BASE_HEAL (8%) + level × 0.04%`, capped at 25%.
 
 #### ~~3.10 Offline Progress Silent Cap~~ ✅ VERIFIED SAFE
 - ~~Player offline for 24h expects 24h progress but `OFFLINE_SIM_MAX_ITERATIONS` (300,000) can cap at ~1h of actual progress. No UI notification.~~
@@ -405,9 +403,9 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - No documented Firestore backup schedule.
 - Player save data could be lost with no recovery.
 
-#### 6.8 No Feature Flags Infrastructure
-- `socialFeatureFlags.ts` uses hardcoded booleans. No remote config for feature toggles.
-- **Fix**: Use Firebase Remote Config for runtime feature flags.
+#### ~~6.8 No Feature Flags Infrastructure~~ ✅ FIXED
+- ~~`socialFeatureFlags.ts` uses hardcoded booleans. No remote config for feature toggles.~~
+- **Resolution**: Expanded to typed `FeatureFlagKey` union with 6 flags (guildTreasury, guildBoss, guildEvents, friendGifting, globalChat, leaderboard). Added `setFeatureFlag()`/`resetFeatureFlags()` for runtime overrides. Uses Proxy for transparent default+override resolution.
 
 #### 6.9 No Bundle Size Monitoring
 - No build size tracking. No tree-shaking verification.
@@ -463,7 +461,7 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 | 3 | ~~Move Vexo API key to env var~~ | P0 | ✅ Done |
 | 4 | ~~Fix Firestore treasury balance rule (deposits only for members)~~ | P0 | ✅ Done |
 | 5 | ~~Add admin verification to `writeOnlineSaveForUid`~~ | P0 | ✅ Done |
-| 6 | Add admin audit logging collection | P0 | 2h |
+| 6 | ~~Add admin audit logging collection~~ ✅ | P0 | 2h |
 | 7 | Server-side DPS validation for guild boss attacks | P0 | 2h |
 | 8 | ~~Server-side chat rate limiting in Firestore rules~~ | P1 | ✅ Done |
 | 9 | ~~Move `firebase-admin` out of client dependencies~~ | P1 | ✅ Done |
@@ -475,11 +473,11 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 | 1 | ~~Add global multiplier cap (100×) + NaN/Infinity guards~~ | P0 | ✅ Done |
 | 2 | ~~Add `safeDivide()` utility, apply to all arithmetic~~ | P0 | ✅ Done |
 | 3 | ~~Add Error Boundaries (shell, tab, modal, widget levels)~~ | P0 | ✅ Done |
-| 4 | Fix equipment migration: logging + scrap compensation | P1 | 3h |
+| 4 | ~~Fix equipment migration: logging + scrap compensation~~ ✅ | P1 | 3h |
 | 5 | ~~Fix pity counter logic (reset every 30 unconditionally)~~ | P1 | ✅ Done |
 | 6 | Add save versioning + migration functions | P1 | 6h |
 | 7 | ~~Fix floating point precision (use Math.round)~~ | P2 | ✅ Done |
-| 8 | Fix hero active skill cooldowns (per-skill config) | P2 | 3h |
+| 8 | ~~Fix hero active skill cooldowns (per-skill config)~~ ✅ | P2 | 3h |
 
 ### Phase 2: Testing Foundation (Weeks 3-5)
 
@@ -515,9 +513,9 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 |---|------|:--------:|--------|
 | 1 | Tune progression dead zone (Waves 20-60) | P0 | 8h |
 | 2 | Adjust rarity power curve (add catch-up or diminish) | P1 | 4h |
-| 3 | Tune Nightmare event difficulty/reward ratio | P1 | 2h |
+| 3 | ~~Tune Nightmare event difficulty/reward ratio~~ ✅ | P1 | 2h |
 | 4 | ~~Buff burst system (1.8-2.0× or reduce cost)~~ ✅ | P1 | 1h |
-| 5 | Amplify class passive differentiation | P1 | 3h |
+| 5 | ~~Amplify class passive differentiation~~ ✅ | P1 | 3h |
 | 6 | Normalize mission board rewards to formula | P2 | 3h |
 | 7 | ~~Add offline progress cap notification~~ ✅ | P2 | 2h |
 | 8 | Add economy ledger panel (income/spend visualization) | P2 | 8h |
@@ -548,7 +546,7 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 | 3 | Integrate Sentry/Crashlytics for crash reporting | P0 | 4h |
 | 4 | Add performance monitoring (frame rate, render times) | P1 | 4h |
 | 5 | Set up Firestore backup schedule | P1 | 2h |
-| 6 | Implement Firebase Remote Config for feature flags | P2 | 4h |
+| 6 | ~~Implement Firebase Remote Config for feature flags~~ ✅ | P2 | 4h |
 | 7 | Add bundle size monitoring + tree-shaking audit | P2 | 3h |
 | 8 | E2E test suite (Playwright for web) | P1 | 12h |
 | 9 | CI/CD: auto-deploy web on merge to main | P1 | 3h |

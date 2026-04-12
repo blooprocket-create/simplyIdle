@@ -877,7 +877,7 @@ export async function attackBoss(input: { uid: string; displayName: string; dps:
     }, { merge: true });
 
     return {
-      dealt: Math.min(strikeDamage, currentHp),
+      dealt: effectiveDamage,
       rewardGranted: defeated,
       rewardAmount: Math.max(100, Math.floor(maxHp / 5_000_000_000)),
       boss: {

@@ -2392,7 +2392,7 @@ function sanitizeSaveData(payload: Partial<SaveData>) {
     level,
   );
   if (migratedCount > 0 || droppedCount > 0) {
-    debugLog(`[Equipment Migration] Migrated: ${migratedCount}, Dropped (unrecognized): ${droppedCount}`);
+    debugLog('equipment', `Migration: ${migratedCount} migrated, ${droppedCount} dropped (unrecognized)`);
   }
   const cleanedEquipmentInventory = Object.fromEntries(
     Object.entries(migratedEquipmentInventory).filter(([, item]) => item.source !== 'hero_unique'),
