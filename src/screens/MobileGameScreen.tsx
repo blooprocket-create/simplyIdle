@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useState, useMemo, Suspense } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { theme } from '../theme/colors';
 import MobileNavigation, { MobileTab } from '../components/MobileNavigation';
 import MobileHeader from '../components/MobileHeader';
@@ -7,8 +7,13 @@ import WarfrontTab from './tabs/WarfrontTab';
 import RosterTab from './tabs/RosterTab';
 import EngineTab from './tabs/EngineTab';
 import ProgressTab from './tabs/ProgressTab';
-import { useGameState, getCharacterSaveSlot } from '../useGameState';
-import { PlayerClass } from '../gameConfig';
+import { useGameState, getCharacterSaveSlot, getMaxHeatForLevel } from '../useGameState';
+import { PlayerClass, getMonsterForWave, getRebirthWaveRequirement } from '../gameConfig';
+import { fmt } from '../utils';
+
+const SocialTabContent = React.lazy(() =>
+  import('./tabs/SocialTabContent').then(m => ({ default: m.SocialTabContent })),
+);
 
 interface MobileGameScreenProps {
   accountName: string;
@@ -31,6 +36,24 @@ export default function MobileGameScreen({
 
   const { state, stats, burst, rebirth, autoEquipBestHeroes, autoRecycleHeroes, toggleEquipHero, summonHero, allocateStat, claimWeeklyTrack, claimMission } = gameState;
   const teamSlotCap = Math.max(4, Math.min(6, state.teamSlotsUnlocked ?? 4));
+
+  // Computed combat values
+  const monster = getMonsterForWave(state.wave || 1);
+  const isBoss = (state.wave || 1) % 10 === 0;
+  const burstCost = 20;
+  const canBurst = (state.burstCharge || 0) >= burstCost;
+  const maxHeat = getMaxHeatForLevel(state.level || 1);
+  const rebirthWaveRequirement = getRebirthWaveRequirement(state.prestigeCount || 0);
+  const canRebirth = (state.highestWaveReached || 1) >= rebirthWaveRequirement;
+  const rebirthWavesLeft = Math.max(0, rebirthWaveRequirement - (state.highestWaveReached || 1));
+
+  // Approximate danger score (simplified — no affix data on mobile yet)
+  const dangerScore = state.teamHp > 0
+    ? Math.max(0, Math.min(100, (1 - state.teamHp / Math.max(1, state.teamMaxHp)) * 120))
+    : 0;
+  const dangerLabel = dangerScore < 25 ? 'Low' : dangerScore < 55 ? 'Moderate' : dangerScore < 80 ? 'High' : 'Critical';
+
+  const [socialPendingCount, setSocialPendingCount] = useState(0);
 
   // Prepare navigation tabs with badges
   const navTabs = useMemo(() => [
@@ -58,7 +81,13 @@ export default function MobileGameScreen({
       label: 'Legends',
       badge: undefined,
     },
-  ], [state.heroRoster?.length, state.unspentStatPoints]);
+    {
+      id: 'social' as MobileTab,
+      icon: '💬',
+      label: 'Social',
+      badge: socialPendingCount > 0 ? socialPendingCount : undefined,
+    },
+  ], [state.heroRoster?.length, state.unspentStatPoints, socialPendingCount]);
 
   // Prepare header chips (primary currency/resources)
   const headerPrimary = useMemo(() => [
@@ -72,7 +101,7 @@ export default function MobileGameScreen({
       id: 'power',
       icon: '⚡',
       label: 'Power',
-      value: `${Math.floor(stats.dps || 0)}`,
+      value: fmt(stats.dps || 0),
     },
     {
       id: 'team',
@@ -88,31 +117,31 @@ export default function MobileGameScreen({
       id: 'gold',
       icon: '💰',
       label: 'Gold',
-      value: `${Math.floor(state.gold || 0)}`,
+      value: fmt(state.gold || 0),
     },
     {
       id: 'diamonds',
       icon: '💎',
       label: 'Diamonds',
-      value: `${state.diamonds || 0}`,
+      value: fmt(state.diamonds || 0),
     },
     {
       id: 'tears',
       icon: '💧',
       label: 'Tears',
-      value: `${state.bossTears || 0}`,
+      value: fmt(state.bossTears || 0),
     },
     {
       id: 'shards',
       icon: '💠',
       label: 'Shards',
-      value: `${Math.floor(state.heroShards || 0)}`,
+      value: fmt(state.heroShards || 0),
     },
     {
       id: 'essence',
       icon: '✨',
       label: 'Essence',
-      value: `${Math.floor(state.essence || 0)}`,
+      value: fmt(state.essence || 0),
     },
   ], [state.gold, state.diamonds, state.bossTears, state.heroShards, state.essence]);
 
@@ -131,21 +160,21 @@ export default function MobileGameScreen({
         {currentTab === 'warfront' && (
           <WarfrontTab
             wave={state.wave || 1}
-            monsterName="Monster"
+            monsterName={monster.name}
             teamHp={state.teamHp || 0}
             teamMaxHp={state.teamMaxHp || 1}
             monsterHp={state.monsterHp || 0}
             monsterMaxHp={state.monsterMaxHp || 1}
             teamDps={stats.dps || 0}
-            dangerScore={0}
-            dangerLabel="Moderate"
-            isBoss={false}
-            canBurst={false}
+            dangerScore={dangerScore}
+            dangerLabel={dangerLabel}
+            isBoss={isBoss}
+            canBurst={canBurst}
             burstCharge={state.burstCharge || 0}
-            burstCost={10}
-            canRebirth={false}
-            rebirthWavesLeft={0}
-            rebirthThreshold={300}
+            burstCost={burstCost}
+            canRebirth={canRebirth}
+            rebirthWavesLeft={rebirthWavesLeft}
+            rebirthThreshold={rebirthWaveRequirement}
             activeTeamCount={state.activeTeamHeroIds?.length || 0}
             teamSlotCap={teamSlotCap}
             onBurst={() => burst(4)}
@@ -220,6 +249,23 @@ export default function MobileGameScreen({
             onClaimMission={(missionId: string) => claimMission(missionId)}
           />
         )}
+
+        {currentTab === 'social' && selectedCharacterClass && (
+          <Suspense fallback={<View style={styles.loadingWrap}><ActivityIndicator color={theme.accent.gold} /><Text style={styles.loadingText}>Loading Social...</Text></View>}>
+            <SocialTabContent
+              tab="social"
+              accountName={accountName}
+              publicUsername={accountName}
+              level={state.level || 1}
+              highestWaveReached={state.highestWaveReached || 1}
+              vipLevel={state.vipLevel || 0}
+              diamonds={state.diamonds || 0}
+              saveSlotId={getCharacterSaveSlot(accountName, selectedCharacterClass)}
+              isAdmin={false}
+              onPendingRequestsCountChange={setSocialPendingCount}
+            />
+          </Suspense>
+        )}
       </View>
 
       {/* Bottom navigation */}
@@ -239,5 +285,15 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  loadingWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 12,
+    color: theme.text.secondary,
   },
 });

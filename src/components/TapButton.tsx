@@ -5,6 +5,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { t } from '../i18n';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -51,8 +52,8 @@ export default function AttackButton({ onAttack, dmgPerClick }: Props) {
         accessibilityLabel={`Attack for ${dmgPerClick} damage`}
       >
         <Text style={styles.sword}>⚔️</Text>
-        <Text style={styles.label}>ATTACK</Text>
-        <Text style={styles.dmg}>-{dmgPerClick} dmg</Text>
+        <Text style={styles.label}>{t('tap.attack')}</Text>
+        <Text style={styles.dmg}>{t('tap.damage', { amount: dmgPerClick })}</Text>
       </AnimatedPressable>
     </View>
   );

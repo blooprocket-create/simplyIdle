@@ -3,7 +3,7 @@ import { View, Text, Pressable } from 'react-native';
 import { FacilityId, GameState, Stats, EXPEDITION_CONTRACT_REFRESH_MS, EXPEDITION_CONTRACT_REFRESH_GOLD_COST, FACILITY_MAX_LEVEL, MINI_OPS_COOLDOWN_MS, getFacilityUpgradeCost } from '../../useGameState';
 import { EXPEDITION_TYPES, EXPEDITION_TYPE_META, EXPEDITION_RARITY_META, formatDurationShort, ExpeditionType, ExpeditionRarity } from '../GameScreen';
 import { fmt } from '../../utils';
-import { styles } from '../GameScreen';
+import { styles } from './OperationsTabContent.styles';
 
 export interface OperationsTabContentProps {
   tab: string;

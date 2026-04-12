@@ -52,7 +52,10 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~**Problem**: Single reducer handles all game state — combat, economy, roster, meta, liveops. No domain isolation.~~
 - ~~**Impact**: Every action type lives in one switch statement. Balance changes require navigating thousands of lines.~~
 - **AAA Standard**: Domain-sliced reducers (combat, economy, roster, progression, social) composed together.
-- **Resolution**: Extracted minigames domain (8 cases, ~350 lines) into `src/reducers/minigamesReducer.ts` with explicit `MinigameContext` param to avoid circular imports. Main reducer delegates via `MINIGAME_ACTION_TYPES` set check. Remaining domains (combat, economy, roster, progression) are next.
+- **Resolution**: Extracted 2 domain slices so far:
+  - Minigames (8 cases, ~350 lines) → `src/reducers/minigamesReducer.ts`
+  - Progression (15 cases, ~366 lines) → `src/reducers/progressionReducer.ts`
+  - Total: 23 cases / ~716 lines extracted. Remaining domains (combat ~10 cases, economy ~17 cases, roster ~22 cases) are next.
 
 #### ~~1.3 No Error Boundaries~~ ✅ FIXED
 - ~~**Problem**: Zero `<ErrorBoundary>` components anywhere. A single render error in any tab crashes the entire game.~~
@@ -90,6 +93,12 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 #### 1.10 Monolithic Stylesheet (~5,800 lines) — PARTIALLY ADDRESSED
 - `GameScreen.styles.ts` has 989 style keys in a single file. Full split is a multi-session effort.
 - **Progress**: New components (e.g. `ProfileModal`) use co-located `StyleSheet.create` — establishing the pattern for incremental migration.
+- 3 legacy tab content files now have co-located stylesheets:
+  - `BattleTabContent.styles.ts` (47 keys)
+  - `StatsTabContent.styles.ts` (57 keys)
+  - `OperationsTabContent.styles.ts` (54 keys)
+- 5 newer tabs (`EngineTab`, `ProgressTab`, `RosterTab`, `WarfrontTab`, `SocialTabContent`) already had co-located styles.
+- Remaining: 4 legacy tabs still import from monolithic file (`HeroesTabContent`, `EquipmentTabContent`, `AchievementsTabContent`, `WarroomTabContent`).
 
 #### ~~1.11 No Code Splitting~~ ✅ FIXED
 - ~~Entire game loads as one bundle. No lazy loading for tabs, modals, or mini-games.~~
@@ -282,10 +291,15 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 
 ### HIGH
 
-#### 4.3 No Internationalization (i18n)
-- 200+ hardcoded English strings throughout UI (dialog titles, button labels, error messages, hints).
-- No i18n library (react-i18next, etc.).
+#### 4.3 No Internationalization (i18n) — PARTIALLY ADDRESSED
+- ~~200+ hardcoded English strings throughout UI (dialog titles, button labels, error messages, hints).~~
+- ~~No i18n library (react-i18next, etc.).~~
 - **AAA Standard**: All user-facing strings externalized for localization.
+- **Resolution**: Created lightweight i18n scaffold:
+  - `src/i18n/en.ts` — English string catalog with ~100 keys across 8 namespaces (header, tap, prestige, building, progress, engine, stats, common).
+  - `src/i18n/index.ts` — Core `t()` function with `{{variable}}` interpolation, type-safe dot-path keys, locale switching API.
+  - Integrated into `GameHeader.tsx` (sync status labels, stat tooltips) and `TapButton.tsx` (attack label, damage text) as proof-of-concept.
+  - Remaining: migrate 150+ remaining hardcoded strings to catalogs across all components.
 
 #### ~~4.4 No Loading/Error States for Several Flows~~ ✅ FIXED
 - ~~Shop VIP loading: no indicator.~~
@@ -306,9 +320,14 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~**AAA Standard**: Guided first-session questline → first summon → first boss → first rebirth.~~
 - **Resolution**: Added 6 progressive onboarding hints to the existing hint system: Welcome (wave 1-3), First Hero (wave 5+), Deploy Hero, Gear Up (wave 10+), Stat Points, and First Rebirth. Each triggers at the appropriate milestone and is dismissible. `useGameGuidance` hook also updated with early-game recruit guidance.
 
-#### 4.7 Mobile vs Web Layout Parity Gap
-- `MobileGameScreen.tsx` is a skeleton (110 lines, most handlers are `// TODO`).
+#### 4.7 Mobile vs Web Layout Parity Gap — PARTIALLY ADDRESSED
+- ~~`MobileGameScreen.tsx` is a skeleton (110 lines, most handlers are `// TODO`).~~
 - Web has full 6,400-line GameScreen. Native mobile gets a fraction of the experience.
+- **Progress**:
+  - Wired proper computed values: `monsterName` from `getMonsterForWave()`, `isBoss` wave check, `canBurst`/`burstCost`, `canRebirth`/`rebirthWavesLeft` from `getRebirthWaveRequirement()`, `dangerScore`/`dangerLabel`, formatted resources via `fmt()`.
+  - Added 5th tab: Social (`SocialTabContent` lazy-loaded with `Suspense` fallback).
+  - Updated `MobileNavigation` type to include `'social'` tab.
+  - Remaining: warroom tab, equipment tab, modal system, shop/settings panels.
 
 ### MEDIUM
 

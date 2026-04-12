@@ -4,7 +4,7 @@ import { GameState, Stats } from '../../useGameState';
 import { StatKey } from '../../gameConfig';
 import { STAT_LABELS } from '../GameScreen';
 import { fmt } from '../../utils';
-import { styles } from '../GameScreen';
+import { styles } from './StatsTabContent.styles';
 
 export interface StatsTabContentProps {
   tab: string;

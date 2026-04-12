@@ -2,7 +2,7 @@ import React from 'react';
 import { Alert, Platform, View, Text, Pressable } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import { PlayerClass, rarityConfig } from '../../gameConfig';
-import { styles } from '../GameScreen';
+import { styles } from './BattleTabContent.styles';
 
 export interface BattleTabContentProps {
   tab: string;

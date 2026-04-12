@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, Pressable, Text, StatusBar, useWindowDimensions } from 'react-native';
 import { THEME, TYPOGRAPHY, SPACING, Z_INDEX, RADIUS } from '../theme';
 import { debugLog } from '../telemetry';
+import { t } from '../i18n';
 
 interface GameHeaderProps {
   playerName: string;
@@ -53,14 +54,16 @@ export default function GameHeader({
     if (onlineSyncState === 'synced') {
       const ageSec = onlineSyncAt ? Math.max(0, Math.floor((Date.now() - onlineSyncAt) / 1000)) : 0;
       return {
-        label: ageSec <= 10 ? 'Cloud Synced just now' : `Cloud Synced ${ageSec}s ago`,
+        label: ageSec <= 10
+          ? t('header.cloudSyncedNow')
+          : t('header.cloudSyncedAgo', { seconds: ageSec }),
         color: '#7CE58D',
       };
     }
-    if (onlineSyncState === 'syncing') return { label: 'Cloud Syncing...', color: '#FFCC66' };
-    if (onlineSyncState === 'conflict') return { label: 'Cloud Conflict Resolved', color: '#FFB86B' };
-    if (onlineSyncState === 'error') return { label: 'Cloud Sync Error', color: '#FF7C7C' };
-    return { label: 'Local Save Only', color: '#A8B0C3' };
+    if (onlineSyncState === 'syncing') return { label: t('header.cloudSyncing'), color: '#FFCC66' };
+    if (onlineSyncState === 'conflict') return { label: t('header.cloudConflict'), color: '#FFB86B' };
+    if (onlineSyncState === 'error') return { label: t('header.cloudSyncError'), color: '#FF7C7C' };
+    return { label: t('header.localSaveOnly'), color: '#A8B0C3' };
   })();
 
   return (
@@ -180,7 +183,7 @@ export default function GameHeader({
           accessibilityLabel={`DPS: ${formatNumber(dps)}. Tap for combat stats`}
         >
           <View style={styles.statRow}>
-            <Text style={styles.statLabel}>DPS</Text>
+            <Text style={styles.statLabel}>{t('header.dps')}</Text>
             <Text style={styles.statValueDps}>{formatNumber(dps)}</Text>
           </View>
         </Pressable>
@@ -189,13 +192,13 @@ export default function GameHeader({
       {/* Stat Tooltip (optional expanded view) */}
       {showStatTip && (
         <View style={styles.statTooltip}>
-          <Text style={styles.tooltipLabel}>Combat Stats</Text>
+          <Text style={styles.tooltipLabel}>{t('header.combatStats')}</Text>
           <View style={styles.tooltipRow}>
-            <Text style={styles.tooltipKey}>DPS:</Text>
+            <Text style={styles.tooltipKey}>{t('header.dpsLabel')}</Text>
             <Text style={styles.tooltipValue}>{formatNumber(dps)}</Text>
           </View>
           <View style={styles.tooltipRow}>
-            <Text style={styles.tooltipKey}>Power:</Text>
+            <Text style={styles.tooltipKey}>{t('header.powerLabel')}</Text>
             <Text style={styles.tooltipValue}>{formatNumber(power)}</Text>
           </View>
         </View>
