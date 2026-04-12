@@ -31,7 +31,7 @@
 ## 5. Core Gameplay Loops
 
 ### 5.1 Moment-to-Moment Combat Loop
-- Auto and manual combat attacks run continuously.
+- All combat attacks run automatically (commander + heroes + buildings).
 - Kill monster -> grant gold, EXP, weekly/affix-modified rewards.
 - Wave increments after kill.
 - Every 10th wave is boss with amplified reward and progression implications.

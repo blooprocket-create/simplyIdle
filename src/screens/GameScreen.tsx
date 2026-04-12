@@ -617,13 +617,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         id: 'hint_onboard_welcome',
         title: 'Welcome, Commander',
         detail:
-          'Tap the battle area to deal damage. Earn gold from defeated enemies and spend it on buildings in the Engine tab.',
+          'Your troops attack automatically. Earn gold from defeated enemies and spend it on buildings in the Engine tab.',
       });
     } else if (state.wave >= 5 && state.heroRoster.length === 0 && !h('hint_onboard_summon')) {
       list.push({
         id: 'hint_onboard_summon',
         title: 'Recruit Your First Hero',
-        detail: "Open the Heroes tab and summon a hero. Heroes deal automatic DPS so you don't have to tap forever.",
+        detail: 'Open the Heroes tab and summon a hero. Heroes add automatic DPS to your army.',
       });
     } else if (state.heroRoster.length >= 1 && state.activeTeamHeroIds.length === 0 && !h('hint_onboard_equip_hero')) {
       list.push({
