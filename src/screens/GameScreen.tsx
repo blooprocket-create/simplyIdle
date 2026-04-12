@@ -446,11 +446,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [equipmentSubTab, setEquipmentSubTab] = useState<EquipmentSubTab>('inventory');
   const [achievementsSubTab, setAchievementsSubTab] = useState<AchievementsSubTab>('overview');
   const [operationsSubTab, setOperationsSubTab] = useState<OperationsSubTab>('facilities');
-  const [publicUsername, setPublicUsername] = useState('');
-  const [liveLeaderboardRows, setLiveLeaderboardRows] = useState<LiveLeaderboardRow[]>([]);
-  const [liveLeaderboardRank, setLiveLeaderboardRank] = useState<number | null>(null);
-  const [liveLeaderboardLoading, setLiveLeaderboardLoading] = useState(false);
-  const [liveLeaderboardError, setLiveLeaderboardError] = useState<string | null>(null);
+  const {
+    publicUsername, setPublicUsername,
+    liveLeaderboardRows, liveLeaderboardRank,
+    liveLeaderboardLoading, liveLeaderboardError,
+    playerBoardScore,
+  } = useLeaderboard({ state, accountName, activeModal });
   const [socialPendingCount, setSocialPendingCount] = useState(0);
   const [mailSyncError, setMailSyncError] = useState<string | null>(null);
   const [devCommandInput, setDevCommandInput] = useState('');
@@ -1774,12 +1775,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   };
 
   const seasonScore = state.seasonPoints;
-  const playerBoardScore =
-    seasonScore
-    + Math.floor(state.bestSeasonPoints * 0.35)
-    + state.wave * 12
-    + state.highestWaveReached * 9
-    + state.prestigeCount * 280;
   const seasonRank = seasonScore < 1000 ? '🥉 Bronze' : seasonScore < 5000 ? '🥈 Silver' : seasonScore < 15000 ? '🥇 Gold' : seasonScore < 40000 ? '💎 Diamond' : '👑 Legend';
   const classMasteryLevel = Math.floor((state.playerClass ? state.classMasteryXp[state.playerClass] : 0) / 100);
   const campaignChapter = Math.floor((Math.max(1, state.wave) - 1) / 20) + 1;
@@ -1787,116 +1782,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const campaignBossStage = 20;
   const powerTier = teamPowerIndex < 12000 ? 'Recruit' : teamPowerIndex < 55000 ? 'Elite' : teamPowerIndex < 180000 ? 'Mythic' : 'Ascendant';
   const guildRank = state.totalKills < 500 ? 'Bronze Order' : state.totalKills < 2500 ? 'Silver Order' : state.totalKills < 9000 ? 'Gold Order' : 'Eternal Order';
-  useEffect(() => {
-    if (activeModal !== 'events') return;
-    void trackEvent('leaderboard_viewed', {
-      rank: liveLeaderboardRank ?? 0,
-      score: playerBoardScore,
-    });
-    void trackEvent('leaderboard_rank', {
-      rank: liveLeaderboardRank ?? 0,
-      score: playerBoardScore,
-    });
-  }, [activeModal === 'events', liveLeaderboardRank, playerBoardScore]);
-
-  useEffect(() => {
-    if (!state.characterCreated) return;
-    if (!isLiveLeaderboardAvailable()) return;
-
-    const submit = async () => {
-      try {
-        await submitLeaderboardScore({
-          accountName,
-          publicUsername: publicUsername || accountName,
-          score: playerBoardScore,
-          level: state.level,
-          vipLevel: state.vipLevel,
-          highestWaveReached: state.highestWaveReached,
-          prestigeCount: state.prestigeCount,
-        });
-      } catch {
-        // Non-blocking background sync.
-      }
-    };
-
-    void submit();
-    const timer = setInterval(() => {
-      void submit();
-    }, 45_000);
-
-    return () => clearInterval(timer);
-  }, [
-    state.characterCreated,
-    accountName,
-    publicUsername,
-    playerBoardScore,
-    state.level,
-    state.highestWaveReached,
-    state.prestigeCount,
-  ]);
-
-  useEffect(() => {
-    if (activeModal !== 'events' || !state.characterCreated) return;
-
-    let cancelled = false;
-    setLiveLeaderboardLoading(true);
-    setLiveLeaderboardError(null);
-
-    void (async () => {
-      try {
-        if (isLiveLeaderboardAvailable()) {
-          await submitLeaderboardScore({
-            accountName,
-            publicUsername: publicUsername || accountName,
-            score: playerBoardScore,
-            level: state.level,
-            vipLevel: state.vipLevel,
-            highestWaveReached: state.highestWaveReached,
-            prestigeCount: state.prestigeCount,
-          });
-
-          const [topRows, myRank] = await Promise.all([
-            fetchLeaderboardTop(15),
-            fetchCurrentUserRank(playerBoardScore),
-          ]);
-
-          if (cancelled) return;
-
-          const mapped = topRows.map((row, index) => ({
-            rank: index + 1,
-            name: row.publicUsername,
-            score: row.score,
-            badge: index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '⚔️',
-            isYou: row.uid === (getFirebaseAuth()?.currentUser?.uid ?? ''),
-          }));
-
-          setLiveLeaderboardRows(mapped);
-          setLiveLeaderboardRank(myRank);
-          return;
-        }
-
-        const fallbackRows: LiveLeaderboardRow[] = [
-          { rank: 1, name: state.playerName || 'You', score: playerBoardScore, badge: '🛰️', isYou: true },
-        ];
-        if (!cancelled) {
-          setLiveLeaderboardRows(fallbackRows);
-          setLiveLeaderboardRank(1);
-        }
-      } catch {
-        if (cancelled) return;
-        setLiveLeaderboardError('Leaderboard is currently unavailable.');
-      } finally {
-        if (!cancelled) {
-          setLiveLeaderboardLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeModal === 'events', state.characterCreated, accountName, publicUsername, playerBoardScore, state.highestWaveReached, state.prestigeCount]);
 
   const isBossImminent = state.wave % 10 >= 8;
   const burstCost = 20;
@@ -2384,15 +2269,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
     setDevCommandOutput(`Unknown command: ${tokens[0]}. Use /devHelp for available commands.`);
   }, [accountName, appendMailboxMessages, collectCharacterSnapshots, devCommandInput, isAdmin, publicUsername, selectedCharacterClass, state.characterCreated, state.highestWaveReached, state.level, state.playerName]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const fresh = await refreshCurrentUserPublicUsername();
-      if (!cancelled && fresh) setPublicUsername(fresh);
-    })();
-    return () => { cancelled = true; };
-  }, [accountName]);
 
   useEffect(() => {
     if (!state.characterCreated) return;

@@ -52,12 +52,13 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~**Problem**: Single reducer handles all game state — combat, economy, roster, meta, liveops. No domain isolation.~~
 - ~~**Impact**: Every action type lives in one switch statement. Balance changes require navigating thousands of lines.~~
 - **AAA Standard**: Domain-sliced reducers (combat, economy, roster, progression, social) composed together.
-- **Resolution**: Extracted 4 domain slices so far:
+- **Resolution**: Extracted 5 domain slices so far:
   - Minigames (8 cases, ~350 lines) → `src/reducers/minigamesReducer.ts`
   - Progression (15 cases, ~366 lines) → `src/reducers/progressionReducer.ts`
   - Roster (18 cases, ~600 lines) → `src/reducers/rosterReducer.ts`
   - Economy (19 cases, ~650 lines) → `src/reducers/economyReducer.ts`
-  - Total: 60 cases / ~1,966 lines extracted. Remaining domains (combat ~5 cases, settings ~14 cases, core ~3 cases) are next.
+  - Settings (15 cases, ~165 lines) → `src/reducers/settingsReducer.ts`
+  - Total: 75 cases / ~2,131 lines extracted. Only 6 cases remain in main switch (CREATE_CHARACTER, TICK, ATTACK, BURST, APPLY_OFFLINE_PROGRESS, LOAD) + 2 stub pass-throughs.
 
 #### ~~1.3 No Error Boundaries~~ ✅ FIXED
 - ~~**Problem**: Zero `<ErrorBoundary>` components anywhere. A single render error in any tab crashes the entire game.~~

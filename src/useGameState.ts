@@ -76,6 +76,8 @@ import { rosterReducer, ROSTER_ACTION_TYPES } from './reducers/rosterReducer';
 import type { RosterAction } from './reducers/rosterReducer';
 import { economyReducer, ECONOMY_ACTION_TYPES } from './reducers/economyReducer';
 import type { EconomyAction } from './reducers/economyReducer';
+import { settingsReducer, SETTINGS_ACTION_TYPES } from './reducers/settingsReducer';
+import type { SettingsAction } from './reducers/settingsReducer';
 import { getFirebaseAuth } from './services/firebase';
 
 const TICK_MS = 100;
@@ -3565,6 +3567,16 @@ function reducer(state: GameState, action: Action): GameState {
     if (result) return result;
   }
 
+  // Delegate settings/config actions to extracted slice
+  if (SETTINGS_ACTION_TYPES.has(action.type)) {
+    const result = settingsReducer(state, action as SettingsAction, {
+      clampInt,
+      clampString,
+      SAFE_INTEGER_CAP,
+    });
+    if (result) return result;
+  }
+
   switch (action.type) {
     case 'CREATE_CHARACTER': {
       if (state.characterCreated) return state;
@@ -3633,71 +3645,15 @@ function reducer(state: GameState, action: Action): GameState {
     // USE_USABLE_ITEM, DISMANTLE_EQUIPMENT, AUTO_DISMANTLE_EQUIPMENT,
     // CRAFT_EQUIPMENT, UPGRADE_EQUIPMENT_RARITY handled by economyReducer
 
-    case 'SET_AUTO_USE_POTION': {
-      return {
-        ...state,
-        autoUsePotionEnabled: action.enabled,
-      };
-    }
-
-    case 'SET_AUTO_USE_COOLANT': {
-      return {
-        ...state,
-        autoUseCoolantEnabled: action.enabled,
-      };
-    }
-
-    case 'SET_AUTO_USE_POTION_THRESHOLD': {
-      const clamped = Math.max(0.1, Math.min(1, action.thresholdPct));
-      return {
-        ...state,
-        autoUsePotionThresholdPct: clamped,
-      };
-    }
+    // SET_AUTO_USE_POTION, SET_AUTO_USE_COOLANT, SET_AUTO_USE_POTION_THRESHOLD,
+    // MARK_HINT_SEEN, APPEND_MAIL_MESSAGES, SET_LAST_ACTIVE_AT,
+    // SET_AUTO_RECYCLE_MAX_RARITY, SET_AUTO_RECYCLE_ENABLED,
+    // SET_AUTO_SUMMON_ENABLED, SET_AUTO_SUMMON_MODE, SET_AUTO_BURST_ENABLED,
+    // SET_COMBAT_TEMPO, SET_AUTO_TEMPO_ENABLED, SET_AUTO_TEMPO_TARGET,
+    // SET_AUTO_SUMMON_RESERVE_GOLD handled by settingsReducer
 
     // SPEND_ESSENCE_UPGRADE, APPLY_WEEKLY_ROLLOVER, CLAIM_WEEKLY_TRACK,
     // CLAIM_MISSION handled by progressionReducer
-
-    case 'MARK_HINT_SEEN': {
-      if (state.seenHintIds.includes(action.hintId)) return state;
-      return {
-        ...state,
-        seenHintIds: [...state.seenHintIds, action.hintId],
-      };
-    }
-
-    case 'APPEND_MAIL_MESSAGES': {
-      if (!Array.isArray(action.mails) || action.mails.length === 0) return state;
-      const existingIds = new Set(state.mailbox.map(mail => mail.id));
-      const fresh = action.mails
-        .filter(mail => !!mail && typeof mail.id === 'string' && !existingIds.has(mail.id))
-        .map(mail => ({
-          ...mail,
-          subject: clampString(mail.subject, 'Developer Mail', 80),
-          message: clampString(mail.message, '', 280),
-          from: clampString(mail.from, 'Dev Team', 48),
-          sentAt: clampInt(mail.sentAt, 0, Date.now(), Date.now()),
-          attachments: {
-            shards: clampInt(mail.attachments?.shards, 0, SAFE_INTEGER_CAP, 0),
-            gold: clampInt(mail.attachments?.gold, 0, SAFE_INTEGER_CAP, 0),
-            diamonds: clampInt(mail.attachments?.diamonds, 0, SAFE_INTEGER_CAP, 0),
-            tears: clampInt(mail.attachments?.tears, 0, SAFE_INTEGER_CAP, 0),
-            essence: clampInt(mail.attachments?.essence, 0, SAFE_INTEGER_CAP, 0),
-          },
-          claimedAttachments: {
-            shards: clampInt(mail.claimedAttachments?.shards, 0, SAFE_INTEGER_CAP, 0),
-            gold: clampInt(mail.claimedAttachments?.gold, 0, SAFE_INTEGER_CAP, 0),
-            diamonds: clampInt(mail.claimedAttachments?.diamonds, 0, SAFE_INTEGER_CAP, 0),
-            tears: clampInt(mail.claimedAttachments?.tears, 0, SAFE_INTEGER_CAP, 0),
-            essence: clampInt(mail.claimedAttachments?.essence, 0, SAFE_INTEGER_CAP, 0),
-          },
-        }));
-      if (fresh.length === 0) return state;
-      return {
-        ...state,
-        mailbox: [...fresh, ...state.mailbox].slice(0, 100),
-      };
-    }
 
     // CLAIM_MAIL_ATTACHMENT, CLAIM_ALL_MAIL_ATTACHMENTS handled by economyReducer
 
@@ -3733,26 +3689,10 @@ function reducer(state: GameState, action: Action): GameState {
       return withAchievement((next));
     }
 
-    case 'SET_LAST_ACTIVE_AT': {
-      if (!state.characterCreated) return state;
-      const timestampMs = Number.isFinite(action.timestampMs) ? Math.max(0, Math.floor(action.timestampMs)) : Date.now();
-      return {
-        ...state,
-        lastActiveAt: timestampMs,
-      };
-    }
-
     // APPLY_DAILY_LOGIN, REBIRTH, CLEAR_ACHIEVEMENT, CLEAR_REWARD_POPUP
     // handled by progressionReducer
 
     // RECYCLE_HERO, AUTO_RECYCLE_HEROES handled by rosterReducer
-
-    case 'SET_AUTO_RECYCLE_MAX_RARITY': {
-      return {
-        ...state,
-        autoRecycleMaxRarity: action.rarity,
-      };
-    }
 
     case 'SET_HERO_FORMATION': // handled by rosterReducer
     case 'BATCH_LEVEL_HEROES': // handled by rosterReducer
@@ -3766,68 +3706,12 @@ function reducer(state: GameState, action: Action): GameState {
     // UPGRADE_FACILITY, START_EXPEDITION, REFRESH_EXPEDITION_CONTRACTS,
     // COMPLETE_EXPEDITION handled by economyReducer
 
-    case 'SET_AUTO_RECYCLE_ENABLED': {
-      return {
-        ...state,
-        autoRecycleEnabled: action.enabled,
-      };
-    }
-
     // TOGGLE_HERO_UNIQUE_WEAPON, RANK_UP_HERO, LEVEL_UP_HERO_GOLD,
     // REBIRTH_HERO handled by rosterReducer
 
     // CONVERT_SCRAP_TO_ESSENCE, CONVERT_SCRAP_TO_SHARDS handled by economyReducer
 
     // SPEND_REBIRTH_CORE handled by progressionReducer
-
-    case 'SET_AUTO_SUMMON_ENABLED': {
-      return {
-        ...state,
-        autoSummonEnabled: action.enabled,
-      };
-    }
-
-    case 'SET_AUTO_SUMMON_MODE': {
-      return {
-        ...state,
-        autoSummonMode: action.mode,
-      };
-    }
-
-    case 'SET_AUTO_BURST_ENABLED': {
-      return {
-        ...state,
-        autoBurstEnabled: action.enabled,
-      };
-    }
-
-    case 'SET_COMBAT_TEMPO': {
-      return {
-        ...state,
-        combatTempo: clampCombatTempoForVip(action.tempo, state),
-      };
-    }
-
-    case 'SET_AUTO_TEMPO_ENABLED': {
-      return {
-        ...state,
-        autoTempoEnabled: action.enabled,
-      };
-    }
-
-    case 'SET_AUTO_TEMPO_TARGET': {
-      return {
-        ...state,
-        autoTempoTarget: clampAutoTempoTargetForVip(action.target, state),
-      };
-    }
-
-    case 'SET_AUTO_SUMMON_RESERVE_GOLD': {
-      return {
-        ...state,
-        autoSummonReserveGold: Math.max(0, action.reserveGold),
-      };
-    }
 
     // BUY_GOLD_SHOP_ITEM, BUY_DIAMOND_SHOP_ITEM, SIMULATE_DOLLAR_PURCHASE,
     // BUY_PREMIUM_COOLANT handled by economyReducer
