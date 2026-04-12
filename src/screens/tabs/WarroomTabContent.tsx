@@ -3,7 +3,8 @@ import { View, Text, Pressable } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import { PermanentUnlockId, EquipmentSlot } from '../../gameConfig';
 import { fmt } from '../../utils';
-import { styles, Tab } from '../GameScreen';
+import { Tab } from '../GameScreen';
+import { styles } from './WarroomTabContent.styles';
 
 export interface WarroomTabContentProps {
   tab: string;

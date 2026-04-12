@@ -3,7 +3,7 @@ import { View, Text, Pressable } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import { EquipmentSlot, EquipmentRarity, getHeroBackstory, getHeroUniqueEffectFamilyLabel, getHeroUniqueSkillDescription, getHeroUniqueWeaponName, RARITIES } from '../../gameConfig';
 import { fmt } from '../../utils';
-import { styles } from '../GameScreen';
+import { styles } from './EquipmentTabContent.styles';
 
 export interface EquipmentTabContentProps {
   tab: string;

@@ -4,7 +4,7 @@ import { GameState, Stats } from '../../useGameState';
 import { ACHIEVEMENTS, HERO_POOL, WEEKLY_TRACK_MILESTONES, getHeroBackstory, getHeroUniqueWeaponName } from '../../gameConfig';
 import { getHeroPortraitSource } from '../../heroPortraits';
 import { ACH_BONUS_PER_UNLOCK_PCT } from '../GameScreen';
-import { styles } from '../GameScreen';
+import { styles } from './AchievementsTabContent.styles';
 
 export interface AchievementsTabContentProps {
   tab: string;

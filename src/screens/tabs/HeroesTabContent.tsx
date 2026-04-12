@@ -4,7 +4,7 @@ import { GameState, Stats } from '../../useGameState';
 import { RARITIES, Rarity, PlayerClass, HeroPassiveTraitId, HeroActiveSkillArchetypeId, HERO_LEVEL_CAP, HERO_POOL, getHeroBackstory, getHeroRebirthPlan, getHeroUniqueEffectFamilyLabel, getHeroUniqueSkillDescription, getHeroUniqueWeaponName } from '../../gameConfig';
 import { getHeroPortraitSource } from '../../heroPortraits';
 import { fmt } from '../../utils';
-import { styles } from '../GameScreen';
+import { styles } from './HeroesTabContent.styles';
 
 interface FeaturedSummonBannerView {
   id: string;

@@ -90,15 +90,18 @@ SimplyIdle has a **strong gameplay foundation** — compounding progression, bro
 - ~~Most event handlers are `// TODO: Implement`. Mobile users get a skeleton experience.~~
 - **Resolution**: Wired up stub handlers to real gameState actions: rebirth, autoEquipBestHeroes, autoRecycleHeroes, toggleEquipHero, summonHero, allocateStat, claimWeeklyTrack, claimMission, burst, tab navigation. Removed `as any` cast on selectedCharacterClass (typed as `PlayerClass | null`).
 
-#### 1.10 Monolithic Stylesheet (~5,800 lines) — PARTIALLY ADDRESSED
-- `GameScreen.styles.ts` has 989 style keys in a single file. Full split is a multi-session effort.
-- **Progress**: New components (e.g. `ProfileModal`) use co-located `StyleSheet.create` — establishing the pattern for incremental migration.
-- 3 legacy tab content files now have co-located stylesheets:
+#### ~~1.10 Monolithic Stylesheet (~5,800 lines)~~ ✅ FIXED
+- ~~`GameScreen.styles.ts` has 989 style keys in a single file.~~
+- **Resolution**: All 12 tab content files now have co-located stylesheets. No tab imports styles from `GameScreen` anymore.
   - `BattleTabContent.styles.ts` (47 keys)
   - `StatsTabContent.styles.ts` (57 keys)
   - `OperationsTabContent.styles.ts` (54 keys)
-- 5 newer tabs (`EngineTab`, `ProgressTab`, `RosterTab`, `WarfrontTab`, `SocialTabContent`) already had co-located styles.
-- Remaining: 4 legacy tabs still import from monolithic file (`HeroesTabContent`, `EquipmentTabContent`, `AchievementsTabContent`, `WarroomTabContent`).
+  - `HeroesTabContent.styles.ts` (140 keys)
+  - `EquipmentTabContent.styles.ts` (75 keys)
+  - `AchievementsTabContent.styles.ts` (67 keys)
+  - `WarroomTabContent.styles.ts` (43 keys)
+  - 5 newer tabs (`EngineTab`, `ProgressTab`, `RosterTab`, `WarfrontTab`, `SocialTabContent`) already had co-located styles.
+- `GameScreen.styles.ts` remains for non-tab styles (header, layout, modals) but is no longer a monolithic dependency.
 
 #### ~~1.11 No Code Splitting~~ ✅ FIXED
 - ~~Entire game loads as one bundle. No lazy loading for tabs, modals, or mini-games.~~
