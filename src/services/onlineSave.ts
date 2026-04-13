@@ -17,20 +17,12 @@ interface SaveDocRecord {
   updatedAt: number;
   schemaVersion: number;
   saveSlot: string;
-  payload: Record<string, unknown>;
+  payload?: Record<string, unknown>;
+  payloadJson?: string;
 }
 
 const NESTED_ARRAY_MARKER = 'simplyIdleNestedArrayV1';
 const LEGACY_NESTED_ARRAY_MARKER = '__simplyIdle_nested_array_v1__';
-const OMIT_VALUE = Symbol('omit-firestore-value');
-
-type EncodedFirestoreValue =
-  | null
-  | string
-  | number
-  | boolean
-  | EncodedFirestoreValue[]
-  | { [key: string]: EncodedFirestoreValue };
 
 export type OnlineSaveWriteResult<TPayload extends Record<string, unknown>> =
   | { ok: true; revision: number }
@@ -41,7 +33,11 @@ export type OnlineSaveLoadResult<TPayload extends Record<string, unknown>> =
   | { ok: false; errorCode: OnlineSaveErrorCode };
 
 function sanitizeSaveSlot(saveSlot: string): string {
-  const sanitized = saveSlot.trim().replace(/[/.#$\[\]]/g, '_').slice(0, 96) || 'default';
+  const sanitized =
+    saveSlot
+      .trim()
+      .replace(/[/.#$[\]]/g, '_')
+      .slice(0, 96) || 'default';
   if (/^__.*__$/.test(sanitized)) {
     return `slot${sanitized.replace(/^_+|_+$/g, '')}`.slice(0, 96);
   }
@@ -64,69 +60,36 @@ function isSaveDocRecord(value: unknown): value is SaveDocRecord {
   if (!value || typeof value !== 'object') return false;
   const record = value as Partial<SaveDocRecord>;
   return (
-    typeof record.revision === 'number'
-    && typeof record.updatedAt === 'number'
-    && typeof record.saveSlot === 'string'
-    && !!record.payload
-    && typeof record.payload === 'object'
+    typeof record.revision === 'number' &&
+    typeof record.updatedAt === 'number' &&
+    typeof record.saveSlot === 'string' &&
+    (typeof record.payloadJson === 'string' || (!!record.payload && typeof record.payload === 'object'))
   );
 }
 
 function toEnvelope<TPayload extends Record<string, unknown>>(raw: unknown): OnlineSaveEnvelope<TPayload> | null {
   if (!isSaveDocRecord(raw)) return null;
+
+  let payload: Record<string, unknown>;
+  if (typeof raw.payloadJson === 'string') {
+    // New compact format: single JSON string field
+    try {
+      payload = JSON.parse(raw.payloadJson) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  } else if (raw.payload) {
+    // Legacy structured-map format
+    payload = decodeFirestorePayload(raw.payload);
+  } else {
+    return null;
+  }
+
   return {
     revision: Math.max(0, Math.floor(raw.revision)),
     updatedAt: Math.max(0, Math.floor(raw.updatedAt)),
-    payload: decodeFirestorePayload(raw.payload) as TPayload,
+    payload: payload as TPayload,
   };
-}
-
-function encodeFirestoreValue(value: unknown, parentIsArray = false): EncodedFirestoreValue | typeof OMIT_VALUE {
-  if (value === undefined) {
-    return parentIsArray ? null : OMIT_VALUE;
-  }
-
-  if (value === null) return null;
-
-  if (Array.isArray(value)) {
-    const encodedItems = value
-      .map(item => encodeFirestoreValue(item, true))
-      .map(item => (item === OMIT_VALUE ? null : item));
-
-    if (parentIsArray) {
-      return { [NESTED_ARRAY_MARKER]: encodedItems };
-    }
-
-    return encodedItems;
-  }
-
-  if (typeof value === 'object') {
-    const encodedObject: Record<string, EncodedFirestoreValue> = {};
-    Object.entries(value as Record<string, unknown>).forEach(([key, nested]) => {
-      const encoded = encodeFirestoreValue(nested, false);
-      if (encoded !== OMIT_VALUE) {
-        encodedObject[key] = encoded;
-      }
-    });
-    return encodedObject;
-  }
-
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return value;
-  }
-
-  if (typeof value === 'bigint') {
-    return value.toString();
-  }
-
-  return String(value);
-}
-
-function encodeFirestorePayload(payload: Record<string, unknown>): Record<string, EncodedFirestoreValue> {
-  const encoded = encodeFirestoreValue(payload, false);
-  return (encoded && typeof encoded === 'object' && !Array.isArray(encoded))
-    ? encoded as Record<string, EncodedFirestoreValue>
-    : {};
 }
 
 function decodeFirestoreValue(value: unknown): unknown {
@@ -140,11 +103,9 @@ function decodeFirestoreValue(value: unknown): unknown {
 
   const asRecord = value as Record<string, unknown>;
   if (
-    Object.keys(asRecord).length === 1
-    && (
-      (NESTED_ARRAY_MARKER in asRecord && Array.isArray(asRecord[NESTED_ARRAY_MARKER]))
-      || (LEGACY_NESTED_ARRAY_MARKER in asRecord && Array.isArray(asRecord[LEGACY_NESTED_ARRAY_MARKER]))
-    )
+    Object.keys(asRecord).length === 1 &&
+    ((NESTED_ARRAY_MARKER in asRecord && Array.isArray(asRecord[NESTED_ARRAY_MARKER])) ||
+      (LEGACY_NESTED_ARRAY_MARKER in asRecord && Array.isArray(asRecord[LEGACY_NESTED_ARRAY_MARKER])))
   ) {
     const encodedArray = (asRecord[NESTED_ARRAY_MARKER] ?? asRecord[LEGACY_NESTED_ARRAY_MARKER]) as unknown[];
     return encodedArray.map(decodeFirestoreValue);
@@ -159,9 +120,7 @@ function decodeFirestoreValue(value: unknown): unknown {
 
 function decodeFirestorePayload(payload: Record<string, unknown>): Record<string, unknown> {
   const decoded = decodeFirestoreValue(payload);
-  return (decoded && typeof decoded === 'object' && !Array.isArray(decoded))
-    ? decoded as Record<string, unknown>
-    : {};
+  return decoded && typeof decoded === 'object' && !Array.isArray(decoded) ? (decoded as Record<string, unknown>) : {};
 }
 
 export function isOnlineSaveAvailable(): boolean {
@@ -203,7 +162,6 @@ export async function writeOnlineSave<TPayload extends Record<string, unknown>>(
     const safeSlot = sanitizeSaveSlot(saveSlot);
     const ref = doc(db, 'users', uid, 'saveSlots', safeSlot);
     const now = Date.now();
-    const safePayload = encodeFirestorePayload(payload);
 
     return runTransaction(db, async tx => {
       const snap = await tx.get(ref);
@@ -221,7 +179,7 @@ export async function writeOnlineSave<TPayload extends Record<string, unknown>>(
         updatedAt: now,
         schemaVersion: SAVE_SCHEMA_VERSION,
         saveSlot: safeSlot,
-        payload: safePayload,
+        payloadJson: JSON.stringify(payload),
       });
 
       return { ok: true, revision: nextRevision } as OnlineSaveWriteResult<TPayload>;
@@ -246,48 +204,49 @@ export async function deleteOnlineSave(saveSlot: string): Promise<{ ok: boolean;
   }
 }
 
-  /** Reads a specific user's save slot (used by admins for /sendMsg). */
-  export async function loadOnlineSaveForUid<TPayload extends Record<string, unknown>>(
-    uid: string,
-    saveSlotId: string,
-  ): Promise<OnlineSaveLoadResult<TPayload>> {
-    const db = getFirebaseFirestore();
-    if (!db) return { ok: false, errorCode: 'unavailable' };
-    if (!(await isCurrentUserAdmin())) return { ok: false, errorCode: 'permission-denied' };
-    try {
-      const ref = doc(db, 'users', uid, 'saveSlots', saveSlotId);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return { ok: true, data: null };
-      await logAdminAction('load_save_for_uid', { targetUid: uid, saveSlotId });
-      return { ok: true, data: toEnvelope<TPayload>(snap.data()) };
-    } catch (error) {
-      return { ok: false, errorCode: mapFirestoreErrorCode(error) };
-    }
+/** Reads a specific user's save slot (used by admins for /sendMsg). */
+export async function loadOnlineSaveForUid<TPayload extends Record<string, unknown>>(
+  uid: string,
+  saveSlotId: string,
+): Promise<OnlineSaveLoadResult<TPayload>> {
+  const db = getFirebaseFirestore();
+  if (!db) return { ok: false, errorCode: 'unavailable' };
+  if (!(await isCurrentUserAdmin())) return { ok: false, errorCode: 'permission-denied' };
+  try {
+    const ref = doc(db, 'users', uid, 'saveSlots', saveSlotId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return { ok: true, data: null };
+    await logAdminAction('load_save_for_uid', { targetUid: uid, saveSlotId });
+    return { ok: true, data: toEnvelope<TPayload>(snap.data()) };
+  } catch (error) {
+    return { ok: false, errorCode: mapFirestoreErrorCode(error) };
   }
+}
 
-  /** Overwrites a specific user's save slot (used by admins for /sendMsg mail injection). */
-  export async function writeOnlineSaveForUid<TPayload extends Record<string, unknown>>(
-    uid: string,
-    saveSlotId: string,
-    payload: TPayload,
-  ): Promise<{ ok: boolean; errorCode?: OnlineSaveErrorCode }> {
-    const db = getFirebaseFirestore();
-    if (!db) return { ok: false, errorCode: 'unavailable' };
-    if (!(await isCurrentUserAdmin())) return { ok: false, errorCode: 'permission-denied' };
-    try {
-      const ref = doc(db, 'users', uid, 'saveSlots', saveSlotId);
-      const safePayload = encodeFirestorePayload(payload as Record<string, unknown>);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return { ok: false, errorCode: 'invalid-slot' };
-      const existing = snap.data() as SaveDocRecord;
-      await setDoc(ref, {
-        ...existing,
-        updatedAt: Date.now(),
-        payload: safePayload,
-      });
-      await logAdminAction('write_save_for_uid', { targetUid: uid, saveSlotId });
-      return { ok: true };
-    } catch (error) {
-      return { ok: false, errorCode: mapFirestoreErrorCode(error) };
-    }
+/** Overwrites a specific user's save slot (used by admins for /sendMsg mail injection). */
+export async function writeOnlineSaveForUid<TPayload extends Record<string, unknown>>(
+  uid: string,
+  saveSlotId: string,
+  payload: TPayload,
+): Promise<{ ok: boolean; errorCode?: OnlineSaveErrorCode }> {
+  const db = getFirebaseFirestore();
+  if (!db) return { ok: false, errorCode: 'unavailable' };
+  if (!(await isCurrentUserAdmin())) return { ok: false, errorCode: 'permission-denied' };
+  try {
+    const ref = doc(db, 'users', uid, 'saveSlots', saveSlotId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return { ok: false, errorCode: 'invalid-slot' };
+    const existing = snap.data() as SaveDocRecord;
+    await setDoc(ref, {
+      revision: existing.revision,
+      updatedAt: Date.now(),
+      schemaVersion: existing.schemaVersion ?? SAVE_SCHEMA_VERSION,
+      saveSlot: existing.saveSlot,
+      payloadJson: JSON.stringify(payload),
+    });
+    await logAdminAction('write_save_for_uid', { targetUid: uid, saveSlotId });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, errorCode: mapFirestoreErrorCode(error) };
   }
+}
