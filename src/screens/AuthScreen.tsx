@@ -24,7 +24,7 @@ import {
   loginOnlineWithGoogleTokens,
   registerOnline,
 } from '../services/onlineAuth';
-import { getFirebaseAuth, getFirebaseConfigDiagnostics } from '../services/firebase';
+import { getFirebaseAuth } from '../services/firebase';
 import {
   isPublicUsernameAvailable,
   loadPublicUsername,
@@ -74,7 +74,7 @@ function mapAuthError(error: unknown): string {
     case 'auth/account-exists-with-different-credential':
       return 'That email already exists with another sign-in method.';
     case 'auth/unauthorized-domain':
-      return 'This web address is not allowed by Firebase Auth yet. Add the current site to Firebase Authentication > Settings > Authorized domains.';
+      return 'Sign-in is not available from this web address. Please use the official site.';
     case 'auth/network-request-failed':
       return 'Network error. Check your connection and try again.';
     default:
@@ -150,7 +150,6 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const onlineAuthEnabled = isOnlineAuthAvailable();
-  const firebaseConfigDiagnostics = getFirebaseConfigDiagnostics();
   const googleAuthEnabled = isGoogleAuthAvailable();
   const googleConfig = getGoogleAuthConfig();
   const hasNativeGoogleConfig = !!(
@@ -332,9 +331,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       }
 
       if (!hasNativeGoogleConfig) {
-        throw new Error(
-          'Google sign-in is not configured for this build. Add Google client IDs to Expo public env vars.',
-        );
+        throw new Error('Google sign-in is not available on this device.');
       }
 
       setBusy(false);
@@ -359,7 +356,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       : t('auth.submitCreateAccount');
   const supportingNote = onlineAuthEnabled ? t('auth.supportingOnline') : t('auth.supportingOffline');
   const firebaseMissingNote = !onlineAuthEnabled
-    ? `Missing Firebase env keys for ${firebaseConfigDiagnostics.appEnv}: ${firebaseConfigDiagnostics.missingRequired.join(', ') || 'unknown'}`
+    ? 'Online features are temporarily unavailable. Please try again later.'
     : null;
   const googleNote =
     Platform.OS === 'web'

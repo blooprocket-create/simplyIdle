@@ -74,10 +74,10 @@ const en = {
     submitPleaseWait: 'Please wait...',
     submitCreateAccount: 'Create Account',
     supportingOnline: 'Sign in with your account to sync progress across devices.',
-    supportingOffline: 'Authentication not available. Please check your Firebase configuration.',
-    googleNoteWeb: 'Google sign-in uses the Firebase web popup flow configured in Firebase.',
-    googleNoteNativeReady: 'Google sign-in is ready for this build.',
-    googleNoteNativeMissing: 'Google sign-in needs Expo Google client IDs in your public env vars for native builds.',
+    supportingOffline: 'Online features are temporarily unavailable. Please try again later.',
+    googleNoteWeb: 'Google sign-in is available via popup.',
+    googleNoteNativeReady: 'Google sign-in is ready.',
+    googleNoteNativeMissing: 'Google sign-in is not available on this device.',
   },
 
   // ── Tap / Attack ─────────────────────────────────────────

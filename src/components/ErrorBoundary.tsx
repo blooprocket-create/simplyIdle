@@ -50,12 +50,8 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <View style={styles.container}>
           <Text style={styles.icon}>⚠️</Text>
-          <Text style={styles.title}>
-            {this.props.label ? `${this.props.label} encountered an error` : 'Something went wrong'}
-          </Text>
-          <Text style={styles.detail}>
-            {this.state.error?.message ?? 'Unknown error'}
-          </Text>
+          <Text style={styles.title}>Something went wrong</Text>
+          <Text style={styles.detail}>An unexpected error occurred. Tap Retry to try again.</Text>
           <Pressable style={styles.retryButton} onPress={this.handleRetry}>
             <Text style={styles.retryText}>Retry</Text>
           </Pressable>

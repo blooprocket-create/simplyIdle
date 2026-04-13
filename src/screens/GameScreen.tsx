@@ -120,6 +120,7 @@ import { useCharacterSlots } from '../hooks/useCharacterSlots';
 import { useShopUi } from '../hooks/useShopUi';
 import { useGameOverlays } from '../hooks/useGameOverlays';
 import { useModalOpenTelemetry } from '../hooks/useModalOpenTelemetry';
+import TutorialOverlay from '../components/TutorialOverlay';
 import {
   normalizeCharacterNameForCompare,
   releaseCharacterName,
@@ -611,21 +612,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     const seen = state.seenHintIds;
     const h = (id: string) => seen.includes(id);
 
-    // --- Onboarding hints (progressive, ordered by milestone) ---
-    if (state.wave <= 3 && !h('hint_onboard_welcome')) {
-      list.push({
-        id: 'hint_onboard_welcome',
-        title: 'Welcome, Commander',
-        detail:
-          'Your troops attack automatically. Earn gold from defeated enemies and spend it on buildings in the Engine tab.',
-      });
-    } else if (state.wave >= 5 && state.heroRoster.length === 0 && !h('hint_onboard_summon')) {
-      list.push({
-        id: 'hint_onboard_summon',
-        title: 'Recruit Your First Hero',
-        detail: 'Open the Heroes tab and summon a hero. Heroes add automatic DPS to your army.',
-      });
-    } else if (state.heroRoster.length >= 1 && state.activeTeamHeroIds.length === 0 && !h('hint_onboard_equip_hero')) {
+    // --- Progressive gameplay hints (tutorial covers early basics) ---
+    if (state.heroRoster.length >= 1 && state.activeTeamHeroIds.length === 0 && !h('hint_onboard_equip_hero')) {
       list.push({
         id: 'hint_onboard_equip_hero',
         title: 'Deploy Your Hero',
@@ -658,13 +646,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     }
 
     // --- Feature unlock hints ---
-    if (!h('hint_mission_board')) {
-      list.push({
-        id: 'hint_mission_board',
-        title: 'Mission Board Online',
-        detail: 'Check Achievements for short/medium/long goals and claim rewards when complete.',
-      });
-    }
     if (state.permanentUnlocks.includes('advanced_consumables') && !h('hint_consumables')) {
       list.push({
         id: 'hint_consumables',
@@ -1972,9 +1953,12 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     );
   }
 
+  const showTutorial = !state.seenHintIds.includes('tutorial_complete');
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#0A0A18" />
+      {showTutorial && <TutorialOverlay onComplete={() => markHintSeen('tutorial_complete')} />}
       <View pointerEvents="none" style={styles.sceneDecor}>
         <View style={styles.sceneOrbA} />
         <View style={styles.sceneOrbB} />
@@ -3509,17 +3493,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 )}
               </View>
 
-              {isAdmin ? (
+              {isAdmin && (
                 <View style={styles.settingsCard}>
                   <Text style={styles.settingsCardTitle}>Dev Mail Console</Text>
                   <Text style={styles.settingsLabel}>Use /devHelp to list all available commands.</Text>
-                  <Text style={styles.settingsLabel}>
-                    Quick: /showOnlineUsersAndCharacters, /showSlot warrior, /whoAmI, /devDiag, /clearSlot warrior
-                  </Text>
                   <View style={styles.devCommandRow}>
                     <TextInput
                       style={styles.devCommandInput}
-                      placeholder="/sendMsg sendAll #WELCOME# ##message## $shard 100"
+                      placeholder="/devHelp"
                       placeholderTextColor="#7F9CB8"
                       value={devCommandInput}
                       onChangeText={setDevCommandInput}
@@ -3536,15 +3517,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     </Pressable>
                   </View>
                   {!!devCommandOutput && <Text style={styles.devCommandOutput}>{devCommandOutput}</Text>}
-                </View>
-              ) : (
-                <View style={styles.settingsCard}>
-                  <Text style={styles.settingsCardTitle}>Developer Tools</Text>
-                  <Text style={styles.settingsLabel}>
-                    {adminCheckPending
-                      ? 'Checking admin permissions...'
-                      : 'Developer console is restricted to admin accounts.'}
-                  </Text>
                 </View>
               )}
 
