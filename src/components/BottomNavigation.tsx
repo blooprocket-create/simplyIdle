@@ -3,12 +3,21 @@ import { View, StyleSheet, Pressable, Text, Platform } from 'react-native';
 import { THEME, RADIUS, Z_INDEX } from '../theme';
 import { debugLog } from '../telemetry';
 
-export type BottomTabType = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations' | 'social';
+export type BottomTabType =
+  | 'warroom'
+  | 'battle'
+  | 'heroes'
+  | 'stats'
+  | 'achievements'
+  | 'equipment'
+  | 'operations'
+  | 'social';
 
 interface BottomNavigationProps {
   activeTab: BottomTabType;
   onTabChange: (tab: BottomTabType) => void;
   notifications?: Partial<Record<BottomTabType, number>>; // count badges
+  allowedTabs?: Set<string>; // empty or undefined = all allowed
 }
 
 const TAB_CONFIG: Record<BottomTabType, { icon: string; label: string }> = {
@@ -22,35 +31,48 @@ const TAB_CONFIG: Record<BottomTabType, { icon: string; label: string }> = {
   social: { icon: '🌐', label: 'Social' },
 };
 
-export default function BottomNavigation({ activeTab, onTabChange, notifications = {} }: BottomNavigationProps) {
+export default function BottomNavigation({
+  activeTab,
+  onTabChange,
+  notifications = {},
+  allowedTabs,
+}: BottomNavigationProps) {
+  const isLocked = (tab: BottomTabType) => allowedTabs && allowedTabs.size > 0 && !allowedTabs.has(tab);
+
   return (
     <View style={styles.root}>
       {(Object.keys(TAB_CONFIG) as BottomTabType[]).map(tab => {
         const isActive = tab === activeTab;
+        const locked = isLocked(tab);
         const { icon, label } = TAB_CONFIG[tab];
         const notificationCount = notifications[tab];
 
         return (
           <Pressable
             key={tab}
-            style={[styles.tab, isActive && styles.tabActive]}
+            style={[styles.tab, isActive && styles.tabActive, locked && styles.tabLocked]}
             onPress={() => {
+              if (locked) return;
               debugLog('nav', 'Bottom tab pressed', { from: activeTab, to: tab });
               onTabChange(tab);
             }}
             accessibilityRole="tab"
             accessibilityLabel={`${TAB_CONFIG[tab].label} tab`}
-            accessibilityState={{ selected: isActive }}
+            accessibilityState={{ selected: isActive, disabled: locked }}
           >
             <View style={styles.tabIconWrap}>
-              <Text style={[styles.tabIcon, isActive && styles.tabIconActive]}>{icon}</Text>
-              {notificationCount !== undefined && notificationCount > 0 && (
+              <Text style={[styles.tabIcon, isActive && styles.tabIconActive, locked && styles.tabIconLocked]}>
+                {icon}
+              </Text>
+              {!locked && notificationCount !== undefined && notificationCount > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{notificationCount > 9 ? '9+' : notificationCount}</Text>
                 </View>
               )}
             </View>
-            <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>{label}</Text>
+            <Text style={[styles.tabLabel, isActive && styles.tabLabelActive, locked && styles.tabLabelLocked]}>
+              {locked ? '🔒' : label}
+            </Text>
           </Pressable>
         );
       })}
@@ -118,5 +140,15 @@ const styles = StyleSheet.create({
   tabLabelActive: {
     color: THEME.nav.active.text,
     fontWeight: '700',
+  },
+  tabLocked: {
+    opacity: 0.35,
+  },
+  tabIconLocked: {
+    opacity: 0.5,
+  },
+  tabLabelLocked: {
+    color: '#555',
+    fontSize: 8,
   },
 });

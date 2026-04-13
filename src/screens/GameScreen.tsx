@@ -120,7 +120,11 @@ import { useCharacterSlots } from '../hooks/useCharacterSlots';
 import { useShopUi } from '../hooks/useShopUi';
 import { useGameOverlays } from '../hooks/useGameOverlays';
 import { useModalOpenTelemetry } from '../hooks/useModalOpenTelemetry';
-import TutorialOverlay from '../components/TutorialOverlay';
+import TutorialOverlay, {
+  TutorialBanner,
+  getTutorialStep,
+  getTutorialAllowedTabs,
+} from '../components/TutorialOverlay';
 import {
   normalizeCharacterNameForCompare,
   releaseCharacterName,
@@ -404,6 +408,18 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     });
 
   const [tab, setTab] = useState<Tab>('warroom');
+
+  // ─── Tutorial gating ─────────────────────────────────────────
+  const tutorialStep = getTutorialStep(
+    state.seenHintIds.includes('tutorial_complete'),
+    state.freeSummonCharges > 0,
+    state.bossTears > 0,
+    state.heroRoster.length > 0,
+    state.activeTeamHeroIds.length > 0,
+    state.seenHintIds.includes('tutorial_welcome_seen'),
+  );
+  const tutorialAllowedTabs = getTutorialAllowedTabs(tutorialStep);
+
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [draftName, setDraftName] = useState('');
   const [characterNameError, setCharacterNameError] = useState<string | null>(null);
@@ -1114,6 +1130,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     }
   }, [activeAffixTooltipId, monsterAffixes]);
 
+  // Force tab to 'battle' if current tab isn't allowed by tutorial gating
+  useEffect(() => {
+    if (tutorialAllowedTabs.size > 0 && !tutorialAllowedTabs.has(tab)) {
+      setTab('battle');
+    }
+  }, [tutorialAllowedTabs, tab]);
+
   const onTabChange = (nextTab: Tab) => {
     debugLog('ui', 'Tab changed', { from: tab, to: nextTab, wave: state.wave });
     void trackGameplayAction('ui_tab_changed', { from: tab, to: nextTab, wave: state.wave }, 500);
@@ -1620,6 +1643,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         activeTab={tab as BottomTabType}
         onTabChange={(nextTab: BottomTabType) => onTabChange(nextTab as Tab)}
         notifications={notifications}
+        allowedTabs={tutorialAllowedTabs.size > 0 ? tutorialAllowedTabs : undefined}
       />
     );
   };
@@ -1953,12 +1977,17 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     );
   }
 
-  const showTutorial = !state.seenHintIds.includes('tutorial_complete');
-
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#0A0A18" />
-      {showTutorial && <TutorialOverlay onComplete={() => markHintSeen('tutorial_complete')} />}
+      <TutorialOverlay
+        step={tutorialStep}
+        onDismissWelcome={() => {
+          markHintSeen('tutorial_welcome_seen');
+          setTab('battle');
+        }}
+        onFinishTutorial={() => markHintSeen('tutorial_complete')}
+      />
       <View pointerEvents="none" style={styles.sceneDecor}>
         <View style={styles.sceneOrbA} />
         <View style={styles.sceneOrbB} />
@@ -2164,7 +2193,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         </Modal>
       )}
 
-      {activeHint && (
+      <TutorialBanner step={tutorialStep} />
+
+      {tutorialStep === 'done' && activeHint && (
         <View style={styles.hintBanner}>
           <View style={styles.hintBannerTop}>
             <Text style={styles.hintBannerTitle}>💡 {activeHint.title}</Text>
@@ -2176,13 +2207,15 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         </View>
       )}
 
-      <View style={styles.nextStepBannerCompact}>
-        <Pressable style={styles.nextStepChipCompact} onPress={() => onTabChange(nextGuidance.tab)}>
-          <Text style={styles.nextStepChipText}>💡 {nextGuidance.title}</Text>
-          <Text style={styles.nextStepChipArrow}>→</Text>
-        </Pressable>
-        {extraGuidanceCount > 0 && <Text style={styles.nextStepCompactMore}>+{extraGuidanceCount}</Text>}
-      </View>
+      {tutorialStep === 'done' && (
+        <View style={styles.nextStepBannerCompact}>
+          <Pressable style={styles.nextStepChipCompact} onPress={() => onTabChange(nextGuidance.tab)}>
+            <Text style={styles.nextStepChipText}>💡 {nextGuidance.title}</Text>
+            <Text style={styles.nextStepChipArrow}>→</Text>
+          </Pressable>
+          {extraGuidanceCount > 0 && <Text style={styles.nextStepCompactMore}>+{extraGuidanceCount}</Text>}
+        </View>
+      )}
 
       <ScrollView
         horizontal={true}
