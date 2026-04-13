@@ -58,15 +58,15 @@ function isEntry(value: unknown): value is LeaderboardEntry {
   if (!value || typeof value !== 'object') return false;
   const entry = value as Partial<LeaderboardEntry>;
   return (
-    typeof entry.uid === 'string'
-    && typeof entry.accountName === 'string'
-    && typeof entry.publicUsername === 'string'
-    && typeof entry.score === 'number'
-    && typeof entry.level === 'number'
-    && (typeof entry.vipLevel === 'number' || typeof entry.vipLevel === 'undefined')
-    && typeof entry.highestWaveReached === 'number'
-    && typeof entry.prestigeCount === 'number'
-    && typeof entry.updatedAt === 'number'
+    typeof entry.uid === 'string' &&
+    typeof entry.accountName === 'string' &&
+    typeof entry.publicUsername === 'string' &&
+    typeof entry.score === 'number' &&
+    typeof entry.level === 'number' &&
+    (typeof entry.vipLevel === 'number' || typeof entry.vipLevel === 'undefined') &&
+    typeof entry.highestWaveReached === 'number' &&
+    typeof entry.prestigeCount === 'number' &&
+    typeof entry.updatedAt === 'number'
   );
 }
 
@@ -92,7 +92,7 @@ export async function submitLeaderboardScore(input: SubmitLeaderboardScoreInput)
   };
 
   if (guard.inFlight) return;
-  if (now - guard.lastAttemptAt < MIN_SUBMIT_INTERVAL_MS && score <= guard.lastScoreSeen) {
+  if (now - guard.lastAttemptAt < MIN_SUBMIT_INTERVAL_MS) {
     return;
   }
 
@@ -106,7 +106,8 @@ export async function submitLeaderboardScore(input: SubmitLeaderboardScoreInput)
       const snap = await tx.get(ref);
       const remoteData = snap.exists() ? snap.data() : null;
       const remoteScore = remoteData && typeof remoteData.score === 'number' ? clampScore(remoteData.score) : 0;
-      const remoteVipLevel = remoteData && typeof remoteData.vipLevel === 'number' ? Math.max(0, Math.floor(remoteData.vipLevel)) : 0;
+      const remoteVipLevel =
+        remoteData && typeof remoteData.vipLevel === 'number' ? Math.max(0, Math.floor(remoteData.vipLevel)) : 0;
       const nextScore = Math.max(remoteScore, score);
       const nextVipLevel = Math.max(remoteVipLevel, Math.max(0, Math.floor(input.vipLevel || 0)));
 
