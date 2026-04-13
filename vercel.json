@@ -2,6 +2,14 @@
   "buildCommand": "npm run build:web",
   "outputDirectory": "dist",
   "framework": null,
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" }
+      ]
+    }
+  ],
   "rewrites": [
     { "source": "/wiki", "destination": "/wiki/index.html" },
     { "source": "/wiki/", "destination": "/wiki/index.html" },
