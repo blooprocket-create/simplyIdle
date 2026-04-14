@@ -49,6 +49,7 @@ import {
   EquipmentRarity,
   getUsableItem,
   rollUsableItem,
+  UsableItem,
   rollEquipmentRarityByTier,
   rollRarity,
   rarityConfig,
@@ -62,14 +63,18 @@ import {
   getHeroUniqueCombatModifiers,
   getHeroUniqueSkillDescription,
   getHeroUniqueWeaponName,
+  getHeroUniqueSkillParams,
   unlockLabel,
   pickHeroForRarity,
   SPARK_TOKEN_BY_RARITY,
   SOFT_PITY_START,
   SOFT_PITY_BOOST_PER_PULL,
   getHeroStatProfile,
+  DIAMOND_SUMMON_COST,
+  VIP_SUMMON_DISCOUNT_LEVEL,
+  VIP_SUMMON_DISCOUNT,
 } from './gameConfig';
-import { buildingCost, bulkCost, safeDivide, roundTo4, safeMultiplier } from './utils';
+import { buildingCost, bulkCost, safeDivide, roundTo4, safeMultiplier, fmt } from './utils';
 import { debugLog, trackEvent, trackGameplayAction } from './telemetry';
 import { isOnlineSaveAvailable, loadOnlineSave, writeOnlineSave } from './services/onlineSave';
 import { claimCloudMail, fetchCloudMail } from './services/cloudMail';
@@ -1602,9 +1607,10 @@ function maybeAutoSummonTick(state: GameState): GameState {
   };
 
   const tryX10 = (): GameState | null => {
-    const totalPulls = 10;
-    const freeUses = Math.min(state.freeSummonCharges, totalPulls);
-    const paidUses = totalPulls - freeUses;
+    const totalPulls = 11; // x10 summon gives 11 heroes (1 bonus)
+    const paidPullCount = 10;
+    const freeUses = Math.min(state.freeSummonCharges, paidPullCount);
+    const paidUses = paidPullCount - freeUses;
     if (state.bossTears < paidUses) return null;
 
     const summoned: HeroUnit[] = [];
@@ -1694,47 +1700,191 @@ function tickHeroActives(state: GameState, elapsedMs: number): GameState {
     const triggerChance = Math.min(0.16, 0.015 + hero.level * 0.00012) * roleTriggerMult * (elapsedMs / 1000);
     if (Math.random() > triggerChance) continue;
 
-    const archetype: HeroActiveSkillArchetypeId = hero.activeSkillArchetype;
-    const info = getHeroActiveArchetypeInfo(archetype);
+    // Check if hero has unique weapon equipped → use unique skill instead of generic
+    const gearProgress = state.heroUniqueGearByHeroId[hero.id];
+    const hasUniqueEquipped = gearProgress && gearProgress.equippedByUid === hero.uid;
+    const uniqueSkill = hasUniqueEquipped ? getHeroUniqueSkillParams(hero.id, gearProgress.rank) : null;
 
-    if (archetype === 'frontline_ward') {
-      nextState = {
-        ...nextState,
-        damageReductionBuffPct: Math.max(nextState.damageReductionBuffPct, 0.2),
-        damageReductionBuffMs: Math.max(nextState.damageReductionBuffMs, 3500),
-      };
-      nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} cast ${info.name} (team guard up)`);
+    if (uniqueSkill) {
+      // ── Unique weapon skill ──────────────────────────────────────────
+      const weaponName = getHeroUniqueWeaponName(hero.id);
+      const profile = uniqueSkill;
+
+      switch (profile.type) {
+        case 'shield_wall':
+          nextState = {
+            ...nextState,
+            damageReductionBuffPct: Math.max(nextState.damageReductionBuffPct, profile.power),
+            damageReductionBuffMs: Math.max(nextState.damageReductionBuffMs, profile.durationMs),
+          };
+          nextState = queueCombatLog(
+            nextState,
+            `${hero.emoji} ${hero.name} raised ${weaponName} — Shield Wall! (${Math.round(profile.power * 100)}% DR)`,
+          );
+          break;
+
+        case 'execute': {
+          const missingHp = nextState.monsterMaxHp - nextState.monsterHp;
+          const executeDmg = Math.ceil(missingHp * profile.power);
+          nextState = {
+            ...nextState,
+            monsterHp: Math.max(1, nextState.monsterHp - executeDmg),
+          };
+          nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} — Execute! ${executeDmg} dmg`);
+          break;
+        }
+
+        case 'rallying_cry': {
+          const heal = Math.ceil(nextState.teamMaxHp * profile.power);
+          nextState = {
+            ...nextState,
+            damageBuffPct: Math.max(nextState.damageBuffPct, profile.power),
+            damageBuffMs: Math.max(nextState.damageBuffMs, profile.durationMs),
+            teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + heal),
+          };
+          nextState = queueCombatLog(
+            nextState,
+            `${hero.emoji} ${hero.name} — Rallying Cry! +${Math.round(profile.power * 100)}% DPS & healed ${heal}`,
+          );
+          break;
+        }
+
+        case 'soul_drain': {
+          const drainDmg = Math.ceil(nextState.monsterMaxHp * profile.power);
+          const selfHeal = Math.ceil(nextState.teamMaxHp * profile.power * 0.5);
+          nextState = {
+            ...nextState,
+            monsterHp: Math.max(1, nextState.monsterHp - drainDmg),
+            teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + selfHeal),
+          };
+          nextState = queueCombatLog(
+            nextState,
+            `${hero.emoji} ${hero.name} — Soul Drain! ${drainDmg} dmg, healed ${selfHeal}`,
+          );
+          break;
+        }
+
+        case 'crit_storm': {
+          const hitDmg = Math.ceil(nextState.monsterMaxHp * profile.power);
+          const totalDmg = hitDmg * 5;
+          nextState = {
+            ...nextState,
+            monsterHp: Math.max(1, nextState.monsterHp - totalDmg),
+          };
+          nextState = queueCombatLog(
+            nextState,
+            `${hero.emoji} ${hero.name} — Crit Storm! 5×${hitDmg} = ${totalDmg} dmg`,
+          );
+          break;
+        }
+
+        case 'mark_prey':
+          nextState = {
+            ...nextState,
+            damageBuffPct: Math.max(nextState.damageBuffPct, profile.power),
+            damageBuffMs: Math.max(nextState.damageBuffMs, profile.durationMs),
+          };
+          nextState = queueCombatLog(
+            nextState,
+            `${hero.emoji} ${hero.name} — Mark Prey! Enemy takes +${Math.round(profile.power * 100)}% dmg`,
+          );
+          break;
+
+        case 'chain_lightning': {
+          const burstDmg = Math.ceil(nextState.monsterMaxHp * profile.power);
+          nextState = {
+            ...nextState,
+            monsterHp: Math.max(1, nextState.monsterHp - burstDmg),
+            damageBuffPct: Math.max(nextState.damageBuffPct, profile.power * 0.6),
+            damageBuffMs: Math.max(nextState.damageBuffMs, profile.durationMs),
+          };
+          nextState = queueCombatLog(
+            nextState,
+            `${hero.emoji} ${hero.name} — Chain Lightning! ${burstDmg} burst + DPS up`,
+          );
+          break;
+        }
+
+        case 'barrier_pulse': {
+          const bHeal = Math.ceil(nextState.teamMaxHp * profile.power);
+          nextState = {
+            ...nextState,
+            teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + bHeal),
+            damageReductionBuffPct: Math.max(nextState.damageReductionBuffPct, profile.power * 0.5),
+            damageReductionBuffMs: Math.max(nextState.damageReductionBuffMs, profile.durationMs),
+          };
+          nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} — Barrier Pulse! +${bHeal} HP & shield`);
+          break;
+        }
+
+        case 'armor_shred':
+          nextState = {
+            ...nextState,
+            damageBuffPct: Math.max(nextState.damageBuffPct, profile.power),
+            damageBuffMs: Math.max(nextState.damageBuffMs, profile.durationMs),
+          };
+          nextState = queueCombatLog(
+            nextState,
+            `${hero.emoji} ${hero.name} — Armor Shred! Team DPS +${Math.round(profile.power * 100)}%`,
+          );
+          break;
+
+        case 'overcharge': {
+          const overDmg = Math.ceil(nextState.monsterMaxHp * profile.power);
+          nextState = {
+            ...nextState,
+            monsterHp: Math.max(1, nextState.monsterHp - overDmg),
+          };
+          nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} — Overcharge! ${overDmg} massive hit`);
+          break;
+        }
+      }
+
+      cooldowns[hero.uid] = profile.cooldownMs;
+    } else {
+      // ── Generic archetype skill (no unique weapon) ───────────────────
+      const archetype: HeroActiveSkillArchetypeId = hero.activeSkillArchetype;
+      const info = getHeroActiveArchetypeInfo(archetype);
+
+      if (archetype === 'frontline_ward') {
+        nextState = {
+          ...nextState,
+          damageReductionBuffPct: Math.max(nextState.damageReductionBuffPct, 0.2),
+          damageReductionBuffMs: Math.max(nextState.damageReductionBuffMs, 3500),
+        };
+        nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} cast ${info.name} (team guard up)`);
+      }
+
+      if (archetype === 'burst_volley') {
+        const burst = Math.ceil(nextState.monsterMaxHp * 0.08);
+        nextState = {
+          ...nextState,
+          monsterHp: Math.max(1, nextState.monsterHp - burst),
+        };
+        nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} used ${info.name} for ${burst} burst`);
+      }
+
+      if (archetype === 'battle_chant') {
+        nextState = {
+          ...nextState,
+          damageBuffPct: Math.max(nextState.damageBuffPct, 0.18),
+          damageBuffMs: Math.max(nextState.damageBuffMs, 4200),
+        };
+        nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} activated ${info.name} (+DPS)`);
+      }
+
+      if (archetype === 'mending_pulse') {
+        const healFrac = MENDING_PULSE_BASE_HEAL + hero.level * MENDING_PULSE_LEVEL_SCALE;
+        const heal = Math.ceil(nextState.teamMaxHp * Math.min(healFrac, 0.25));
+        nextState = {
+          ...nextState,
+          teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + heal),
+        };
+        nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} triggered ${info.name} (+${heal} HP)`);
+      }
+
+      cooldowns[hero.uid] = ACTIVE_SKILL_COOLDOWN_MS[archetype];
     }
-
-    if (archetype === 'burst_volley') {
-      const burst = Math.ceil(nextState.monsterMaxHp * 0.08);
-      nextState = {
-        ...nextState,
-        monsterHp: Math.max(1, nextState.monsterHp - burst),
-      };
-      nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} used ${info.name} for ${burst} burst`);
-    }
-
-    if (archetype === 'battle_chant') {
-      nextState = {
-        ...nextState,
-        damageBuffPct: Math.max(nextState.damageBuffPct, 0.18),
-        damageBuffMs: Math.max(nextState.damageBuffMs, 4200),
-      };
-      nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} activated ${info.name} (+DPS)`);
-    }
-
-    if (archetype === 'mending_pulse') {
-      const healFrac = MENDING_PULSE_BASE_HEAL + hero.level * MENDING_PULSE_LEVEL_SCALE;
-      const heal = Math.ceil(nextState.teamMaxHp * Math.min(healFrac, 0.25));
-      nextState = {
-        ...nextState,
-        teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + heal),
-      };
-      nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} triggered ${info.name} (+${heal} HP)`);
-    }
-
-    cooldowns[hero.uid] = ACTIVE_SKILL_COOLDOWN_MS[archetype];
   }
 
   return {
@@ -2019,6 +2169,32 @@ function getScaledUsableHeatReduction(state: GameState, baseValue: number, itemT
   const maxHeat = getMaxHeatForLevel(state.level);
   const pctFloor = itemType === 'advanced' ? 0.22 : 0.1;
   return Math.max(Math.ceil(baseValue), Math.ceil(maxHeat * pctFloor));
+}
+
+/** Returns a dynamic description for a usable item with actual scaled values. */
+export function getUsableItemDescription(state: GameState, item: UsableItem): string {
+  switch (item.effect) {
+    case 'heal_team_percent':
+      return `Restore ${Math.round(item.value * 100)}% team HP instantly.`;
+    case 'gain_gold_flat': {
+      const gain = getScaledUsableGoldGain(state, item.value, item.itemType);
+      return `Instantly grants ${fmt(gain)} gold.`;
+    }
+    case 'gain_exp_flat': {
+      const gain = getScaledUsableExpGain(state, item.value, item.itemType);
+      return `Instantly grants ${fmt(gain)} EXP.`;
+    }
+    case 'gain_shards_flat': {
+      const gain = getScaledUsableShardGain(state, item.value, item.itemType);
+      return `Instantly grants ${fmt(gain)} hero shards.`;
+    }
+    case 'reduce_heat_flat': {
+      const reduction = getScaledUsableHeatReduction(state, item.value, item.itemType);
+      return `Reduce combat heat by ${fmt(reduction)}.`;
+    }
+    default:
+      return item.description;
+  }
 }
 
 function canUseTempo4(state: Pick<GameState, 'vipLevel'>): boolean {
@@ -3866,9 +4042,9 @@ type Action =
   | { type: 'BURST'; hits: number }
   | { type: 'LEVEL_UP_HERO_GOLD'; uid: string }
   | { type: 'EQUIP_ITEM'; itemId: string }
-  | { type: 'SUMMON_HERO' }
-  | { type: 'SUMMON_HERO_X10'; featuredHeroId?: string }
-  | { type: 'SUMMON_HERO_X10_CINEMATIC'; featuredHeroId?: string }
+  | { type: 'SUMMON_HERO'; payWithDiamonds?: boolean }
+  | { type: 'SUMMON_HERO_X10'; featuredHeroId?: string; payWithDiamonds?: boolean }
+  | { type: 'SUMMON_HERO_X10_CINEMATIC'; featuredHeroId?: string; payWithDiamonds?: boolean }
   | { type: 'SPARK_EXCHANGE'; optionId: string; targetHeroId?: string }
   | { type: 'AUTO_EQUIP_BEST_HEROES' }
   | { type: 'SAVE_TEAM_LOADOUT'; slot: number }
@@ -4979,9 +5155,10 @@ export function useGameState(saveSlot: string = 'default') {
   );
   const burst = useCallback((hits: number) => dispatch({ type: 'BURST', hits }), []);
   const equipItem = useCallback((itemId: string) => dispatch({ type: 'EQUIP_ITEM', itemId }), []);
-  const summonHero = useCallback(() => dispatch({ type: 'SUMMON_HERO' }), []);
+  const summonHero = useCallback((payWithDiamonds?: boolean) => dispatch({ type: 'SUMMON_HERO', payWithDiamonds }), []);
   const summonHeroX10Cinematic = useCallback(
-    (featuredHeroId?: string) => dispatch({ type: 'SUMMON_HERO_X10_CINEMATIC', featuredHeroId }),
+    (featuredHeroId?: string, payWithDiamonds?: boolean) =>
+      dispatch({ type: 'SUMMON_HERO_X10_CINEMATIC', featuredHeroId, payWithDiamonds }),
     [],
   );
   const sparkExchange = useCallback(
@@ -5037,7 +5214,7 @@ export function useGameState(saveSlot: string = 'default') {
   const spendRebirthCore = useCallback((path: 'damage' | 'economy' | 'survival') => {
     dispatch({ type: 'SPEND_REBIRTH_CORE', path });
   }, []);
-  const useUsableItem = useCallback(
+  const applyUsableItem = useCallback(
     (itemId: string, amount: number | 'all' = 1) => dispatch({ type: 'USE_USABLE_ITEM', itemId, amount }),
     [],
   );
@@ -5303,7 +5480,7 @@ export function useGameState(saveSlot: string = 'default') {
     convertScrapToEssence,
     convertScrapToShards,
     spendRebirthCore,
-    useUsableItem,
+    applyUsableItem,
     dismantleEquipment,
     craftEquipment,
     upgradeEquipmentRarity,

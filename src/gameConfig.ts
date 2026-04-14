@@ -1446,366 +1446,466 @@ interface HeroUniqueCombatModifiers {
   incomingDmgMult: number;
 }
 
+// ── Unique Weapon Active Skills ───────────────────────────────────────────
+
+/**
+ * When a hero's unique weapon is equipped, their generic archetype skill
+ * is replaced by a signature combat skill. Each hero gets one of these types
+ * with custom parameters.
+ */
+export type UniqueSkillType =
+  | 'shield_wall' // massive DR shield, longer than ward
+  | 'execute' // deal % of monster MISSING HP as damage
+  | 'rallying_cry' // DPS buff + heal combo
+  | 'soul_drain' // damage + self-heal based on damage dealt
+  | 'crit_storm' // multiple rapid hits (burst DPS)
+  | 'mark_prey' // debuff monster: take more damage for duration
+  | 'chain_lightning' // instant burst + lingering DoT (DPS buff)
+  | 'barrier_pulse' // shield + heal team
+  | 'armor_shred' // reduce monster defense, boost team DPS briefly
+  | 'overcharge'; // massive single hit based on hero's own DPS contribution
+
+export interface UniqueSkillParams {
+  type: UniqueSkillType;
+  /** Skill-specific primary value (meaning depends on type). */
+  power: number;
+  /** Duration in ms for timed effects. */
+  durationMs: number;
+  /** Custom cooldown override in ms (default: archetype cooldown). */
+  cooldownMs: number;
+}
+
 interface HeroUniqueWeaponProfile {
   weaponName: string;
   skillName: string;
   skillFlavor: string;
   effectFamily?: HeroUniqueEffectFamily | LegacyHeroUniqueEffectFamily;
+  uniqueSkill: UniqueSkillParams;
 }
 
 const HERO_UNIQUE_WEAPONS: Record<string, HeroUniqueWeaponProfile> = {
+  // ── Tier 1 ──────────────────────────────────────────────────────────────
   h1: {
     weaponName: 'Blackgate Oathwall',
     skillName: 'Last Stand of Blackgate',
     skillFlavor: 'Turns a broken line into an unbreakable defense.',
+    uniqueSkill: { type: 'shield_wall', power: 0.3, durationMs: 4000, cooldownMs: 10000 },
   },
   h2: {
     weaponName: 'Crownfall Convoy Shield',
     skillName: 'Refuge Keeper',
     skillFlavor: 'Marches protection forward with every rescued soul.',
+    uniqueSkill: { type: 'barrier_pulse', power: 0.1, durationMs: 3500, cooldownMs: 9000 },
   },
   h3: {
     weaponName: "Exile's Redress",
     skillName: 'Ashen Return',
     skillFlavor: 'Punishes any clan that mistakes mercy for weakness.',
+    uniqueSkill: { type: 'armor_shred', power: 0.2, durationMs: 4000, cooldownMs: 8000 },
   },
   h4: {
     weaponName: 'Siegehide Mantleaxe',
     skillName: 'Beastwall Charge',
     skillFlavor: 'Drives forward behind the weight of hunted war beasts.',
+    uniqueSkill: { type: 'rallying_cry', power: 0.2, durationMs: 4000, cooldownMs: 9000 },
   },
   h5: {
     weaponName: 'Gale-Sleeper Longbow',
     skillName: 'Stormdraft Split',
     skillFlavor: 'Reads wind shear before the arrow ever leaves the string.',
+    uniqueSkill: { type: 'crit_storm', power: 0.06, durationMs: 0, cooldownMs: 7000 },
   },
   h6: {
     weaponName: "Tyrant's Last Verdict",
     skillName: 'Reversed Sentence',
     skillFlavor: 'Executes oppressors with the same precision once used on prisoners.',
+    uniqueSkill: { type: 'execute', power: 0.12, durationMs: 0, cooldownMs: 7000 },
   },
   h7: {
     weaponName: 'Bridge of White Silence',
     skillName: 'Frostspan Miracle',
     skillFlavor: 'Freezes catastrophe into a path for allies to cross.',
+    uniqueSkill: { type: 'barrier_pulse', power: 0.12, durationMs: 3500, cooldownMs: 6000 },
   },
   h8: {
     weaponName: 'Brandless Censer',
     skillName: 'Rebel Pyre',
     skillFlavor: 'Turns forbidden fire against the rulers who ordered it.',
+    uniqueSkill: { type: 'chain_lightning', power: 0.1, durationMs: 3000, cooldownMs: 7000 },
   },
   h9: {
     weaponName: 'Granary Wardstaff',
     skillName: 'Seven-Day Hold',
     skillFlavor: 'Finds endurance in hunger, rubble, and bare hands.',
+    uniqueSkill: { type: 'shield_wall', power: 0.25, durationMs: 4500, cooldownMs: 8000 },
   },
   h10: {
     weaponName: 'Dawnscript Veils',
     skillName: 'Sutra at First Light',
     skillFlavor: 'Unfolds lost healing doctrine through sacred movement.',
+    uniqueSkill: { type: 'barrier_pulse', power: 0.1, durationMs: 4000, cooldownMs: 8000 },
   },
   h11: {
     weaponName: 'Village-Name Plate',
     skillName: 'Hearthwall Ledger',
     skillFlavor: 'Carries every protected settlement into the next defense.',
+    uniqueSkill: { type: 'shield_wall', power: 0.35, durationMs: 4000, cooldownMs: 10000 },
   },
   h12: {
     weaponName: 'Pitscar Reaver',
     skillName: 'Red Pit Breakout',
     skillFlavor: 'Turns trial scars into momentum that cannot be chained.',
+    uniqueSkill: { type: 'soul_drain', power: 0.08, durationMs: 0, cooldownMs: 7000 },
   },
   h13: {
     weaponName: "Occupier's Blind",
     skillName: 'Whisper Route',
     skillFlavor: 'Shoots along the hidden paths only a courier survivor remembers.',
+    uniqueSkill: { type: 'mark_prey', power: 0.22, durationMs: 4000, cooldownMs: 8000 },
   },
   h14: {
     weaponName: 'Prism Command Lattice',
     skillName: 'Observatory Overwatch',
     skillFlavor: 'Converts star math into battlefield certainty.',
+    uniqueSkill: { type: 'barrier_pulse', power: 0.12, durationMs: 4000, cooldownMs: 6000 },
   },
   h15: {
     weaponName: 'Sunstep Warfan',
     skillName: 'Processional Breaker',
     skillFlavor: 'Refines ceremonial grace into a marching combat rhythm.',
+    uniqueSkill: { type: 'rallying_cry', power: 0.2, durationMs: 4500, cooldownMs: 9000 },
   },
   h16: {
     weaponName: 'Ashwater Testhammer',
     skillName: 'Live-Drill Temper',
     skillFlavor: 'Hits with the certainty of steel proven under real fire.',
+    uniqueSkill: { type: 'shield_wall', power: 0.3, durationMs: 3800, cooldownMs: 9500 },
   },
   h17: {
     weaponName: 'Night-Raid Standard',
     skillName: 'Third Banner Rising',
     skillFlavor: 'Raises morale the instant a fallen line is reclaimed.',
+    uniqueSkill: { type: 'rallying_cry', power: 0.22, durationMs: 4200, cooldownMs: 9000 },
   },
   h18: {
     weaponName: 'Hornblood Cleaver',
     skillName: 'Camp-Horn Reading',
     skillFlavor: 'Breaks enemy tempo by hearing command patterns before they crest.',
+    uniqueSkill: { type: 'mark_prey', power: 0.2, durationMs: 4000, cooldownMs: 8000 },
   },
   h19: {
     weaponName: 'Chainfield Sever',
     skillName: 'Corridor of Hooks',
     skillFlavor: 'Turns enemy restraint into a killing lane.',
+    uniqueSkill: { type: 'crit_storm', power: 0.06, durationMs: 0, cooldownMs: 6500 },
   },
   h20: {
     weaponName: 'Cliffline Talonbow',
     skillName: 'Far-Sight Execution',
     skillFlavor: 'Punishes commanders who believe distance is safety.',
+    uniqueSkill: { type: 'execute', power: 0.12, durationMs: 0, cooldownMs: 7000 },
   },
   h21: {
     weaponName: 'Lunar Trident Bow',
     skillName: 'Three Arrows to Midnight',
     skillFlavor: 'Aligns impossible shots to the cold math of moonlight.',
+    uniqueSkill: { type: 'overcharge', power: 0.15, durationMs: 0, cooldownMs: 8000 },
   },
   h22: {
     weaponName: 'Scarwell Focus',
     skillName: 'Riftfused Channel',
     skillFlavor: 'Makes void damage flow through wounds that never fully closed.',
     effectFamily: 'arcane',
+    uniqueSkill: { type: 'chain_lightning', power: 0.1, durationMs: 3000, cooldownMs: 7000 },
   },
   h23: {
     weaponName: 'Beaconrend Lantern',
     skillName: 'Lantern Burst',
     skillFlavor: 'Condenses siege-signal fire into disciplined devastation.',
     effectFamily: 'arcane',
+    uniqueSkill: { type: 'chain_lightning', power: 0.08, durationMs: 3500, cooldownMs: 7000 },
   },
   h24: {
     weaponName: 'Treatybreaker Hands',
     skillName: 'Stillwater Verdict',
     skillFlavor: 'Delivers the judgment diplomacy could not secure.',
     effectFamily: 'monk',
+    uniqueSkill: { type: 'barrier_pulse', power: 0.1, durationMs: 4000, cooldownMs: 6000 },
   },
   h25: {
     weaponName: 'Thunderbreath Tonfa',
     skillName: 'Silent Storm Form',
     skillFlavor: 'Lets motion speak where hearing no longer can.',
     effectFamily: 'monk',
+    uniqueSkill: { type: 'armor_shred', power: 0.2, durationMs: 3500, cooldownMs: 8000 },
   },
   h26: {
     weaponName: 'Emberwatch Greatblade',
     skillName: 'Rankfire Command',
     skillFlavor: 'Burns brighter when held beside common soldiers.',
+    uniqueSkill: { type: 'rallying_cry', power: 0.2, durationMs: 4000, cooldownMs: 9000 },
   },
   h27: {
     weaponName: 'Convoy-Breaker Rig',
     skillName: 'Ashrender Ambush',
     skillFlavor: 'Turns scavenged ruin into perfect demolition timing.',
+    uniqueSkill: { type: 'overcharge', power: 0.18, durationMs: 0, cooldownMs: 7500 },
   },
   h28: {
     weaponName: 'Starplot Recurve',
     skillName: "Cartographer's Answer",
     skillFlavor: 'Fires where the chart says the future will stand.',
     effectFamily: 'ranger',
+    uniqueSkill: { type: 'mark_prey', power: 0.22, durationMs: 4000, cooldownMs: 7500 },
   },
   h29: {
     weaponName: 'Soul-Lamp Reliquary',
     skillName: 'Palefire Ward',
     skillFlavor: 'Binds mourning rites into protection for the living.',
     effectFamily: 'arcane',
+    uniqueSkill: { type: 'barrier_pulse', power: 0.12, durationMs: 4000, cooldownMs: 6000 },
   },
   h30: {
     weaponName: 'Floodstep Reedstaff',
     skillName: 'Hollowreed Current',
     skillFlavor: 'Flows through unstable terrain without ever surrendering balance.',
     effectFamily: 'monk',
+    uniqueSkill: { type: 'shield_wall', power: 0.25, durationMs: 4500, cooldownMs: 9000 },
   },
+  // ── Tier 2 ──────────────────────────────────────────────────────────────
   h31: {
     weaponName: "Baron's End Pickblade",
     skillName: 'Ironpeak Uprising',
     skillFlavor: 'Turns labor tools into the start of revolt.',
+    uniqueSkill: { type: 'armor_shred', power: 0.22, durationMs: 4000, cooldownMs: 8500 },
   },
   h32: {
     weaponName: 'Kinshield Pactblade',
     skillName: 'Orphan Phalanx',
     skillFlavor: 'Fights as though every ally were sworn family.',
+    uniqueSkill: { type: 'shield_wall', power: 0.3, durationMs: 4000, cooldownMs: 9000 },
   },
   h33: {
     weaponName: 'Five-Province Jawmaul',
     skillName: "Pit Defector's Rush",
     skillFlavor: 'Carries arena brutality into wars that finally matter.',
+    uniqueSkill: { type: 'crit_storm', power: 0.07, durationMs: 0, cooldownMs: 6500 },
   },
   h34: {
     weaponName: 'Quarrysigil Fists',
     skillName: 'Seismic Recall',
     skillFlavor: 'Calls old stone-markings back as living shockwaves.',
+    uniqueSkill: { type: 'overcharge', power: 0.18, durationMs: 0, cooldownMs: 7500 },
   },
   h35: {
     weaponName: 'Caravan Halo Bow',
     skillName: 'Silversprint',
     skillFlavor: 'Keeps perfect aim even at full mounted speed.',
     effectFamily: 'ranger',
+    uniqueSkill: { type: 'crit_storm', power: 0.07, durationMs: 0, cooldownMs: 6500 },
   },
   h36: {
     weaponName: 'Relaybrand Repeater',
     skillName: 'Rotating Pressure',
     skillFlavor: 'Maintains relentless ranged tempo through disciplined cycling.',
     effectFamily: 'ranger',
+    uniqueSkill: { type: 'mark_prey', power: 0.25, durationMs: 4500, cooldownMs: 7500 },
   },
   h37: {
     weaponName: 'Eclipse Catechism',
     skillName: 'Duskborn Veil',
     skillFlavor: 'Turns ritual shadow into surgical spell cover.',
     effectFamily: 'arcane',
+    uniqueSkill: { type: 'soul_drain', power: 0.1, durationMs: 0, cooldownMs: 7000 },
   },
   h38: {
     weaponName: 'Dawnthief Corvid Seal',
     skillName: 'Nightwhisper Rewrite',
     skillFlavor: "Steals the enemy's next command before it is spoken.",
     effectFamily: 'arcane',
+    uniqueSkill: { type: 'mark_prey', power: 0.22, durationMs: 4000, cooldownMs: 7500 },
   },
   h39: {
     weaponName: 'Winterwall Sunstaff',
     skillName: 'Dawn Masonry',
     skillFlavor: 'Builds a defense and becomes its first guardian.',
     effectFamily: 'monk',
+    uniqueSkill: { type: 'shield_wall', power: 0.28, durationMs: 4000, cooldownMs: 9000 },
   },
   h40: {
     weaponName: 'Quarantine Veilblades',
     skillName: 'No Retreat Convoy',
     skillFlavor: 'Cuts a safe road where plague and fear say to turn back.',
     effectFamily: 'monk',
+    uniqueSkill: { type: 'barrier_pulse', power: 0.12, durationMs: 4000, cooldownMs: 6000 },
   },
+  // ── Tier 3 ──────────────────────────────────────────────────────────────
   h41: {
     weaponName: 'Memory-Anvil Greatsword',
     skillName: 'Fallen Chorus',
     skillFlavor: 'Strikes with the will of comrades preserved inside the steel.',
+    uniqueSkill: { type: 'soul_drain', power: 0.12, durationMs: 0, cooldownMs: 7000 },
   },
   h42: {
     weaponName: 'Republic Dawn',
     skillName: 'House Without Throne',
     skillFlavor: 'Fights for a future that outlives noble bloodlines.',
+    uniqueSkill: { type: 'rallying_cry', power: 0.25, durationMs: 4500, cooldownMs: 8500 },
   },
   h43: {
     weaponName: 'Ruinbreak Fangblade',
     skillName: 'Fortress Null',
     skillFlavor: 'Leaves command structures gutted and leaderless.',
+    uniqueSkill: { type: 'execute', power: 0.15, durationMs: 0, cooldownMs: 6500 },
   },
   h44: {
     weaponName: 'Sanctumrend Idol-Axe',
     skillName: 'Prophetbreaker Pyre',
     skillFlavor: 'Burns fear doctrine down and feeds on the collapse.',
+    uniqueSkill: { type: 'armor_shred', power: 0.25, durationMs: 4000, cooldownMs: 8000 },
   },
   h45: {
     weaponName: 'Vacuumstring Bow',
     skillName: 'Skybridge Deadfall',
     skillFlavor: 'Shoots through empty air where hesitation means death.',
     effectFamily: 'ranger',
+    uniqueSkill: { type: 'overcharge', power: 0.2, durationMs: 0, cooldownMs: 7000 },
   },
   h46: {
     weaponName: "Warden's Red Ledger",
     skillName: 'Dossier Collapse',
     skillFlavor: 'Turns old hunting records into a chain of command-kills.',
     effectFamily: 'ranger',
+    uniqueSkill: { type: 'execute', power: 0.15, durationMs: 0, cooldownMs: 7000 },
   },
   h47: {
     weaponName: 'Prismheart Canopy',
     skillName: 'Tempo Veil',
     skillFlavor: "Layers protective light exactly against the enemy's rhythm.",
     effectFamily: 'arcane',
+    uniqueSkill: { type: 'barrier_pulse', power: 0.15, durationMs: 4500, cooldownMs: 6000 },
   },
   h48: {
     weaponName: 'Cryo-Crown Scepter',
     skillName: 'Glacier Fault',
     skillFlavor: 'Breaks an advance by teaching the ground to freeze and split.',
     effectFamily: 'arcane',
+    uniqueSkill: { type: 'chain_lightning', power: 0.12, durationMs: 3500, cooldownMs: 6500 },
   },
   h49: {
     weaponName: 'Lightfury Shockstaff',
     skillName: 'Solar Breach Step',
     skillFlavor: 'Combines radiant breath and impact footwork into one opening.',
     effectFamily: 'monk',
+    uniqueSkill: { type: 'overcharge', power: 0.2, durationMs: 0, cooldownMs: 7000 },
   },
   h50: {
     weaponName: 'Soulreturn Mantra',
     skillName: "Veteran's Recall",
     skillFlavor: 'Pulls the broken back into the fight with renewed shape.',
     effectFamily: 'monk',
+    uniqueSkill: { type: 'rallying_cry', power: 0.25, durationMs: 4500, cooldownMs: 7000 },
   },
+  // ── Tier 4 ──────────────────────────────────────────────────────────────
   h51: {
     weaponName: 'Eclipse-Scale Halberd',
     skillName: 'Extinction Protocol',
     skillFlavor: 'Advances with the doctrine of wars meant to erase civilizations.',
+    uniqueSkill: { type: 'armor_shred', power: 0.3, durationMs: 4500, cooldownMs: 8000 },
   },
   h52: {
     weaponName: 'Office of the Fallen Wing',
     skillName: 'Infinite Descent',
     skillFlavor: 'Trades celestial stature for absolute commitment to mortal lines.',
+    uniqueSkill: { type: 'rallying_cry', power: 0.28, durationMs: 5000, cooldownMs: 8000 },
   },
   h53: {
     weaponName: 'Abyss Ringbreaker',
     skillName: 'Citadel Arena',
     skillFlavor: 'Treats every fortress as another circle to conquer.',
+    uniqueSkill: { type: 'crit_storm', power: 0.1, durationMs: 0, cooldownMs: 6000 },
   },
   h54: {
     weaponName: 'Shadowcourt Headsman',
     skillName: 'Syndicate Reversal',
     skillFlavor: 'Redirects an empire of secrets into targeted regime collapse.',
+    uniqueSkill: { type: 'mark_prey', power: 0.3, durationMs: 5000, cooldownMs: 7500 },
   },
   h55: {
     weaponName: 'First-Impact Railbow',
     skillName: 'Stratos Verdict',
     skillFlavor: 'Ends the battle before the enemy registers the opening exchange.',
     effectFamily: 'ranger',
+    uniqueSkill: { type: 'execute', power: 0.18, durationMs: 0, cooldownMs: 6500 },
   },
   h56: {
     weaponName: 'Cultneedle Widowbow',
     skillName: 'One-Night Collapse',
     skillFlavor: 'Brings years of infiltration down in a single coordinated kill.',
     effectFamily: 'ranger',
+    uniqueSkill: { type: 'soul_drain', power: 0.14, durationMs: 0, cooldownMs: 6500 },
   },
   h57: {
     weaponName: 'Branchkeeper Chronometer',
     skillName: 'Civilian Line',
     skillFlavor: 'Selects the future where the innocent remain standing.',
     effectFamily: 'arcane',
+    uniqueSkill: { type: 'barrier_pulse', power: 0.18, durationMs: 5000, cooldownMs: 5500 },
   },
   h58: {
     weaponName: 'Furnaceheart Scepter',
     skillName: 'Panic to Flame',
     skillFlavor: 'Refines battlefield terror into controlled annihilation.',
     effectFamily: 'arcane',
+    uniqueSkill: { type: 'chain_lightning', power: 0.15, durationMs: 4000, cooldownMs: 6000 },
   },
   h59: {
     weaponName: 'Stellarch Wheelstaff',
     skillName: 'Cloister Command',
     skillFlavor: 'Turns disciplined enlightenment into multi-front battle control.',
     effectFamily: 'monk',
+    uniqueSkill: { type: 'rallying_cry', power: 0.28, durationMs: 5000, cooldownMs: 8000 },
   },
   h60: {
     weaponName: 'Riftseal Sovereign Rings',
     skillName: 'Age-End Closure',
     skillFlavor: 'Closes breaches with the force of a final imperial decree.',
     effectFamily: 'monk',
+    uniqueSkill: { type: 'shield_wall', power: 0.4, durationMs: 5000, cooldownMs: 9000 },
   },
+  // ── Tier 5 ──────────────────────────────────────────────────────────────
   h61: {
     weaponName: 'Orbital Furnace Pike',
     skillName: 'Godplate Sundering',
     skillFlavor: 'Breaks divine armor the way siege furnaces break ore.',
+    uniqueSkill: { type: 'armor_shred', power: 0.35, durationMs: 5000, cooldownMs: 7500 },
   },
   h62: {
     weaponName: 'Trenchwake Guillotine',
     skillName: 'Tidal Citadel Crush',
     skillFlavor: 'Hits like an abyssal surge rolling over fortress walls.',
+    uniqueSkill: { type: 'overcharge', power: 0.3, durationMs: 0, cooldownMs: 6000 },
   },
   h63: {
     weaponName: 'Downfall Sunwing',
     skillName: 'Skyfire Reprisal',
     skillFlavor: 'Returns from certain death as an airborne execution order.',
     effectFamily: 'ranger',
+    uniqueSkill: { type: 'soul_drain', power: 0.18, durationMs: 0, cooldownMs: 6000 },
   },
   h64: {
     weaponName: 'Theaterframe Axiom',
     skillName: 'Impossible Geometry',
     skillFlavor: 'Rearranges the field until victory becomes structurally inevitable.',
     effectFamily: 'arcane',
+    uniqueSkill: { type: 'chain_lightning', power: 0.18, durationMs: 4500, cooldownMs: 5500 },
   },
   h65: {
     weaponName: 'Last Wheel Naginata',
     skillName: 'Archive of Returns',
     skillFlavor: 'Carries preserved wisdom from one rebirth age into the next.',
     effectFamily: 'monk',
+    uniqueSkill: { type: 'barrier_pulse', power: 0.2, durationMs: 5000, cooldownMs: 5500 },
   },
 };
 
@@ -1962,6 +2062,60 @@ export function getHeroUniqueCombatModifiers(heroId: string, rank: number): Hero
   };
 }
 
+/** Returns the unique combat skill params for a hero, scaled by weapon rank. */
+export function getHeroUniqueSkillParams(heroId: string, rank: number): UniqueSkillParams | null {
+  const profile = HERO_UNIQUE_WEAPONS[heroId];
+  if (!profile?.uniqueSkill) return null;
+  const safeRank = clampHeroUniqueRank(rank);
+  const rankScale = 1 + (safeRank - 1) * 0.12; // rank 1 = 1×, rank 10 = 2.08×
+  return {
+    ...profile.uniqueSkill,
+    power: profile.uniqueSkill.power * rankScale,
+  };
+}
+
+const UNIQUE_SKILL_LABELS: Record<UniqueSkillType, string> = {
+  shield_wall: 'Shield Wall',
+  execute: 'Execute',
+  rallying_cry: 'Rallying Cry',
+  soul_drain: 'Soul Drain',
+  crit_storm: 'Crit Storm',
+  mark_prey: 'Mark Prey',
+  chain_lightning: 'Chain Lightning',
+  barrier_pulse: 'Barrier Pulse',
+  armor_shred: 'Armor Shred',
+  overcharge: 'Overcharge',
+};
+
+function describeUniqueSkillEffect(params: UniqueSkillParams): string {
+  const pct = Math.round(params.power * 100);
+  const dur = params.durationMs > 0 ? ` for ${(params.durationMs / 1000).toFixed(1)}s` : '';
+  switch (params.type) {
+    case 'shield_wall':
+      return `Reduces incoming damage by ${pct}%${dur}`;
+    case 'execute':
+      return `Deals ${pct}% of monster missing HP as instant damage`;
+    case 'rallying_cry':
+      return `Boosts team DPS by ${pct}% and heals ${pct}% of max HP${dur}`;
+    case 'soul_drain':
+      return `Deals ${pct}% team DPS as damage and heals self for the same`;
+    case 'crit_storm':
+      return `Fires 5 rapid hits, each dealing ${pct}% of monster max HP`;
+    case 'mark_prey':
+      return `Marks the enemy to take ${pct}% more damage${dur}`;
+    case 'chain_lightning':
+      return `Deals ${pct}% of monster max HP and boosts DPS${dur}`;
+    case 'barrier_pulse':
+      return `Heals team for ${pct}% of max HP and reduces damage${dur}`;
+    case 'armor_shred':
+      return `Shreds armor, enemy takes ${pct}% more damage${dur}`;
+    case 'overcharge':
+      return `Deals a massive hit equal to ${pct}% of hero's DPS contribution`;
+    default:
+      return `Activates unique combat skill`;
+  }
+}
+
 export function getHeroUniqueSkillDescription(heroId: string, rank: number): string {
   const hero = getHeroTemplateById(heroId);
   const profile = HERO_UNIQUE_WEAPONS[heroId];
@@ -1982,7 +2136,12 @@ export function getHeroUniqueSkillDescription(heroId: string, rank: number): str
     bonusParts.push(`${Math.round((1 - modifiers.incomingDmgMult) * 100)}% damage reduction`);
   }
 
-  return `${skillName} • ${effectLabel}: ${skillFlavor} While active, grants ${bonusParts.join(', ')}.`;
+  const scaledSkill = getHeroUniqueSkillParams(heroId, safeRank);
+  const combatLine = scaledSkill
+    ? ` ⚔️ ${UNIQUE_SKILL_LABELS[scaledSkill.type]}: ${describeUniqueSkillEffect(scaledSkill)} (${(scaledSkill.cooldownMs / 1000).toFixed(0)}s CD).`
+    : '';
+
+  return `${skillName} • ${effectLabel}: ${skillFlavor} While active, grants ${bonusParts.join(', ')}.${combatLine}`;
 }
 
 export function getSummonRarityPool(postgameUnlocked: boolean): RarityConfig[] {
@@ -2947,8 +3106,13 @@ export const HERO_POOL: HeroTemplate[] = [
 export const MAX_EQUIPPED_HEROES = 5;
 export const ACTIVE_TEAM_SIZE = 6; // max heroes in battle (+ player)
 export const GACHA_SUMMON_COST = 500;
+export const DIAMOND_SUMMON_COST = 500; // diamonds per single summon
 export const HERO_LEVEL_EXP_FORMULA = (level: number) => Math.floor(50 * Math.pow(1.18, level - 1));
 export const HERO_LEVEL_CAP = 999;
+
+/** VIP 3+ reduces summon costs (boss tear & diamond) by 10%. */
+export const VIP_SUMMON_DISCOUNT_LEVEL = 3;
+export const VIP_SUMMON_DISCOUNT = 0.1; // 10% off
 
 // ── Gacha V2: Tiered Hero Pool ────────────────────────────────────────────
 

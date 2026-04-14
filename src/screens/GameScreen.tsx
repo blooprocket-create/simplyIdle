@@ -67,6 +67,9 @@ import {
   Rarity,
   expForLevel,
   BREAKPOINTS,
+  DIAMOND_SUMMON_COST,
+  VIP_SUMMON_DISCOUNT_LEVEL,
+  VIP_SUMMON_DISCOUNT,
 } from '../gameConfig';
 import { getHeroPortraitSource } from '../heroPortraits';
 import { fmt } from '../utils';
@@ -135,7 +138,7 @@ import { getFirebaseAuth } from '../services/firebase';
 import { t } from '../i18n';
 
 export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations' | 'social';
-type HeroesSubTab = 'summon' | 'roster' | 'batch';
+type HeroesSubTab = 'summon' | 'roster' | 'batch' | 'spark';
 type EquipmentSubTab = 'inventory' | 'armory' | 'craft' | 'forge';
 type AchievementsSubTab = 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex';
 type OperationsSubTab = 'facilities' | 'expeditions' | 'miniops' | 'dungeonops';
@@ -349,7 +352,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     convertScrapToEssence,
     convertScrapToShards,
     spendRebirthCore,
-    useUsableItem,
+    applyUsableItem,
     dismantleEquipment,
     craftEquipment,
     upgradeEquipmentRarity,
@@ -602,10 +605,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     [state.usableItemCounts],
   );
 
-  // Boss Tears is the real summon currency; gold cost line kept for reference in tooltips
-  const canGachaOnce = state.freeSummonCharges > 0 || state.bossTears >= 1;
+  // Boss Tears or Diamonds are summon currencies
+  const vipDiscount = state.vipLevel >= VIP_SUMMON_DISCOUNT_LEVEL ? VIP_SUMMON_DISCOUNT : 0;
+  const diamondPerSummon = Math.floor(DIAMOND_SUMMON_COST * (1 - vipDiscount));
+  const canGachaOnce = state.freeSummonCharges > 0 || state.bossTears >= 1 || state.diamonds >= diamondPerSummon;
   const paidX10 = Math.max(0, 10 - state.freeSummonCharges);
-  const canGachaX10 = state.freeSummonCharges >= 10 || state.bossTears >= paidX10;
+  const canGachaX10 =
+    state.freeSummonCharges >= 10 || state.bossTears >= paidX10 || state.diamonds >= paidX10 * diamondPerSummon;
   const pityRemaining = Math.max(0, 30 - state.gachaPityCounter);
   const summonTimeline = state.summonHistory.slice(0, 12);
   const hasStatsNotification = state.unspentStatPoints > 0;
@@ -2413,7 +2419,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 setCombatTempo,
                 burst,
                 buyPremiumCoolant,
-                useUsableItem,
+                applyUsableItem,
               }}
             />
           </ErrorBoundary>
@@ -2434,6 +2440,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 pityRemaining,
                 hasGachaNotification,
                 paidX10,
+                diamondPerSummon,
                 summonTimeline,
                 rarityConfig,
                 expandedHeroes,

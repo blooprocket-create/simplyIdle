@@ -28,6 +28,9 @@ import {
   SOFT_PITY_START,
   SOFT_PITY_BOOST_PER_PULL,
   SPARK_EXCHANGE_OPTIONS,
+  DIAMOND_SUMMON_COST,
+  VIP_SUMMON_DISCOUNT_LEVEL,
+  VIP_SUMMON_DISCOUNT,
   type HeroUnit,
   type Rarity,
   type PlayerClass,
@@ -53,9 +56,9 @@ interface SummonHistoryEntry {
 
 export type RosterAction =
   | { type: 'EQUIP_ITEM'; itemId: string }
-  | { type: 'SUMMON_HERO' }
-  | { type: 'SUMMON_HERO_X10' }
-  | { type: 'SUMMON_HERO_X10_CINEMATIC'; featuredHeroId?: string }
+  | { type: 'SUMMON_HERO'; payWithDiamonds?: boolean }
+  | { type: 'SUMMON_HERO_X10'; payWithDiamonds?: boolean }
+  | { type: 'SUMMON_HERO_X10_CINEMATIC'; featuredHeroId?: string; payWithDiamonds?: boolean }
   | { type: 'AUTO_EQUIP_BEST_HEROES' }
   | { type: 'SAVE_TEAM_LOADOUT'; slot: number }
   | { type: 'LOAD_TEAM_LOADOUT'; slot: number }
@@ -452,7 +455,97 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
     }
 
     case 'SUMMON_HERO': {
+      const useDiamonds = action.payWithDiamonds === true;
+      const vipDiscount = state.vipLevel >= VIP_SUMMON_DISCOUNT_LEVEL ? VIP_SUMMON_DISCOUNT : 0;
       const canUseFree = state.freeSummonCharges > 0;
+
+      if (useDiamonds) {
+        const diamondCost = Math.floor(DIAMOND_SUMMON_COST * (1 - vipDiscount));
+        if (!canUseFree && state.diamonds < diamondCost) return state;
+        const postgameUnlocked = isPostgameSummonUnlocked(state);
+
+        const roll = rollRarityWithPity(state.gachaPityCounter, postgameUnlocked, state.guaranteedMinRarity);
+        const rarity = roll.rarity;
+        const { template } = pickHeroWithBanner(rarity, undefined);
+        const rarityMult = rarityConfig(rarity).boostMultiplier;
+        const uid = `${template.id}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+        const hero: HeroUnit = {
+          ...template,
+          uid,
+          rarity,
+          level: 1,
+          rank: 1,
+          teamBoost: roundTo4(template.baseTeamBoost * rarityMult),
+        };
+
+        const sparkGain = getSparkTokensForSummon(state, template.id, rarity);
+        const historyEntry: SummonHistoryEntry = {
+          id: `hist_${uid}`,
+          heroName: hero.name,
+          heroEmoji: hero.emoji,
+          rarity: hero.rarity,
+          ts: Date.now(),
+          pityTriggered: roll.pityTriggered,
+        };
+
+        const newTotalSummons = state.totalSummons + 1;
+        const milestones = checkSummonMilestones(newTotalSummons, state.claimedSummonMilestones);
+
+        let nextState = ctx.withAchievement({
+          ...state,
+          diamonds: canUseFree ? state.diamonds : state.diamonds - diamondCost,
+          heroRoster: [hero, ...state.heroRoster],
+          summonHistory: [historyEntry, ...state.summonHistory].slice(0, MAX_SAVE_SUMMON_HISTORY),
+          totalSummons: newTotalSummons,
+          freeSummonCharges:
+            (canUseFree ? state.freeSummonCharges - 1 : state.freeSummonCharges) + milestones.freeCharges,
+          gachaPityCounter: roll.nextCounter,
+          sparkTokens: state.sparkTokens + sparkGain + milestones.sparkTokens,
+          claimedSummonMilestones: milestones.newClaimed,
+          guaranteedMinRarity: state.guaranteedMinRarity ? null : milestones.guaranteedRarity,
+        });
+        nextState = syncUniqueWeaponAssignmentForHero(nextState, hero.id);
+        nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.06);
+        if (milestones.grantUnique) {
+          const randomHero = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
+          const fakeUnit: HeroUnit = {
+            ...randomHero,
+            uid: `forge_${Date.now()}`,
+            rarity: 'legendary',
+            level: 1,
+            rank: 1,
+            teamBoost: 0,
+          };
+          nextState = grantHeroUniqueGear(nextState, fakeUnit);
+        }
+        if (roll.pityTriggered) {
+          nextState = queueReward(nextState, {
+            id: `pity_single_${Date.now()}`,
+            kind: 'system',
+            title: 'Pity Triggered',
+            detail: `${hero.emoji} ${hero.name} arrived at ${rarity.toUpperCase()}!`,
+          });
+        }
+        if (sparkGain > 0) {
+          nextState = queueReward(nextState, {
+            id: `spark_${Date.now()}`,
+            kind: 'system',
+            title: 'Dupe Spark',
+            detail: `+${sparkGain} Spark Token${sparkGain > 1 ? 's' : ''} (duplicate hero)`,
+          });
+        }
+        for (const label of milestones.rewardLabel) {
+          nextState = queueReward(nextState, {
+            id: `milestone_${Date.now()}_${label}`,
+            kind: 'system',
+            title: 'Summon Milestone!',
+            detail: label,
+          });
+        }
+        return nextState;
+      }
+
+      // Boss Tear payment (original path)
       if (!canUseFree && state.bossTears < 1) return state;
       const postgameUnlocked = isPostgameSummonUnlocked(state);
 
@@ -539,10 +632,21 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
 
     case 'SUMMON_HERO_X10':
     case 'SUMMON_HERO_X10_CINEMATIC': {
-      const totalPulls = 10;
-      const freeUses = Math.min(state.freeSummonCharges, totalPulls);
-      const paidUses = totalPulls - freeUses;
-      if (state.bossTears < paidUses) return state;
+      const useDiamonds = action.payWithDiamonds === true;
+      const vipDiscount = state.vipLevel >= VIP_SUMMON_DISCOUNT_LEVEL ? VIP_SUMMON_DISCOUNT : 0;
+      const totalPulls = 11; // x10 summon gives 11 heroes (1 bonus)
+      const paidPullCount = 10; // cost is always based on 10
+      const freeUses = Math.min(state.freeSummonCharges, paidPullCount);
+      const paidUses = paidPullCount - freeUses;
+
+      if (useDiamonds) {
+        const perPullCost = Math.floor(DIAMOND_SUMMON_COST * (1 - vipDiscount));
+        const totalDiamondCost = paidUses * perPullCost;
+        if (state.diamonds < totalDiamondCost) return state;
+      } else {
+        if (state.bossTears < paidUses) return state;
+      }
+
       const postgameUnlocked = isPostgameSummonUnlocked(state);
       const featuredHeroId = action.type === 'SUMMON_HERO_X10_CINEMATIC' ? action.featuredHeroId : undefined;
 
@@ -588,13 +692,15 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
       const newTotalSummons = state.totalSummons + totalPulls;
       const milestones = checkSummonMilestones(newTotalSummons, state.claimedSummonMilestones);
 
+      const diamondCostPerPull = Math.floor(DIAMOND_SUMMON_COST * (1 - vipDiscount));
       let nextState = ctx.withAchievement({
         ...state,
-        bossTears: state.bossTears - paidUses,
+        bossTears: useDiamonds ? state.bossTears : state.bossTears - paidUses,
+        diamonds: useDiamonds ? state.diamonds - paidUses * diamondCostPerPull : state.diamonds,
         heroRoster: [...summoned, ...state.heroRoster],
         summonHistory: [...historyBatch, ...state.summonHistory].slice(0, MAX_SAVE_SUMMON_HISTORY),
         totalSummons: newTotalSummons,
-        freeSummonCharges: state.freeSummonCharges - freeUses + 1 + milestones.freeCharges,
+        freeSummonCharges: state.freeSummonCharges - freeUses + milestones.freeCharges,
         gachaPityCounter: pityCounter,
         sparkTokens: state.sparkTokens + totalSparkGain + milestones.sparkTokens,
         claimedSummonMilestones: milestones.newClaimed,
@@ -634,12 +740,6 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
           detail: `+${totalSparkGain} Spark Tokens from duplicate heroes`,
         });
       }
-      nextState = queueReward(nextState, {
-        id: `cinematic_bonus_${Date.now()}`,
-        kind: 'system',
-        title: 'Cinematic Bonus',
-        detail: '+1 free summon charge awarded.',
-      });
       for (const label of milestones.rewardLabel) {
         nextState = queueReward(nextState, {
           id: `milestone_${Date.now()}_${label}`,

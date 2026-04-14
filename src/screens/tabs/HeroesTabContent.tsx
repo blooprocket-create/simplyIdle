@@ -37,7 +37,7 @@ export interface HeroesTabContentProps {
   state: GameState;
   stats: Stats;
   heroesSubTab: string;
-  setHeroesSubTab: (tab: 'summon' | 'roster' | 'batch') => void;
+  setHeroesSubTab: (tab: 'summon' | 'roster' | 'batch' | 'spark') => void;
   batchLevelMode: 10 | 50 | 100 | 'max';
   setBatchLevelMode: (mode: 10 | 50 | 100 | 'max') => void;
   batchLevelSelected: Set<string>;
@@ -47,6 +47,7 @@ export interface HeroesTabContentProps {
   pityRemaining: number;
   hasGachaNotification: boolean;
   paidX10: number;
+  diamondPerSummon: number;
   summonTimeline: any[];
   rarityConfig: (rarity: Rarity) => any;
   expandedHeroes: Set<string>;
@@ -60,8 +61,8 @@ export interface HeroesTabContentProps {
   calculateShardReward: (rarity: Rarity, level: number) => number;
   getRankUpShardCost: (rarity: Rarity, rank: number) => number;
   getHeroGoldLevelCost: (level: number) => number;
-  summonHero: () => void;
-  summonHeroX10Cinematic: () => void;
+  summonHero: (payWithDiamonds?: boolean) => void;
+  summonHeroX10Cinematic: (featuredHeroId?: string, payWithDiamonds?: boolean) => void;
   sparkExchange: (optionId: string, targetHeroId?: string) => void;
   featuredSummonBanner: FeaturedSummonBannerView;
   autoEquipBestHeroes: () => void;
@@ -95,6 +96,7 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
     pityRemaining,
     hasGachaNotification,
     paidX10: _paidX10,
+    diamondPerSummon,
     summonTimeline,
     rarityConfig,
     expandedHeroes,
@@ -227,9 +229,16 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
         {tab === 'heroes' && (
           <View style={styles.heroesTab}>
             {renderSubTabBar(
-              (['summon', 'roster', 'batch'] as const).map(st => ({
+              (['summon', 'roster', 'batch', 'spark'] as const).map(st => ({
                 id: st,
-                label: st === 'summon' ? 'Summon Bay' : st === 'roster' ? 'Roster' : 'Batch Level',
+                label:
+                  st === 'summon'
+                    ? 'Summon Bay'
+                    : st === 'roster'
+                      ? 'Roster'
+                      : st === 'batch'
+                        ? 'Batch Level'
+                        : 'Spark Exchange',
                 active: heroesSubTab === st,
                 onPress: () => setHeroesSubTab(st),
                 notificationCount:
@@ -239,7 +248,9 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                       ? 1
                       : st === 'roster' && hasUnlockableTeamSlot
                         ? 1
-                        : 0,
+                        : st === 'spark' && state.sparkTokens > 0
+                          ? 1
+                          : 0,
               })),
             )}
 
@@ -273,9 +284,9 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                   <Pressable
                     style={[styles.featuredSummonBtn, !canGachaX10 && styles.featuredSummonBtnDisabled]}
                     disabled={!canGachaX10}
-                    onPress={summonHeroX10Cinematic}
+                    onPress={() => summonHeroX10Cinematic()}
                   >
-                    <Text style={styles.featuredSummonBtnText}>Cinematic x10 Summon (+1 Free Charge)</Text>
+                    <Text style={styles.featuredSummonBtnText}>Cinematic x10 Summon (11 Heroes)</Text>
                   </Pressable>
                 </View>
                 <Text style={styles.pityLabel}>
@@ -284,46 +295,37 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                 {state.freeSummonCharges > 0 ? (
                   <Text style={styles.gachaFree}>Free Summon Ready ({state.freeSummonCharges})</Text>
                 ) : (
-                  <Text style={styles.gachaCost}>Cost: 💧 1 Boss Tear ({state.bossTears} owned)</Text>
+                  <Text style={styles.gachaCost}>
+                    Cost: 💧 1 Boss Tear ({state.bossTears} owned) or 💎 {diamondPerSummon} Diamonds ({state.diamonds}{' '}
+                    owned)
+                  </Text>
                 )}
                 <View style={styles.gachaBtnRow}>
                   <Pressable
                     style={[
                       styles.gachaBtn,
-                      !canGachaOnce && styles.gachaBtnDisabled,
+                      !(state.freeSummonCharges > 0 || state.bossTears >= 1) && styles.gachaBtnDisabled,
                       hasGachaNotification && styles.gachaBtnNotify,
                     ]}
-                    disabled={!canGachaOnce}
-                    onPress={summonHero}
+                    disabled={!(state.freeSummonCharges > 0 || state.bossTears >= 1)}
+                    onPress={() => summonHero(false)}
                   >
                     <Text style={styles.gachaBtnText}>
-                      {state.freeSummonCharges > 0 ? 'Use Free Summon' : 'Summon Hero'}
+                      {state.freeSummonCharges > 0 ? 'Use Free Summon' : '💧 Summon (Boss Tear)'}
                     </Text>
                     {hasGachaNotification && <View style={styles.gachaBtnDot} />}
                   </Pressable>
-                </View>
-
-                {/* Spark Token Exchange */}
-                <View style={styles.featuredSummonCard}>
-                  <Text style={styles.featuredSummonTitle}>✧ Spark Exchange</Text>
-                  <Text style={styles.featuredSummonDesc}>
-                    Spark Tokens: ⚡ {state.sparkTokens} — Earned from duplicate hero summons.
-                  </Text>
-                  {SPARK_EXCHANGE_OPTIONS.map(opt => (
-                    <Pressable
-                      key={opt.id}
-                      style={[
-                        styles.gachaBtn,
-                        state.sparkTokens < opt.sparkCost && styles.gachaBtnDisabled,
-                        { marginTop: 6 },
-                      ]}
-                      disabled={state.sparkTokens < opt.sparkCost}
-                      onPress={() => sparkExchange(opt.id)}
-                    >
-                      <Text style={styles.gachaBtnText}>{opt.label}</Text>
-                      <Text style={styles.gachaX10Cost}>⚡ {opt.sparkCost} Sparks</Text>
-                    </Pressable>
-                  ))}
+                  <Pressable
+                    style={[
+                      styles.gachaBtn,
+                      state.diamonds < diamondPerSummon && styles.gachaBtnDisabled,
+                      { marginLeft: 8 },
+                    ]}
+                    disabled={state.diamonds < diamondPerSummon}
+                    onPress={() => summonHero(true)}
+                  >
+                    <Text style={styles.gachaBtnText}>💎 Summon ({diamondPerSummon})</Text>
+                  </Pressable>
                 </View>
 
                 {/* Summon Milestones */}
@@ -369,6 +371,32 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                       })
                     )}
                   </View>
+                </View>
+              </View>
+            )}
+
+            {heroesSubTab === 'spark' && (
+              <View style={styles.gachaSection}>
+                <Text style={styles.sectionTitle}>✧ Spark Exchange</Text>
+                <View style={styles.featuredSummonCard}>
+                  <Text style={styles.featuredSummonDesc}>
+                    Spark Tokens: ⚡ {state.sparkTokens} — Earned from duplicate hero summons.
+                  </Text>
+                  {SPARK_EXCHANGE_OPTIONS.map(opt => (
+                    <Pressable
+                      key={opt.id}
+                      style={[
+                        styles.gachaBtn,
+                        state.sparkTokens < opt.sparkCost && styles.gachaBtnDisabled,
+                        { marginTop: 6 },
+                      ]}
+                      disabled={state.sparkTokens < opt.sparkCost}
+                      onPress={() => sparkExchange(opt.id)}
+                    >
+                      <Text style={styles.gachaBtnText}>{opt.label}</Text>
+                      <Text style={styles.gachaX10Cost}>⚡ {opt.sparkCost} Sparks</Text>
+                    </Pressable>
+                  ))}
                 </View>
               </View>
             )}

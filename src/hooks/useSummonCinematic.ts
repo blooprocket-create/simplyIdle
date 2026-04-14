@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing } from 'react-native';
 import { Rarity } from '../gameConfig';
 
@@ -24,7 +24,7 @@ interface UseSummonCinematicParams {
   summonHistory: SummonHistoryEntry[];
   heroTemplateIdByName: Map<string, string>;
   featuredHeroId: string;
-  summonHeroX10Cinematic: (featuredHeroId: string) => void;
+  summonHeroX10Cinematic: (featuredHeroId?: string, payWithDiamonds?: boolean) => void;
 }
 
 export function useSummonCinematic({
@@ -44,21 +44,22 @@ export function useSummonCinematic({
   const pendingCinematicSummonRef = useRef(false);
   const cinematicTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
 
-  const cinematicPulse = useRef(new Animated.Value(0)).current;
-  const cinematicRevealScale = useRef(new Animated.Value(0.8)).current;
+  const cinematicPulse = useMemo(() => new Animated.Value(0), []);
+  const cinematicRevealScale = useMemo(() => new Animated.Value(0.8), []);
 
   const clearCinematicTimers = () => {
     cinematicTimersRef.current.forEach(timer => clearTimeout(timer));
     cinematicTimersRef.current = [];
   };
 
-  const mapLatestTen = () => summonHistory.slice(0, 10).map(entry => ({
-    id: entry.id,
-    heroId: heroTemplateIdByName.get(entry.heroName) ?? null,
-    heroName: entry.heroName,
-    emoji: entry.heroEmoji,
-    rarity: entry.rarity,
-  }));
+  const mapLatestTen = () =>
+    summonHistory.slice(0, 10).map(entry => ({
+      id: entry.id,
+      heroId: heroTemplateIdByName.get(entry.heroName) ?? null,
+      heroName: entry.heroName,
+      emoji: entry.heroEmoji,
+      rarity: entry.rarity,
+    }));
 
   useEffect(() => {
     if (activeModal !== 'cinematicSummon') return;
@@ -106,20 +107,24 @@ export function useSummonCinematic({
 
     if (pendingCinematicSummonRef.current) {
       pendingCinematicSummonRef.current = false;
-      setCinematicSummonResults(mapLatestTen());
-      setCinematicSummonPhase('reveal');
+      const results = mapLatestTen();
+      queueMicrotask(() => {
+        setCinematicSummonResults(results);
+        setCinematicSummonPhase('reveal');
+      });
       return;
     }
 
     if (activeModal === 'cinematicSummon') return;
 
-    setSummonReveal({
+    const reveal: SummonReveal = {
       id: latest.id,
       heroId: heroTemplateIdByName.get(latest.heroName) ?? null,
       heroName: latest.heroName,
       emoji: latest.heroEmoji,
       rarity: latest.rarity,
-    });
+    };
+    queueMicrotask(() => setSummonReveal(reveal));
 
     const timer = setTimeout(() => setSummonReveal(null), 2000);
     return () => clearTimeout(timer);
