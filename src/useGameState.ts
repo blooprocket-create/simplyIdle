@@ -3813,10 +3813,12 @@ function applyBurst(state: GameState, hits: number): GameState {
 
   let working: GameState = { ...state, burstCharge: 0 };
   const burstHits = Math.max(1, Math.floor(hits));
+  const weekly = getCurrentWeeklyEvent(working);
   for (let i = 0; i < burstHits; i++) {
     const affix = getMonsterAffixModifiers(working.wave);
     const crit = Math.random() < 0.2;
-    const dmg = (getDps(working) * BURST_STRIKE_DPS_MULT * (crit ? 1.8 : 1)) / affix.hpMult;
+    const dmg =
+      (getDps(working) * BURST_STRIKE_DPS_MULT * (crit ? 1.8 : 1)) / (affix.hpMult * weekly.enemyHpMultiplier);
     const hp = working.monsterHp - dmg;
     if (hp <= 0) {
       working = withAchievement(killMonster(working));

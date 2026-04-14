@@ -1,5 +1,14 @@
-import React, { useMemo } from 'react';
-import { View, Text, Pressable, ScrollView, useWindowDimensions, Image } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  useWindowDimensions,
+  Image,
+  Modal,
+  StyleSheet as RNStyleSheet,
+} from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import {
   RARITIES,
@@ -142,6 +151,11 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
 
       return <Text style={[styles.heroEmoji, isMobile && styles.heroEmojiMobile]}>{emoji}</Text>;
     };
+
+    const [diamondConfirm, setDiamondConfirm] = useState<{
+      type: 'single' | 'x10';
+      cost: number;
+    } | null>(null);
 
     const { width: viewportWidth } = useWindowDimensions();
     const isPhoneWidth = viewportWidth < 700;
@@ -288,7 +302,11 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                       const freeUses = Math.min(state.freeSummonCharges, 10);
                       const paidNeeded = 10 - freeUses;
                       const shouldPayDiamonds = state.bossTears < paidNeeded;
-                      summonHeroX10Cinematic(undefined, shouldPayDiamonds);
+                      if (shouldPayDiamonds && paidNeeded > 0) {
+                        setDiamondConfirm({ type: 'x10', cost: paidNeeded * diamondPerSummon });
+                      } else {
+                        summonHeroX10Cinematic(undefined, false);
+                      }
                     }}
                   >
                     <Text style={styles.featuredSummonBtnText}>Cinematic x10 Summon (11 Heroes)</Text>
@@ -327,7 +345,7 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                       { marginLeft: 8 },
                     ]}
                     disabled={state.diamonds < diamondPerSummon}
-                    onPress={() => summonHero(true)}
+                    onPress={() => setDiamondConfirm({ type: 'single', cost: diamondPerSummon })}
                   >
                     <Text style={styles.gachaBtnText}>💎 Summon ({diamondPerSummon})</Text>
                   </Pressable>
@@ -997,7 +1015,99 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
             )}
           </View>
         )}
+
+        {diamondConfirm && (
+          <Modal transparent animationType="fade" visible onRequestClose={() => setDiamondConfirm(null)}>
+            <View style={confirmStyles.backdrop}>
+              <View style={confirmStyles.card}>
+                <Text style={confirmStyles.title}>💎 Confirm Diamond Summon</Text>
+                <Text style={confirmStyles.body}>
+                  Spend {fmt(diamondConfirm.cost)} Diamonds on{' '}
+                  {diamondConfirm.type === 'x10' ? 'x10 Cinematic' : 'a single'} summon?
+                </Text>
+                <Text style={confirmStyles.balance}>
+                  Balance: {fmt(state.diamonds)} → {fmt(state.diamonds - diamondConfirm.cost)}
+                </Text>
+                <View style={confirmStyles.btnRow}>
+                  <Pressable style={confirmStyles.cancelBtn} onPress={() => setDiamondConfirm(null)}>
+                    <Text style={confirmStyles.cancelText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={confirmStyles.confirmBtn}
+                    onPress={() => {
+                      if (diamondConfirm.type === 'x10') {
+                        summonHeroX10Cinematic(undefined, true);
+                      } else {
+                        summonHero(true);
+                      }
+                      setDiamondConfirm(null);
+                    }}
+                  >
+                    <Text style={confirmStyles.confirmText}>Summon</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        )}
       </>
     );
   },
 );
+
+const confirmStyles = RNStyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  card: {
+    backgroundColor: '#1e1e2e',
+    borderRadius: 14,
+    padding: 24,
+    width: 300,
+    borderWidth: 1,
+    borderColor: '#C77DFF',
+  },
+  title: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  body: {
+    color: '#ccc',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  balance: {
+    color: '#aaa',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  btnRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#333',
+    alignItems: 'center',
+  },
+  cancelText: { color: '#aaa', fontWeight: '600', fontSize: 14 },
+  confirmBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#C77DFF',
+    alignItems: 'center',
+  },
+  confirmText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+});

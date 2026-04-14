@@ -852,7 +852,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const powerFromDefense = stats.teamDefense * 7;
   const powerFromGear = gearScore * 15;
   const teamPowerIndex = Math.floor(powerFromDps + powerFromHp + powerFromDefense + powerFromGear);
-  const effectiveTeamDps = Math.max(1, stats.dps / affixTotals.hpMult);
+  const effectiveTeamDps = Math.max(1, stats.dps / (affixTotals.hpMult * weeklyEvent.enemyHpMultiplier));
   const ttkSeconds = state.monsterHp / effectiveTeamDps;
   const baseEnemyDps = getMonsterDamage(state.wave) * affixTotals.dmgMult;
   const incomingAfterDefense = baseEnemyDps * (1 - Math.min(0.8, stats.teamDefense / (stats.teamDefense + 100)));
