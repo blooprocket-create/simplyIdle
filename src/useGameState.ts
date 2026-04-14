@@ -67,6 +67,7 @@ import {
   SPARK_TOKEN_BY_RARITY,
   SOFT_PITY_START,
   SOFT_PITY_BOOST_PER_PULL,
+  getHeroStatProfile,
 } from './gameConfig';
 import { buildingCost, bulkCost, safeDivide, roundTo4, safeMultiplier } from './utils';
 import { debugLog, trackEvent, trackGameplayAction } from './telemetry';
@@ -184,6 +185,7 @@ const VALID_PERMANENT_UNLOCKS = new Set<PermanentUnlockId>([
   'mythic_equipment',
 ]);
 const VALID_HERO_TEMPLATE_IDS = new Set(HERO_POOL.map(hero => hero.id));
+const HERO_TEMPLATE_MAP = new Map(HERO_POOL.map(h => [h.id, h]));
 const VALID_HERO_FORMATION_ROLES = new Set<HeroFormationRole>(['front', 'mid', 'back']);
 const VALID_SKILL_IDS = new Set(SKILLS.map(skill => skill.id));
 const VALID_ACHIEVEMENT_IDS = new Set(ACHIEVEMENTS.map(achievement => achievement.id));
@@ -1823,6 +1825,7 @@ export function getDpsBreakdown(state: GameState): {
     vipDamage: number;
     uniqueRelics: number;
     temporaryBuff: number;
+    teamBoost: number;
   };
   totalMultiplier: number;
   finalDps: number;
@@ -1840,20 +1843,32 @@ export function getDpsBreakdown(state: GameState): {
 
   const playerDps = (physical * cls.physWeight * 0.72 + magic * cls.magicWeight * 0.52) / 1.85;
 
-  // Active team heroes damage
+  // Active team heroes damage (V2: per-hero stats via tier + class profile + variance)
   let heroDps = 0;
   const activeTeam = new Set(state.activeTeamHeroIds);
   for (const hero of state.heroRoster) {
     if (activeTeam.has(hero.uid)) {
       const heroClass = getClassConfig(hero.heroClass);
+      const template = HERO_TEMPLATE_MAP.get(hero.id);
       const rankMult = getRankMultiplier(hero.rank, hero.rarity);
       const statMult = Math.max(1, hero.rebirthStatMult ?? 1);
-      const heroStr = (heroClass.baseStats.strength + hero.level * 0.9) * rankMult * statMult;
-      const heroInt = (heroClass.baseStats.intelligence + hero.level * 0.85) * rankMult * statMult;
-      const heroAgi = (heroClass.baseStats.agility + hero.level * 0.7) * rankMult * statMult;
+
+      let heroStr: number, heroInt: number, heroAgi: number, heroSpr: number;
+      if (template) {
+        const hp = getHeroStatProfile(template);
+        heroStr = (hp.baseStats.str + hero.level * hp.statGrowth.str) * rankMult * statMult;
+        heroInt = (hp.baseStats.int + hero.level * hp.statGrowth.int) * rankMult * statMult;
+        heroAgi = (hp.baseStats.agi + hero.level * hp.statGrowth.agi) * rankMult * statMult;
+        heroSpr = (hp.baseStats.spr + hero.level * hp.statGrowth.spr) * rankMult * statMult;
+      } else {
+        heroStr = (heroClass.baseStats.strength + hero.level * 0.9) * rankMult * statMult;
+        heroInt = (heroClass.baseStats.intelligence + hero.level * 0.85) * rankMult * statMult;
+        heroAgi = (heroClass.baseStats.agility + hero.level * 0.7) * rankMult * statMult;
+        heroSpr = (heroClass.baseStats.spirit + hero.level * 0.6) * rankMult * statMult;
+      }
 
       const heroPhy = heroStr * 2 + heroAgi * 1.2 + hero.level * 0.5;
-      const heroMag = heroInt * 2 + (heroClass.baseStats.spirit + hero.level * 0.6) * rankMult * statMult * 1.1;
+      const heroMag = heroInt * 2 + heroSpr * 1.1;
 
       const heroDmg = (heroPhy * heroClass.physWeight * 0.4 + heroMag * heroClass.magicWeight * 0.3) / 3;
       heroDps += heroDmg;
@@ -1871,6 +1886,7 @@ export function getDpsBreakdown(state: GameState): {
   const vipDamageMult = getVipDamageMultiplier(state);
   const tacticsPowerMult = getTacticsPowerMultiplier(state);
   const uniqueSkillMult = getActiveUniqueSkillMultipliers(state).dpsMult;
+  const teamBoostMult = 1 + getTeamHeroBoost(state);
   const multipliers = {
     rebirthLegacy: rebirthMult,
     achievementLegacy: getAchievementBonusMultiplier(state),
@@ -1885,6 +1901,7 @@ export function getDpsBreakdown(state: GameState): {
     vipDamage: vipDamageMult,
     uniqueRelics: uniqueSkillMult,
     temporaryBuff: activeBuffMult,
+    teamBoost: teamBoostMult,
   };
   const totalMultiplier = safeMultiplier(
     multipliers.rebirthLegacy *
@@ -1899,7 +1916,8 @@ export function getDpsBreakdown(state: GameState): {
       multipliers.mastery *
       multipliers.vipDamage *
       multipliers.uniqueRelics *
-      multipliers.temporaryBuff,
+      multipliers.temporaryBuff *
+      multipliers.teamBoost,
   );
   const rawDps = (playerDps + heroDps) * totalMultiplier;
   const finalDps = Number.isFinite(rawDps) ? Math.max(1, rawDps) : 1;
@@ -3017,13 +3035,26 @@ export function computeStats(state: GameState) {
   > = {};
   for (const hero of state.heroRoster) {
     const heroClass = getClassConfig(hero.heroClass);
+    const template = HERO_TEMPLATE_MAP.get(hero.id);
     const rankMult = getRankMultiplier(hero.rank, hero.rarity);
     const statMult = Math.max(1, hero.rebirthStatMult ?? 1);
-    const hStr = (heroClass.baseStats.strength + hero.level * 0.9) * rankMult * statMult;
-    const hInt = (heroClass.baseStats.intelligence + hero.level * 0.85) * rankMult * statMult;
-    const hAgi = (heroClass.baseStats.agility + hero.level * 0.7) * rankMult * statMult;
-    const hVit = (heroClass.baseStats.vitality + hero.level * 0.8) * rankMult * statMult;
-    const hSpr = (heroClass.baseStats.spirit + hero.level * 0.6) * rankMult * statMult;
+
+    let hStr: number, hInt: number, hAgi: number, hVit: number, hSpr: number;
+    if (template) {
+      const hp = getHeroStatProfile(template);
+      hStr = (hp.baseStats.str + hero.level * hp.statGrowth.str) * rankMult * statMult;
+      hInt = (hp.baseStats.int + hero.level * hp.statGrowth.int) * rankMult * statMult;
+      hAgi = (hp.baseStats.agi + hero.level * hp.statGrowth.agi) * rankMult * statMult;
+      hVit = (hp.baseStats.vit + hero.level * hp.statGrowth.vit) * rankMult * statMult;
+      hSpr = (hp.baseStats.spr + hero.level * hp.statGrowth.spr) * rankMult * statMult;
+    } else {
+      hStr = (heroClass.baseStats.strength + hero.level * 0.9) * rankMult * statMult;
+      hInt = (heroClass.baseStats.intelligence + hero.level * 0.85) * rankMult * statMult;
+      hAgi = (heroClass.baseStats.agility + hero.level * 0.7) * rankMult * statMult;
+      hVit = (heroClass.baseStats.vitality + hero.level * 0.8) * rankMult * statMult;
+      hSpr = (heroClass.baseStats.spirit + hero.level * 0.6) * rankMult * statMult;
+    }
+
     const heroPhy = hStr * 2 + hAgi * 1.2 + hero.level * 0.5;
     const heroMag = hInt * 2 + hSpr * 1.1;
     const heroDps = (heroPhy * heroClass.physWeight * 0.4 + heroMag * heroClass.magicWeight * 0.3) / 3;

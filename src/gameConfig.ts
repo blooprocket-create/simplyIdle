@@ -2001,6 +2001,84 @@ export interface HeroTemplate {
   passiveTrait: HeroPassiveTraitId;
   activeSkillArchetype: HeroActiveSkillArchetypeId;
   baseTeamBoost: number; // decimal (0.06 = +6% base)
+  tier: 1 | 2 | 3 | 4 | 5;
+}
+
+// ── Hero V2: Per-hero stat profiles ──────────────────────────────────────
+
+/** Class-level base stats and growth rates for heroes. */
+export const HERO_CLASS_STAT_PROFILE: Record<
+  PlayerClass,
+  {
+    baseStats: { str: number; int: number; agi: number; vit: number; spr: number };
+    statGrowth: { str: number; int: number; agi: number; vit: number; spr: number };
+  }
+> = {
+  warrior: {
+    baseStats: { str: 12, int: 4, agi: 6, vit: 10, spr: 5 },
+    statGrowth: { str: 1.1, int: 0.3, agi: 0.5, vit: 0.9, spr: 0.4 },
+  },
+  berserker: {
+    baseStats: { str: 14, int: 3, agi: 8, vit: 6, spr: 4 },
+    statGrowth: { str: 1.3, int: 0.2, agi: 0.7, vit: 0.4, spr: 0.3 },
+  },
+  archer: {
+    baseStats: { str: 6, int: 5, agi: 13, vit: 5, spr: 7 },
+    statGrowth: { str: 0.5, int: 0.4, agi: 1.2, vit: 0.4, spr: 0.5 },
+  },
+  mage: {
+    baseStats: { str: 3, int: 14, agi: 5, vit: 4, spr: 10 },
+    statGrowth: { str: 0.2, int: 1.3, agi: 0.4, vit: 0.3, spr: 0.9 },
+  },
+  monk: {
+    baseStats: { str: 7, int: 8, agi: 9, vit: 8, spr: 9 },
+    statGrowth: { str: 0.6, int: 0.7, agi: 0.8, vit: 0.7, spr: 0.8 },
+  },
+};
+
+/** Tier growth multiplier: higher-tier heroes have stronger bases and scale faster. */
+export const TIER_GROWTH_MULT: Record<number, number> = {
+  1: 1.0,
+  2: 1.15,
+  3: 1.35,
+  4: 1.6,
+  5: 2.0,
+};
+
+/** Deterministic ±15% stat variance per hero per stat key. Stable across sessions. */
+function heroStatVariance(heroId: string, statKey: string): number {
+  let hash = 0;
+  const seed = heroId + statKey;
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+  }
+  return 0.85 + ((hash & 0xffff) / 0xffff) * 0.3;
+}
+
+/** Resolve per-hero base stats & growth with class profile × tier × individual variance. */
+export function getHeroStatProfile(hero: HeroTemplate): {
+  baseStats: { str: number; int: number; agi: number; vit: number; spr: number };
+  statGrowth: { str: number; int: number; agi: number; vit: number; spr: number };
+} {
+  const profile = HERO_CLASS_STAT_PROFILE[hero.heroClass];
+  const tierMult = TIER_GROWTH_MULT[hero.tier] ?? 1;
+  const v = (stat: string) => heroStatVariance(hero.id, stat);
+  return {
+    baseStats: {
+      str: profile.baseStats.str * v('str') * tierMult,
+      int: profile.baseStats.int * v('int') * tierMult,
+      agi: profile.baseStats.agi * v('agi') * tierMult,
+      vit: profile.baseStats.vit * v('vit') * tierMult,
+      spr: profile.baseStats.spr * v('spr') * tierMult,
+    },
+    statGrowth: {
+      str: profile.statGrowth.str * v('str') * tierMult,
+      int: profile.statGrowth.int * v('int') * tierMult,
+      agi: profile.statGrowth.agi * v('agi') * tierMult,
+      vit: profile.statGrowth.vit * v('vit') * tierMult,
+      spr: profile.statGrowth.spr * v('spr') * tierMult,
+    },
+  };
 }
 
 export type HeroPassiveTraitId = 'bulwark_instinct' | 'warpath_instinct' | 'fortune_hunter' | 'sage_instinct';
@@ -2218,6 +2296,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'bulwark_instinct',
     activeSkillArchetype: 'frontline_ward',
     baseTeamBoost: 0.05,
+    tier: 1,
   },
   {
     id: 'h2',
@@ -2227,6 +2306,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'fortune_hunter',
     activeSkillArchetype: 'frontline_ward',
     baseTeamBoost: 0.055,
+    tier: 1,
   },
   {
     id: 'h3',
@@ -2236,6 +2316,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'battle_chant',
     baseTeamBoost: 0.06,
+    tier: 1,
   },
   {
     id: 'h4',
@@ -2245,6 +2326,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'bulwark_instinct',
     activeSkillArchetype: 'battle_chant',
     baseTeamBoost: 0.05,
+    tier: 1,
   },
   {
     id: 'h5',
@@ -2254,6 +2336,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.055,
+    tier: 1,
   },
   {
     id: 'h6',
@@ -2263,6 +2346,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'fortune_hunter',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.06,
+    tier: 1,
   },
   {
     id: 'h7',
@@ -2272,6 +2356,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'mending_pulse',
     baseTeamBoost: 0.065,
+    tier: 1,
   },
   {
     id: 'h8',
@@ -2281,6 +2366,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.06,
+    tier: 1,
   },
   {
     id: 'h9',
@@ -2290,6 +2376,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'bulwark_instinct',
     activeSkillArchetype: 'mending_pulse',
     baseTeamBoost: 0.055,
+    tier: 1,
   },
   {
     id: 'h10',
@@ -2299,6 +2386,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'frontline_ward',
     baseTeamBoost: 0.06,
+    tier: 1,
   },
   {
     id: 'h11',
@@ -2308,6 +2396,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'bulwark_instinct',
     activeSkillArchetype: 'frontline_ward',
     baseTeamBoost: 0.05,
+    tier: 1,
   },
   {
     id: 'h12',
@@ -2317,6 +2406,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'battle_chant',
     baseTeamBoost: 0.065,
+    tier: 1,
   },
   {
     id: 'h13',
@@ -2326,6 +2416,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'fortune_hunter',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.055,
+    tier: 1,
   },
   {
     id: 'h14',
@@ -2335,6 +2426,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'mending_pulse',
     baseTeamBoost: 0.07,
+    tier: 1,
   },
   {
     id: 'h15',
@@ -2344,6 +2436,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'battle_chant',
     baseTeamBoost: 0.06,
+    tier: 1,
   },
   {
     id: 'h16',
@@ -2353,6 +2446,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'bulwark_instinct',
     activeSkillArchetype: 'frontline_ward',
     baseTeamBoost: 0.058,
+    tier: 1,
   },
   {
     id: 'h17',
@@ -2362,6 +2456,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'fortune_hunter',
     activeSkillArchetype: 'battle_chant',
     baseTeamBoost: 0.062,
+    tier: 1,
   },
   {
     id: 'h18',
@@ -2371,6 +2466,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'battle_chant',
     baseTeamBoost: 0.068,
+    tier: 1,
   },
   {
     id: 'h19',
@@ -2380,6 +2476,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'bulwark_instinct',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.057,
+    tier: 1,
   },
   {
     id: 'h20',
@@ -2389,6 +2486,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'fortune_hunter',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.061,
+    tier: 1,
   },
   {
     id: 'h21',
@@ -2398,6 +2496,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'frontline_ward',
     baseTeamBoost: 0.058,
+    tier: 1,
   },
   {
     id: 'h22',
@@ -2407,6 +2506,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.071,
+    tier: 1,
   },
   {
     id: 'h23',
@@ -2416,6 +2516,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'mending_pulse',
     baseTeamBoost: 0.066,
+    tier: 1,
   },
   {
     id: 'h24',
@@ -2425,6 +2526,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'mending_pulse',
     baseTeamBoost: 0.063,
+    tier: 1,
   },
   {
     id: 'h25',
@@ -2434,6 +2536,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'bulwark_instinct',
     activeSkillArchetype: 'battle_chant',
     baseTeamBoost: 0.064,
+    tier: 1,
   },
   {
     id: 'h26',
@@ -2443,6 +2546,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'frontline_ward',
     baseTeamBoost: 0.06,
+    tier: 1,
   },
   {
     id: 'h27',
@@ -2452,6 +2556,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.067,
+    tier: 1,
   },
   {
     id: 'h28',
@@ -2461,6 +2566,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.06,
+    tier: 1,
   },
   {
     id: 'h29',
@@ -2470,6 +2576,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'fortune_hunter',
     activeSkillArchetype: 'mending_pulse',
     baseTeamBoost: 0.065,
+    tier: 1,
   },
   {
     id: 'h30',
@@ -2479,6 +2586,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'frontline_ward',
     baseTeamBoost: 0.062,
+    tier: 1,
   },
   // ── Tier 2 Heroes (Epic+ fodder) ────────────────────────────────────────
   {
@@ -2489,6 +2597,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'bulwark_instinct',
     activeSkillArchetype: 'frontline_ward',
     baseTeamBoost: 0.061,
+    tier: 2,
   },
   {
     id: 'h32',
@@ -2498,6 +2607,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'fortune_hunter',
     activeSkillArchetype: 'battle_chant',
     baseTeamBoost: 0.063,
+    tier: 2,
   },
   {
     id: 'h33',
@@ -2507,6 +2617,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'battle_chant',
     baseTeamBoost: 0.069,
+    tier: 2,
   },
   {
     id: 'h34',
@@ -2516,6 +2627,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'bulwark_instinct',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.059,
+    tier: 2,
   },
   {
     id: 'h35',
@@ -2525,6 +2637,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'fortune_hunter',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.062,
+    tier: 2,
   },
   {
     id: 'h36',
@@ -2534,6 +2647,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'mending_pulse',
     baseTeamBoost: 0.06,
+    tier: 2,
   },
   {
     id: 'h37',
@@ -2543,6 +2657,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.072,
+    tier: 2,
   },
   {
     id: 'h38',
@@ -2552,6 +2667,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'fortune_hunter',
     activeSkillArchetype: 'mending_pulse',
     baseTeamBoost: 0.067,
+    tier: 2,
   },
   {
     id: 'h39',
@@ -2561,6 +2677,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'battle_chant',
     baseTeamBoost: 0.065,
+    tier: 2,
   },
   {
     id: 'h40',
@@ -2570,6 +2687,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'bulwark_instinct',
     activeSkillArchetype: 'mending_pulse',
     baseTeamBoost: 0.064,
+    tier: 2,
   },
   // ── Tier 3 Heroes (Legendary/Mythic base) ──────────────────────────────
   {
@@ -2580,6 +2698,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'frontline_ward',
     baseTeamBoost: 0.073,
+    tier: 3,
   },
   {
     id: 'h42',
@@ -2589,6 +2708,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'battle_chant',
     baseTeamBoost: 0.068,
+    tier: 3,
   },
   {
     id: 'h43',
@@ -2598,6 +2718,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.075,
+    tier: 3,
   },
   {
     id: 'h44',
@@ -2607,6 +2728,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'bulwark_instinct',
     activeSkillArchetype: 'battle_chant',
     baseTeamBoost: 0.07,
+    tier: 3,
   },
   {
     id: 'h45',
@@ -2616,6 +2738,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.074,
+    tier: 3,
   },
   {
     id: 'h46',
@@ -2625,6 +2748,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'frontline_ward',
     baseTeamBoost: 0.069,
+    tier: 3,
   },
   {
     id: 'h47',
@@ -2634,6 +2758,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'mending_pulse',
     baseTeamBoost: 0.078,
+    tier: 3,
   },
   {
     id: 'h48',
@@ -2643,6 +2768,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'fortune_hunter',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.076,
+    tier: 3,
   },
   {
     id: 'h49',
@@ -2652,6 +2778,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'battle_chant',
     baseTeamBoost: 0.072,
+    tier: 3,
   },
   {
     id: 'h50',
@@ -2661,6 +2788,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'bulwark_instinct',
     activeSkillArchetype: 'mending_pulse',
     baseTeamBoost: 0.071,
+    tier: 3,
   },
   // ── Tier 4 Heroes (Godly heroes - ultra rare summons) ────────────────
   {
@@ -2671,6 +2799,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'frontline_ward',
     baseTeamBoost: 0.085,
+    tier: 4,
   },
   {
     id: 'h52',
@@ -2680,6 +2809,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'battle_chant',
     baseTeamBoost: 0.082,
+    tier: 4,
   },
   {
     id: 'h53',
@@ -2689,6 +2819,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.088,
+    tier: 4,
   },
   {
     id: 'h54',
@@ -2698,6 +2829,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'fortune_hunter',
     activeSkillArchetype: 'battle_chant',
     baseTeamBoost: 0.084,
+    tier: 4,
   },
   {
     id: 'h55',
@@ -2707,6 +2839,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.087,
+    tier: 4,
   },
   {
     id: 'h56',
@@ -2716,6 +2849,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'mending_pulse',
     baseTeamBoost: 0.083,
+    tier: 4,
   },
   {
     id: 'h57',
@@ -2725,6 +2859,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'mending_pulse',
     baseTeamBoost: 0.091,
+    tier: 4,
   },
   {
     id: 'h58',
@@ -2734,6 +2869,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'fortune_hunter',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.089,
+    tier: 4,
   },
   {
     id: 'h59',
@@ -2743,6 +2879,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'battle_chant',
     baseTeamBoost: 0.086,
+    tier: 4,
   },
   {
     id: 'h60',
@@ -2752,6 +2889,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'bulwark_instinct',
     activeSkillArchetype: 'mending_pulse',
     baseTeamBoost: 0.085,
+    tier: 4,
   },
   // ── Tier 5 Heroes (Transcendent - only in postgame) ───────────────────
   {
@@ -2762,6 +2900,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'frontline_ward',
     baseTeamBoost: 0.095,
+    tier: 5,
   },
   {
     id: 'h62',
@@ -2771,6 +2910,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'warpath_instinct',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.098,
+    tier: 5,
   },
   {
     id: 'h63',
@@ -2780,6 +2920,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'burst_volley',
     baseTeamBoost: 0.096,
+    tier: 5,
   },
   {
     id: 'h64',
@@ -2789,6 +2930,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'mending_pulse',
     baseTeamBoost: 0.1,
+    tier: 5,
   },
   {
     id: 'h65',
@@ -2798,6 +2940,7 @@ export const HERO_POOL: HeroTemplate[] = [
     passiveTrait: 'sage_instinct',
     activeSkillArchetype: 'battle_chant',
     baseTeamBoost: 0.099,
+    tier: 5,
   },
 ];
 
