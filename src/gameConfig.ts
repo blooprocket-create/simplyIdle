@@ -2807,6 +2807,115 @@ export const GACHA_SUMMON_COST = 500;
 export const HERO_LEVEL_EXP_FORMULA = (level: number) => Math.floor(50 * Math.pow(1.18, level - 1));
 export const HERO_LEVEL_CAP = 999;
 
+// ── Gacha V2: Tiered Hero Pool ────────────────────────────────────────────
+
+/** Maps a pulled rarity to the eligible hero sub-pool (by tier). */
+const HERO_TIER_RANGES: { rarities: Rarity[]; startIndex: number; endIndex: number }[] = [
+  { rarities: ['common', 'uncommon'], startIndex: 0, endIndex: 30 }, // h1–h30
+  { rarities: ['rare', 'epic'], startIndex: 30, endIndex: 50 }, // h31–h50
+  { rarities: ['legendary', 'mythic'], startIndex: 40, endIndex: 60 }, // h41–h60 (overlaps for variety)
+  { rarities: ['godly', 'transcendent'], startIndex: 50, endIndex: 65 }, // h51–h65
+];
+
+export function pickHeroForRarity(rarity: Rarity): HeroTemplate {
+  const tier = HERO_TIER_RANGES.find(t => t.rarities.includes(rarity));
+  if (!tier) return HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
+  const slice = HERO_POOL.slice(tier.startIndex, tier.endIndex);
+  return slice[Math.floor(Math.random() * slice.length)];
+}
+
+// ── Gacha V2: Dupe Spark Tokens ───────────────────────────────────────────
+
+export const SPARK_TOKEN_BY_RARITY: Record<Rarity, number> = {
+  common: 1,
+  uncommon: 3,
+  rare: 8,
+  epic: 20,
+  legendary: 50,
+  mythic: 120,
+  godly: 300,
+  transcendent: 600,
+};
+
+export interface SparkExchangeOption {
+  id: string;
+  label: string;
+  sparkCost: number;
+  kind: 'free_summon' | 'targeted_hero';
+  minRarity?: Rarity;
+}
+
+export const SPARK_EXCHANGE_OPTIONS: SparkExchangeOption[] = [
+  { id: 'spark_free_charge', label: '1 Free Summon Charge', sparkCost: 50, kind: 'free_summon' },
+  { id: 'spark_rare', label: 'Choose a Rare-tier Hero', sparkCost: 150, kind: 'targeted_hero', minRarity: 'rare' },
+  { id: 'spark_epic', label: 'Choose an Epic-tier Hero', sparkCost: 500, kind: 'targeted_hero', minRarity: 'epic' },
+  {
+    id: 'spark_legendary',
+    label: 'Choose a Legendary-tier Hero',
+    sparkCost: 1500,
+    kind: 'targeted_hero',
+    minRarity: 'legendary',
+  },
+  { id: 'spark_mythic', label: 'Choose a Mythic+ Hero', sparkCost: 5000, kind: 'targeted_hero', minRarity: 'mythic' },
+];
+
+// ── Gacha V2: Banner Rate-Up (across all Legendary+ pulls) ───────────────
+
+export const BANNER_RATE_UP_BY_RARITY: Partial<Record<Rarity, number>> = {
+  legendary: 0.35,
+  mythic: 0.45,
+  godly: 0.55,
+  transcendent: 0.65,
+};
+
+// ── Gacha V2: Summon Milestones ───────────────────────────────────────────
+
+export interface SummonMilestone {
+  threshold: number;
+  rewardLabel: string;
+  rewardKind: 'free_charges' | 'guaranteed_rarity' | 'spark_tokens' | 'spark_and_unique';
+  freeCharges?: number;
+  sparkTokens?: number;
+  guaranteedRarity?: Rarity;
+  grantUniqueForge?: boolean;
+}
+
+export const SUMMON_MILESTONES: SummonMilestone[] = [
+  { threshold: 10, rewardLabel: '5 Free Summon Charges', rewardKind: 'free_charges', freeCharges: 5 },
+  {
+    threshold: 50,
+    rewardLabel: 'Next summon guaranteed Epic+',
+    rewardKind: 'guaranteed_rarity',
+    guaranteedRarity: 'epic',
+  },
+  { threshold: 100, rewardLabel: '500 Spark Tokens', rewardKind: 'spark_tokens', sparkTokens: 500 },
+  {
+    threshold: 250,
+    rewardLabel: 'Next summon guaranteed Legendary+',
+    rewardKind: 'guaranteed_rarity',
+    guaranteedRarity: 'legendary',
+  },
+  {
+    threshold: 500,
+    rewardLabel: '2000 Spark Tokens + Unique Gear',
+    rewardKind: 'spark_and_unique',
+    sparkTokens: 2000,
+    grantUniqueForge: true,
+  },
+  {
+    threshold: 1000,
+    rewardLabel: 'Next summon guaranteed Mythic+',
+    rewardKind: 'guaranteed_rarity',
+    guaranteedRarity: 'mythic',
+  },
+];
+
+// ── Gacha V2: Soft Pity ──────────────────────────────────────────────────
+
+/** Pulls 20+ get +3% cumulative Legendary+ chance per pull past 20. */
+export const SOFT_PITY_START = 20;
+export const SOFT_PITY_BOOST_PER_PULL = 0.03;
+
 export function rollRarity(random: number, pool: RarityConfig[] = RARITIES): Rarity {
   let acc = 0;
   for (const r of pool) {

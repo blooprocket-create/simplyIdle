@@ -63,6 +63,10 @@ import {
   getHeroUniqueSkillDescription,
   getHeroUniqueWeaponName,
   unlockLabel,
+  pickHeroForRarity,
+  SPARK_TOKEN_BY_RARITY,
+  SOFT_PITY_START,
+  SOFT_PITY_BOOST_PER_PULL,
 } from './gameConfig';
 import { buildingCost, bulkCost, safeDivide, roundTo4, safeMultiplier } from './utils';
 import { debugLog, trackEvent, trackGameplayAction } from './telemetry';
@@ -74,6 +78,7 @@ import { progressionReducer, PROGRESSION_ACTION_TYPES } from './reducers/progres
 import type { ProgressionAction } from './reducers/progressionReducer';
 import { rosterReducer, ROSTER_ACTION_TYPES } from './reducers/rosterReducer';
 import type { RosterAction } from './reducers/rosterReducer';
+import { getSparkTokensForSummon, checkSummonMilestones, pickHeroWithBanner } from './reducers/rosterReducer';
 import { economyReducer, ECONOMY_ACTION_TYPES } from './reducers/economyReducer';
 import type { EconomyAction } from './reducers/economyReducer';
 import { settingsReducer, SETTINGS_ACTION_TYPES } from './reducers/settingsReducer';
@@ -153,9 +158,31 @@ export function getMaxHeatForLevel(level: number): number {
 }
 
 const VALID_PLAYER_CLASSES = new Set<PlayerClass>(['warrior', 'berserker', 'archer', 'mage', 'monk']);
-const VALID_RARITIES = new Set<Rarity>(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'godly', 'transcendent']);
-const VALID_AUTO_RECYCLE_RARITIES = new Set<Rarity>(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'godly', 'transcendent']);
-const VALID_PERMANENT_UNLOCKS = new Set<PermanentUnlockId>(['class_passive', 'advanced_consumables', 'mythic_equipment']);
+const VALID_RARITIES = new Set<Rarity>([
+  'common',
+  'uncommon',
+  'rare',
+  'epic',
+  'legendary',
+  'mythic',
+  'godly',
+  'transcendent',
+]);
+const VALID_AUTO_RECYCLE_RARITIES = new Set<Rarity>([
+  'common',
+  'uncommon',
+  'rare',
+  'epic',
+  'legendary',
+  'mythic',
+  'godly',
+  'transcendent',
+]);
+const VALID_PERMANENT_UNLOCKS = new Set<PermanentUnlockId>([
+  'class_passive',
+  'advanced_consumables',
+  'mythic_equipment',
+]);
 const VALID_HERO_TEMPLATE_IDS = new Set(HERO_POOL.map(hero => hero.id));
 const VALID_HERO_FORMATION_ROLES = new Set<HeroFormationRole>(['front', 'mid', 'back']);
 const VALID_SKILL_IDS = new Set(SKILLS.map(skill => skill.id));
@@ -166,8 +193,8 @@ const VALID_DOLLAR_SHOP_OFFER_IDS = new Set<DollarShopOfferId>(['usd_499', 'usd_
 const ACTION_TELEMETRY_SAMPLE: Partial<Record<Action['type'], number>> = {
   CREATE_CHARACTER: 0,
   SUMMON_HERO: 1500,
-  SUMMON_HERO_X10: 1500,
   SUMMON_HERO_X10_CINEMATIC: 1500,
+  SPARK_EXCHANGE: 0,
   REBIRTH: 0,
   PLAY_DICE_ROLL: 0,
   PLAY_RECON_SWEEP: 0,
@@ -231,7 +258,8 @@ function createWelcomeGiftMail(): MailMessage {
     subject: 'Welcome to SimplyIdle',
     from: 'SimplyIdle Team',
     sentAt: Date.now(),
-    message: 'Thank you for joining SimplyIdle. We are grateful to have you with us at launch, and we hope this Welcome Gift helps you begin your journey with momentum. Build your roster, push deeper waves, and we will continue improving the experience with every update.',
+    message:
+      'Thank you for joining SimplyIdle. We are grateful to have you with us at launch, and we hope this Welcome Gift helps you begin your journey with momentum. Build your roster, push deeper waves, and we will continue improving the experience with every update.',
     attachments: {
       gold: WELCOME_GIFT_ATTACHMENTS.gold,
       shards: WELCOME_GIFT_ATTACHMENTS.shards,
@@ -274,7 +302,7 @@ function isMiniOpOnCooldown(lastUsedMs: number | null, nowMs: number): boolean {
   if (lastUsedMs == null) return false;
   // Clamp: if lastUsedMs is in the future (clock skew), treat as just now → on cooldown
   const clamped = Math.min(lastUsedMs, nowMs);
-  return (nowMs - clamped) < MINI_OPS_COOLDOWN_MS;
+  return nowMs - clamped < MINI_OPS_COOLDOWN_MS;
 }
 const EXPEDITION_TYPES: ExpeditionType[] = ['artifact', 'merchant', 'ruins', 'vault', 'abyss'];
 const EXPEDITION_RARITIES: ExpeditionRarity[] = ['common', 'rare', 'epic', 'legendary', 'godly'];
@@ -329,9 +357,19 @@ export interface Stats {
   vipExpBonusPct: number;
   combined: StatBlock;
   equipmentBonus: StatBlock;
-  heroDetails: Record<string, { dps: number; hp: number; str: number; vit: number; agi: number; int: number; spr: number; }>;
-  formation: { front: number; mid: number; back: number; dpsBonusPct: number; hpBonusPct: number; incomingDeltaPct: number; };
-  synergies: Array<{ id: string; name: string; effect: string; }>;
+  heroDetails: Record<
+    string,
+    { dps: number; hp: number; str: number; vit: number; agi: number; int: number; spr: number }
+  >;
+  formation: {
+    front: number;
+    mid: number;
+    back: number;
+    dpsBonusPct: number;
+    hpBonusPct: number;
+    incomingDeltaPct: number;
+  };
+  synergies: Array<{ id: string; name: string; effect: string }>;
 }
 
 export interface GameState {
@@ -350,7 +388,7 @@ export interface GameState {
   statsAlloc: StatBlock;
 
   totalKills: number;
-  burstCharge: number;  // 0-BURST_COST; increments on each kill, resets on BURST
+  burstCharge: number; // 0-BURST_COST; increments on each kill, resets on BURST
   combatHeat: number;
   wave: number;
   monsterHp: number;
@@ -362,12 +400,12 @@ export interface GameState {
   skills: Set<string>;
 
   heroRoster: HeroUnit[];
-  activeTeamHeroIds: string[];  // unlockable up to 6 heroes in battle (+ player)
+  activeTeamHeroIds: string[]; // unlockable up to 6 heroes in battle (+ player)
   totalSummons: number;
-  firstSummonGiven: boolean;  // track if free summon given on first kill
+  firstSummonGiven: boolean; // track if free summon given on first kill
   freeSummonCharges: number;
-  bossTears: number;  // drops 1 per boss kill; used as the gacha summon currency
-  heroShards: number;  // currency used to rank up heroes
+  bossTears: number; // drops 1 per boss kill; used as the gacha summon currency
+  heroShards: number; // currency used to rank up heroes
   essence: number;
   rebirthCores: number;
   rebirthDamagePath: number;
@@ -376,6 +414,9 @@ export interface GameState {
   autoRecycleMaxRarity: Rarity;
   equipmentScrap: number;
   gachaPityCounter: number;
+  sparkTokens: number;
+  claimedSummonMilestones: number[];
+  guaranteedMinRarity: Rarity | null;
   summonHistory: SummonHistoryEntry[];
   teamLoadouts: string[][];
   teamSlotsUnlocked: number;
@@ -561,6 +602,9 @@ export const DEFAULT_STATE: GameState = {
   autoRecycleMaxRarity: 'uncommon',
   equipmentScrap: 0,
   gachaPityCounter: 0,
+  sparkTokens: 0,
+  claimedSummonMilestones: [],
+  guaranteedMinRarity: null,
   summonHistory: [],
   teamLoadouts: [[], [], []],
   teamSlotsUnlocked: 4,
@@ -678,11 +722,13 @@ function sumStats(a: StatBlock, b: StatBlock): StatBlock {
 }
 
 function sumBonusStats(bonus: Partial<StatBlock>): number {
-  return (bonus.strength ?? 0)
-    + (bonus.vitality ?? 0)
-    + (bonus.agility ?? 0)
-    + (bonus.intelligence ?? 0)
-    + (bonus.spirit ?? 0);
+  return (
+    (bonus.strength ?? 0) +
+    (bonus.vitality ?? 0) +
+    (bonus.agility ?? 0) +
+    (bonus.intelligence ?? 0) +
+    (bonus.spirit ?? 0)
+  );
 }
 
 function getEquipmentEntry(state: GameState, itemId: string): EquipmentInstance | EquipmentItem | null {
@@ -704,7 +750,15 @@ function equipmentBudgetFor(baseItem: EquipmentItem, itemLevel: number): number 
     accessory: 1,
   };
   const levelMultiplier = 1 + Math.max(0, itemLevel - 1) * 0.07;
-  return Math.max(2, Math.round(sumBonusStats(baseItem.bonus) * rarityMultiplier[baseItem.rarity] * slotMultiplier[baseItem.slot] * levelMultiplier));
+  return Math.max(
+    2,
+    Math.round(
+      sumBonusStats(baseItem.bonus) *
+        rarityMultiplier[baseItem.rarity] *
+        slotMultiplier[baseItem.slot] *
+        levelMultiplier,
+    ),
+  );
 }
 
 function getForgeStatMultiplier(forgeLevel: number): number {
@@ -746,10 +800,13 @@ function randomizeEquipmentBonus(baseItem: EquipmentItem, itemLevel: number, sta
   const weights = getEquipmentStatWeights(playerClass, baseItem.slot);
   const keys = Object.keys(weights) as Array<keyof StatBlock>;
   const scaledBudget = Math.max(2, Math.round(equipmentBudgetFor(baseItem, itemLevel) * Math.max(1, statMultiplier)));
-  const rolledWeights = keys.reduce<Record<keyof StatBlock, number>>((acc, key) => {
-    acc[key] = weights[key] * (0.82 + Math.random() * 0.45);
-    return acc;
-  }, { strength: 0, vitality: 0, agility: 0, intelligence: 0, spirit: 0 });
+  const rolledWeights = keys.reduce<Record<keyof StatBlock, number>>(
+    (acc, key) => {
+      acc[key] = weights[key] * (0.82 + Math.random() * 0.45);
+      return acc;
+    },
+    { strength: 0, vitality: 0, agility: 0, intelligence: 0, spirit: 0 },
+  );
   const totalWeight = keys.reduce((sum, key) => sum + rolledWeights[key], 0);
   const bonus: Partial<StatBlock> = {};
   let assigned = 0;
@@ -757,9 +814,10 @@ function randomizeEquipmentBonus(baseItem: EquipmentItem, itemLevel: number, sta
   keys.forEach((key, index) => {
     const remaining = scaledBudget - assigned;
     if (remaining <= 0) return;
-    const rawValue = index === keys.length - 1
-      ? remaining
-      : Math.max(0, Math.round((scaledBudget * rolledWeights[key]) / totalWeight));
+    const rawValue =
+      index === keys.length - 1
+        ? remaining
+        : Math.max(0, Math.round((scaledBudget * rolledWeights[key]) / totalWeight));
     const value = Math.min(remaining, rawValue);
     if (value > 0) {
       bonus[key] = value;
@@ -777,7 +835,12 @@ function randomizeEquipmentBonus(baseItem: EquipmentItem, itemLevel: number, sta
   return bonus;
 }
 
-function createEquipmentInstance(baseItem: EquipmentItem, itemLevel: number, source: EquipmentSource, statMultiplier = 1): EquipmentInstance {
+function createEquipmentInstance(
+  baseItem: EquipmentItem,
+  itemLevel: number,
+  source: EquipmentSource,
+  statMultiplier = 1,
+): EquipmentInstance {
   const instanceId = `eq_${source}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const clampedLevel = Math.max(1, Math.floor(itemLevel));
   return {
@@ -837,15 +900,18 @@ function grantHeroUniqueGear(state: GameState, hero: HeroUnit): GameState {
   const uniqueWeaponName = getHeroUniqueWeaponName(hero.id);
   const uniqueSkill = getHeroUniqueSkillDescription(hero.id, nextRank);
 
-  const rewarded = queueReward({
-    ...state,
-    heroUniqueGearByHeroId: nextUnique,
-  }, {
-    id: `hero_unique_${hero.id}_${Date.now()}`,
-    kind: 'item',
-    title: alreadyOwned ? `Unique Weapon Rank Up: ${hero.name}` : `Unique Weapon Forged: ${hero.name}`,
-    detail: `${uniqueWeaponName} • Rank ${nextRank}/10 • ${uniqueSkill} ${storySnippet}`,
-  });
+  const rewarded = queueReward(
+    {
+      ...state,
+      heroUniqueGearByHeroId: nextUnique,
+    },
+    {
+      id: `hero_unique_${hero.id}_${Date.now()}`,
+      kind: 'item',
+      title: alreadyOwned ? `Unique Weapon Rank Up: ${hero.name}` : `Unique Weapon Forged: ${hero.name}`,
+      detail: `${uniqueWeaponName} • Rank ${nextRank}/10 • ${uniqueSkill} ${storySnippet}`,
+    },
+  );
   return queueCombatLog(rewarded, `${hero.name}'s unique weapon is now Rank ${nextRank}`);
 }
 
@@ -962,7 +1028,10 @@ function migrateLegacyEquipmentIds(
       continue;
     }
     const baseItem = getEquipmentItem(itemId);
-    if (!baseItem) { droppedCount++; continue; }
+    if (!baseItem) {
+      droppedCount++;
+      continue;
+    }
     let migratedId = legacyMap.get(itemId);
     if (!migratedId) {
       const instance = createEquipmentInstance(baseItem, playerLevel, 'legacy');
@@ -1028,9 +1097,7 @@ function derivedStats(state: GameState): StatBlock {
 
 function getTeamHeroBoost(state: GameState): number {
   const activeTeam = new Set(state.activeTeamHeroIds);
-  return state.heroRoster
-    .filter(h => activeTeam.has(h.uid))
-    .reduce((sum, h) => sum + h.teamBoost, 0);
+  return state.heroRoster.filter(h => activeTeam.has(h.uid)).reduce((sum, h) => sum + h.teamBoost, 0);
 }
 
 function getClassMasteryLevel(state: GameState, playerClass: PlayerClass | null): number {
@@ -1044,11 +1111,11 @@ function getClassMasteryLevel(state: GameState, playerClass: PlayerClass | null)
 //   monk                 → front | mid
 //   mage  / archer       → mid  | back
 export const VALID_FORMATION_ROLES_FOR_CLASS: Record<PlayerClass, HeroFormationRole[]> = {
-  warrior:   ['front'],
+  warrior: ['front'],
   berserker: ['front'],
-  monk:      ['front', 'mid'],
-  mage:      ['mid'],
-  archer:    ['back'],
+  monk: ['front', 'mid'],
+  mage: ['mid'],
+  archer: ['back'],
 };
 
 function defaultFormationForClass(playerClass: PlayerClass): HeroFormationRole {
@@ -1059,7 +1126,9 @@ function getFormationRoleForHero(hero: HeroUnit): HeroFormationRole {
   return VALID_FORMATION_ROLES_FOR_CLASS[hero.heroClass][0];
 }
 
-function getTeamSlotUnlockRequirement(targetSlots: number): { requiredWave: number; goldCost: number; shardCost: number } | null {
+function getTeamSlotUnlockRequirement(
+  targetSlots: number,
+): { requiredWave: number; goldCost: number; shardCost: number } | null {
   return TEAM_SLOT_UNLOCK_RULES[targetSlots] ?? null;
 }
 
@@ -1124,7 +1193,7 @@ function getFormationMultipliers(state: GameState): {
   for (const hero of state.heroRoster) {
     if (!active.has(hero.uid)) continue;
     const role = getFormationRoleForHero(hero);
-    
+
     // Cap each role at MAX_FORMATION_ROLE_HEROES
     if (role === 'front') {
       if (front >= MAX_FORMATION_ROLE_HEROES) continue;
@@ -1211,11 +1280,11 @@ function getTeamSynergy(state: GameState): {
   }
 
   if (factionCounts.ranger >= 1 && factionCounts.arcanum >= 1) {
-    dpsMult *= 1.10;
+    dpsMult *= 1.1;
     active.push({ id: 'spellshot', name: 'Spellshot Link', effect: '+10% team DPS' });
   }
 
-  if ((classCounts.warrior + classCounts.berserker) >= 1 && classCounts.monk >= 1) {
+  if (classCounts.warrior + classCounts.berserker >= 1 && classCounts.monk >= 1) {
     incomingMult *= 0.93;
     active.push({ id: 'iron_mandala', name: 'Iron Mandala', effect: '-7% incoming damage' });
   }
@@ -1227,7 +1296,9 @@ function getTeamSynergy(state: GameState): {
     active.push({ id: 'grand_coalition', name: 'Grand Coalition', effect: '+8% DPS, +8% EXP' });
   }
 
-  const monoClass = (Object.values(classCounts) as number[]).some(n => n === activeHeroes.length && activeHeroes.length >= 3);
+  const monoClass = (Object.values(classCounts) as number[]).some(
+    n => n === activeHeroes.length && activeHeroes.length >= 3,
+  );
   if (monoClass) {
     goldMult *= 1.18;
     active.push({ id: 'warband_focus', name: 'Warband Focus', effect: '+18% gold gains' });
@@ -1237,16 +1308,18 @@ function getTeamSynergy(state: GameState): {
 }
 
 function rarityRank(rarity: Rarity): number {
-  return {
-    common: 0,
-    uncommon: 1,
-    rare: 2,
-    epic: 3,
-    legendary: 4,
-    mythic: 5,
-    godly: 6,
-    transcendent: 7,
-  }[rarity] ?? 0;
+  return (
+    {
+      common: 0,
+      uncommon: 1,
+      rare: 2,
+      epic: 3,
+      legendary: 4,
+      mythic: 5,
+      godly: 6,
+      transcendent: 7,
+    }[rarity] ?? 0
+  );
 }
 
 function isPostgameSummonUnlocked(state: Pick<GameState, 'highestWaveReached' | 'prestigeCount'>): boolean {
@@ -1274,7 +1347,13 @@ function emptyAttachments(): MailAttachments {
 }
 
 function hasAnyAttachment(attachments: MailAttachments): boolean {
-  return attachments.shards > 0 || attachments.gold > 0 || attachments.diamonds > 0 || attachments.tears > 0 || attachments.essence > 0;
+  return (
+    attachments.shards > 0 ||
+    attachments.gold > 0 ||
+    attachments.diamonds > 0 ||
+    attachments.tears > 0 ||
+    attachments.essence > 0
+  );
 }
 
 function claimMailAttachments(state: GameState, mailId: string, keys: MailAttachmentKey[]): GameState {
@@ -1343,9 +1422,7 @@ function claimMailAttachments(state: GameState, mailId: string, keys: MailAttach
 }
 
 function claimAllMailAttachments(state: GameState): GameState {
-  const claimable = state.mailbox
-    .filter(mail => hasAnyAttachment(mail.attachments))
-    .map(mail => mail.id);
+  const claimable = state.mailbox.filter(mail => hasAnyAttachment(mail.attachments)).map(mail => mail.id);
   if (claimable.length === 0) return state;
 
   let nextState = state;
@@ -1441,7 +1518,9 @@ function maybeAutoRecycleBackground(state: GameState): GameState {
 
   const recycledIds = new Set(toRecycle.map(h => h.uid));
   const weekly = getCurrentWeeklyEvent(state);
-  const shardReward = Math.ceil(toRecycle.reduce((sum, hero) => sum + calculateShardReward(hero.rarity, hero.level), 0) * weekly.shardMultiplier);
+  const shardReward = Math.ceil(
+    toRecycle.reduce((sum, hero) => sum + calculateShardReward(hero.rarity, hero.level), 0) * weekly.shardMultiplier,
+  );
   const newRoster = state.heroRoster.filter(h => !recycledIds.has(h.uid));
   const newMaxHp = getTeamMaxHp({ ...state, heroRoster: newRoster });
   const heroFormationByUid = Object.fromEntries(
@@ -1451,20 +1530,23 @@ function maybeAutoRecycleBackground(state: GameState): GameState {
     Object.entries(state.heroActiveCdMs).filter(([uid]) => !recycledIds.has(uid)),
   ) as Record<string, number>;
 
-  return queueReward({
-    ...state,
-    heroRoster: newRoster,
-    heroFormationByUid,
-    heroActiveCdMs,
-    heroShards: state.heroShards + shardReward,
-    teamMaxHp: newMaxHp,
-    teamHp: Math.min(state.teamHp, newMaxHp),
-  }, {
-    id: `bg_auto_recycle_${Date.now()}`,
-    kind: 'shard',
-    title: 'Auto Recycle (Background)',
-    detail: `+${shardReward} shards from ${toRecycle.length} heroes`,
-  });
+  return queueReward(
+    {
+      ...state,
+      heroRoster: newRoster,
+      heroFormationByUid,
+      heroActiveCdMs,
+      heroShards: state.heroShards + shardReward,
+      teamMaxHp: newMaxHp,
+      teamHp: Math.min(state.teamHp, newMaxHp),
+    },
+    {
+      id: `bg_auto_recycle_${Date.now()}`,
+      kind: 'shard',
+      title: 'Auto Recycle (Background)',
+      detail: `+${shardReward} shards from ${toRecycle.length} heroes`,
+    },
+  );
 }
 
 function maybeAutoSummonTick(state: GameState): GameState {
@@ -1475,9 +1557,9 @@ function maybeAutoSummonTick(state: GameState): GameState {
     const canUseFree = state.freeSummonCharges > 0;
     if (!canUseFree && state.bossTears < 1) return null;
 
-    const template = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
-    const roll = rollRarityWithPity(state.gachaPityCounter, postgameUnlocked);
+    const roll = rollRarityWithPity(state.gachaPityCounter, postgameUnlocked, state.guaranteedMinRarity);
     const rarity = roll.rarity;
+    const { template } = pickHeroWithBanner(rarity, undefined);
     const rarityMult = rarityConfig(rarity).boostMultiplier;
     const uid = `${template.id}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
     const hero: HeroUnit = {
@@ -1496,16 +1578,22 @@ function maybeAutoSummonTick(state: GameState): GameState {
       ts: Date.now(),
       pityTriggered: roll.pityTriggered,
     };
-    let nextState = withAchievement(({
+    const sparkGain = getSparkTokensForSummon(state, template.id, rarity);
+    const newTotalSummons = state.totalSummons + 1;
+    const milestones = checkSummonMilestones(newTotalSummons, state.claimedSummonMilestones);
+    let nextState = withAchievement({
       ...state,
       bossTears: canUseFree ? state.bossTears : state.bossTears - 1,
       heroRoster: [hero, ...state.heroRoster],
       summonHistory: [historyEntry, ...state.summonHistory].slice(0, MAX_SAVE_SUMMON_HISTORY),
-      totalSummons: state.totalSummons + 1,
-      freeSummonCharges: canUseFree ? state.freeSummonCharges - 1 : state.freeSummonCharges,
+      totalSummons: newTotalSummons,
+      freeSummonCharges: (canUseFree ? state.freeSummonCharges - 1 : state.freeSummonCharges) + milestones.freeCharges,
       gachaPityCounter: roll.nextCounter,
+      sparkTokens: state.sparkTokens + sparkGain + milestones.sparkTokens,
+      claimedSummonMilestones: milestones.newClaimed,
+      guaranteedMinRarity: state.guaranteedMinRarity ? null : milestones.guaranteedRarity,
       autoSummonCooldownMs: 1200,
-    }));
+    });
     nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.05);
     nextState = queueCombatLog(nextState, `Auto Summon: ${hero.emoji} ${hero.name} (${hero.rarity})`);
     return nextState;
@@ -1520,11 +1608,14 @@ function maybeAutoSummonTick(state: GameState): GameState {
     const summoned: HeroUnit[] = [];
     const historyBatch: SummonHistoryEntry[] = [];
     let pityCounter = state.gachaPityCounter;
+    let guaranteedMin = state.guaranteedMinRarity;
+    let totalSparkGain = 0;
     for (let i = 0; i < totalPulls; i++) {
-      const template = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
-      const roll = rollRarityWithPity(pityCounter, postgameUnlocked);
+      const roll = rollRarityWithPity(pityCounter, postgameUnlocked, guaranteedMin);
       pityCounter = roll.nextCounter;
       const rarity = roll.rarity;
+      if (guaranteedMin) guaranteedMin = null;
+      const { template } = pickHeroWithBanner(rarity, undefined);
       const rarityMult = rarityConfig(rarity).boostMultiplier;
       const uid = `${template.id}_${Date.now()}_${i}_${Math.floor(Math.random() * 10000)}`;
       const summonedHero: HeroUnit = {
@@ -1544,18 +1635,27 @@ function maybeAutoSummonTick(state: GameState): GameState {
         ts: Date.now(),
         pityTriggered: roll.pityTriggered,
       });
+      const alreadyOwned =
+        state.heroRoster.some(h => h.id === template.id) || summoned.slice(0, i).some(h => h.id === template.id);
+      if (alreadyOwned) totalSparkGain += SPARK_TOKEN_BY_RARITY[rarity];
     }
 
-    let nextState = withAchievement(({
+    const newTotalSummons = state.totalSummons + totalPulls;
+    const milestones = checkSummonMilestones(newTotalSummons, state.claimedSummonMilestones);
+
+    let nextState = withAchievement({
       ...state,
       bossTears: state.bossTears - paidUses,
       heroRoster: [...summoned, ...state.heroRoster],
       summonHistory: [...historyBatch, ...state.summonHistory].slice(0, MAX_SAVE_SUMMON_HISTORY),
-      totalSummons: state.totalSummons + totalPulls,
-      freeSummonCharges: state.freeSummonCharges - freeUses,
+      totalSummons: newTotalSummons,
+      freeSummonCharges: state.freeSummonCharges - freeUses + milestones.freeCharges,
       gachaPityCounter: pityCounter,
+      sparkTokens: state.sparkTokens + totalSparkGain + milestones.sparkTokens,
+      claimedSummonMilestones: milestones.newClaimed,
+      guaranteedMinRarity: guaranteedMin ?? milestones.guaranteedRarity ?? null,
       autoSummonCooldownMs: 1800,
-    }));
+    });
     for (const hero of summoned) {
       nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.06);
     }
@@ -1664,7 +1764,15 @@ function getTeamMaxHp(state: GameState): number {
   const masteryLevel = getClassMasteryLevel(state, state.playerClass);
   const masteryHpMult = 1 + Math.min(0.25, Math.floor(masteryLevel / 4) * 0.02);
   const tacticsPowerMult = getTacticsPowerMultiplier(state);
-  return Math.ceil(maxHp * survivalMult * getRebirthSurvivalMultiplier(state) * formation.hpMult * synergy.hpMult * masteryHpMult * tacticsPowerMult);
+  return Math.ceil(
+    maxHp *
+      survivalMult *
+      getRebirthSurvivalMultiplier(state) *
+      formation.hpMult *
+      synergy.hpMult *
+      masteryHpMult *
+      tacticsPowerMult,
+  );
 }
 
 function getTeamDefense(state: GameState): number {
@@ -1687,7 +1795,15 @@ function getTeamDefense(state: GameState): number {
   const formation = getFormationMultipliers(state);
   const synergy = getTeamSynergy(state);
   const tacticsPowerMult = getTacticsPowerMultiplier(state);
-  return Math.max(0, defense * getMetaSurvivalMultiplier(state) * getRebirthSurvivalMultiplier(state) * formation.hpMult * synergy.hpMult * tacticsPowerMult);
+  return Math.max(
+    0,
+    defense *
+      getMetaSurvivalMultiplier(state) *
+      getRebirthSurvivalMultiplier(state) *
+      formation.hpMult *
+      synergy.hpMult *
+      tacticsPowerMult,
+  );
 }
 
 export function getDpsBreakdown(state: GameState): {
@@ -1717,9 +1833,12 @@ export function getDpsBreakdown(state: GameState): {
 
   // Player damage contribution
   const physical = stats.strength * 3.2 + stats.agility * (1.6 + cls.physWeight * 0.95) + state.level * 1.6;
-  const magic = stats.intelligence * (2 + cls.magicWeight * 1.2) + stats.spirit * (1.3 + cls.magicWeight * 0.75) + state.level * 1.2;
+  const magic =
+    stats.intelligence * (2 + cls.magicWeight * 1.2) +
+    stats.spirit * (1.3 + cls.magicWeight * 0.75) +
+    state.level * 1.2;
 
-  const playerDps = ((physical * cls.physWeight * 0.72) + (magic * cls.magicWeight * 0.52)) / 1.85;
+  const playerDps = (physical * cls.physWeight * 0.72 + magic * cls.magicWeight * 0.52) / 1.85;
 
   // Active team heroes damage
   let heroDps = 0;
@@ -1734,9 +1853,9 @@ export function getDpsBreakdown(state: GameState): {
       const heroAgi = (heroClass.baseStats.agility + hero.level * 0.7) * rankMult * statMult;
 
       const heroPhy = heroStr * 2 + heroAgi * 1.2 + hero.level * 0.5;
-      const heroMag = heroInt * 2 + ((heroClass.baseStats.spirit + hero.level * 0.6) * rankMult * statMult) * 1.1;
+      const heroMag = heroInt * 2 + (heroClass.baseStats.spirit + hero.level * 0.6) * rankMult * statMult * 1.1;
 
-      const heroDmg = ((heroPhy * heroClass.physWeight * 0.4) + (heroMag * heroClass.magicWeight * 0.3)) / 3;
+      const heroDmg = (heroPhy * heroClass.physWeight * 0.4 + heroMag * heroClass.magicWeight * 0.3) / 3;
       heroDps += heroDmg;
     }
   }
@@ -1768,19 +1887,19 @@ export function getDpsBreakdown(state: GameState): {
     temporaryBuff: activeBuffMult,
   };
   const totalMultiplier = safeMultiplier(
-    multipliers.rebirthLegacy
-    * multipliers.achievementLegacy
-    * multipliers.metaDamage
-    * multipliers.rebirthDamagePath
-    * multipliers.tacticsFacility
-    * multipliers.classPassive
-    * multipliers.heroPassives
-    * multipliers.formation
-    * multipliers.synergy
-    * multipliers.mastery
-    * multipliers.vipDamage
-    * multipliers.uniqueRelics
-    * multipliers.temporaryBuff,
+    multipliers.rebirthLegacy *
+      multipliers.achievementLegacy *
+      multipliers.metaDamage *
+      multipliers.rebirthDamagePath *
+      multipliers.tacticsFacility *
+      multipliers.classPassive *
+      multipliers.heroPassives *
+      multipliers.formation *
+      multipliers.synergy *
+      multipliers.mastery *
+      multipliers.vipDamage *
+      multipliers.uniqueRelics *
+      multipliers.temporaryBuff,
   );
   const rawDps = (playerDps + heroDps) * totalMultiplier;
   const finalDps = Number.isFinite(rawDps) ? Math.max(1, rawDps) : 1;
@@ -1835,7 +1954,9 @@ function getUsableProgressScale(state: GameState): number {
 
 function getScaledUsableGoldGain(state: GameState, baseValue: number, itemType: 'basic' | 'advanced'): number {
   const scaledBase = Math.ceil(baseValue * getUsableProgressScale(state) * getVipGoldMultiplier(state));
-  const waveFloor = Math.ceil(getMonsterGold(Math.max(1, state.highestWaveReached)) * (itemType === 'advanced' ? 8 : 3));
+  const waveFloor = Math.ceil(
+    getMonsterGold(Math.max(1, state.highestWaveReached)) * (itemType === 'advanced' ? 8 : 3),
+  );
 
   if (!Number.isFinite(scaledBase) && !Number.isFinite(waveFloor)) {
     return 1;
@@ -1847,7 +1968,9 @@ function getScaledUsableGoldGain(state: GameState, baseValue: number, itemType: 
 }
 
 function getScaledUsableExpGain(state: GameState, baseValue: number, itemType: 'basic' | 'advanced'): number {
-  const scaledBase = Math.ceil(baseValue * getUsableProgressScale(state) * getAchievementBonusMultiplier(state) * getVipExpMultiplier(state));
+  const scaledBase = Math.ceil(
+    baseValue * getUsableProgressScale(state) * getAchievementBonusMultiplier(state) * getVipExpMultiplier(state),
+  );
   const waveFloor = Math.ceil(getMonsterExp(Math.max(1, state.highestWaveReached)) * (itemType === 'advanced' ? 6 : 2));
 
   if (!Number.isFinite(scaledBase) && !Number.isFinite(waveFloor)) {
@@ -1930,7 +2053,14 @@ function getRebirthSurvivalMultiplier(state: GameState): number {
   return 1 + state.rebirthSurvivalPath * 0.07;
 }
 
-const EQUIP_RARITY_ORDER: Array<ReturnType<typeof equipmentRarityConfig>['id']> = ['common', 'rare', 'epic', 'legendary', 'mythic', 'transcendent'];
+const EQUIP_RARITY_ORDER: Array<ReturnType<typeof equipmentRarityConfig>['id']> = [
+  'common',
+  'rare',
+  'epic',
+  'legendary',
+  'mythic',
+  'transcendent',
+];
 
 /** Gold cost to manually level a hero from `level` to `level+1` via gold. */
 export function getHeroGoldLevelCost(level: number): number {
@@ -1946,7 +2076,10 @@ export function getEquipmentCraftCost(slot: EquipmentSlot): { scrap: number; gol
   return costBySlot[slot];
 }
 
-function getEquipmentUpgradePlan(state: GameState, itemId: string): {
+function getEquipmentUpgradePlan(
+  state: GameState,
+  itemId: string,
+): {
   canUpgrade: boolean;
   targetItemId: string | null;
   targetRarity: ReturnType<typeof equipmentRarityConfig>['id'] | null;
@@ -1958,27 +2091,60 @@ function getEquipmentUpgradePlan(state: GameState, itemId: string): {
   const ownedItem = getEquipmentEntry(state, itemId);
   const item = ownedItem && 'baseItemId' in ownedItem ? getEquipmentItem(ownedItem.baseItemId) : ownedItem;
   if (!item) {
-    return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, goldCost: 0, reason: 'Missing item' };
+    return {
+      canUpgrade: false,
+      targetItemId: null,
+      targetRarity: null,
+      scrapCost: 0,
+      essenceCost: 0,
+      goldCost: 0,
+      reason: 'Missing item',
+    };
   }
 
   const idx = EQUIP_RARITY_ORDER.indexOf(item.rarity);
   if (idx < 0 || idx >= EQUIP_RARITY_ORDER.length - 1) {
-    return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, goldCost: 0, reason: 'At max rarity' };
+    return {
+      canUpgrade: false,
+      targetItemId: null,
+      targetRarity: null,
+      scrapCost: 0,
+      essenceCost: 0,
+      goldCost: 0,
+      reason: 'At max rarity',
+    };
   }
 
   let step = 0;
   for (let i = idx + 1; i < EQUIP_RARITY_ORDER.length; i++) {
     const rarity = EQUIP_RARITY_ORDER[i];
     if (rarity === 'mythic' && !hasUnlock(state, 'mythic_equipment')) {
-      return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, goldCost: 0, reason: 'Mythic tier locked' };
+      return {
+        canUpgrade: false,
+        targetItemId: null,
+        targetRarity: null,
+        scrapCost: 0,
+        essenceCost: 0,
+        goldCost: 0,
+        reason: 'Mythic tier locked',
+      };
     }
     if (rarity === 'transcendent' && !isPostgameSummonUnlocked(state)) {
-      return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, goldCost: 0, reason: 'Transcendent tier locked' };
+      return {
+        canUpgrade: false,
+        targetItemId: null,
+        targetRarity: null,
+        scrapCost: 0,
+        essenceCost: 0,
+        goldCost: 0,
+        reason: 'Transcendent tier locked',
+      };
     }
-    const pool = EQUIPMENT_CATALOG.filter(candidate =>
-      candidate.slot === item.slot
-      && candidate.rarity === rarity
-      && candidate.allowedClasses.some(cls => item.allowedClasses.includes(cls)),
+    const pool = EQUIPMENT_CATALOG.filter(
+      candidate =>
+        candidate.slot === item.slot &&
+        candidate.rarity === rarity &&
+        candidate.allowedClasses.some(cls => item.allowedClasses.includes(cls)),
     );
     step++;
     if (pool.length > 0) {
@@ -2005,7 +2171,15 @@ function getEquipmentUpgradePlan(state: GameState, itemId: string): {
     }
   }
 
-  return { canUpgrade: false, targetItemId: null, targetRarity: null, scrapCost: 0, essenceCost: 0, goldCost: 0, reason: 'No higher tier candidate' };
+  return {
+    canUpgrade: false,
+    targetItemId: null,
+    targetRarity: null,
+    scrapCost: 0,
+    essenceCost: 0,
+    goldCost: 0,
+    reason: 'No higher tier candidate',
+  };
 }
 
 function getScrapToEssenceCost(state: GameState): number {
@@ -2091,15 +2265,15 @@ function sanitizeRuntimeEconomyState(state: GameState): GameState {
   const safeScrap = clampInt(state.equipmentScrap, 0, SAFE_INTEGER_CAP, 0);
 
   if (
-    safeGold === state.gold
-    && safeDiamonds === state.diamonds
-    && safeTotalGold === state.totalGold
-    && safeExp === state.exp
-    && safeTotalExp === state.totalExp
-    && safeBossTears === state.bossTears
-    && safeHeroShards === state.heroShards
-    && safeEssence === state.essence
-    && safeScrap === state.equipmentScrap
+    safeGold === state.gold &&
+    safeDiamonds === state.diamonds &&
+    safeTotalGold === state.totalGold &&
+    safeExp === state.exp &&
+    safeTotalExp === state.totalExp &&
+    safeBossTears === state.bossTears &&
+    safeHeroShards === state.heroShards &&
+    safeEssence === state.essence &&
+    safeScrap === state.equipmentScrap
   ) {
     return state;
   }
@@ -2150,11 +2324,7 @@ function sanitizeIntList(value: unknown, maxItems: number): number[] {
   const sanitized: number[] = [];
 
   for (const item of value) {
-    const parsed = typeof item === 'number'
-      ? item
-      : typeof item === 'string'
-        ? Number(item)
-        : NaN;
+    const parsed = typeof item === 'number' ? item : typeof item === 'string' ? Number(item) : NaN;
     if (!Number.isFinite(parsed)) continue;
     const intVal = Math.floor(parsed);
     if (seen.has(intVal)) continue;
@@ -2180,7 +2350,11 @@ function sanitizeMiniOpsCooldownTimestamp(value: unknown, nowMs: number): number
   return parsed;
 }
 
-function sanitizeStatAllocation(raw: unknown, level: number, savedUnspent?: unknown): {
+function sanitizeStatAllocation(
+  raw: unknown,
+  level: number,
+  savedUnspent?: unknown,
+): {
   statsAlloc: StatBlock;
   unspentStatPoints: number;
 } {
@@ -2195,11 +2369,8 @@ function sanitizeStatAllocation(raw: unknown, level: number, savedUnspent?: unkn
     spirit: clampInt(record.spirit, 0, SAFE_INTEGER_CAP, 0),
   };
 
-  const spentTotal = requested.strength
-    + requested.vitality
-    + requested.agility
-    + requested.intelligence
-    + requested.spirit;
+  const spentTotal =
+    requested.strength + requested.vitality + requested.agility + requested.intelligence + requested.spirit;
 
   // Preserve saved allocations exactly to avoid losing invested stats on schema/balance migrations.
   // If a legacy save exceeds the current level-derived budget, keep the invested distribution and
@@ -2219,9 +2390,8 @@ function sanitizeLoadedHero(raw: unknown, index: number): HeroUnit | null {
   const template = HERO_POOL.find(hero => hero.id === raw.id);
   if (!template) return null;
 
-  const rarity = typeof raw.rarity === 'string' && VALID_RARITIES.has(raw.rarity as Rarity)
-    ? raw.rarity as Rarity
-    : 'common';
+  const rarity =
+    typeof raw.rarity === 'string' && VALID_RARITIES.has(raw.rarity as Rarity) ? (raw.rarity as Rarity) : 'common';
   const level = clampInt(raw.level, 1, HERO_LEVEL_CAP, 1);
   const rank = clampInt(raw.rank, 1, 10, 1);
   const uid = clampString(raw.uid, `${template.id}_${index}`, 64) || `${template.id}_${index}`;
@@ -2251,12 +2421,15 @@ function sanitizeEquipmentInventoryRecord(raw: unknown, fallbackLevel: number): 
     const baseItemId = typeof entry.baseItemId === 'string' ? entry.baseItemId : null;
     const baseItem = baseItemId ? getEquipmentItem(baseItemId) : null;
     if (!baseItem) continue;
-    const rarity = typeof entry.rarity === 'string' && EQUIP_RARITY_ORDER.includes(entry.rarity as EquipmentRarity)
-      ? entry.rarity as EquipmentRarity
-      : baseItem.rarity;
-    const source = typeof entry.source === 'string' && ['starter', 'drop', 'craft', 'crate', 'upgrade', 'legacy', 'hero_unique'].includes(entry.source)
-      ? entry.source as EquipmentSource
-      : 'legacy';
+    const rarity =
+      typeof entry.rarity === 'string' && EQUIP_RARITY_ORDER.includes(entry.rarity as EquipmentRarity)
+        ? (entry.rarity as EquipmentRarity)
+        : baseItem.rarity;
+    const source =
+      typeof entry.source === 'string' &&
+      ['starter', 'drop', 'craft', 'crate', 'upgrade', 'legacy', 'hero_unique'].includes(entry.source)
+        ? (entry.source as EquipmentSource)
+        : 'legacy';
     inventory[instanceId] = {
       id: instanceId,
       baseItemId: baseItem.id,
@@ -2290,9 +2463,10 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
   const currentWeek = weekNumberForTimestamp(now);
   const currentDay = toDayNumber(now);
   const playerName = clampString(payload.playerName, '', 24);
-  const playerClass = typeof payload.playerClass === 'string' && VALID_PLAYER_CLASSES.has(payload.playerClass as PlayerClass)
-    ? payload.playerClass as PlayerClass
-    : null;
+  const playerClass =
+    typeof payload.playerClass === 'string' && VALID_PLAYER_CLASSES.has(payload.playerClass as PlayerClass)
+      ? (payload.playerClass as PlayerClass)
+      : null;
   const characterCreated = clampBoolean(payload.characterCreated, false) && !!playerName && playerClass !== null;
   const level = clampInt(payload.level, 1, MAX_SAVE_PLAYER_LEVEL, 1);
   const maxHeat = getMaxHeatForLevel(level);
@@ -2301,7 +2475,11 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     wave,
     clampInt(payload.highestWaveReached ?? payload.highestLevelReached, 1, MAX_SAVE_WAVE, 1),
   );
-  const { statsAlloc, unspentStatPoints } = sanitizeStatAllocation(payload.statsAlloc, level, payload.unspentStatPoints);
+  const { statsAlloc, unspentStatPoints } = sanitizeStatAllocation(
+    payload.statsAlloc,
+    level,
+    payload.unspentStatPoints,
+  );
   const maxMonsterHp = getMonsterMaxHp(wave);
   const monsterHp = clampFloat(payload.monsterHp, 0, maxMonsterHp, maxMonsterHp);
   const teamMaxHp = Math.max(100, clampInt(payload.teamHp, 1, SAFE_INTEGER_CAP, 100));
@@ -2314,8 +2492,9 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     }
   }
 
-  const skills = sanitizeStringList(payload.skills, VALID_SKILL_IDS.size)
-    .filter(skillId => VALID_SKILL_IDS.has(skillId));
+  const skills = sanitizeStringList(payload.skills, VALID_SKILL_IDS.size).filter(skillId =>
+    VALID_SKILL_IDS.has(skillId),
+  );
 
   const heroRoster: HeroUnit[] = [];
   const heroUidSet = new Set<string>();
@@ -2334,9 +2513,11 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     .slice(0, ACTIVE_TEAM_SIZE);
 
   const rawTeamLoadouts = Array.isArray(payload.teamLoadouts)
-    ? payload.teamLoadouts.slice(0, 3).map(loadout => sanitizeStringList(loadout, ACTIVE_TEAM_SIZE)
-      .filter(uid => heroUidSet.has(uid))
-      .slice(0, ACTIVE_TEAM_SIZE))
+    ? payload.teamLoadouts.slice(0, 3).map(loadout =>
+        sanitizeStringList(loadout, ACTIVE_TEAM_SIZE)
+          .filter(uid => heroUidSet.has(uid))
+          .slice(0, ACTIVE_TEAM_SIZE),
+      )
     : [];
   while (rawTeamLoadouts.length < 3) rawTeamLoadouts.push([]);
 
@@ -2360,13 +2541,13 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
   if (isRecord(payload.heroUniqueGearByHeroId)) {
     for (const [heroId, raw] of Object.entries(payload.heroUniqueGearByHeroId)) {
       if (!VALID_HERO_TEMPLATE_IDS.has(heroId)) continue;
-      const rank = isRecord(raw)
-        ? clampInt(raw.rank, 1, 10, 1)
-        : clampInt(raw, 1, 10, 1);
+      const rank = isRecord(raw) ? clampInt(raw.rank, 1, 10, 1) : clampInt(raw, 1, 10, 1);
       const shouldBeEquipped = isRecord(raw)
-        ? (typeof raw.equippedByUid === 'string' ? raw.equippedByUid.length > 0 : clampBoolean(raw.equipped, true))
+        ? typeof raw.equippedByUid === 'string'
+          ? raw.equippedByUid.length > 0
+          : clampBoolean(raw.equipped, true)
         : true;
-      const equippedByUid = shouldBeEquipped ? getPreferredUniqueBearer({ heroRoster }, heroId)?.uid ?? null : null;
+      const equippedByUid = shouldBeEquipped ? (getPreferredUniqueBearer({ heroRoster }, heroId)?.uid ?? null) : null;
       heroUniqueGearByHeroId[heroId] = { rank, equippedByUid };
     }
   }
@@ -2390,8 +2571,9 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
 
   const equipmentInventory = sanitizeEquipmentInventoryRecord(payload.equipmentInventory, level);
 
-  const rawInventoryItemIds = sanitizeStringList(payload.inventoryItemIds, MAX_SAVE_COLLECTION)
-    .filter(itemId => !!equipmentInventory[itemId] || !!getEquipmentItem(itemId));
+  const rawInventoryItemIds = sanitizeStringList(payload.inventoryItemIds, MAX_SAVE_COLLECTION).filter(
+    itemId => !!equipmentInventory[itemId] || !!getEquipmentItem(itemId),
+  );
 
   const equippedItems = {
     weapon: null as string | null,
@@ -2405,12 +2587,13 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     if (!item || item.slot !== slot || !rawInventoryItemIds.includes(itemId)) continue;
     equippedItems[slot] = itemId;
   }
-  const { inventoryItemIds, equippedItems: migratedEquippedItems, equipmentInventory: migratedEquipmentInventory, migratedCount, droppedCount } = migrateLegacyEquipmentIds(
-    rawInventoryItemIds,
-    equippedItems,
-    equipmentInventory,
-    level,
-  );
+  const {
+    inventoryItemIds,
+    equippedItems: migratedEquippedItems,
+    equipmentInventory: migratedEquipmentInventory,
+    migratedCount,
+    droppedCount,
+  } = migrateLegacyEquipmentIds(rawInventoryItemIds, equippedItems, equipmentInventory, level);
   if (migratedCount > 0 || droppedCount > 0) {
     debugLog('equipment', `Migration: ${migratedCount} migrated, ${droppedCount} dropped (unrecognized)`);
   }
@@ -2423,15 +2606,18 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     return !entry || entry.source !== 'hero_unique';
   });
   const cleanedEquippedItems = {
-    weapon: migratedEquippedItems.weapon && cleanedInventoryItemIds.includes(migratedEquippedItems.weapon)
-      ? migratedEquippedItems.weapon
-      : null,
-    armor: migratedEquippedItems.armor && cleanedInventoryItemIds.includes(migratedEquippedItems.armor)
-      ? migratedEquippedItems.armor
-      : null,
-    accessory: migratedEquippedItems.accessory && cleanedInventoryItemIds.includes(migratedEquippedItems.accessory)
-      ? migratedEquippedItems.accessory
-      : null,
+    weapon:
+      migratedEquippedItems.weapon && cleanedInventoryItemIds.includes(migratedEquippedItems.weapon)
+        ? migratedEquippedItems.weapon
+        : null,
+    armor:
+      migratedEquippedItems.armor && cleanedInventoryItemIds.includes(migratedEquippedItems.armor)
+        ? migratedEquippedItems.armor
+        : null,
+    accessory:
+      migratedEquippedItems.accessory && cleanedInventoryItemIds.includes(migratedEquippedItems.accessory)
+        ? migratedEquippedItems.accessory
+        : null,
   };
 
   const usableItemCounts: Record<string, number> = {};
@@ -2447,18 +2633,19 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
 
   const summonHistory = Array.isArray(payload.summonHistory)
     ? payload.summonHistory
-      .slice(0, MAX_SAVE_SUMMON_HISTORY)
-      .filter((entry): entry is SummonHistoryEntry => isRecord(entry))
-      .map((entry, index) => ({
-        id: clampString(entry.id, `summon_${index}`, 64) || `summon_${index}`,
-        heroName: clampString(entry.heroName, 'Unknown Hero', 64),
-        heroEmoji: clampString(entry.heroEmoji, '🛡️', 4),
-        rarity: typeof entry.rarity === 'string' && VALID_RARITIES.has(entry.rarity as Rarity)
-          ? entry.rarity as Rarity
-          : 'common',
-        ts: clampInt(entry.ts, 0, now, now),
-        pityTriggered: clampBoolean(entry.pityTriggered, false),
-      }))
+        .slice(0, MAX_SAVE_SUMMON_HISTORY)
+        .filter((entry): entry is SummonHistoryEntry => isRecord(entry))
+        .map((entry, index) => ({
+          id: clampString(entry.id, `summon_${index}`, 64) || `summon_${index}`,
+          heroName: clampString(entry.heroName, 'Unknown Hero', 64),
+          heroEmoji: clampString(entry.heroEmoji, '🛡️', 4),
+          rarity:
+            typeof entry.rarity === 'string' && VALID_RARITIES.has(entry.rarity as Rarity)
+              ? (entry.rarity as Rarity)
+              : 'common',
+          ts: clampInt(entry.ts, 0, now, now),
+          pityTriggered: clampBoolean(entry.pityTriggered, false),
+        }))
     : [];
 
   const weeklyEventWeek = clampInt(payload.weeklyEventWeek, 0, 1_000_000, currentWeek);
@@ -2484,65 +2671,85 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
   const validExpeditionRarities = new Set(['common', 'rare', 'epic', 'legendary', 'godly']);
   const expeditionQueue: GameState['expeditionQueue'] = Array.isArray(payload.expeditionQueue)
     ? payload.expeditionQueue
-      .filter((entry): entry is Record<string, unknown> => isRecord(entry))
-      .slice(0, 20)
-      .map((entry, index) => {
-        const type: GameState['expeditionQueue'][number]['type'] =
-          typeof entry.type === 'string' && validExpeditionTypes.has(entry.type)
-            ? entry.type as GameState['expeditionQueue'][number]['type']
-            : 'artifact';
-        const rarity: GameState['expeditionQueue'][number]['rarity'] =
-          typeof entry.rarity === 'string' && validExpeditionRarities.has(entry.rarity)
-            ? entry.rarity as GameState['expeditionQueue'][number]['rarity']
-            : 'common';
-        const reward = isRecord(entry.reward) ? entry.reward : {};
-        return {
-          id: clampString(entry.id, `exp_${index}`, 64),
-          type,
-          rarity,
-          startTime: clampInt(entry.startTime, 0, now, now),
-          durationMs: clampInt(entry.durationMs, 1_000, 7 * 24 * 60 * 60 * 1000, 30_000),
-          reward: {
-            diamonds: clampInt(reward.diamonds, 0, SAFE_INTEGER_CAP, 0),
-            shards: clampInt(reward.shards, 0, SAFE_INTEGER_CAP, 0),
-            essence: clampInt(reward.essence, 0, SAFE_INTEGER_CAP, 0),
-            artifacts: clampInt(reward.artifacts, 0, SAFE_INTEGER_CAP, 0),
-          },
-        };
-      })
+        .filter((entry): entry is Record<string, unknown> => isRecord(entry))
+        .slice(0, 20)
+        .map((entry, index) => {
+          const type: GameState['expeditionQueue'][number]['type'] =
+            typeof entry.type === 'string' && validExpeditionTypes.has(entry.type)
+              ? (entry.type as GameState['expeditionQueue'][number]['type'])
+              : 'artifact';
+          const rarity: GameState['expeditionQueue'][number]['rarity'] =
+            typeof entry.rarity === 'string' && validExpeditionRarities.has(entry.rarity)
+              ? (entry.rarity as GameState['expeditionQueue'][number]['rarity'])
+              : 'common';
+          const reward = isRecord(entry.reward) ? entry.reward : {};
+          return {
+            id: clampString(entry.id, `exp_${index}`, 64),
+            type,
+            rarity,
+            startTime: clampInt(entry.startTime, 0, now, now),
+            durationMs: clampInt(entry.durationMs, 1_000, 7 * 24 * 60 * 60 * 1000, 30_000),
+            reward: {
+              diamonds: clampInt(reward.diamonds, 0, SAFE_INTEGER_CAP, 0),
+              shards: clampInt(reward.shards, 0, SAFE_INTEGER_CAP, 0),
+              essence: clampInt(reward.essence, 0, SAFE_INTEGER_CAP, 0),
+              artifacts: clampInt(reward.artifacts, 0, SAFE_INTEGER_CAP, 0),
+            },
+          };
+        })
     : [];
 
   const lastExpeditionDay = {
-    artifact: payload.lastExpeditionDay?.artifact == null ? null : clampInt(payload.lastExpeditionDay.artifact, 0, currentDay, currentDay),
-    merchant: payload.lastExpeditionDay?.merchant == null ? null : clampInt(payload.lastExpeditionDay.merchant, 0, currentDay, currentDay),
-    ruins: payload.lastExpeditionDay?.ruins == null ? null : clampInt(payload.lastExpeditionDay.ruins, 0, currentDay, currentDay),
-    vault: payload.lastExpeditionDay?.vault == null ? null : clampInt(payload.lastExpeditionDay.vault, 0, currentDay, currentDay),
-    abyss: payload.lastExpeditionDay?.abyss == null ? null : clampInt(payload.lastExpeditionDay.abyss, 0, currentDay, currentDay),
+    artifact:
+      payload.lastExpeditionDay?.artifact == null
+        ? null
+        : clampInt(payload.lastExpeditionDay.artifact, 0, currentDay, currentDay),
+    merchant:
+      payload.lastExpeditionDay?.merchant == null
+        ? null
+        : clampInt(payload.lastExpeditionDay.merchant, 0, currentDay, currentDay),
+    ruins:
+      payload.lastExpeditionDay?.ruins == null
+        ? null
+        : clampInt(payload.lastExpeditionDay.ruins, 0, currentDay, currentDay),
+    vault:
+      payload.lastExpeditionDay?.vault == null
+        ? null
+        : clampInt(payload.lastExpeditionDay.vault, 0, currentDay, currentDay),
+    abyss:
+      payload.lastExpeditionDay?.abyss == null
+        ? null
+        : clampInt(payload.lastExpeditionDay.abyss, 0, currentDay, currentDay),
   };
 
   const expeditionContractOffers: Record<ExpeditionType, ExpeditionRarity> = {
-    artifact: typeof payload.expeditionContractOffers?.artifact === 'string' && validExpeditionRarities.has(payload.expeditionContractOffers.artifact)
-      ? payload.expeditionContractOffers.artifact as ExpeditionRarity
-      : EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)],
-    merchant: typeof payload.expeditionContractOffers?.merchant === 'string' && validExpeditionRarities.has(payload.expeditionContractOffers.merchant)
-      ? payload.expeditionContractOffers.merchant as ExpeditionRarity
-      : EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)],
-    ruins: typeof payload.expeditionContractOffers?.ruins === 'string' && validExpeditionRarities.has(payload.expeditionContractOffers.ruins)
-      ? payload.expeditionContractOffers.ruins as ExpeditionRarity
-      : EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)],
-    vault: typeof payload.expeditionContractOffers?.vault === 'string' && validExpeditionRarities.has(payload.expeditionContractOffers.vault)
-      ? payload.expeditionContractOffers.vault as ExpeditionRarity
-      : EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)],
-    abyss: typeof payload.expeditionContractOffers?.abyss === 'string' && validExpeditionRarities.has(payload.expeditionContractOffers.abyss)
-      ? payload.expeditionContractOffers.abyss as ExpeditionRarity
-      : EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)],
+    artifact:
+      typeof payload.expeditionContractOffers?.artifact === 'string' &&
+      validExpeditionRarities.has(payload.expeditionContractOffers.artifact)
+        ? (payload.expeditionContractOffers.artifact as ExpeditionRarity)
+        : EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)],
+    merchant:
+      typeof payload.expeditionContractOffers?.merchant === 'string' &&
+      validExpeditionRarities.has(payload.expeditionContractOffers.merchant)
+        ? (payload.expeditionContractOffers.merchant as ExpeditionRarity)
+        : EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)],
+    ruins:
+      typeof payload.expeditionContractOffers?.ruins === 'string' &&
+      validExpeditionRarities.has(payload.expeditionContractOffers.ruins)
+        ? (payload.expeditionContractOffers.ruins as ExpeditionRarity)
+        : EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)],
+    vault:
+      typeof payload.expeditionContractOffers?.vault === 'string' &&
+      validExpeditionRarities.has(payload.expeditionContractOffers.vault)
+        ? (payload.expeditionContractOffers.vault as ExpeditionRarity)
+        : EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)],
+    abyss:
+      typeof payload.expeditionContractOffers?.abyss === 'string' &&
+      validExpeditionRarities.has(payload.expeditionContractOffers.abyss)
+        ? (payload.expeditionContractOffers.abyss as ExpeditionRarity)
+        : EXPEDITION_RARITIES[Math.floor(Math.random() * EXPEDITION_RARITIES.length)],
   };
-  const expeditionContractsRefreshedAt = clampInt(
-    payload.expeditionContractsRefreshedAt,
-    0,
-    now,
-    now,
-  );
+  const expeditionContractsRefreshedAt = clampInt(payload.expeditionContractsRefreshedAt, 0, now, now);
 
   const rawMailbox = Array.isArray((payload as { mailbox?: unknown[] }).mailbox)
     ? (payload as { mailbox: unknown[] }).mailbox
@@ -2551,27 +2758,46 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     .filter((entry): entry is Record<string, unknown> => isRecord(entry))
     .slice(0, 100)
     .map((entry, index) => ({
-        id: clampString(entry.id, `mail_${index}`, 80),
-        subject: clampString(entry.subject, 'Developer Mail', 80),
-        message: clampString(entry.message, 'Compensation package', 280),
-        from: clampString(entry.from, 'Dev Team', 48),
-        sentAt: clampInt(entry.sentAt, 0, now, now),
-        attachments: {
-          shards: clampInt(isRecord(entry.attachments) ? entry.attachments.shards : 0, 0, SAFE_INTEGER_CAP, 0),
-          gold: clampInt(isRecord(entry.attachments) ? entry.attachments.gold : 0, 0, SAFE_INTEGER_CAP, 0),
-          diamonds: clampInt(isRecord(entry.attachments) ? entry.attachments.diamonds : 0, 0, SAFE_INTEGER_CAP, 0),
-          tears: clampInt(isRecord(entry.attachments) ? entry.attachments.tears : 0, 0, SAFE_INTEGER_CAP, 0),
-          essence: clampInt(isRecord(entry.attachments) ? entry.attachments.essence : 0, 0, SAFE_INTEGER_CAP, 0),
-        },
-        claimedAttachments: {
-          shards: clampInt(isRecord(entry.claimedAttachments) ? entry.claimedAttachments.shards : 0, 0, SAFE_INTEGER_CAP, 0),
-          gold: clampInt(isRecord(entry.claimedAttachments) ? entry.claimedAttachments.gold : 0, 0, SAFE_INTEGER_CAP, 0),
-          diamonds: clampInt(isRecord(entry.claimedAttachments) ? entry.claimedAttachments.diamonds : 0, 0, SAFE_INTEGER_CAP, 0),
-          tears: clampInt(isRecord(entry.claimedAttachments) ? entry.claimedAttachments.tears : 0, 0, SAFE_INTEGER_CAP, 0),
-          essence: clampInt(isRecord(entry.claimedAttachments) ? entry.claimedAttachments.essence : 0, 0, SAFE_INTEGER_CAP, 0),
-        },
-      }));
-
+      id: clampString(entry.id, `mail_${index}`, 80),
+      subject: clampString(entry.subject, 'Developer Mail', 80),
+      message: clampString(entry.message, 'Compensation package', 280),
+      from: clampString(entry.from, 'Dev Team', 48),
+      sentAt: clampInt(entry.sentAt, 0, now, now),
+      attachments: {
+        shards: clampInt(isRecord(entry.attachments) ? entry.attachments.shards : 0, 0, SAFE_INTEGER_CAP, 0),
+        gold: clampInt(isRecord(entry.attachments) ? entry.attachments.gold : 0, 0, SAFE_INTEGER_CAP, 0),
+        diamonds: clampInt(isRecord(entry.attachments) ? entry.attachments.diamonds : 0, 0, SAFE_INTEGER_CAP, 0),
+        tears: clampInt(isRecord(entry.attachments) ? entry.attachments.tears : 0, 0, SAFE_INTEGER_CAP, 0),
+        essence: clampInt(isRecord(entry.attachments) ? entry.attachments.essence : 0, 0, SAFE_INTEGER_CAP, 0),
+      },
+      claimedAttachments: {
+        shards: clampInt(
+          isRecord(entry.claimedAttachments) ? entry.claimedAttachments.shards : 0,
+          0,
+          SAFE_INTEGER_CAP,
+          0,
+        ),
+        gold: clampInt(isRecord(entry.claimedAttachments) ? entry.claimedAttachments.gold : 0, 0, SAFE_INTEGER_CAP, 0),
+        diamonds: clampInt(
+          isRecord(entry.claimedAttachments) ? entry.claimedAttachments.diamonds : 0,
+          0,
+          SAFE_INTEGER_CAP,
+          0,
+        ),
+        tears: clampInt(
+          isRecord(entry.claimedAttachments) ? entry.claimedAttachments.tears : 0,
+          0,
+          SAFE_INTEGER_CAP,
+          0,
+        ),
+        essence: clampInt(
+          isRecord(entry.claimedAttachments) ? entry.claimedAttachments.essence : 0,
+          0,
+          SAFE_INTEGER_CAP,
+          0,
+        ),
+      },
+    }));
 
   return {
     playerName,
@@ -2579,7 +2805,10 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     characterCreated,
     gold: clampInt(payload.gold, 0, SAFE_INTEGER_CAP, 0),
     diamonds: clampInt(payload.diamonds, 0, SAFE_INTEGER_CAP, 0),
-    totalGold: Math.max(clampInt(payload.gold, 0, SAFE_INTEGER_CAP, 0), clampInt(payload.totalGold, 0, SAFE_INTEGER_CAP, 0)),
+    totalGold: Math.max(
+      clampInt(payload.gold, 0, SAFE_INTEGER_CAP, 0),
+      clampInt(payload.totalGold, 0, SAFE_INTEGER_CAP, 0),
+    ),
     exp: clampInt(payload.exp, 0, Math.max(0, expForLevel(level) - 1), 0),
     totalExp: clampInt(payload.totalExp, 0, SAFE_INTEGER_CAP, 0),
     level,
@@ -2608,11 +2837,24 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     rebirthDamagePath: clampInt(payload.rebirthDamagePath, 0, SAFE_INTEGER_CAP, 0),
     rebirthEconomyPath: clampInt(payload.rebirthEconomyPath, 0, SAFE_INTEGER_CAP, 0),
     rebirthSurvivalPath: clampInt(payload.rebirthSurvivalPath, 0, SAFE_INTEGER_CAP, 0),
-    autoRecycleMaxRarity: typeof payload.autoRecycleMaxRarity === 'string' && VALID_AUTO_RECYCLE_RARITIES.has(payload.autoRecycleMaxRarity as Rarity)
-      ? payload.autoRecycleMaxRarity as Rarity
-      : 'uncommon',
+    autoRecycleMaxRarity:
+      typeof payload.autoRecycleMaxRarity === 'string' &&
+      VALID_AUTO_RECYCLE_RARITIES.has(payload.autoRecycleMaxRarity as Rarity)
+        ? (payload.autoRecycleMaxRarity as Rarity)
+        : 'uncommon',
     equipmentScrap: clampInt(payload.equipmentScrap, 0, SAFE_INTEGER_CAP, 0),
     gachaPityCounter: clampInt(payload.gachaPityCounter, 0, PITY_THRESHOLD - 1, 0),
+    sparkTokens: clampInt(payload.sparkTokens, 0, SAFE_INTEGER_CAP, 0),
+    claimedSummonMilestones: Array.isArray(payload.claimedSummonMilestones)
+      ? (payload.claimedSummonMilestones as unknown[]).filter(
+          (v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0,
+        )
+      : [],
+    guaranteedMinRarity:
+      typeof payload.guaranteedMinRarity === 'string' &&
+      VALID_AUTO_RECYCLE_RARITIES.has(payload.guaranteedMinRarity as Rarity)
+        ? (payload.guaranteedMinRarity as Rarity)
+        : null,
     summonHistory,
     teamLoadouts,
     teamSlotsUnlocked,
@@ -2620,19 +2862,26 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     heroUniqueGearByHeroId,
     lastDiceRollDay: sanitizeMiniOpsCooldownTimestamp(payload.lastDiceRollDay, now),
     riftDungeonLevel: clampInt(payload.riftDungeonLevel, 1, MAX_SAVE_PLAYER_LEVEL, 1),
-    riftEntryDay: payload.riftEntryDay == null
-      ? (payload.lastRiftRunDay == null ? null : clampInt(payload.lastRiftRunDay, 0, currentDay, currentDay))
-      : clampInt(payload.riftEntryDay, 0, currentDay, currentDay),
-    riftEntriesUsedToday: payload.riftEntriesUsedToday == null
-      ? (payload.lastRiftRunDay === currentDay ? 1 : 0)
-      : clampInt(payload.riftEntriesUsedToday, 0, 10, 0),
+    riftEntryDay:
+      payload.riftEntryDay == null
+        ? payload.lastRiftRunDay == null
+          ? null
+          : clampInt(payload.lastRiftRunDay, 0, currentDay, currentDay)
+        : clampInt(payload.riftEntryDay, 0, currentDay, currentDay),
+    riftEntriesUsedToday:
+      payload.riftEntriesUsedToday == null
+        ? payload.lastRiftRunDay === currentDay
+          ? 1
+          : 0
+        : clampInt(payload.riftEntriesUsedToday, 0, 10, 0),
     riftRaidTickets: clampInt(payload.riftRaidTickets, 0, SAFE_INTEGER_CAP, 0),
     lastRiftBossDamagePct: clampFloat(payload.lastRiftBossDamagePct, 0, 1, 0),
     lastDiceRollValue: payload.lastDiceRollValue == null ? null : clampInt(payload.lastDiceRollValue, 1, 20, 1),
     lastRiftWavesCleared: clampInt(payload.lastRiftWavesCleared, 0, 5, 0),
     treasureDungeonLevel: clampInt(payload.treasureDungeonLevel, 1, MAX_SAVE_PLAYER_LEVEL, 1),
     treasureEntriesUsedToday: clampInt(payload.treasureEntriesUsedToday, 0, 10, 0),
-    treasureEntryDay: payload.treasureEntryDay == null ? null : clampInt(payload.treasureEntryDay, 0, currentDay, currentDay),
+    treasureEntryDay:
+      payload.treasureEntryDay == null ? null : clampInt(payload.treasureEntryDay, 0, currentDay, currentDay),
     lastTreasureHaulPct: clampFloat(payload.lastTreasureHaulPct, 0, 1, 0),
     lastTreasureWiped: clampBoolean(payload.lastTreasureWiped, false),
     lastReconSweepDay: sanitizeMiniOpsCooldownTimestamp(payload.lastReconSweepDay, now),
@@ -2641,20 +2890,21 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     lastBountyDraftDay: sanitizeMiniOpsCooldownTimestamp(payload.lastBountyDraftDay, now),
     miniBounty: isRecord(payload.miniBounty)
       ? {
-        id: clampString(payload.miniBounty.id, `bounty_${currentDay}`, 64),
-        title: clampString(payload.miniBounty.title, 'Mini Bounty', 64),
-        metric: payload.miniBounty.metric === 'wave'
-          ? 'wave'
-          : payload.miniBounty.metric === 'summons'
-            ? 'summons'
-            : 'kills',
-        startValue: clampInt(payload.miniBounty.startValue, 0, SAFE_INTEGER_CAP, 0),
-        targetValue: clampInt(payload.miniBounty.targetValue, 0, SAFE_INTEGER_CAP, 0),
-        rewardGold: clampInt(payload.miniBounty.rewardGold, 0, SAFE_INTEGER_CAP, 0),
-        rewardShards: clampInt(payload.miniBounty.rewardShards, 0, SAFE_INTEGER_CAP, 0),
-        rewardDiamonds: clampInt(payload.miniBounty.rewardDiamonds, 0, SAFE_INTEGER_CAP, 0),
-        claimed: clampBoolean(payload.miniBounty.claimed, false),
-      }
+          id: clampString(payload.miniBounty.id, `bounty_${currentDay}`, 64),
+          title: clampString(payload.miniBounty.title, 'Mini Bounty', 64),
+          metric:
+            payload.miniBounty.metric === 'wave'
+              ? 'wave'
+              : payload.miniBounty.metric === 'summons'
+                ? 'summons'
+                : 'kills',
+          startValue: clampInt(payload.miniBounty.startValue, 0, SAFE_INTEGER_CAP, 0),
+          targetValue: clampInt(payload.miniBounty.targetValue, 0, SAFE_INTEGER_CAP, 0),
+          rewardGold: clampInt(payload.miniBounty.rewardGold, 0, SAFE_INTEGER_CAP, 0),
+          rewardShards: clampInt(payload.miniBounty.rewardShards, 0, SAFE_INTEGER_CAP, 0),
+          rewardDiamonds: clampInt(payload.miniBounty.rewardDiamonds, 0, SAFE_INTEGER_CAP, 0),
+          claimed: clampBoolean(payload.miniBounty.claimed, false),
+        }
       : null,
     guildhallFacilities,
     expeditionQueue,
@@ -2665,22 +2915,28 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     seasonPoints,
     bestSeasonPoints,
     dailyLoginStreak: clampInt(payload.dailyLoginStreak, 0, 100_000, 0),
-    lastDailyLoginDay: payload.lastDailyLoginDay == null ? null : clampInt(payload.lastDailyLoginDay, 0, currentDay, currentDay),
+    lastDailyLoginDay:
+      payload.lastDailyLoginDay == null ? null : clampInt(payload.lastDailyLoginDay, 0, currentDay, currentDay),
     streakInsuranceCharges: clampInt(payload.streakInsuranceCharges, 0, SAFE_INTEGER_CAP, 1),
     weeklyEventWeek,
     weeklyEventId,
     weeklyKills: clampInt(payload.weeklyKills, 0, SAFE_INTEGER_CAP, 0),
-    weeklyTrackClaimed: sanitizeIntList(payload.weeklyTrackClaimed, WEEKLY_TRACK_MILESTONES.length)
-      .filter(value => VALID_WEEKLY_TRACK_MILESTONES.has(value)),
-    claimedMissionIds: sanitizeStringList(payload.claimedMissionIds, VALID_MISSION_IDS.size)
-      .filter(id => VALID_MISSION_IDS.has(id)),
-    codexVipClaimedHeroIds: sanitizeStringList(payload.codexVipClaimedHeroIds, VALID_HERO_TEMPLATE_IDS.size)
-      .filter(id => VALID_HERO_TEMPLATE_IDS.has(id)),
-    codexVipClaimedUniqueIds: sanitizeStringList(payload.codexVipClaimedUniqueIds, VALID_HERO_TEMPLATE_IDS.size)
-      .filter(id => VALID_HERO_TEMPLATE_IDS.has(id)),
+    weeklyTrackClaimed: sanitizeIntList(payload.weeklyTrackClaimed, WEEKLY_TRACK_MILESTONES.length).filter(value =>
+      VALID_WEEKLY_TRACK_MILESTONES.has(value),
+    ),
+    claimedMissionIds: sanitizeStringList(payload.claimedMissionIds, VALID_MISSION_IDS.size).filter(id =>
+      VALID_MISSION_IDS.has(id),
+    ),
+    codexVipClaimedHeroIds: sanitizeStringList(payload.codexVipClaimedHeroIds, VALID_HERO_TEMPLATE_IDS.size).filter(
+      id => VALID_HERO_TEMPLATE_IDS.has(id),
+    ),
+    codexVipClaimedUniqueIds: sanitizeStringList(payload.codexVipClaimedUniqueIds, VALID_HERO_TEMPLATE_IDS.size).filter(
+      id => VALID_HERO_TEMPLATE_IDS.has(id),
+    ),
     seenHintIds: sanitizeStringList(payload.seenHintIds, MAX_SAVE_LOG_ENTRIES),
-    permanentUnlocks: sanitizeStringList(payload.permanentUnlocks, VALID_PERMANENT_UNLOCKS.size)
-      .filter((id): id is PermanentUnlockId => VALID_PERMANENT_UNLOCKS.has(id as PermanentUnlockId)),
+    permanentUnlocks: sanitizeStringList(payload.permanentUnlocks, VALID_PERMANENT_UNLOCKS.size).filter(
+      (id): id is PermanentUnlockId => VALID_PERMANENT_UNLOCKS.has(id as PermanentUnlockId),
+    ),
     metaDamageLevel: clampInt(payload.metaDamageLevel, 0, SAFE_INTEGER_CAP, 0),
     metaEconomyLevel: clampInt(payload.metaEconomyLevel, 0, SAFE_INTEGER_CAP, 0),
     metaSurvivalLevel: clampInt(payload.metaSurvivalLevel, 0, SAFE_INTEGER_CAP, 0),
@@ -2692,10 +2948,13 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
       const vipPoints = clampInt(payload.vipPoints, 0, SAFE_INTEGER_CAP, 0);
       return getVipLevelFromPoints(vipPoints);
     })(),
-    vipRewardClaimedLevels: sanitizeIntList(payload.vipRewardClaimedLevels, 10)
-      .filter(level => level >= 1 && level <= 10),
-    dollarFirstPurchaseClaimedOfferIds: sanitizeStringList(payload.dollarFirstPurchaseClaimedOfferIds, VALID_DOLLAR_SHOP_OFFER_IDS.size)
-      .filter((id): id is DollarShopOfferId => VALID_DOLLAR_SHOP_OFFER_IDS.has(id as DollarShopOfferId)),
+    vipRewardClaimedLevels: sanitizeIntList(payload.vipRewardClaimedLevels, 10).filter(
+      level => level >= 1 && level <= 10,
+    ),
+    dollarFirstPurchaseClaimedOfferIds: sanitizeStringList(
+      payload.dollarFirstPurchaseClaimedOfferIds,
+      VALID_DOLLAR_SHOP_OFFER_IDS.size,
+    ).filter((id): id is DollarShopOfferId => VALID_DOLLAR_SHOP_OFFER_IDS.has(id as DollarShopOfferId)),
     inventoryItemIds: cleanedInventoryItemIds,
     equipmentInventory: cleanedEquipmentInventory,
     equippedItems: cleanedEquippedItems,
@@ -2707,9 +2966,12 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     autoSummonEnabled: clampBoolean(payload.autoSummonEnabled, false),
     autoSummonMode,
     autoBurstEnabled: clampBoolean(payload.autoBurstEnabled, false),
-    combatTempo: clampCombatTempoForVip(payload.combatTempo === 2 || payload.combatTempo === 4 ? payload.combatTempo : 1, {
-      vipLevel: getVipLevelFromPoints(clampInt(payload.vipPoints, 0, SAFE_INTEGER_CAP, 0)),
-    }),
+    combatTempo: clampCombatTempoForVip(
+      payload.combatTempo === 2 || payload.combatTempo === 4 ? payload.combatTempo : 1,
+      {
+        vipLevel: getVipLevelFromPoints(clampInt(payload.vipPoints, 0, SAFE_INTEGER_CAP, 0)),
+      },
+    ),
     autoTempoEnabled: clampBoolean(payload.autoTempoEnabled, false),
     autoTempoTarget: clampAutoTempoTargetForVip(payload.autoTempoTarget === 4 ? 4 : 2, {
       vipLevel: getVipLevelFromPoints(clampInt(payload.vipPoints, 0, SAFE_INTEGER_CAP, 0)),
@@ -2717,8 +2979,9 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     autoSummonReserveGold: clampInt(payload.autoSummonReserveGold, 0, SAFE_INTEGER_CAP, 5000),
     lastActiveAt: clampInt(payload.lastActiveAt, 0, now, now),
     prestigeCount: clampInt(payload.prestigeCount, 0, SAFE_INTEGER_CAP, 0),
-    achievements: sanitizeStringList(payload.achievements, VALID_ACHIEVEMENT_IDS.size)
-      .filter(id => VALID_ACHIEVEMENT_IDS.has(id)),
+    achievements: sanitizeStringList(payload.achievements, VALID_ACHIEVEMENT_IDS.size).filter(id =>
+      VALID_ACHIEVEMENT_IDS.has(id),
+    ),
     combatLog: sanitizeStringList(payload.combatLog, MAX_SAVE_LOG_ENTRIES),
     damageBuffPct: clampFloat(payload.damageBuffPct, 0, 1, 0),
     damageBuffMs: clampInt(payload.damageBuffMs, 0, 600_000, 0),
@@ -2726,9 +2989,8 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     damageReductionBuffMs: clampInt(payload.damageReductionBuffMs, 0, 600_000, 0),
     heroActiveCdMs,
     mailbox,
-    giftPreference: payload.giftPreference === 'shards' || payload.giftPreference === 'essence'
-      ? payload.giftPreference
-      : 'gold',
+    giftPreference:
+      payload.giftPreference === 'shards' || payload.giftPreference === 'essence' ? payload.giftPreference : 'gold',
   };
 }
 
@@ -2741,10 +3003,18 @@ export function computeStats(state: GameState) {
   const synergy = getTeamSynergy(state);
 
   // Per-hero derived stats for display in the heroes tab
-  const heroDetails: Record<string, {
-    dps: number; hp: number;
-    str: number; vit: number; agi: number; int: number; spr: number;
-  }> = {};
+  const heroDetails: Record<
+    string,
+    {
+      dps: number;
+      hp: number;
+      str: number;
+      vit: number;
+      agi: number;
+      int: number;
+      spr: number;
+    }
+  > = {};
   for (const hero of state.heroRoster) {
     const heroClass = getClassConfig(hero.heroClass);
     const rankMult = getRankMultiplier(hero.rank, hero.rarity);
@@ -2756,12 +3026,15 @@ export function computeStats(state: GameState) {
     const hSpr = (heroClass.baseStats.spirit + hero.level * 0.6) * rankMult * statMult;
     const heroPhy = hStr * 2 + hAgi * 1.2 + hero.level * 0.5;
     const heroMag = hInt * 2 + hSpr * 1.1;
-    const heroDps = ((heroPhy * heroClass.physWeight * 0.4) + (heroMag * heroClass.magicWeight * 0.3)) / 3;
+    const heroDps = (heroPhy * heroClass.physWeight * 0.4 + heroMag * heroClass.magicWeight * 0.3) / 3;
     heroDetails[hero.uid] = {
       dps: heroDps,
       hp: Math.ceil((hVit + 3) * 8),
-      str: Math.ceil(hStr), vit: Math.ceil(hVit), agi: Math.ceil(hAgi),
-      int: Math.ceil(hInt), spr: Math.ceil(hSpr),
+      str: Math.ceil(hStr),
+      vit: Math.ceil(hVit),
+      agi: Math.ceil(hAgi),
+      int: Math.ceil(hInt),
+      spr: Math.ceil(hSpr),
     };
   }
 
@@ -2815,31 +3088,75 @@ function addUsableItemCount(counts: Record<string, number>, itemId: string, amou
   return next;
 }
 
-function rollRarityWithPity(counter: number, postgameUnlocked: boolean): { rarity: Rarity; nextCounter: number; pityTriggered: boolean } {
+function rollRarityWithPity(
+  counter: number,
+  postgameUnlocked: boolean,
+  guaranteedMin: Rarity | null,
+): { rarity: Rarity; nextCounter: number; pityTriggered: boolean } {
   const pityTriggered = counter + 1 >= PITY_THRESHOLD;
   if (pityTriggered) {
     const r = Math.random();
     const rarity: Rarity = postgameUnlocked
-      ? (r < 0.7 ? 'legendary' : r < 0.92 ? 'mythic' : r < 0.99 ? 'godly' : 'transcendent')
-      : (r < 0.75 ? 'legendary' : r < 0.95 ? 'mythic' : 'godly');
+      ? r < 0.7
+        ? 'legendary'
+        : r < 0.92
+          ? 'mythic'
+          : r < 0.99
+            ? 'godly'
+            : 'transcendent'
+      : r < 0.75
+        ? 'legendary'
+        : r < 0.95
+          ? 'mythic'
+          : 'godly';
     return { rarity, nextCounter: 0, pityTriggered: true };
   }
 
-  const rarity = rollRarity(Math.random(), getSummonRarityPool(postgameUnlocked));
-  // Counter always increments — natural legendary+ pulls are bonuses.
-  // Pity guarantees a legendary every PITY_THRESHOLD pulls unconditionally.
-  return { rarity, nextCounter: counter + 1, pityTriggered: false };
+  const pool = getSummonRarityPool(postgameUnlocked);
+  let rarity: Rarity;
+  if (counter >= SOFT_PITY_START) {
+    const softBoost = (counter - SOFT_PITY_START + 1) * SOFT_PITY_BOOST_PER_PULL;
+    if (Math.random() < softBoost) {
+      const r = Math.random();
+      rarity = postgameUnlocked
+        ? r < 0.75
+          ? 'legendary'
+          : r < 0.95
+            ? 'mythic'
+            : r < 0.99
+              ? 'godly'
+              : 'transcendent'
+        : r < 0.8
+          ? 'legendary'
+          : r < 0.96
+            ? 'mythic'
+            : 'godly';
+    } else {
+      rarity = rollRarity(Math.random(), pool);
+    }
+  } else {
+    rarity = rollRarity(Math.random(), pool);
+  }
+
+  if (guaranteedMin && rarityRank(rarity) < rarityRank(guaranteedMin)) {
+    rarity = guaranteedMin;
+  }
+
+  const isLegendaryPlus = rarityRank(rarity) >= rarityRank('legendary');
+  return { rarity, nextCounter: isLegendaryPlus ? 0 : counter + 1, pityTriggered: false };
 }
 
 function equipmentScrapValue(rarity: ReturnType<typeof equipmentRarityConfig>['id']): number {
-  return {
-    common: 10,
-    rare: 24,
-    epic: 60,
-    legendary: 160,
-    mythic: 360,
-    transcendent: 760,
-  }[rarity] ?? 10;
+  return (
+    {
+      common: 10,
+      rare: 24,
+      epic: 60,
+      legendary: 160,
+      mythic: 360,
+      transcendent: 760,
+    }[rarity] ?? 10
+  );
 }
 
 function maybeAutoUsePotion(state: GameState): GameState {
@@ -2852,23 +3169,34 @@ function maybeAutoUsePotion(state: GameState): GameState {
   const smallQty = state.usableItemCounts['small_potion'] ?? 0;
   const preferGrand = hpRatio <= state.autoUsePotionThresholdPct * 0.6;
   const itemId = preferGrand
-    ? (grandQty > 0 ? 'grand_potion' : smallQty > 0 ? 'small_potion' : null)
-    : (smallQty > 0 ? 'small_potion' : grandQty > 0 ? 'grand_potion' : null);
+    ? grandQty > 0
+      ? 'grand_potion'
+      : smallQty > 0
+        ? 'small_potion'
+        : null
+    : smallQty > 0
+      ? 'small_potion'
+      : grandQty > 0
+        ? 'grand_potion'
+        : null;
   if (!itemId) return state;
 
   const item = getUsableItem(itemId);
   if (!item || item.effect !== 'heal_team_percent') return state;
   const healed = Math.ceil(state.teamMaxHp * item.value);
-  return queueReward({
-    ...state,
-    usableItemCounts: addUsableItemCount(state.usableItemCounts, item.id, -1),
-    teamHp: Math.min(state.teamMaxHp, state.teamHp + healed),
-  }, {
-    id: `auto_potion_${Date.now()}`,
-    kind: 'item',
-    title: `Auto Used ${item.emoji} ${item.name}`,
-    detail: `Restored ${healed} team HP`,
-  });
+  return queueReward(
+    {
+      ...state,
+      usableItemCounts: addUsableItemCount(state.usableItemCounts, item.id, -1),
+      teamHp: Math.min(state.teamMaxHp, state.teamHp + healed),
+    },
+    {
+      id: `auto_potion_${Date.now()}`,
+      kind: 'item',
+      title: `Auto Used ${item.emoji} ${item.name}`,
+      detail: `Restored ${healed} team HP`,
+    },
+  );
 }
 
 function maybeAutoUseCoolant(state: GameState): GameState {
@@ -2885,24 +3213,37 @@ function maybeAutoUseCoolant(state: GameState): GameState {
   const severeHeat = heatRatio >= 0.9;
   const mk1WouldStabilize = state.combatHeat - 35 <= maxHeat * 0.55;
   const itemId = severeHeat
-    ? (mk2Qty > 0 && !mk1WouldStabilize ? 'coolant_mk2' : mk1Qty > 0 ? 'coolant_mk1' : mk2Qty > 0 ? 'coolant_mk2' : null)
-    : (mk1Qty > 0 ? 'coolant_mk1' : mk2Qty > 0 ? 'coolant_mk2' : null);
+    ? mk2Qty > 0 && !mk1WouldStabilize
+      ? 'coolant_mk2'
+      : mk1Qty > 0
+        ? 'coolant_mk1'
+        : mk2Qty > 0
+          ? 'coolant_mk2'
+          : null
+    : mk1Qty > 0
+      ? 'coolant_mk1'
+      : mk2Qty > 0
+        ? 'coolant_mk2'
+        : null;
   if (!itemId) return state;
 
   const item = getUsableItem(itemId);
   if (!item || item.effect !== 'reduce_heat_flat') return state;
 
   const reduced = Math.max(0, state.combatHeat - item.value);
-  return queueReward({
-    ...state,
-    usableItemCounts: addUsableItemCount(state.usableItemCounts, item.id, -1),
-    combatHeat: reduced,
-  }, {
-    id: `auto_coolant_${Date.now()}`,
-    kind: 'system',
-    title: `Smart Used ${item.emoji} ${item.name}`,
-    detail: `Heat ${Math.ceil(state.combatHeat)} -> ${Math.ceil(reduced)}`,
-  });
+  return queueReward(
+    {
+      ...state,
+      usableItemCounts: addUsableItemCount(state.usableItemCounts, item.id, -1),
+      combatHeat: reduced,
+    },
+    {
+      id: `auto_coolant_${Date.now()}`,
+      kind: 'system',
+      title: `Smart Used ${item.emoji} ${item.name}`,
+      detail: `Heat ${Math.ceil(state.combatHeat)} -> ${Math.ceil(reduced)}`,
+    },
+  );
 }
 
 function getMonsterAffixModifiers(wave: number) {
@@ -2943,8 +3284,30 @@ function killMonster(state: GameState): GameState {
   const synergy = getTeamSynergy(state);
   const masteryLevel = getClassMasteryLevel(state, state.playerClass);
   const masteryEconomyMult = 1 + Math.min(0.25, Math.floor(masteryLevel / 5) * 0.01);
-  const goldReward = Math.ceil(getMonsterGold(state.wave) * Math.pow(REBIRTH_BONUS, state.prestigeCount) * achievementMult * affix.goldMult * economyMult * getRebirthEconomyMultiplier(state) * heroPassive.goldMult * synergy.goldMult * masteryEconomyMult * weekly.goldMultiplier * getVipGoldMultiplier(state) * getTreasuryGoldMultiplier(state));
-  const expReward = Math.ceil(getMonsterExp(state.wave) * achievementMult * affix.expMult * heroPassive.expMult * synergy.expMult * weekly.expMultiplier * getVipExpMultiplier(state) * getTrainingExpMultiplier(state));
+  const goldReward = Math.ceil(
+    getMonsterGold(state.wave) *
+      Math.pow(REBIRTH_BONUS, state.prestigeCount) *
+      achievementMult *
+      affix.goldMult *
+      economyMult *
+      getRebirthEconomyMultiplier(state) *
+      heroPassive.goldMult *
+      synergy.goldMult *
+      masteryEconomyMult *
+      weekly.goldMultiplier *
+      getVipGoldMultiplier(state) *
+      getTreasuryGoldMultiplier(state),
+  );
+  const expReward = Math.ceil(
+    getMonsterExp(state.wave) *
+      achievementMult *
+      affix.expMult *
+      heroPassive.expMult *
+      synergy.expMult *
+      weekly.expMultiplier *
+      getVipExpMultiplier(state) *
+      getTrainingExpMultiplier(state),
+  );
   const lvl = processLevelUp(state.exp + expReward, state.level);
   const isBoss = state.wave % 10 === 0;
   const act = getActForWave(state.wave);
@@ -2982,7 +3345,7 @@ function killMonster(state: GameState): GameState {
     wave: newWave,
     monsterHp: nextMaxHp,
     monsterMaxHp: nextMaxHp,
-    teamHp: newTeamMaxHp,  // Heal team after win
+    teamHp: newTeamMaxHp, // Heal team after win
     teamMaxHp: newTeamMaxHp,
     heroRoster: updatedRoster,
   };
@@ -3008,7 +3371,10 @@ function killMonster(state: GameState): GameState {
       });
     }
   }
-  newState = queueCombatLog(newState, `Defeated ${getMonsterForWave(state.wave).name} • +${goldReward} gold +${expReward} EXP (${weekly.name})`);
+  newState = queueCombatLog(
+    newState,
+    `Defeated ${getMonsterForWave(state.wave).name} • +${goldReward} gold +${expReward} EXP (${weekly.name})`,
+  );
 
   // Grant one free summon charge on first kill.
   if (state.totalKills === 0 && !state.firstSummonGiven) {
@@ -3022,12 +3388,11 @@ function killMonster(state: GameState): GameState {
   // Chance to drop class-compatible equipment on kill.
   const mythicUnlocked = hasUnlock(newState, 'mythic_equipment');
   const transcendentUnlocked = isPostgameSummonUnlocked(newState);
-  const dropChance = Math.min(0.4, 0.10 + state.wave * 0.003 + (isBoss ? 0.12 : 0));
+  const dropChance = Math.min(0.4, 0.1 + state.wave * 0.003 + (isBoss ? 0.12 : 0));
   if (newState.playerClass && Math.random() <= dropChance) {
     const droppedRarity = rollEquipmentRarityByTier(Math.random(), mythicUnlocked, transcendentUnlocked);
-    const pool = EQUIPMENT_CATALOG.filter(item =>
-      item.allowedClasses.includes(newState.playerClass as PlayerClass) &&
-      item.rarity === droppedRarity,
+    const pool = EQUIPMENT_CATALOG.filter(
+      item => item.allowedClasses.includes(newState.playerClass as PlayerClass) && item.rarity === droppedRarity,
     );
     const fallbackPool = EQUIPMENT_CATALOG.filter(item =>
       item.allowedClasses.includes(newState.playerClass as PlayerClass),
@@ -3038,19 +3403,22 @@ function killMonster(state: GameState): GameState {
       const forgeMult = getForgeStatMultiplier(newState.guildhallFacilities.forge.level);
       const item = createEquipmentInstance(baseItem, Math.max(1, newState.level), 'drop', forgeMult);
       if (!newState.inventoryItemIds.includes(item.id)) {
-        newState = queueReward({
-          ...newState,
-          equipmentInventory: {
-            ...newState.equipmentInventory,
-            [item.id]: item,
+        newState = queueReward(
+          {
+            ...newState,
+            equipmentInventory: {
+              ...newState.equipmentInventory,
+              [item.id]: item,
+            },
+            inventoryItemIds: [...newState.inventoryItemIds, item.id],
           },
-          inventoryItemIds: [...newState.inventoryItemIds, item.id],
-        }, {
-          id: `item_${item.id}_${Date.now()}`,
-          kind: 'item',
-          title: `Equipment Drop: ${item.emoji} ${item.name}`,
-          detail: `${equipmentRarityConfig(item.rarity).label} ${item.slot} • iLv ${item.itemLevel}`,
-        });
+          {
+            id: `item_${item.id}_${Date.now()}`,
+            kind: 'item',
+            title: `Equipment Drop: ${item.emoji} ${item.name}`,
+            detail: `${equipmentRarityConfig(item.rarity).label} ${item.slot} • iLv ${item.itemLevel}`,
+          },
+        );
         newState = queueCombatLog(newState, `Loot drop: ${item.emoji} ${item.name}`);
         if (item.rarity === 'mythic') {
           newState = queueReward(newState, {
@@ -3069,16 +3437,33 @@ function killMonster(state: GameState): GameState {
   if (Math.random() <= usableDropChance) {
     const usable = rollUsableItem(Math.random(), hasUnlock(newState, 'advanced_consumables'));
     const nextCounts = addUsableItemCount(newState.usableItemCounts, usable.id, 1);
-    newState = queueReward({
-      ...newState,
-      usableItemCounts: nextCounts,
-    }, {
-      id: `usable_${usable.id}_${Date.now()}`,
-      kind: 'item',
-      title: `Found ${usable.emoji} ${usable.name}`,
-      detail: usable.description,
-    });
+    newState = queueReward(
+      {
+        ...newState,
+        usableItemCounts: nextCounts,
+      },
+      {
+        id: `usable_${usable.id}_${Date.now()}`,
+        kind: 'item',
+        title: `Found ${usable.emoji} ${usable.name}`,
+        detail: usable.description,
+      },
+    );
     newState = queueCombatLog(newState, `Item drop: ${usable.emoji} ${usable.name}`);
+  }
+
+  // Chest node: every 5th campaign stage (not boss) has 50% chance for a Boss Tear.
+  const campaignStageLocal = ((state.wave - 1) % 20) + 1;
+  const isChestNode = !isBoss && campaignStageLocal % 5 === 0;
+  if (isChestNode && Math.random() < 0.5) {
+    newState = { ...newState, bossTears: newState.bossTears + 1 };
+    newState = queueReward(newState, {
+      id: `chest_tear_${Date.now()}`,
+      kind: 'system',
+      title: '🎁 Chest Node',
+      detail: '+1 Boss Tear 💧 found in chest!',
+    });
+    newState = queueCombatLog(newState, `Chest node: +1 Boss Tear 💧`);
   }
 
   if (isBoss) {
@@ -3091,15 +3476,18 @@ function killMonster(state: GameState): GameState {
     });
     const unlock = getBossUnlockForWave(state.wave);
     if (unlock && !newState.permanentUnlocks.includes(unlock)) {
-      newState = queueReward({
-        ...newState,
-        permanentUnlocks: [...newState.permanentUnlocks, unlock],
-      }, {
-        id: `unlock_${unlock}_${Date.now()}`,
-        kind: 'system',
-        title: `Act Boss Defeated • ${act.name}`,
-        detail: unlockLabel(unlock),
-      });
+      newState = queueReward(
+        {
+          ...newState,
+          permanentUnlocks: [...newState.permanentUnlocks, unlock],
+        },
+        {
+          id: `unlock_${unlock}_${Date.now()}`,
+          kind: 'system',
+          title: `Act Boss Defeated • ${act.name}`,
+          detail: unlockLabel(unlock),
+        },
+      );
     }
 
     newState = queueReward(newState, {
@@ -3112,15 +3500,13 @@ function killMonster(state: GameState): GameState {
     newState = queueCombatLog(newState, `Boss drop: +1 Boss Tear 💧`);
   }
 
-  return withAchievement((newState));
+  return withAchievement(newState);
 }
 
 function checkAchievements(state: GameState): string | null {
   const activeTeam = new Set(state.activeTeamHeroIds);
   const activeTeamClassCount = new Set(
-    state.heroRoster
-      .filter(hero => activeTeam.has(hero.uid))
-      .map(hero => hero.heroClass),
+    state.heroRoster.filter(hero => activeTeam.has(hero.uid)).map(hero => hero.heroClass),
   ).size;
 
   const maxHeroRankCount = state.heroRoster.filter(hero => hero.rank >= 10).length;
@@ -3129,10 +3515,15 @@ function checkAchievements(state: GameState): string | null {
   const transcendentHeroCount = state.heroRoster.filter(hero => hero.rarity === 'transcendent').length;
   const uniqueEntries = Object.values(state.heroUniqueGearByHeroId);
   const uniqueForgedCount = uniqueEntries.filter(progress => (progress?.rank ?? 0) > 0).length;
-  const uniqueEquippedCount = uniqueEntries.filter(progress => (progress?.rank ?? 0) > 0 && !!progress?.equippedByUid).length;
+  const uniqueEquippedCount = uniqueEntries.filter(
+    progress => (progress?.rank ?? 0) > 0 && !!progress?.equippedByUid,
+  ).length;
   const uniqueMaxRankCount = uniqueEntries.filter(progress => (progress?.rank ?? 0) >= 10).length;
   const codexClaimCount = state.codexVipClaimedHeroIds.length + state.codexVipClaimedUniqueIds.length;
-  const facilityTotalLevel = Object.values(state.guildhallFacilities).reduce((sum, facility) => sum + facility.level, 0);
+  const facilityTotalLevel = Object.values(state.guildhallFacilities).reduce(
+    (sum, facility) => sum + facility.level,
+    0,
+  );
   const forgeFacilityLevel = state.guildhallFacilities.forge.level;
 
   const ownedEquipmentIds = new Set<string>([
@@ -3145,7 +3536,12 @@ function checkAchievements(state: GameState): string | null {
   for (const itemId of ownedEquipmentIds) {
     const item = getEquipmentEntry(state, itemId);
     if (!item) continue;
-    if (item.rarity === 'epic' || item.rarity === 'legendary' || item.rarity === 'mythic' || item.rarity === 'transcendent') {
+    if (
+      item.rarity === 'epic' ||
+      item.rarity === 'legendary' ||
+      item.rarity === 'mythic' ||
+      item.rarity === 'transcendent'
+    ) {
       epicPlusEquipmentCount += 1;
     }
     if (item.rarity === 'mythic' || item.rarity === 'transcendent') mythicPlusEquipmentCount += 1;
@@ -3253,21 +3649,20 @@ function advanceCombatStep(state: GameState, elapsedMs: number): GameState {
   const defense = getTeamDefense(working);
   const damageReduction = Math.min(0.8, defense / (defense + 100));
   const passive = working.playerClass ? getClassPassive(working.playerClass) : null;
-  const passiveIncomingMult = hasUnlock(working, 'class_passive') && passive
-    ? passive.incomingDamageMultiplier
-    : 1;
+  const passiveIncomingMult = hasUnlock(working, 'class_passive') && passive ? passive.incomingDamageMultiplier : 1;
   const heroPassive = getHeroPassiveMultipliers(working);
   const formation = getFormationMultipliers(working);
   const synergy = getTeamSynergy(working);
   const activeReductionMult = 1 - Math.max(0, Math.min(0.7, working.damageReductionBuffPct));
-  const actualEnemyDamage = enemyDmg
-    * (1 - damageReduction)
-    * passiveIncomingMult
-    * heroPassive.incomingDmgMult
-    * formation.incomingMult
-    * synergy.incomingMult
-    * activeReductionMult
-    * (scaledElapsed / 1000);
+  const actualEnemyDamage =
+    enemyDmg *
+    (1 - damageReduction) *
+    passiveIncomingMult *
+    heroPassive.incomingDmgMult *
+    formation.incomingMult *
+    synergy.incomingMult *
+    activeReductionMult *
+    (scaledElapsed / 1000);
   const teamHp = working.teamHp - actualEnemyDamage;
 
   if (hp <= 0) return withAchievement(killMonster(working));
@@ -3275,9 +3670,8 @@ function advanceCombatStep(state: GameState, elapsedMs: number): GameState {
   if (teamHp <= 0) {
     const currentChapter = Math.floor((Math.max(1, working.wave) - 1) / 20);
     const chapterStartWave = currentChapter * 20 + 1;
-    const retreatWave = working.wave === chapterStartWave && chapterStartWave > 1
-      ? Math.max(1, chapterStartWave - 20)
-      : chapterStartWave;
+    const retreatWave =
+      working.wave === chapterStartWave && chapterStartWave > 1 ? Math.max(1, chapterStartWave - 20) : chapterStartWave;
     return {
       ...working,
       wave: retreatWave,
@@ -3286,7 +3680,10 @@ function advanceCombatStep(state: GameState, elapsedMs: number): GameState {
       teamHp: getTeamMaxHp(working),
       teamMaxHp: getTeamMaxHp(working),
       lastActiveAt: Date.now(),
-      combatLog: [`${new Date().toLocaleTimeString()} • Team collapsed and retreated to Wave ${retreatWave}`, ...working.combatLog].slice(0, 24),
+      combatLog: [
+        `${new Date().toLocaleTimeString()} • Team collapsed and retreated to Wave ${retreatWave}`,
+        ...working.combatLog,
+      ].slice(0, 24),
     };
   }
 
@@ -3340,21 +3737,21 @@ function getOfflineStepElapsedMs(state: GameState, remainingMs: number): number 
   const defense = getTeamDefense(withAutoTempo);
   const damageReduction = Math.min(0.8, defense / (defense + 100));
   const passive = withAutoTempo.playerClass ? getClassPassive(withAutoTempo.playerClass) : null;
-  const passiveIncomingMult = hasUnlock(withAutoTempo, 'class_passive') && passive
-    ? passive.incomingDamageMultiplier
-    : 1;
+  const passiveIncomingMult =
+    hasUnlock(withAutoTempo, 'class_passive') && passive ? passive.incomingDamageMultiplier : 1;
   const heroPassive = getHeroPassiveMultipliers(withAutoTempo);
   const formation = getFormationMultipliers(withAutoTempo);
   const synergy = getTeamSynergy(withAutoTempo);
   const activeReductionMult = 1 - Math.max(0, Math.min(0.7, withAutoTempo.damageReductionBuffPct));
-  const enemyDmgPerMs = enemyDmg
-    * (1 - damageReduction)
-    * passiveIncomingMult
-    * heroPassive.incomingDmgMult
-    * formation.incomingMult
-    * synergy.incomingMult
-    * activeReductionMult
-    * (combatTempo / 1000);
+  const enemyDmgPerMs =
+    enemyDmg *
+    (1 - damageReduction) *
+    passiveIncomingMult *
+    heroPassive.incomingDmgMult *
+    formation.incomingMult *
+    synergy.incomingMult *
+    activeReductionMult *
+    (combatTempo / 1000);
   if (enemyDmgPerMs > 0) {
     candidateWindows.push(withAutoTempo.teamHp / enemyDmgPerMs);
   }
@@ -3369,7 +3766,10 @@ function getOfflineStepElapsedMs(state: GameState, remainingMs: number): number 
   return Math.min(remainingMs, roundedMs, OFFLINE_SIM_MAX_SLICE_MS);
 }
 
-function simulateOfflineProgress(state: GameState, elapsedMs: number): {
+function simulateOfflineProgress(
+  state: GameState,
+  elapsedMs: number,
+): {
   state: GameState;
   reachedIterationCap: boolean;
 } {
@@ -3436,8 +3836,9 @@ type Action =
   | { type: 'LEVEL_UP_HERO_GOLD'; uid: string }
   | { type: 'EQUIP_ITEM'; itemId: string }
   | { type: 'SUMMON_HERO' }
-  | { type: 'SUMMON_HERO_X10' }
+  | { type: 'SUMMON_HERO_X10'; featuredHeroId?: string }
   | { type: 'SUMMON_HERO_X10_CINEMATIC'; featuredHeroId?: string }
+  | { type: 'SPARK_EXCHANGE'; optionId: string; targetHeroId?: string }
   | { type: 'AUTO_EQUIP_BEST_HEROES' }
   | { type: 'SAVE_TEAM_LOADOUT'; slot: number }
   | { type: 'LOAD_TEAM_LOADOUT'; slot: number }
@@ -3600,8 +4001,8 @@ function reducer(state: GameState, action: Action): GameState {
         characterCreated: true,
         playerName: name,
         playerClass: action.playerClass,
-        unspentStatPoints: 10,   // starting stat points to customise immediately
-        gold: 100,               // starting gold to feel snappy
+        unspentStatPoints: 10, // starting stat points to customise immediately
+        gold: 100, // starting gold to feel snappy
         inventoryItemIds: starterItems.map(item => item.id),
         equipmentInventory: Object.fromEntries(starterItems.map(item => [item.id, item])),
         equippedItems: starterEquip,
@@ -3666,7 +4067,10 @@ function reducer(state: GameState, action: Action): GameState {
       const startGold = state.gold;
       const startExp = state.totalExp;
       const startItems = state.inventoryItemIds.length;
-      const startUsableCount = Object.values(state.usableItemCounts).reduce((sum, count) => sum + Math.max(0, count), 0);
+      const startUsableCount = Object.values(state.usableItemCounts).reduce(
+        (sum, count) => sum + Math.max(0, count),
+        0,
+      );
       const simulation = simulateOfflineProgress(state, elapsed);
       const working = simulation.state;
 
@@ -3675,18 +4079,24 @@ function reducer(state: GameState, action: Action): GameState {
       const goldGain = Math.max(0, working.gold - startGold);
       const expGain = Math.max(0, working.totalExp - startExp);
       const itemsGained = Math.max(0, working.inventoryItemIds.length - startItems);
-      const usableNetGain = Math.max(0, Object.values(working.usableItemCounts).reduce((sum, count) => sum + Math.max(0, count), 0) - startUsableCount);
+      const usableNetGain = Math.max(
+        0,
+        Object.values(working.usableItemCounts).reduce((sum, count) => sum + Math.max(0, count), 0) - startUsableCount,
+      );
 
-      const next = queueReward({
-        ...working,
-        lastActiveAt: Date.now(),
-      }, {
-        id: `offline_${Date.now()}`,
-        kind: 'system',
-        title: 'Offline Progress',
-        detail: `+${killsGained} kills • +${wavesGained} waves • +${goldGain} gold • +${expGain} EXP${itemsGained > 0 ? ` • +${itemsGained} gear` : ''}${usableNetGain > 0 ? ` • +${usableNetGain} usable` : ''} • now Wave ${working.wave}${simulation.reachedIterationCap ? ' (simulation budget reached)' : ''}`,
-      });
-      return withAchievement((next));
+      const next = queueReward(
+        {
+          ...working,
+          lastActiveAt: Date.now(),
+        },
+        {
+          id: `offline_${Date.now()}`,
+          kind: 'system',
+          title: 'Offline Progress',
+          detail: `+${killsGained} kills • +${wavesGained} waves • +${goldGain} gold • +${expGain} EXP${itemsGained > 0 ? ` • +${itemsGained} gear` : ''}${usableNetGain > 0 ? ` • +${usableNetGain} usable` : ''} • now Wave ${working.wave}${simulation.reachedIterationCap ? ' (simulation budget reached)' : ''}`,
+        },
+      );
+      return withAchievement(next);
     }
 
     // APPLY_DAILY_LOGIN, REBIRTH, CLEAR_ACHIEVEMENT, CLEAR_REWARD_POPUP
@@ -3721,139 +4131,143 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'LOAD': {
       const p = sanitizeSaveData(action.payload);
-      return maybeAutoRefreshExpeditionContracts({
-        ...DEFAULT_STATE,
-        playerName: p.playerName,
-        playerClass: p.playerClass,
-        characterCreated: p.characterCreated,
+      return maybeAutoRefreshExpeditionContracts(
+        {
+          ...DEFAULT_STATE,
+          playerName: p.playerName,
+          playerClass: p.playerClass,
+          characterCreated: p.characterCreated,
 
-        gold: p.gold,
-        totalGold: p.totalGold,
-        exp: p.exp,
-        totalExp: p.totalExp,
-        level: p.level,
-        highestWaveReached: p.highestWaveReached,
-        unspentStatPoints: p.unspentStatPoints,
-        statsAlloc: p.statsAlloc,
+          gold: p.gold,
+          totalGold: p.totalGold,
+          exp: p.exp,
+          totalExp: p.totalExp,
+          level: p.level,
+          highestWaveReached: p.highestWaveReached,
+          unspentStatPoints: p.unspentStatPoints,
+          statsAlloc: p.statsAlloc,
 
-        totalKills: p.totalKills,
-        burstCharge: p.burstCharge,
-        combatHeat: p.combatHeat,
-        wave: p.wave,
-        monsterHp: p.monsterHp,
-        monsterMaxHp: p.monsterMaxHp,
-        teamHp: p.teamHp,
-        teamMaxHp: p.teamMaxHp,
+          totalKills: p.totalKills,
+          burstCharge: p.burstCharge,
+          combatHeat: p.combatHeat,
+          wave: p.wave,
+          monsterHp: p.monsterHp,
+          monsterMaxHp: p.monsterMaxHp,
+          teamHp: p.teamHp,
+          teamMaxHp: p.teamMaxHp,
 
-        party: p.party,
-        skills: new Set(p.skills),
+          party: p.party,
+          skills: new Set(p.skills),
 
-        heroRoster: p.heroRoster,
-        activeTeamHeroIds: p.activeTeamHeroIds,
-        totalSummons: p.totalSummons,
-        firstSummonGiven: p.firstSummonGiven,
-        freeSummonCharges: p.freeSummonCharges,
-        diamonds: p.diamonds,
-        bossTears: p.bossTears,
-        heroShards: p.heroShards,
-        essence: p.essence,
-        rebirthCores: p.rebirthCores,
-        rebirthDamagePath: p.rebirthDamagePath,
-        rebirthEconomyPath: p.rebirthEconomyPath,
-        rebirthSurvivalPath: p.rebirthSurvivalPath,
-        autoRecycleMaxRarity: p.autoRecycleMaxRarity,
-        equipmentScrap: p.equipmentScrap,
-        gachaPityCounter: p.gachaPityCounter,
-        summonHistory: p.summonHistory,
-        teamLoadouts: p.teamLoadouts,
-        teamSlotsUnlocked: p.teamSlotsUnlocked,
-        heroFormationByUid: p.heroFormationByUid,
-        heroUniqueGearByHeroId: p.heroUniqueGearByHeroId ?? {},
-        lastDiceRollDay: p.lastDiceRollDay,
-        riftDungeonLevel: p.riftDungeonLevel ?? 1,
-        riftEntriesUsedToday: p.riftEntriesUsedToday ?? 0,
-        riftEntryDay: p.riftEntryDay ?? null,
-        riftRaidTickets: p.riftRaidTickets ?? 0,
-        lastRiftBossDamagePct: p.lastRiftBossDamagePct ?? 0,
-        lastDiceRollValue: p.lastDiceRollValue,
-        lastRiftWavesCleared: p.lastRiftWavesCleared,
-        treasureDungeonLevel: p.treasureDungeonLevel ?? 1,
-        treasureEntriesUsedToday: p.treasureEntriesUsedToday ?? 0,
-        treasureEntryDay: p.treasureEntryDay ?? null,
-        lastTreasureHaulPct: p.lastTreasureHaulPct ?? 0,
-        lastTreasureWiped: p.lastTreasureWiped ?? false,
-        lastReconSweepDay: p.lastReconSweepDay,
-        lastLockpickDay: p.lastLockpickDay,
-        lastTargetPracticeDay: p.lastTargetPracticeDay,
-        lastBountyDraftDay: p.lastBountyDraftDay,
-        miniBounty: p.miniBounty
-          ? {
-            ...p.miniBounty,
-            metric: p.miniBounty.metric === 'wave'
-              ? 'wave'
-              : p.miniBounty.metric === 'summons'
-                ? 'summons'
-                : 'kills',
-          }
-          : null,
-        guildhallFacilities: p.guildhallFacilities ?? DEFAULT_STATE.guildhallFacilities,
-        expeditionQueue: p.expeditionQueue ?? DEFAULT_STATE.expeditionQueue,
-        lastExpeditionDay: p.lastExpeditionDay ?? DEFAULT_STATE.lastExpeditionDay,
-        expeditionContractOffers: p.expeditionContractOffers ?? DEFAULT_STATE.expeditionContractOffers,
-        expeditionContractsRefreshedAt: p.expeditionContractsRefreshedAt ?? DEFAULT_STATE.expeditionContractsRefreshedAt,
-        classMasteryXp: p.classMasteryXp,
-        seasonPoints: p.seasonPoints,
-        bestSeasonPoints: p.bestSeasonPoints,
-        dailyLoginStreak: p.dailyLoginStreak,
-        lastDailyLoginDay: p.lastDailyLoginDay,
-        streakInsuranceCharges: p.streakInsuranceCharges,
-        weeklyEventWeek: p.weeklyEventWeek,
-        weeklyEventId: p.weeklyEventId,
-        weeklyKills: p.weeklyKills,
-        weeklyTrackClaimed: p.weeklyTrackClaimed,
-        claimedMissionIds: p.claimedMissionIds,
-        codexVipClaimedHeroIds: p.codexVipClaimedHeroIds,
-        codexVipClaimedUniqueIds: p.codexVipClaimedUniqueIds,
-        seenHintIds: p.seenHintIds,
-        permanentUnlocks: p.permanentUnlocks,
-        metaDamageLevel: p.metaDamageLevel,
-        metaEconomyLevel: p.metaEconomyLevel,
-        metaSurvivalLevel: p.metaSurvivalLevel,
-        vipPoints: p.vipPoints,
-        vipLevel: p.vipLevel,
-        vipRewardClaimedLevels: p.vipRewardClaimedLevels,
-        dollarFirstPurchaseClaimedOfferIds: p.dollarFirstPurchaseClaimedOfferIds,
+          heroRoster: p.heroRoster,
+          activeTeamHeroIds: p.activeTeamHeroIds,
+          totalSummons: p.totalSummons,
+          firstSummonGiven: p.firstSummonGiven,
+          freeSummonCharges: p.freeSummonCharges,
+          diamonds: p.diamonds,
+          bossTears: p.bossTears,
+          heroShards: p.heroShards,
+          essence: p.essence,
+          rebirthCores: p.rebirthCores,
+          rebirthDamagePath: p.rebirthDamagePath,
+          rebirthEconomyPath: p.rebirthEconomyPath,
+          rebirthSurvivalPath: p.rebirthSurvivalPath,
+          autoRecycleMaxRarity: p.autoRecycleMaxRarity,
+          equipmentScrap: p.equipmentScrap,
+          gachaPityCounter: p.gachaPityCounter,
+          sparkTokens: p.sparkTokens,
+          claimedSummonMilestones: p.claimedSummonMilestones,
+          guaranteedMinRarity: p.guaranteedMinRarity,
+          summonHistory: p.summonHistory,
+          teamLoadouts: p.teamLoadouts,
+          teamSlotsUnlocked: p.teamSlotsUnlocked,
+          heroFormationByUid: p.heroFormationByUid,
+          heroUniqueGearByHeroId: p.heroUniqueGearByHeroId ?? {},
+          lastDiceRollDay: p.lastDiceRollDay,
+          riftDungeonLevel: p.riftDungeonLevel ?? 1,
+          riftEntriesUsedToday: p.riftEntriesUsedToday ?? 0,
+          riftEntryDay: p.riftEntryDay ?? null,
+          riftRaidTickets: p.riftRaidTickets ?? 0,
+          lastRiftBossDamagePct: p.lastRiftBossDamagePct ?? 0,
+          lastDiceRollValue: p.lastDiceRollValue,
+          lastRiftWavesCleared: p.lastRiftWavesCleared,
+          treasureDungeonLevel: p.treasureDungeonLevel ?? 1,
+          treasureEntriesUsedToday: p.treasureEntriesUsedToday ?? 0,
+          treasureEntryDay: p.treasureEntryDay ?? null,
+          lastTreasureHaulPct: p.lastTreasureHaulPct ?? 0,
+          lastTreasureWiped: p.lastTreasureWiped ?? false,
+          lastReconSweepDay: p.lastReconSweepDay,
+          lastLockpickDay: p.lastLockpickDay,
+          lastTargetPracticeDay: p.lastTargetPracticeDay,
+          lastBountyDraftDay: p.lastBountyDraftDay,
+          miniBounty: p.miniBounty
+            ? {
+                ...p.miniBounty,
+                metric:
+                  p.miniBounty.metric === 'wave' ? 'wave' : p.miniBounty.metric === 'summons' ? 'summons' : 'kills',
+              }
+            : null,
+          guildhallFacilities: p.guildhallFacilities ?? DEFAULT_STATE.guildhallFacilities,
+          expeditionQueue: p.expeditionQueue ?? DEFAULT_STATE.expeditionQueue,
+          lastExpeditionDay: p.lastExpeditionDay ?? DEFAULT_STATE.lastExpeditionDay,
+          expeditionContractOffers: p.expeditionContractOffers ?? DEFAULT_STATE.expeditionContractOffers,
+          expeditionContractsRefreshedAt:
+            p.expeditionContractsRefreshedAt ?? DEFAULT_STATE.expeditionContractsRefreshedAt,
+          classMasteryXp: p.classMasteryXp,
+          seasonPoints: p.seasonPoints,
+          bestSeasonPoints: p.bestSeasonPoints,
+          dailyLoginStreak: p.dailyLoginStreak,
+          lastDailyLoginDay: p.lastDailyLoginDay,
+          streakInsuranceCharges: p.streakInsuranceCharges,
+          weeklyEventWeek: p.weeklyEventWeek,
+          weeklyEventId: p.weeklyEventId,
+          weeklyKills: p.weeklyKills,
+          weeklyTrackClaimed: p.weeklyTrackClaimed,
+          claimedMissionIds: p.claimedMissionIds,
+          codexVipClaimedHeroIds: p.codexVipClaimedHeroIds,
+          codexVipClaimedUniqueIds: p.codexVipClaimedUniqueIds,
+          seenHintIds: p.seenHintIds,
+          permanentUnlocks: p.permanentUnlocks,
+          metaDamageLevel: p.metaDamageLevel,
+          metaEconomyLevel: p.metaEconomyLevel,
+          metaSurvivalLevel: p.metaSurvivalLevel,
+          vipPoints: p.vipPoints,
+          vipLevel: p.vipLevel,
+          vipRewardClaimedLevels: p.vipRewardClaimedLevels,
+          dollarFirstPurchaseClaimedOfferIds: p.dollarFirstPurchaseClaimedOfferIds,
 
-        inventoryItemIds: p.inventoryItemIds,
-    equipmentInventory: p.equipmentInventory,
-        equippedItems: p.equippedItems,
-        usableItemCounts: p.usableItemCounts,
-        autoUsePotionEnabled: p.autoUsePotionEnabled,
-        autoUseCoolantEnabled: p.autoUseCoolantEnabled,
-        autoUsePotionThresholdPct: p.autoUsePotionThresholdPct,
-        autoRecycleEnabled: p.autoRecycleEnabled,
-        autoSummonEnabled: p.autoSummonEnabled,
-        autoSummonMode: p.autoSummonMode,
-        autoBurstEnabled: p.autoBurstEnabled,
-        combatTempo: clampCombatTempoForVip(p.combatTempo === 2 || p.combatTempo === 4 ? p.combatTempo : 1, p),
-        autoTempoEnabled: p.autoTempoEnabled,
-        autoTempoTarget: clampAutoTempoTargetForVip(p.autoTempoTarget === 4 ? 4 : 2, p),
-        autoSummonReserveGold: p.autoSummonReserveGold,
-        autoSummonCooldownMs: 0,
-        lastActiveAt: p.lastActiveAt,
+          inventoryItemIds: p.inventoryItemIds,
+          equipmentInventory: p.equipmentInventory,
+          equippedItems: p.equippedItems,
+          usableItemCounts: p.usableItemCounts,
+          autoUsePotionEnabled: p.autoUsePotionEnabled,
+          autoUseCoolantEnabled: p.autoUseCoolantEnabled,
+          autoUsePotionThresholdPct: p.autoUsePotionThresholdPct,
+          autoRecycleEnabled: p.autoRecycleEnabled,
+          autoSummonEnabled: p.autoSummonEnabled,
+          autoSummonMode: p.autoSummonMode,
+          autoBurstEnabled: p.autoBurstEnabled,
+          combatTempo: clampCombatTempoForVip(p.combatTempo === 2 || p.combatTempo === 4 ? p.combatTempo : 1, p),
+          autoTempoEnabled: p.autoTempoEnabled,
+          autoTempoTarget: clampAutoTempoTargetForVip(p.autoTempoTarget === 4 ? 4 : 2, p),
+          autoSummonReserveGold: p.autoSummonReserveGold,
+          autoSummonCooldownMs: 0,
+          lastActiveAt: p.lastActiveAt,
 
-        prestigeCount: p.prestigeCount,
-        achievements: new Set(p.achievements),
-        newAchievement: null,
-        rewardQueue: [],
-        combatLog: p.combatLog,
-        damageBuffPct: p.damageBuffPct,
-        damageBuffMs: p.damageBuffMs,
-        damageReductionBuffPct: p.damageReductionBuffPct,
-        damageReductionBuffMs: p.damageReductionBuffMs,
-        heroActiveCdMs: p.heroActiveCdMs,
-        mailbox: p.mailbox ?? [],
-      }, Date.now());
+          prestigeCount: p.prestigeCount,
+          achievements: new Set(p.achievements),
+          newAchievement: null,
+          rewardQueue: [],
+          combatLog: p.combatLog,
+          damageBuffPct: p.damageBuffPct,
+          damageBuffMs: p.damageBuffMs,
+          damageReductionBuffPct: p.damageReductionBuffPct,
+          damageReductionBuffMs: p.damageReductionBuffMs,
+          heroActiveCdMs: p.heroActiveCdMs,
+          mailbox: p.mailbox ?? [],
+        },
+        Date.now(),
+      );
     }
 
     default:
@@ -3903,6 +4317,9 @@ export interface SaveData {
   autoRecycleMaxRarity: Rarity;
   equipmentScrap: number;
   gachaPityCounter: number;
+  sparkTokens: number;
+  claimedSummonMilestones: number[];
+  guaranteedMinRarity: Rarity | null;
   summonHistory: SummonHistoryEntry[];
   teamLoadouts: string[][];
   teamSlotsUnlocked?: number;
@@ -4038,6 +4455,9 @@ export function serialize(state: GameState): SaveData {
     autoRecycleMaxRarity: state.autoRecycleMaxRarity,
     equipmentScrap: state.equipmentScrap,
     gachaPityCounter: state.gachaPityCounter,
+    sparkTokens: state.sparkTokens,
+    claimedSummonMilestones: state.claimedSummonMilestones,
+    guaranteedMinRarity: state.guaranteedMinRarity,
     summonHistory: state.summonHistory,
     teamLoadouts: state.teamLoadouts,
     teamSlotsUnlocked: state.teamSlotsUnlocked,
@@ -4123,9 +4543,13 @@ export function useGameState(saveSlot: string = 'default') {
   const onlineSlotEligible = !saveSlot.startsWith('__character_slot_preview__');
   const [state, rawDispatch] = useReducer(reducer, DEFAULT_STATE);
   const [hydrated, setHydrated] = useState(false);
-  const [onlineSyncState, setOnlineSyncState] = useState<'local-only' | 'syncing' | 'synced' | 'conflict' | 'error'>('local-only');
+  const [onlineSyncState, setOnlineSyncState] = useState<'local-only' | 'syncing' | 'synced' | 'conflict' | 'error'>(
+    'local-only',
+  );
   const [onlineSyncAt, setOnlineSyncAt] = useState<number | null>(null);
+  // eslint-disable-next-line react-hooks/purity -- ref initial values only evaluate once; Date.now() is intentional for tick/save baselines
   const lastTickRef = useRef(Date.now());
+  // eslint-disable-next-line react-hooks/purity
   const lastSaveRef = useRef(Date.now());
   const stateRef = useRef(state);
   const claimFingerprintRef = useRef('');
@@ -4141,134 +4565,148 @@ export function useGameState(saveSlot: string = 'default') {
   const actionDispatchCountsRef = useRef<Partial<Record<Action['type'], number>>>({});
   stateRef.current = state;
 
-  const dispatch = useCallback((action: Action) => {
-    rawDispatch(action);
+  const dispatch = useCallback(
+    (action: Action) => {
+      rawDispatch(action);
 
-    if (action.type === 'TICK') return;
-    const nextCount = (actionDispatchCountsRef.current[action.type] ?? 0) + 1;
-    actionDispatchCountsRef.current[action.type] = nextCount;
+      if (action.type === 'TICK') return;
+      const nextCount = (actionDispatchCountsRef.current[action.type] ?? 0) + 1;
+      actionDispatchCountsRef.current[action.type] = nextCount;
 
-    debugLog('dispatch', `Action ${action.type}`, {
-      saveSlot,
-      count: nextCount,
-      wave: stateRef.current.wave,
-      level: stateRef.current.level,
-      prestige: stateRef.current.prestigeCount,
-    });
-
-    const throttleMs = ACTION_TELEMETRY_SAMPLE[action.type];
-    if (throttleMs !== undefined) {
-      void trackGameplayAction(
-        `action_${action.type.toLowerCase()}`,
-        {
-          saveSlot,
-          wave: stateRef.current.wave,
-          level: stateRef.current.level,
-          prestigeCount: stateRef.current.prestigeCount,
-          totalKills: stateRef.current.totalKills,
-        },
-        throttleMs,
-      );
-    }
-
-    // Rich dedicated events for key conversion/economy actions.
-    if (action.type === 'CREATE_CHARACTER') {
-      void trackEvent('character_created', {
-        playerClass: action.playerClass,
+      debugLog('dispatch', `Action ${action.type}`, {
         saveSlot,
-      });
-    }
-
-    if (action.type === 'BUY_DIAMOND_SHOP_ITEM') {
-      const cost = DIAMOND_SHOP_COSTS[action.offerId];
-      void trackEvent('spend_diamonds', {
-        item_id: action.offerId,
-        diamonds_spent: cost,
-        diamonds_before: stateRef.current.diamonds,
+        count: nextCount,
         wave: stateRef.current.wave,
         level: stateRef.current.level,
+        prestige: stateRef.current.prestigeCount,
       });
-    }
 
-    if (action.type === 'SIMULATE_DOLLAR_PURCHASE') {
-      const pack = DOLLAR_SHOP_PACKS[action.offerId];
-      if (pack) {
-        void trackEvent('purchase', {
-          item_id: action.offerId,
-          value: pack.usdCents / 100,
-          currency: 'USD',
-          diamonds_received: pack.diamonds,
+      const throttleMs = ACTION_TELEMETRY_SAMPLE[action.type];
+      if (throttleMs !== undefined) {
+        void trackGameplayAction(
+          `action_${action.type.toLowerCase()}`,
+          {
+            saveSlot,
+            wave: stateRef.current.wave,
+            level: stateRef.current.level,
+            prestigeCount: stateRef.current.prestigeCount,
+            totalKills: stateRef.current.totalKills,
+          },
+          throttleMs,
+        );
+      }
+
+      // Rich dedicated events for key conversion/economy actions.
+      if (action.type === 'CREATE_CHARACTER') {
+        void trackEvent('character_created', {
+          playerClass: action.playerClass,
+          saveSlot,
         });
       }
-    }
 
-    if (action.type === 'REBIRTH') {
-      void trackEvent('rebirth', {
-        prestige_count: stateRef.current.prestigeCount + 1,
-        wave: stateRef.current.wave,
-        level: stateRef.current.level,
-      });
-    }
-  }, [saveSlot]);
+      if (action.type === 'BUY_DIAMOND_SHOP_ITEM') {
+        const cost = DIAMOND_SHOP_COSTS[action.offerId];
+        void trackEvent('spend_diamonds', {
+          item_id: action.offerId,
+          diamonds_spent: cost,
+          diamonds_before: stateRef.current.diamonds,
+          wave: stateRef.current.wave,
+          level: stateRef.current.level,
+        });
+      }
 
-  const persistSnapshot = useCallback(async (forceOnline = false, snapshotOverride?: SaveData) => {
-    const snapshot = snapshotOverride ?? serialize(stateRef.current);
+      if (action.type === 'SIMULATE_DOLLAR_PURCHASE') {
+        const pack = DOLLAR_SHOP_PACKS[action.offerId];
+        if (pack) {
+          void trackEvent('purchase', {
+            item_id: action.offerId,
+            value: pack.usdCents / 100,
+            currency: 'USD',
+            diamonds_received: pack.diamonds,
+          });
+        }
+      }
+
+      if (action.type === 'REBIRTH') {
+        void trackEvent('rebirth', {
+          prestige_count: stateRef.current.prestigeCount + 1,
+          wave: stateRef.current.wave,
+          level: stateRef.current.level,
+        });
+      }
+    },
+    [saveSlot],
+  );
+
+  const persistSnapshot = useCallback(
+    async (forceOnline = false, snapshotOverride?: SaveData) => {
+      const snapshot = snapshotOverride ?? serialize(stateRef.current);
       if (!onlineSlotEligible || onlineSyncDisabledRef.current || !isOnlineSaveAvailable()) {
-      setOnlineSyncState('local-only');
-      return;
-    }
-
-    const now = Date.now();
-    if (!forceOnline && now - lastOnlineSaveRef.current < ONLINE_SAVE_INTERVAL_MS) return;
-
-    setOnlineSyncState('syncing');
-    const firstAttempt = await writeOnlineSave(saveSlot, snapshot as unknown as Record<string, unknown>, onlineRevisionRef.current);
-    if (firstAttempt.ok) {
-      onlineRevisionRef.current = firstAttempt.revision;
-      lastOnlineSaveRef.current = now;
-      setOnlineSyncState('synced');
-      setOnlineSyncAt(now);
-      return;
-    }
-
-    const remote = firstAttempt.remote;
-    if (!remote) {
-      if (firstAttempt.errorCode === 'permission-denied' || firstAttempt.errorCode === 'invalid-slot') {
-        onlineSyncDisabledRef.current = true;
         setOnlineSyncState('local-only');
         return;
       }
-      setOnlineSyncState('error');
-      return;
-    }
 
-    const remoteUpdatedAt = Math.max(0, Math.floor(remote.updatedAt));
-    const localUpdatedAt = typeof snapshot.lastActiveAt === 'number' ? snapshot.lastActiveAt : now;
-    if (remoteUpdatedAt > localUpdatedAt) {
-      onlineRevisionRef.current = remote.revision;
-      setOnlineSyncState('conflict');
-      dispatch({ type: 'LOAD', payload: remote.payload as Partial<SaveData> });
-      return;
-    }
+      const now = Date.now();
+      if (!forceOnline && now - lastOnlineSaveRef.current < ONLINE_SAVE_INTERVAL_MS) return;
 
-    const retryAttempt = await writeOnlineSave(saveSlot, snapshot as unknown as Record<string, unknown>, remote.revision);
-    if (retryAttempt.ok) {
-      onlineRevisionRef.current = retryAttempt.revision;
-      lastOnlineSaveRef.current = now;
-      setOnlineSyncState('synced');
-      setOnlineSyncAt(now);
-    } else if (retryAttempt.remote) {
-      onlineRevisionRef.current = retryAttempt.remote.revision;
-      setOnlineSyncState('error');
-    } else if (retryAttempt.errorCode === 'permission-denied' || retryAttempt.errorCode === 'invalid-slot') {
-      onlineSyncDisabledRef.current = true;
-      setOnlineSyncState('local-only');
-    }
-  }, [dispatch, onlineSlotEligible, saveSlot]);
+      setOnlineSyncState('syncing');
+      const firstAttempt = await writeOnlineSave(
+        saveSlot,
+        snapshot as unknown as Record<string, unknown>,
+        onlineRevisionRef.current,
+      );
+      if (firstAttempt.ok) {
+        onlineRevisionRef.current = firstAttempt.revision;
+        lastOnlineSaveRef.current = now;
+        setOnlineSyncState('synced');
+        setOnlineSyncAt(now);
+        return;
+      }
+
+      const remote = firstAttempt.remote;
+      if (!remote) {
+        if (firstAttempt.errorCode === 'permission-denied' || firstAttempt.errorCode === 'invalid-slot') {
+          onlineSyncDisabledRef.current = true;
+          setOnlineSyncState('local-only');
+          return;
+        }
+        setOnlineSyncState('error');
+        return;
+      }
+
+      const remoteUpdatedAt = Math.max(0, Math.floor(remote.updatedAt));
+      const localUpdatedAt = typeof snapshot.lastActiveAt === 'number' ? snapshot.lastActiveAt : now;
+      if (remoteUpdatedAt > localUpdatedAt) {
+        onlineRevisionRef.current = remote.revision;
+        setOnlineSyncState('conflict');
+        dispatch({ type: 'LOAD', payload: remote.payload as Partial<SaveData> });
+        return;
+      }
+
+      const retryAttempt = await writeOnlineSave(
+        saveSlot,
+        snapshot as unknown as Record<string, unknown>,
+        remote.revision,
+      );
+      if (retryAttempt.ok) {
+        onlineRevisionRef.current = retryAttempt.revision;
+        lastOnlineSaveRef.current = now;
+        setOnlineSyncState('synced');
+        setOnlineSyncAt(now);
+      } else if (retryAttempt.remote) {
+        onlineRevisionRef.current = retryAttempt.remote.revision;
+        setOnlineSyncState('error');
+      } else if (retryAttempt.errorCode === 'permission-denied' || retryAttempt.errorCode === 'invalid-slot') {
+        onlineSyncDisabledRef.current = true;
+        setOnlineSyncState('local-only');
+      }
+    },
+    [dispatch, onlineSlotEligible, saveSlot],
+  );
 
   useEffect(() => {
     setHydrated(false);
-      debugLog('save', 'Loading save slot', { saveSlot });
+    debugLog('save', 'Loading save slot', { saveSlot });
     dispatch({ type: 'LOAD', payload: {} });
     sessionStartedRef.current = false;
     sessionStartedAtRef.current = 0;
@@ -4288,11 +4726,11 @@ export function useGameState(saveSlot: string = 'default') {
     let cancelled = false;
     void (async () => {
       const onlineAvailable = onlineSlotEligible && isOnlineSaveAvailable();
-        if (!onlineAvailable) {
-          debugLog('save', 'No online save available; using defaults', { saveSlot });
-          return;
-        }
-        const remoteResult = await loadOnlineSave<Record<string, unknown>>(saveSlot);
+      if (!onlineAvailable) {
+        debugLog('save', 'No online save available; using defaults', { saveSlot });
+        return;
+      }
+      const remoteResult = await loadOnlineSave<Record<string, unknown>>(saveSlot);
       if (cancelled) return;
 
       if (!remoteResult.ok) {
@@ -4302,76 +4740,75 @@ export function useGameState(saveSlot: string = 'default') {
         } else {
           setOnlineSyncState('error');
         }
-          return;
+        return;
       }
 
       const remote = remoteResult.ok ? remoteResult.data : null;
 
-        if (!remote) {
+      if (!remote) {
         debugLog('save', 'No existing save found; using defaults', { saveSlot });
-          setOnlineSyncState('synced');
+        setOnlineSyncState('synced');
         return;
       }
 
-        onlineRevisionRef.current = remote.revision;
-        setOnlineSyncState('synced');
-        setOnlineSyncAt(remote.updatedAt);
-        debugLog('save', 'Loaded cloud save', {
-          saveSlot,
-          wave: (remote.payload as Partial<SaveData>).wave,
-          level: (remote.payload as Partial<SaveData>).level,
-          revision: remote.revision,
-        });
+      onlineRevisionRef.current = remote.revision;
+      setOnlineSyncState('synced');
+      setOnlineSyncAt(remote.updatedAt);
+      debugLog('save', 'Loaded cloud save', {
+        saveSlot,
+        wave: (remote.payload as Partial<SaveData>).wave,
+        level: (remote.payload as Partial<SaveData>).level,
+        revision: remote.revision,
+      });
 
-        let payloadWithCloudMail = remote.payload as Partial<SaveData>;
-        const uid = getFirebaseAuth()?.currentUser?.uid;
-        if (uid) {
-          try {
-            const cloudMails = await fetchCloudMail(uid);
-            if (cloudMails.length > 0) {
-              const existingMailbox = Array.isArray((payloadWithCloudMail as { mailbox?: MailMessage[] }).mailbox)
-                ? (payloadWithCloudMail as { mailbox?: MailMessage[] }).mailbox ?? []
-                : [];
-              const seenIds = new Set(existingMailbox.map(mail => mail.id));
-              const newMails: MailMessage[] = cloudMails
-                .filter(mail => !seenIds.has(mail.id))
-                .map(mail => ({
-                  id: mail.id,
-                  subject: mail.subject,
-                  message: mail.message,
-                  from: mail.from,
-                  sentAt: mail.sentAt,
-                  attachments: mail.attachments,
-                  claimedAttachments: emptyAttachments(),
-                }));
-              if (newMails.length > 0) {
-                payloadWithCloudMail = {
-                  ...payloadWithCloudMail,
-                  mailbox: [...newMails, ...existingMailbox].slice(0, 100),
-                };
-              }
-
-              await Promise.all(cloudMails.map(mail => claimCloudMail(uid, mail.id).catch(() => {})));
+      let payloadWithCloudMail = remote.payload as Partial<SaveData>;
+      const uid = getFirebaseAuth()?.currentUser?.uid;
+      if (uid) {
+        try {
+          const cloudMails = await fetchCloudMail(uid);
+          if (cloudMails.length > 0) {
+            const existingMailbox = Array.isArray((payloadWithCloudMail as { mailbox?: MailMessage[] }).mailbox)
+              ? ((payloadWithCloudMail as { mailbox?: MailMessage[] }).mailbox ?? [])
+              : [];
+            const seenIds = new Set(existingMailbox.map(mail => mail.id));
+            const newMails: MailMessage[] = cloudMails
+              .filter(mail => !seenIds.has(mail.id))
+              .map(mail => ({
+                id: mail.id,
+                subject: mail.subject,
+                message: mail.message,
+                from: mail.from,
+                sentAt: mail.sentAt,
+                attachments: mail.attachments,
+                claimedAttachments: emptyAttachments(),
+              }));
+            if (newMails.length > 0) {
+              payloadWithCloudMail = {
+                ...payloadWithCloudMail,
+                mailbox: [...newMails, ...existingMailbox].slice(0, 100),
+              };
             }
-          } catch {
-            // Non-fatal. The real-time cloud mail listener in GameScreen will still surface messages.
-          }
-        }
 
-        dispatch({ type: 'LOAD', payload: payloadWithCloudMail });
-        const elapsed = Date.now() - (payloadWithCloudMail.lastActiveAt ?? Date.now());
+            await Promise.all(cloudMails.map(mail => claimCloudMail(uid, mail.id).catch(() => {})));
+          }
+        } catch {
+          // Non-fatal. The real-time cloud mail listener in GameScreen will still surface messages.
+        }
+      }
+
+      dispatch({ type: 'LOAD', payload: payloadWithCloudMail });
+      const elapsed = Date.now() - (payloadWithCloudMail.lastActiveAt ?? Date.now());
       dispatch({ type: 'APPLY_OFFLINE_PROGRESS', elapsedMs: elapsed });
       dispatch({ type: 'APPLY_DAILY_LOGIN', nowMs: Date.now() });
       dispatch({ type: 'APPLY_WEEKLY_ROLLOVER', nowMs: Date.now() });
-    })()
-      .finally(() => {
-        if (!cancelled) setHydrated(true);
-      });
+    })().finally(() => {
+      if (!cancelled) setHydrated(true);
+    });
 
     return () => {
       cancelled = true;
     };
-    }, [onlineSlotEligible, saveSlot]);
+  }, [onlineSlotEligible, saveSlot]);
 
   useEffect(() => {
     if (!state.characterCreated) return;
@@ -4437,7 +4874,15 @@ export function useGameState(saveSlot: string = 'default') {
       wave: state.wave,
       highestWave: state.highestWaveReached,
     });
-  }, [state.characterCreated, state.level, state.wave, state.highestWaveReached, state.prestigeCount, state.totalSummons, saveSlot]);
+  }, [
+    state.characterCreated,
+    state.level,
+    state.wave,
+    state.highestWaveReached,
+    state.prestigeCount,
+    state.totalSummons,
+    saveSlot,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -4484,7 +4929,6 @@ export function useGameState(saveSlot: string = 'default') {
         wave: state.wave,
       });
     }
-
   }, [state.totalSummons, state.highestWaveReached, state.prestigeCount, state.wave]);
 
   const createCharacter = useCallback((name: string, playerClass: PlayerClass) => {
@@ -4498,12 +4942,21 @@ export function useGameState(saveSlot: string = 'default') {
   const buySkill = useCallback((id: string) => dispatch({ type: 'BUY_SKILL', id }), []);
   const allocateStat = useCallback((stat: StatKey) => dispatch({ type: 'ALLOCATE_STAT', stat }), []);
   const allocateStatMax = useCallback((stat: StatKey) => dispatch({ type: 'ALLOCATE_STAT_MAX', stat }), []);
-  const allocateStatN = useCallback((stat: StatKey, amount: number) => dispatch({ type: 'ALLOCATE_STAT_N', stat, amount }), []);
+  const allocateStatN = useCallback(
+    (stat: StatKey, amount: number) => dispatch({ type: 'ALLOCATE_STAT_N', stat, amount }),
+    [],
+  );
   const burst = useCallback((hits: number) => dispatch({ type: 'BURST', hits }), []);
   const equipItem = useCallback((itemId: string) => dispatch({ type: 'EQUIP_ITEM', itemId }), []);
   const summonHero = useCallback(() => dispatch({ type: 'SUMMON_HERO' }), []);
-  const summonHeroX10 = useCallback(() => dispatch({ type: 'SUMMON_HERO_X10' }), []);
-  const summonHeroX10Cinematic = useCallback((featuredHeroId?: string) => dispatch({ type: 'SUMMON_HERO_X10_CINEMATIC', featuredHeroId }), []);
+  const summonHeroX10Cinematic = useCallback(
+    (featuredHeroId?: string) => dispatch({ type: 'SUMMON_HERO_X10_CINEMATIC', featuredHeroId }),
+    [],
+  );
+  const sparkExchange = useCallback(
+    (optionId: string, targetHeroId?: string) => dispatch({ type: 'SPARK_EXCHANGE', optionId, targetHeroId }),
+    [],
+  );
   const autoEquipBestHeroes = useCallback(() => dispatch({ type: 'AUTO_EQUIP_BEST_HEROES' }), []);
   const saveTeamLoadout = useCallback((slot: number) => dispatch({ type: 'SAVE_TEAM_LOADOUT', slot }), []);
   const loadTeamLoadout = useCallback((slot: number) => dispatch({ type: 'LOAD_TEAM_LOADOUT', slot }), []);
@@ -4553,26 +5006,59 @@ export function useGameState(saveSlot: string = 'default') {
   const spendRebirthCore = useCallback((path: 'damage' | 'economy' | 'survival') => {
     dispatch({ type: 'SPEND_REBIRTH_CORE', path });
   }, []);
-  const useUsableItem = useCallback((itemId: string, amount: number | 'all' = 1) => dispatch({ type: 'USE_USABLE_ITEM', itemId, amount }), []);
+  const useUsableItem = useCallback(
+    (itemId: string, amount: number | 'all' = 1) => dispatch({ type: 'USE_USABLE_ITEM', itemId, amount }),
+    [],
+  );
   const dismantleEquipment = useCallback((itemId: string) => dispatch({ type: 'DISMANTLE_EQUIPMENT', itemId }), []);
   const craftEquipment = useCallback((slot: EquipmentSlot) => dispatch({ type: 'CRAFT_EQUIPMENT', slot }), []);
-  const upgradeEquipmentRarity = useCallback((itemId: string) => dispatch({ type: 'UPGRADE_EQUIPMENT_RARITY', itemId }), []);
+  const upgradeEquipmentRarity = useCallback(
+    (itemId: string) => dispatch({ type: 'UPGRADE_EQUIPMENT_RARITY', itemId }),
+    [],
+  );
   const setAutoUsePotion = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_USE_POTION', enabled }), []);
   const setAutoUseCoolant = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_USE_COOLANT', enabled }), []);
-  const setAutoUsePotionThreshold = useCallback((thresholdPct: number) => dispatch({ type: 'SET_AUTO_USE_POTION_THRESHOLD', thresholdPct }), []);
-  const setAutoSummonEnabled = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_SUMMON_ENABLED', enabled }), []);
-  const setAutoSummonMode = useCallback((mode: 'single' | 'x10') => dispatch({ type: 'SET_AUTO_SUMMON_MODE', mode }), []);
-  const setAutoBurstEnabled = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_BURST_ENABLED', enabled }), []);
+  const setAutoUsePotionThreshold = useCallback(
+    (thresholdPct: number) => dispatch({ type: 'SET_AUTO_USE_POTION_THRESHOLD', thresholdPct }),
+    [],
+  );
+  const setAutoSummonEnabled = useCallback(
+    (enabled: boolean) => dispatch({ type: 'SET_AUTO_SUMMON_ENABLED', enabled }),
+    [],
+  );
+  const setAutoSummonMode = useCallback(
+    (mode: 'single' | 'x10') => dispatch({ type: 'SET_AUTO_SUMMON_MODE', mode }),
+    [],
+  );
+  const setAutoBurstEnabled = useCallback(
+    (enabled: boolean) => dispatch({ type: 'SET_AUTO_BURST_ENABLED', enabled }),
+    [],
+  );
   const setCombatTempo = useCallback((tempo: CombatTempo) => dispatch({ type: 'SET_COMBAT_TEMPO', tempo }), []);
   const rebirthHero = useCallback((uid: string) => dispatch({ type: 'REBIRTH_HERO', uid }), []);
-  const setAutoTempoEnabled = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_TEMPO_ENABLED', enabled }), []);
-  const setAutoTempoTarget = useCallback((target: AutoTempoTarget) => dispatch({ type: 'SET_AUTO_TEMPO_TARGET', target }), []);
+  const setAutoTempoEnabled = useCallback(
+    (enabled: boolean) => dispatch({ type: 'SET_AUTO_TEMPO_ENABLED', enabled }),
+    [],
+  );
+  const setAutoTempoTarget = useCallback(
+    (target: AutoTempoTarget) => dispatch({ type: 'SET_AUTO_TEMPO_TARGET', target }),
+    [],
+  );
   const setAutoSummonReserveGold = useCallback((reserveGold: number) => {
     dispatch({ type: 'SET_AUTO_SUMMON_RESERVE_GOLD', reserveGold });
   }, []);
-  const buyGoldShopItem = useCallback((offerId: GoldShopOfferId) => dispatch({ type: 'BUY_GOLD_SHOP_ITEM', offerId }), []);
-  const buyDiamondShopItem = useCallback((offerId: DiamondShopOfferId) => dispatch({ type: 'BUY_DIAMOND_SHOP_ITEM', offerId }), []);
-  const simulateDollarPurchase = useCallback((offerId: DollarShopOfferId) => dispatch({ type: 'SIMULATE_DOLLAR_PURCHASE', offerId }), []);
+  const buyGoldShopItem = useCallback(
+    (offerId: GoldShopOfferId) => dispatch({ type: 'BUY_GOLD_SHOP_ITEM', offerId }),
+    [],
+  );
+  const buyDiamondShopItem = useCallback(
+    (offerId: DiamondShopOfferId) => dispatch({ type: 'BUY_DIAMOND_SHOP_ITEM', offerId }),
+    [],
+  );
+  const simulateDollarPurchase = useCallback(
+    (offerId: DollarShopOfferId) => dispatch({ type: 'SIMULATE_DOLLAR_PURCHASE', offerId }),
+    [],
+  );
   const claimVipReward = useCallback((level: number) => dispatch({ type: 'CLAIM_VIP_REWARD', level }), []);
   const buyPremiumCoolant = useCallback((itemId: 'coolant_mk1' | 'coolant_mk2', amount: number = 1) => {
     dispatch({ type: 'BUY_PREMIUM_COOLANT', itemId, amount });
@@ -4609,36 +5095,50 @@ export function useGameState(saveSlot: string = 'default') {
   const clearAchievement = useCallback(() => dispatch({ type: 'CLEAR_ACHIEVEMENT' }), []);
   const clearRewardPopup = useCallback(() => dispatch({ type: 'CLEAR_REWARD_POPUP' }), []);
 
-  const getPartyCost = useCallback((id: PartyId, amount: number) => {
-    const cfg = PARTY.find(p => p.id === id)!;
-    const owned = state.party[id] ?? 0;
-    return amount === 1
-      ? buildingCost(cfg.baseCost, owned, COST_SCALE)
-      : bulkCost(cfg.baseCost, owned, amount, COST_SCALE);
-  }, [state.party]);
+  const getPartyCost = useCallback(
+    (id: PartyId, amount: number) => {
+      const cfg = PARTY.find(p => p.id === id)!;
+      const owned = state.party[id] ?? 0;
+      return amount === 1
+        ? buildingCost(cfg.baseCost, owned, COST_SCALE)
+        : bulkCost(cfg.baseCost, owned, amount, COST_SCALE);
+    },
+    [state.party],
+  );
 
-  const getEssenceCost = useCallback((path: 'damage' | 'economy' | 'survival') => {
-    const currentLevel = path === 'damage'
-      ? state.metaDamageLevel
-      : path === 'economy'
-        ? state.metaEconomyLevel
-        : state.metaSurvivalLevel;
-    return getEssenceUpgradeCost(currentLevel);
-  }, [state.metaDamageLevel, state.metaEconomyLevel, state.metaSurvivalLevel]);
+  const getEssenceCost = useCallback(
+    (path: 'damage' | 'economy' | 'survival') => {
+      const currentLevel =
+        path === 'damage'
+          ? state.metaDamageLevel
+          : path === 'economy'
+            ? state.metaEconomyLevel
+            : state.metaSurvivalLevel;
+      return getEssenceUpgradeCost(currentLevel);
+    },
+    [state.metaDamageLevel, state.metaEconomyLevel, state.metaSurvivalLevel],
+  );
 
-  const getRebirthCoreCost = useCallback((path: 'damage' | 'economy' | 'survival') => {
-    const level = path === 'damage'
-      ? state.rebirthDamagePath
-      : path === 'economy'
-        ? state.rebirthEconomyPath
-        : state.rebirthSurvivalPath;
-    return getRebirthPathCost(level);
-  }, [state.rebirthDamagePath, state.rebirthEconomyPath, state.rebirthSurvivalPath]);
+  const getRebirthCoreCost = useCallback(
+    (path: 'damage' | 'economy' | 'survival') => {
+      const level =
+        path === 'damage'
+          ? state.rebirthDamagePath
+          : path === 'economy'
+            ? state.rebirthEconomyPath
+            : state.rebirthSurvivalPath;
+      return getRebirthPathCost(level);
+    },
+    [state.rebirthDamagePath, state.rebirthEconomyPath, state.rebirthSurvivalPath],
+  );
 
-  const getShardForgeCosts = useCallback(() => ({
-    essenceRefineScrapCost: getScrapToEssenceCost(state),
-    shardRefineScrapCost: getScrapToShardCost(),
-  }), [state]);
+  const getShardForgeCosts = useCallback(
+    () => ({
+      essenceRefineScrapCost: getScrapToEssenceCost(state),
+      shardRefineScrapCost: getScrapToShardCost(),
+    }),
+    [state],
+  );
 
   const getNextTeamSlotUnlock = useCallback(() => {
     const currentSlots = getUnlockedTeamSlotCap(state);
@@ -4658,20 +5158,24 @@ export function useGameState(saveSlot: string = 'default') {
       waveMet: state.highestWaveReached >= req.requiredWave,
       goldMet: state.gold >= req.goldCost,
       shardMet: state.heroShards >= req.shardCost,
-      canUnlock: state.highestWaveReached >= req.requiredWave && state.gold >= req.goldCost && state.heroShards >= req.shardCost,
+      canUnlock:
+        state.highestWaveReached >= req.requiredWave && state.gold >= req.goldCost && state.heroShards >= req.shardCost,
     };
   }, [state]);
 
   const getUpgradePlan = useCallback((itemId: string) => getEquipmentUpgradePlan(state, itemId), [state]);
 
   const getWeeklyEvent = useCallback(() => getCurrentWeeklyEvent(state), [state]);
-  const getMissionProgress = useCallback((mission: MissionBoardGoal) => {
-    const value = getMissionProgressValue(state, mission);
-    return {
-      value,
-      done: value >= mission.target,
-    };
-  }, [state]);
+  const getMissionProgress = useCallback(
+    (mission: MissionBoardGoal) => {
+      const value = getMissionProgressValue(state, mission);
+      return {
+        value,
+        done: value >= mission.target,
+      };
+    },
+    [state],
+  );
 
   const batchLevelHeroes = useCallback((heroIds: string[], addLevels: number | 'max') => {
     dispatch({ type: 'BATCH_LEVEL_HEROES', heroIds, addLevels });
@@ -4681,12 +5185,15 @@ export function useGameState(saveSlot: string = 'default') {
     dispatch({ type: 'UPGRADE_FACILITY', facilityId });
   }, []);
 
-  const startExpedition = useCallback((
-    expeditionType: 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss',
-    offeredRarity?: 'common' | 'rare' | 'epic' | 'legendary' | 'godly',
-  ) => {
-    dispatch({ type: 'START_EXPEDITION', expeditionType, offeredRarity });
-  }, []);
+  const startExpedition = useCallback(
+    (
+      expeditionType: 'artifact' | 'merchant' | 'ruins' | 'vault' | 'abyss',
+      offeredRarity?: 'common' | 'rare' | 'epic' | 'legendary' | 'godly',
+    ) => {
+      dispatch({ type: 'START_EXPEDITION', expeditionType, offeredRarity });
+    },
+    [],
+  );
 
   const refreshExpeditionContracts = useCallback(() => {
     dispatch({ type: 'REFRESH_EXPEDITION_CONTRACTS' });
@@ -4700,17 +5207,20 @@ export function useGameState(saveSlot: string = 'default') {
     dispatch({ type: 'APPLY_OFFLINE_PROGRESS', elapsedMs });
   }, []);
 
-  const setLastActiveAt = useCallback((timestampMs: number, persistNow = false) => {
-    const safeTimestampMs = Number.isFinite(timestampMs) ? Math.max(0, Math.floor(timestampMs)) : Date.now();
-    dispatch({ type: 'SET_LAST_ACTIVE_AT', timestampMs: safeTimestampMs });
-    if (!persistNow || !stateRef.current.characterCreated) return;
+  const setLastActiveAt = useCallback(
+    (timestampMs: number, persistNow = false) => {
+      const safeTimestampMs = Number.isFinite(timestampMs) ? Math.max(0, Math.floor(timestampMs)) : Date.now();
+      dispatch({ type: 'SET_LAST_ACTIVE_AT', timestampMs: safeTimestampMs });
+      if (!persistNow || !stateRef.current.characterCreated) return;
 
-    const snapshot = serialize({
-      ...stateRef.current,
-      lastActiveAt: safeTimestampMs,
-    });
-    void persistSnapshot(true, snapshot);
-  }, [persistSnapshot]);
+      const snapshot = serialize({
+        ...stateRef.current,
+        lastActiveAt: safeTimestampMs,
+      });
+      void persistSnapshot(true, snapshot);
+    },
+    [persistSnapshot],
+  );
 
   const stats = computeStats(state);
 
@@ -4730,8 +5240,8 @@ export function useGameState(saveSlot: string = 'default') {
     burst,
     equipItem,
     summonHero,
-    summonHeroX10,
     summonHeroX10Cinematic,
+    sparkExchange,
     autoEquipBestHeroes,
     saveTeamLoadout,
     loadTeamLoadout,
@@ -4807,4 +5317,3 @@ export function useGameState(saveSlot: string = 'default') {
     setLastActiveAt,
   };
 }
-

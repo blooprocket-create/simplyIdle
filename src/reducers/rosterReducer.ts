@@ -21,6 +21,13 @@ import {
   getHeroUniqueCombatModifiers,
   getHeroUniqueSkillDescription,
   getHeroUniqueWeaponName,
+  pickHeroForRarity,
+  SPARK_TOKEN_BY_RARITY,
+  BANNER_RATE_UP_BY_RARITY,
+  SUMMON_MILESTONES,
+  SOFT_PITY_START,
+  SOFT_PITY_BOOST_PER_PULL,
+  SPARK_EXCHANGE_OPTIONS,
   type HeroUnit,
   type Rarity,
   type PlayerClass,
@@ -62,7 +69,8 @@ export type RosterAction =
   | { type: 'RANK_UP_HERO'; uid: string }
   | { type: 'LEVEL_UP_HERO_GOLD'; uid: string }
   | { type: 'REBIRTH_HERO'; uid: string }
-  | { type: 'BATCH_LEVEL_HEROES'; heroIds: string[]; addLevels: number | 'max' };
+  | { type: 'BATCH_LEVEL_HEROES'; heroIds: string[]; addLevels: number | 'max' }
+  | { type: 'SPARK_EXCHANGE'; optionId: string; targetHeroId?: string };
 
 export const ROSTER_ACTION_TYPES = new Set<string>([
   'EQUIP_ITEM',
@@ -83,6 +91,7 @@ export const ROSTER_ACTION_TYPES = new Set<string>([
   'LEVEL_UP_HERO_GOLD',
   'REBIRTH_HERO',
   'BATCH_LEVEL_HEROES',
+  'SPARK_EXCHANGE',
 ]);
 
 // ─── Context ───────────────────────────────────────────────────
@@ -105,24 +114,26 @@ const MAX_SAVE_SUMMON_HISTORY = 50;
 const VALID_HERO_TEMPLATE_IDS = new Set(HERO_POOL.map(hero => hero.id));
 
 function rarityRank(rarity: Rarity): number {
-  return {
-    common: 0,
-    uncommon: 1,
-    rare: 2,
-    epic: 3,
-    legendary: 4,
-    mythic: 5,
-    godly: 6,
-    transcendent: 7,
-  }[rarity] ?? 0;
+  return (
+    {
+      common: 0,
+      uncommon: 1,
+      rare: 2,
+      epic: 3,
+      legendary: 4,
+      mythic: 5,
+      godly: 6,
+      transcendent: 7,
+    }[rarity] ?? 0
+  );
 }
 
 const VALID_FORMATION_ROLES_FOR_CLASS: Record<PlayerClass, HeroFormationRole[]> = {
-  warrior:   ['front'],
+  warrior: ['front'],
   berserker: ['front'],
-  monk:      ['front', 'mid'],
-  mage:      ['mid'],
-  archer:    ['back'],
+  monk: ['front', 'mid'],
+  mage: ['mid'],
+  archer: ['back'],
 };
 
 const TEAM_SLOT_UNLOCK_RULES: Record<number, { requiredWave: number; goldCost: number; shardCost: number }> = {
@@ -147,25 +158,126 @@ function isPostgameSummonUnlocked(state: Pick<GameState, 'highestWaveReached' | 
   return state.highestWaveReached >= 150 && state.prestigeCount >= 1;
 }
 
-function rollRarityWithPity(counter: number, postgameUnlocked: boolean): { rarity: Rarity; nextCounter: number; pityTriggered: boolean } {
+function rollRarityWithPity(
+  counter: number,
+  postgameUnlocked: boolean,
+  guaranteedMin: Rarity | null,
+): { rarity: Rarity; nextCounter: number; pityTriggered: boolean } {
   const pityTriggered = counter + 1 >= PITY_THRESHOLD;
   if (pityTriggered) {
     const r = Math.random();
     const rarity: Rarity = postgameUnlocked
-      ? (r < 0.7 ? 'legendary' : r < 0.92 ? 'mythic' : r < 0.99 ? 'godly' : 'transcendent')
-      : (r < 0.75 ? 'legendary' : r < 0.95 ? 'mythic' : 'godly');
+      ? r < 0.7
+        ? 'legendary'
+        : r < 0.92
+          ? 'mythic'
+          : r < 0.99
+            ? 'godly'
+            : 'transcendent'
+      : r < 0.75
+        ? 'legendary'
+        : r < 0.95
+          ? 'mythic'
+          : 'godly';
     return { rarity, nextCounter: 0, pityTriggered: true };
   }
 
-  const rarity = rollRarity(Math.random(), getSummonRarityPool(postgameUnlocked));
-  return { rarity, nextCounter: counter + 1, pityTriggered: false };
+  const pool = getSummonRarityPool(postgameUnlocked);
+
+  // Soft pity: pulls past SOFT_PITY_START get cumulative Legendary+ boost
+  let rarity: Rarity;
+  if (counter >= SOFT_PITY_START) {
+    const softBoost = (counter - SOFT_PITY_START + 1) * SOFT_PITY_BOOST_PER_PULL;
+    if (Math.random() < softBoost) {
+      // Soft pity hit — roll from Legendary+ distribution
+      const r = Math.random();
+      rarity = postgameUnlocked
+        ? r < 0.75
+          ? 'legendary'
+          : r < 0.95
+            ? 'mythic'
+            : r < 0.99
+              ? 'godly'
+              : 'transcendent'
+        : r < 0.8
+          ? 'legendary'
+          : r < 0.96
+            ? 'mythic'
+            : 'godly';
+    } else {
+      rarity = rollRarity(Math.random(), pool);
+    }
+  } else {
+    rarity = rollRarity(Math.random(), pool);
+  }
+
+  // Guaranteed minimum rarity floor (from milestone rewards)
+  if (guaranteedMin && rarityRank(rarity) < rarityRank(guaranteedMin)) {
+    rarity = guaranteedMin;
+  }
+
+  // Natural Legendary+ hit resets pity counter
+  const isLegendaryPlus = rarityRank(rarity) >= rarityRank('legendary');
+  return { rarity, nextCounter: isLegendaryPlus ? 0 : counter + 1, pityTriggered: false };
+}
+
+/** Award spark tokens when hero template already exists in roster. */
+export function getSparkTokensForSummon(state: GameState, heroTemplateId: string, rarity: Rarity): number {
+  const isDupe = state.heroRoster.some(hero => hero.id === heroTemplateId);
+  return isDupe ? SPARK_TOKEN_BY_RARITY[rarity] : 0;
+}
+
+/** Check & claim summon milestones, mutates nothing — returns rewards to apply. */
+export function checkSummonMilestones(
+  totalSummons: number,
+  claimed: number[],
+): {
+  newClaimed: number[];
+  freeCharges: number;
+  sparkTokens: number;
+  guaranteedRarity: Rarity | null;
+  grantUnique: boolean;
+  rewardLabel: string[];
+} {
+  let freeCharges = 0;
+  let sparkTokens = 0;
+  let guaranteedRarity: Rarity | null = null;
+  let grantUnique = false;
+  const rewardLabel: string[] = [];
+  const newClaimed = [...claimed];
+  for (const milestone of SUMMON_MILESTONES) {
+    if (totalSummons >= milestone.threshold && !claimed.includes(milestone.threshold)) {
+      newClaimed.push(milestone.threshold);
+      rewardLabel.push(milestone.rewardLabel);
+      if (milestone.freeCharges) freeCharges += milestone.freeCharges;
+      if (milestone.sparkTokens) sparkTokens += milestone.sparkTokens;
+      if (milestone.guaranteedRarity) guaranteedRarity = milestone.guaranteedRarity;
+      if (milestone.grantUniqueForge) grantUnique = true;
+    }
+  }
+  return { newClaimed, freeCharges, sparkTokens, guaranteedRarity, grantUnique, rewardLabel };
+}
+
+/** Pick hero template respecting banner rate-up at Legendary+ rarities. */
+export function pickHeroWithBanner(
+  rarity: Rarity,
+  featuredHeroId: string | undefined,
+): { template: HeroTemplate; wasFeatured: boolean } {
+  const featuredTemplate = featuredHeroId ? (HERO_POOL.find(h => h.id === featuredHeroId) ?? null) : null;
+  const rateUp = BANNER_RATE_UP_BY_RARITY[rarity];
+  if (featuredTemplate && rateUp && Math.random() < rateUp) {
+    return { template: featuredTemplate, wasFeatured: true };
+  }
+  return { template: pickHeroForRarity(rarity), wasFeatured: false };
 }
 
 function defaultFormationForClass(playerClass: PlayerClass): HeroFormationRole {
   return VALID_FORMATION_ROLES_FOR_CLASS[playerClass][0];
 }
 
-function getTeamSlotUnlockRequirement(targetSlots: number): { requiredWave: number; goldCost: number; shardCost: number } | null {
+function getTeamSlotUnlockRequirement(
+  targetSlots: number,
+): { requiredWave: number; goldCost: number; shardCost: number } | null {
   return TEAM_SLOT_UNLOCK_RULES[targetSlots] ?? null;
 }
 
@@ -296,15 +408,18 @@ function grantHeroUniqueGear(state: GameState, hero: HeroUnit): GameState {
   const uniqueWeaponName = getHeroUniqueWeaponName(hero.id);
   const uniqueSkill = getHeroUniqueSkillDescription(hero.id, nextRank);
 
-  const rewarded = queueReward({
-    ...state,
-    heroUniqueGearByHeroId: nextUnique,
-  }, {
-    id: `hero_unique_${hero.id}_${Date.now()}`,
-    kind: 'item',
-    title: alreadyOwned ? `Unique Weapon Rank Up: ${hero.name}` : `Unique Weapon Forged: ${hero.name}`,
-    detail: `${uniqueWeaponName} • Rank ${nextRank}/10 • ${uniqueSkill} ${storySnippet}`,
-  });
+  const rewarded = queueReward(
+    {
+      ...state,
+      heroUniqueGearByHeroId: nextUnique,
+    },
+    {
+      id: `hero_unique_${hero.id}_${Date.now()}`,
+      kind: 'item',
+      title: alreadyOwned ? `Unique Weapon Rank Up: ${hero.name}` : `Unique Weapon Forged: ${hero.name}`,
+      detail: `${uniqueWeaponName} • Rank ${nextRank}/10 • ${uniqueSkill} ${storySnippet}`,
+    },
+  );
   return queueCombatLog(rewarded, `${hero.name}'s unique weapon is now Rank ${nextRank}`);
 }
 
@@ -341,9 +456,9 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
       if (!canUseFree && state.bossTears < 1) return state;
       const postgameUnlocked = isPostgameSummonUnlocked(state);
 
-      const template = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
-      const roll = rollRarityWithPity(state.gachaPityCounter, postgameUnlocked);
+      const roll = rollRarityWithPity(state.gachaPityCounter, postgameUnlocked, state.guaranteedMinRarity);
       const rarity = roll.rarity;
+      const { template } = pickHeroWithBanner(rarity, undefined);
       const rarityMult = rarityConfig(rarity).boostMultiplier;
       const uid = `${template.id}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
       const hero: HeroUnit = {
@@ -355,6 +470,7 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
         teamBoost: roundTo4(template.baseTeamBoost * rarityMult),
       };
 
+      const sparkGain = getSparkTokensForSummon(state, template.id, rarity);
       const historyEntry: SummonHistoryEntry = {
         id: `hist_${uid}`,
         heroName: hero.name,
@@ -364,17 +480,36 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
         pityTriggered: roll.pityTriggered,
       };
 
-      let nextState = ctx.withAchievement(({
+      const newTotalSummons = state.totalSummons + 1;
+      const milestones = checkSummonMilestones(newTotalSummons, state.claimedSummonMilestones);
+
+      let nextState = ctx.withAchievement({
         ...state,
         bossTears: canUseFree ? state.bossTears : state.bossTears - 1,
         heroRoster: [hero, ...state.heroRoster],
         summonHistory: [historyEntry, ...state.summonHistory].slice(0, MAX_SAVE_SUMMON_HISTORY),
-        totalSummons: state.totalSummons + 1,
-        freeSummonCharges: canUseFree ? state.freeSummonCharges - 1 : state.freeSummonCharges,
+        totalSummons: newTotalSummons,
+        freeSummonCharges:
+          (canUseFree ? state.freeSummonCharges - 1 : state.freeSummonCharges) + milestones.freeCharges,
         gachaPityCounter: roll.nextCounter,
-      }));
+        sparkTokens: state.sparkTokens + sparkGain + milestones.sparkTokens,
+        claimedSummonMilestones: milestones.newClaimed,
+        guaranteedMinRarity: state.guaranteedMinRarity ? null : milestones.guaranteedRarity,
+      });
       nextState = syncUniqueWeaponAssignmentForHero(nextState, hero.id);
       nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.06);
+      if (milestones.grantUnique) {
+        const randomHero = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
+        const fakeUnit: HeroUnit = {
+          ...randomHero,
+          uid: `forge_${Date.now()}`,
+          rarity: 'legendary',
+          level: 1,
+          rank: 1,
+          teamBoost: 0,
+        };
+        nextState = grantHeroUniqueGear(nextState, fakeUnit);
+      }
       if (roll.pityTriggered) {
         nextState = queueReward(nextState, {
           id: `pity_single_${Date.now()}`,
@@ -383,97 +518,48 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
           detail: `${hero.emoji} ${hero.name} arrived at ${rarity.toUpperCase()}!`,
         });
       }
-      return nextState;
-    }
-
-    case 'SUMMON_HERO_X10': {
-      const totalPulls = 10;
-      const freeUses = Math.min(state.freeSummonCharges, totalPulls);
-      const paidUses = totalPulls - freeUses;
-      if (state.bossTears < paidUses) return state;
-      const postgameUnlocked = isPostgameSummonUnlocked(state);
-
-      const summoned: HeroUnit[] = [];
-      const historyBatch: SummonHistoryEntry[] = [];
-      let pityCounter = state.gachaPityCounter;
-      let pityHits = 0;
-      for (let i = 0; i < totalPulls; i++) {
-        const template = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
-        const roll = rollRarityWithPity(pityCounter, postgameUnlocked);
-        pityCounter = roll.nextCounter;
-        if (roll.pityTriggered) pityHits++;
-        const rarity = roll.rarity;
-        const rarityMult = rarityConfig(rarity).boostMultiplier;
-        const uid = `${template.id}_${Date.now()}_${i}_${Math.floor(Math.random() * 10000)}`;
-        const summonedHero: HeroUnit = {
-          ...template,
-          uid,
-          rarity,
-          level: 1,
-          rank: 1,
-          teamBoost: roundTo4(template.baseTeamBoost * rarityMult),
-        };
-        summoned.push(summonedHero);
-        historyBatch.push({
-          id: `hist_${uid}`,
-          heroName: summonedHero.name,
-          heroEmoji: summonedHero.emoji,
-          rarity: summonedHero.rarity,
-          ts: Date.now(),
-          pityTriggered: roll.pityTriggered,
-        });
-      }
-
-      let nextState = ctx.withAchievement(({
-        ...state,
-        bossTears: state.bossTears - paidUses,
-        heroRoster: [...summoned, ...state.heroRoster],
-        summonHistory: [...historyBatch, ...state.summonHistory].slice(0, MAX_SAVE_SUMMON_HISTORY),
-        totalSummons: state.totalSummons + totalPulls,
-        freeSummonCharges: state.freeSummonCharges - freeUses,
-        gachaPityCounter: pityCounter,
-      }));
-      for (const hero of summoned) {
-        nextState = syncUniqueWeaponAssignmentForHero(nextState, hero.id);
-      }
-      for (const hero of summoned) {
-        nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.08);
-      }
-      if (pityHits > 0) {
+      if (sparkGain > 0) {
         nextState = queueReward(nextState, {
-          id: `pity_x10_${Date.now()}`,
+          id: `spark_${Date.now()}`,
           kind: 'system',
-          title: 'Pity Triggered',
-          detail: `${pityHits} pity hit${pityHits > 1 ? 's' : ''} in this x10 summon.`,
+          title: 'Dupe Spark',
+          detail: `+${sparkGain} Spark Token${sparkGain > 1 ? 's' : ''} (duplicate hero)`,
+        });
+      }
+      for (const label of milestones.rewardLabel) {
+        nextState = queueReward(nextState, {
+          id: `milestone_${Date.now()}_${label}`,
+          kind: 'system',
+          title: 'Summon Milestone!',
+          detail: label,
         });
       }
       return nextState;
     }
 
+    case 'SUMMON_HERO_X10':
     case 'SUMMON_HERO_X10_CINEMATIC': {
       const totalPulls = 10;
       const freeUses = Math.min(state.freeSummonCharges, totalPulls);
       const paidUses = totalPulls - freeUses;
       if (state.bossTears < paidUses) return state;
       const postgameUnlocked = isPostgameSummonUnlocked(state);
-      const highestRarity = getHighestAvailableSummonRarity(postgameUnlocked);
-      const featuredTemplate = action.featuredHeroId
-        ? HERO_POOL.find(hero => hero.id === action.featuredHeroId) ?? null
-        : null;
+      const featuredHeroId = action.type === 'SUMMON_HERO_X10_CINEMATIC' ? action.featuredHeroId : undefined;
 
       const summoned: HeroUnit[] = [];
       const historyBatch: SummonHistoryEntry[] = [];
       let pityCounter = state.gachaPityCounter;
       let pityHits = 0;
+      let totalSparkGain = 0;
+      let guaranteedMin = state.guaranteedMinRarity;
       for (let i = 0; i < totalPulls; i++) {
-        const roll = rollRarityWithPity(pityCounter, postgameUnlocked);
+        const roll = rollRarityWithPity(pityCounter, postgameUnlocked, guaranteedMin);
         pityCounter = roll.nextCounter;
         if (roll.pityTriggered) pityHits++;
         const rarity = roll.rarity;
-        const shouldFeature = !!featuredTemplate && rarity === highestRarity && Math.random() < 0.65;
-        const template = shouldFeature
-          ? featuredTemplate
-          : HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
+        // Consume guaranteed floor on first pull only
+        if (guaranteedMin) guaranteedMin = null;
+        const { template } = pickHeroWithBanner(rarity, featuredHeroId);
         const rarityMult = rarityConfig(rarity).boostMultiplier;
         const uid = `${template.id}_${Date.now()}_${i}_${Math.floor(Math.random() * 10000)}`;
         const summonedHero: HeroUnit = {
@@ -493,22 +579,44 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
           ts: Date.now(),
           pityTriggered: roll.pityTriggered,
         });
+        // Spark tokens for dupes (check against existing roster + already-summoned in this batch)
+        const alreadyOwned =
+          state.heroRoster.some(h => h.id === template.id) || summoned.slice(0, i).some(h => h.id === template.id);
+        if (alreadyOwned) totalSparkGain += SPARK_TOKEN_BY_RARITY[rarity];
       }
 
-      let nextState = ctx.withAchievement(({
+      const newTotalSummons = state.totalSummons + totalPulls;
+      const milestones = checkSummonMilestones(newTotalSummons, state.claimedSummonMilestones);
+
+      let nextState = ctx.withAchievement({
         ...state,
         bossTears: state.bossTears - paidUses,
         heroRoster: [...summoned, ...state.heroRoster],
         summonHistory: [...historyBatch, ...state.summonHistory].slice(0, MAX_SAVE_SUMMON_HISTORY),
-        totalSummons: state.totalSummons + totalPulls,
-        freeSummonCharges: state.freeSummonCharges - freeUses + 1,
+        totalSummons: newTotalSummons,
+        freeSummonCharges: state.freeSummonCharges - freeUses + 1 + milestones.freeCharges,
         gachaPityCounter: pityCounter,
-      }));
+        sparkTokens: state.sparkTokens + totalSparkGain + milestones.sparkTokens,
+        claimedSummonMilestones: milestones.newClaimed,
+        guaranteedMinRarity: guaranteedMin ?? milestones.guaranteedRarity ?? null,
+      });
       for (const hero of summoned) {
         nextState = syncUniqueWeaponAssignmentForHero(nextState, hero.id);
       }
       for (const hero of summoned) {
-        nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.12);
+        nextState = maybeGrantHeroUniqueGear(nextState, hero, 0.1);
+      }
+      if (milestones.grantUnique) {
+        const randomHero = HERO_POOL[Math.floor(Math.random() * HERO_POOL.length)];
+        const fakeUnit: HeroUnit = {
+          ...randomHero,
+          uid: `forge_${Date.now()}`,
+          rarity: 'legendary',
+          level: 1,
+          rank: 1,
+          teamBoost: 0,
+        };
+        nextState = grantHeroUniqueGear(nextState, fakeUnit);
       }
       if (pityHits > 0) {
         nextState = queueReward(nextState, {
@@ -516,6 +624,14 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
           kind: 'system',
           title: 'Pity Triggered',
           detail: `${pityHits} pity hit${pityHits > 1 ? 's' : ''} in this x10 summon.`,
+        });
+      }
+      if (totalSparkGain > 0) {
+        nextState = queueReward(nextState, {
+          id: `spark_x10_${Date.now()}`,
+          kind: 'system',
+          title: 'Dupe Sparks',
+          detail: `+${totalSparkGain} Spark Tokens from duplicate heroes`,
         });
       }
       nextState = queueReward(nextState, {
@@ -524,6 +640,14 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
         title: 'Cinematic Bonus',
         detail: '+1 free summon charge awarded.',
       });
+      for (const label of milestones.rewardLabel) {
+        nextState = queueReward(nextState, {
+          id: `milestone_${Date.now()}_${label}`,
+          kind: 'system',
+          title: 'Summon Milestone!',
+          detail: label,
+        });
+      }
       return nextState;
     }
 
@@ -536,29 +660,35 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
         if (b.level !== a.level) return b.level - a.level;
         return b.teamBoost - a.teamBoost;
       });
-      const newTeam = ctx.normalizeTeamSelection(state, sorted.map(h => h.uid));
+      const newTeam = ctx.normalizeTeamSelection(
+        state,
+        sorted.map(h => h.uid),
+      );
       const newMaxHp = ctx.getTeamMaxHp({ ...state, activeTeamHeroIds: newTeam });
-      return ({
+      return {
         ...state,
         activeTeamHeroIds: newTeam,
         teamMaxHp: newMaxHp,
         teamHp: Math.min(state.teamHp, newMaxHp),
-      });
+      };
     }
 
     case 'SAVE_TEAM_LOADOUT': {
       const slot = Math.max(0, Math.min(2, action.slot));
       const next = [...state.teamLoadouts];
       next[slot] = [...state.activeTeamHeroIds];
-      return queueReward({
-        ...state,
-        teamLoadouts: next,
-      }, {
-        id: `save_loadout_${slot}_${Date.now()}`,
-        kind: 'system',
-        title: `Saved Loadout ${slot + 1}`,
-        detail: `${next[slot].length} heroes saved`,
-      });
+      return queueReward(
+        {
+          ...state,
+          teamLoadouts: next,
+        },
+        {
+          id: `save_loadout_${slot}_${Date.now()}`,
+          kind: 'system',
+          title: `Saved Loadout ${slot + 1}`,
+          detail: `${next[slot].length} heroes saved`,
+        },
+      );
     }
 
     case 'LOAD_TEAM_LOADOUT': {
@@ -566,17 +696,20 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
       const source = state.teamLoadouts[slot] ?? [];
       const validIds = ctx.normalizeTeamSelection(state, source);
       const newMaxHp = ctx.getTeamMaxHp({ ...state, activeTeamHeroIds: validIds });
-      return queueReward(({
-        ...state,
-        activeTeamHeroIds: validIds,
-        teamMaxHp: newMaxHp,
-        teamHp: Math.min(state.teamHp, newMaxHp),
-      }), {
-        id: `load_loadout_${slot}_${Date.now()}`,
-        kind: 'system',
-        title: `Loaded Loadout ${slot + 1}`,
-        detail: `${validIds.length} heroes equipped`,
-      });
+      return queueReward(
+        {
+          ...state,
+          activeTeamHeroIds: validIds,
+          teamMaxHp: newMaxHp,
+          teamHp: Math.min(state.teamHp, newMaxHp),
+        },
+        {
+          id: `load_loadout_${slot}_${Date.now()}`,
+          kind: 'system',
+          title: `Loaded Loadout ${slot + 1}`,
+          detail: `${validIds.length} heroes equipped`,
+        },
+      );
     }
 
     case 'UNLOCK_TEAM_SLOT': {
@@ -589,17 +722,20 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
       if (state.highestWaveReached < req.requiredWave) return state;
       if (state.gold < req.goldCost || state.heroShards < req.shardCost) return state;
 
-      return queueReward({
-        ...state,
-        teamSlotsUnlocked: targetSlots,
-        gold: state.gold - req.goldCost,
-        heroShards: state.heroShards - req.shardCost,
-      }, {
-        id: `team_slot_unlock_${targetSlots}_${Date.now()}`,
-        kind: 'system',
-        title: `Team Slot ${targetSlots} Unlocked`,
-        detail: `-${req.goldCost} gold, -${req.shardCost} shards`,
-      });
+      return queueReward(
+        {
+          ...state,
+          teamSlotsUnlocked: targetSlots,
+          gold: state.gold - req.goldCost,
+          heroShards: state.heroShards - req.shardCost,
+        },
+        {
+          id: `team_slot_unlock_${targetSlots}_${Date.now()}`,
+          kind: 'system',
+          title: `Team Slot ${targetSlots} Unlocked`,
+          detail: `-${req.goldCost} gold, -${req.shardCost} shards`,
+        },
+      );
     }
 
     case 'TOGGLE_EQUIP_HERO': {
@@ -633,23 +769,23 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
         newTeam = [...active, action.uid];
       }
       const newMaxHp = ctx.getTeamMaxHp({ ...state, activeTeamHeroIds: newTeam });
-      return ctx.withAchievement(({
+      return ctx.withAchievement({
         ...state,
         activeTeamHeroIds: newTeam,
         teamMaxHp: newMaxHp,
         teamHp: Math.min(state.teamHp, newMaxHp),
-      }));
+      });
     }
 
     case 'SET_ACTIVE_TEAM': {
       const validIds = ctx.normalizeTeamSelection(state, action.heroIds);
       const newMaxHp = ctx.getTeamMaxHp({ ...state, activeTeamHeroIds: validIds });
-      return ({
+      return {
         ...state,
         activeTeamHeroIds: validIds,
         teamMaxHp: newMaxHp,
         teamHp: Math.min(state.teamHp, newMaxHp),
-      });
+      };
     }
 
     case 'SET_HERO_FORMATION': {
@@ -659,7 +795,10 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
       if (!validRoles.includes(action.role)) return state;
       const activeTeamSet = new Set(state.activeTeamHeroIds);
       if (activeTeamSet.has(action.uid)) {
-        const nextRoleCounts = getTeamRoleCounts(state, state.activeTeamHeroIds.filter(id => id !== action.uid));
+        const nextRoleCounts = getTeamRoleCounts(
+          state,
+          state.activeTeamHeroIds.filter(id => id !== action.uid),
+        );
         if (nextRoleCounts[action.role] >= MAX_FORMATION_ROLE_HEROES) {
           return queueReward(state, {
             id: `formation_swap_blocked_${Date.now()}`,
@@ -717,7 +856,10 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
 
       const recycledIds = new Set(toRecycle.map(h => h.uid));
       const weekly = ctx.getCurrentWeeklyEvent(state);
-      const shardReward = Math.ceil(toRecycle.reduce((sum, hero) => sum + calculateShardReward(hero.rarity, hero.level), 0) * weekly.shardMultiplier);
+      const shardReward = Math.ceil(
+        toRecycle.reduce((sum, hero) => sum + calculateShardReward(hero.rarity, hero.level), 0) *
+          weekly.shardMultiplier,
+      );
       const newRoster = state.heroRoster.filter(h => !recycledIds.has(h.uid));
       const newMaxHp = ctx.getTeamMaxHp({ ...state, heroRoster: newRoster });
       const heroFormationByUid = Object.fromEntries(
@@ -779,7 +921,7 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
       if (!Number.isFinite(nextRankCost) || state.heroShards < nextRankCost) return state;
 
       const updatedHero = { ...hero, rank: hero.rank + 1 };
-      const newRoster = state.heroRoster.map(h => h.uid === action.uid ? updatedHero : h);
+      const newRoster = state.heroRoster.map(h => (h.uid === action.uid ? updatedHero : h));
 
       return {
         ...state,
@@ -793,9 +935,7 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
       if (!hero || hero.level >= HERO_LEVEL_CAP) return state;
       const cost = getHeroGoldLevelCost(hero.level);
       if (state.gold < cost) return state;
-      const newRoster = state.heroRoster.map(h =>
-        h.uid === action.uid ? { ...h, level: h.level + 1 } : h
-      );
+      const newRoster = state.heroRoster.map(h => (h.uid === action.uid ? { ...h, level: h.level + 1 } : h));
       return {
         ...state,
         gold: state.gold - cost,
@@ -819,17 +959,20 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
         rebirthStatMult: rebirthPlan.nextStatMultiplier,
       });
 
-      return queueReward({
-        ...state,
-        heroShards: state.heroShards - shardCost,
-        essence: state.essence - essenceCost,
-        heroRoster: state.heroRoster.map(h => h.uid === action.uid ? updatedHero : h),
-      }, {
-        id: `hero_rebirth_${hero.uid}_${Date.now()}`,
-        kind: 'system',
-        title: `${hero.name} Reborn`,
-        detail: `-${shardCost} shards, -${essenceCost} essence • +${rebirthPlan.statGainPct}% hero stat gain • stat multiplier x${(updatedHero.rebirthStatMult ?? 1).toFixed(2)}`,
-      });
+      return queueReward(
+        {
+          ...state,
+          heroShards: state.heroShards - shardCost,
+          essence: state.essence - essenceCost,
+          heroRoster: state.heroRoster.map(h => (h.uid === action.uid ? updatedHero : h)),
+        },
+        {
+          id: `hero_rebirth_${hero.uid}_${Date.now()}`,
+          kind: 'system',
+          title: `${hero.name} Reborn`,
+          detail: `-${shardCost} shards, -${essenceCost} essence • +${rebirthPlan.statGainPct}% hero stat gain • stat multiplier x${(updatedHero.rebirthStatMult ?? 1).toFixed(2)}`,
+        },
+      );
     }
 
     case 'BATCH_LEVEL_HEROES': {
@@ -888,6 +1031,51 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
         gold,
         heroRoster,
       };
+    }
+
+    case 'SPARK_EXCHANGE': {
+      const option = SPARK_EXCHANGE_OPTIONS.find(o => o.id === action.optionId);
+      if (!option) return state;
+      if (state.sparkTokens < option.sparkCost) return state;
+
+      let nextState: GameState = { ...state, sparkTokens: state.sparkTokens - option.sparkCost };
+
+      if (option.kind === 'free_summon') {
+        nextState = { ...nextState, freeSummonCharges: nextState.freeSummonCharges + 1 };
+        nextState = queueReward(nextState, {
+          id: `spark_exchange_${Date.now()}`,
+          kind: 'system',
+          title: 'Spark Exchange',
+          detail: '+1 Free Summon Charge',
+        });
+      } else if (option.kind === 'targeted_hero' && option.minRarity) {
+        const targetTemplate = action.targetHeroId ? (HERO_POOL.find(h => h.id === action.targetHeroId) ?? null) : null;
+        const template = targetTemplate ?? pickHeroForRarity(option.minRarity);
+        const rarity = option.minRarity;
+        const rarityMult = rarityConfig(rarity).boostMultiplier;
+        const uid = `${template.id}_${Date.now()}_spark_${Math.floor(Math.random() * 10000)}`;
+        const hero: HeroUnit = {
+          ...template,
+          uid,
+          rarity,
+          level: 1,
+          rank: 1,
+          teamBoost: roundTo4(template.baseTeamBoost * rarityMult),
+        };
+        nextState = {
+          ...nextState,
+          heroRoster: [hero, ...nextState.heroRoster],
+        };
+        nextState = syncUniqueWeaponAssignmentForHero(nextState, hero.id);
+        nextState = queueReward(nextState, {
+          id: `spark_exchange_hero_${Date.now()}`,
+          kind: 'system',
+          title: 'Spark Exchange',
+          detail: `${hero.emoji} ${hero.name} (${rarity}) acquired!`,
+        });
+      }
+
+      return nextState;
     }
 
     default:
