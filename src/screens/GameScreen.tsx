@@ -280,6 +280,7 @@ const VIP_REWARD_MILESTONES = [
 const VIP_UNLOCK_FEATURES = [
   { level: 1, label: 'Unlock 4x combat tempo' },
   { level: 2, label: 'Rift + Treasury daily cap increased to 4' },
+  { level: 3, label: '10% summon cost discount (Boss Tears & Diamonds)' },
   { level: 4, label: 'Rift + Treasury daily cap increased to 5' },
 ] as const;
 
