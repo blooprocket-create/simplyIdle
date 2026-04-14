@@ -70,7 +70,6 @@ import {
 import { getHeroPortraitSource } from '../heroPortraits';
 import { fmt } from '../utils';
 import StoryBeatModal from '../components/StoryBeatModal';
-import AchievementToast from '../components/AchievementToast';
 import RebirthModal from '../components/PrestigeModal';
 import BottomNavigation, { BottomTabType } from '../components/BottomNavigation';
 import GameHeader from '../components/GameHeader';
@@ -377,7 +376,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     appendMailboxMessages,
     claimMailAttachment,
     claimAllMailAttachments,
-    clearAchievement,
     clearRewardPopup,
     rebirth,
     getEssenceCost,
@@ -920,21 +918,14 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const currentVipMilestoneClaimed = vipClaimedLevels.includes(currentVipMilestone.level);
   const currentVipMilestoneCanClaim = !currentVipMilestoneClaimed && vipLevel >= currentVipMilestone.level;
 
-  const {
-    isOfflineRewardPopup,
-    idleChestReward,
-    setIdleChestReward,
-    storyUnlockToast,
-    setStoryUnlockToast,
-    storyBeatModal,
-    setStoryBeatModal,
-  } = useGameOverlays({
-    storyEntries,
-    rewardPopup,
-    activeModal,
-    setActiveModal: modal => setActiveModal(modal as ActiveModal),
-    clearRewardPopup,
-  });
+  const { isOfflineRewardPopup, idleChestReward, setIdleChestReward, storyBeatModal, setStoryBeatModal } =
+    useGameOverlays({
+      storyEntries,
+      rewardPopup,
+      activeModal,
+      setActiveModal: modal => setActiveModal(modal as ActiveModal),
+      clearRewardPopup,
+    });
 
   useModalOpenTelemetry({
     activeModal,
@@ -2624,26 +2615,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       {/* Bottom Navigation */}
       {renderCommandDeck()}
 
-      {storyUnlockToast && (
-        <Pressable
-          style={[styles.rewardToast, styles.rewardToastActive]}
-          onPress={() => {
-            setStoryUnlockToast(null);
-            onTabChange('achievements');
-            setAchievementsSubTab('codex');
-          }}
-        >
-          <Text style={styles.rewardToastSparkle}>📖</Text>
-          <View>
-            <Text style={styles.rewardToastTitle}>{t('gameScreen.newChronicleUnlocked')}</Text>
-            <Text style={styles.rewardToastDetail}>
-              {storyUnlockToast.chapter} - {storyUnlockToast.title}
-            </Text>
-          </View>
-          <Text style={styles.rewardToastSparkle}>{t('gameScreen.view')}</Text>
-        </Pressable>
-      )}
-
       <StoryBeatModal
         visible={!!storyBeatModal}
         chapter={storyBeatModal?.chapter ?? ''}
@@ -2652,20 +2623,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         wave={storyBeatModal?.wave ?? 0}
         onDismiss={() => setStoryBeatModal(null)}
       />
-
-      {rewardPopup && !isOfflineRewardPopup && (
-        <Pressable style={[styles.rewardToast, styles.rewardToastActive]} onPress={clearRewardPopup}>
-          <Text style={styles.rewardToastSparkle}>✨</Text>
-          <View>
-            <Text style={styles.rewardToastTitle}>{rewardPopup.title}</Text>
-            <Text style={styles.rewardToastDetail}>{rewardPopup.detail}</Text>
-          </View>
-          <Text style={styles.rewardToastSparkle}>✨</Text>
-        </Pressable>
-      )}
-
-      {/* Achievement Toast */}
-      <AchievementToast achievementId={state.newAchievement} onDismiss={clearAchievement} />
 
       <Modal
         visible={activeModal === 'chapterMap'}

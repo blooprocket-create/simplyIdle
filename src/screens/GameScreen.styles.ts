@@ -3222,42 +3222,6 @@ export const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
-  rewardToast: {
-    position: 'absolute',
-    bottom: 120,
-    alignSelf: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    backgroundColor: '#1A2A1F',
-    borderLeftWidth: 3,
-    borderLeftColor: theme.status.positive,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    zIndex: 99,
-    pointerEvents: 'box-none',
-  },
-  rewardToastActive: {
-    shadowColor: theme.status.positive,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  rewardToastSparkle: {
-    fontSize: 16,
-  },
-  rewardToastTitle: {
-    color: '#E9FFE5',
-    fontWeight: '700',
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  rewardToastDetail: {
-    color: '#B7D0BB',
-    fontSize: 11,
-  },
   idleChestPopIn: {
     marginHorizontal: 12,
     marginBottom: 8,
@@ -3348,7 +3312,7 @@ export const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  // Battle Tab  
+  // Battle Tab
   battleSection: {
     backgroundColor: '#121C29',
     borderRadius: 8,
@@ -5807,4 +5771,3 @@ export const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
-

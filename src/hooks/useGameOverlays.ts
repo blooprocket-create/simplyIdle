@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStoryUnlockToast } from './useStoryUnlockToast';
 
 interface StoryEntry {
@@ -39,25 +39,46 @@ export function useGameOverlays({
   } | null>(null);
   const { storyUnlockToast, setStoryUnlockToast } = useStoryUnlockToast(storyEntries);
 
+  // Direct chapter transition detection — track the highest unlocked beat
+  // index and show the modal whenever it increases, regardless of how the
+  // unlock was triggered (game-start load, gameplay progression, etc.).
+  const highestUnlockedIndex = useMemo(() => {
+    let idx = -1;
+    for (let i = 0; i < storyEntries.length; i++) {
+      if (storyEntries[i].unlocked) idx = i;
+    }
+    return idx;
+  }, [storyEntries]);
+
+  const prevBeatIndexRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (prevBeatIndexRef.current === null) {
+      // First run — seed without showing the modal
+      prevBeatIndexRef.current = highestUnlockedIndex;
+      return;
+    }
+
+    if (highestUnlockedIndex > prevBeatIndexRef.current) {
+      const entry = storyEntries[highestUnlockedIndex];
+      if (entry) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setStoryBeatModal({
+          chapter: entry.chapter,
+          title: entry.title,
+          body: entry.body,
+          wave: entry.unlockWave,
+        });
+      }
+    }
+
+    prevBeatIndexRef.current = highestUnlockedIndex;
+  }, [highestUnlockedIndex, storyEntries]);
+
   const isOfflineRewardPopup = useMemo(() => {
     if (!rewardPopup) return false;
     return `${rewardPopup.title} ${rewardPopup.detail}`.toLowerCase().includes('offline progress');
   }, [rewardPopup]);
-
-  useEffect(() => {
-    if (!storyUnlockToast) return;
-
-    const unlockedStory = storyEntries.find(entry => entry.id === storyUnlockToast.id);
-    if (!unlockedStory) return;
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setStoryBeatModal({
-      chapter: unlockedStory.chapter,
-      title: unlockedStory.title,
-      body: unlockedStory.body,
-      wave: unlockedStory.unlockWave,
-    });
-  }, [storyUnlockToast, storyEntries]);
 
   useEffect(() => {
     if (!rewardPopup) return;
