@@ -1,6 +1,6 @@
 import 'react-native-reanimated';
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Platform, ActivityIndicator, Animated } from 'react-native';
 import { onAuthStateChanged } from 'firebase/auth';
 import GameScreen from './src/screens/GameScreen';
 import AuthScreen from './src/screens/AuthScreen';
@@ -10,6 +10,45 @@ import { debugLog, identifyTelemetryDevice, initTelemetry, reportCrash, trackEve
 import { getValidOnlineSession, isOnlineAuthAvailable, logoutOnline } from './src/services/onlineAuth';
 import { getFirebaseAuth } from './src/services/firebase';
 import { markPresenceOffline, startPresenceHeartbeat } from './src/services/presence';
+
+const LOADING_HINTS = [
+  'Forging alliances…',
+  'Summoning heroes…',
+  'Counting gold…',
+  'Sharpening swords…',
+  'Consulting the oracle…',
+];
+
+function LoadingSplash() {
+  const pulseAnim = useRef(new Animated.Value(0.4)).current;
+  const [hint, setHint] = useState(() => LOADING_HINTS[Math.floor(Math.random() * LOADING_HINTS.length)]);
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.4, duration: 900, useNativeDriver: true }),
+      ]),
+    ).start();
+  }, [pulseAnim]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setHint(LOADING_HINTS[Math.floor(Math.random() * LOADING_HINTS.length)]);
+    }, 2800);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <View style={styles.loadingWrap}>
+      <ActivityIndicator size="large" color="#7B68EE" style={styles.spinner} />
+      <Text style={styles.loadingTitle}>SIMPLY IDLE</Text>
+      <Animated.Text style={[styles.loadingHint, { opacity: pulseAnim }]}>
+        {hint}
+      </Animated.Text>
+    </View>
+  );
+}
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -109,11 +148,7 @@ export default function App() {
   }, [accountName]);
 
   if (loading) {
-    return (
-      <View style={styles.loadingWrap}>
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
+    return <LoadingSplash />;
   }
 
   if (showTitle) {
@@ -172,9 +207,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#0A0A18',
   },
-  loadingText: {
+  spinner: {
+    marginBottom: 20,
+  },
+  loadingTitle: {
     color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: 2,
+    marginBottom: 12,
+  },
+  loadingHint: {
+    color: '#9B8FCC',
+    fontSize: 14,
+    fontStyle: 'italic',
   },
 });
