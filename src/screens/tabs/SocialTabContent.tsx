@@ -1,5 +1,15 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { Animated, Modal, NativeSyntheticEvent, NativeTouchEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Animated,
+  Modal,
+  NativeSyntheticEvent,
+  NativeTouchEvent,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { THEME, RADIUS } from '../../theme';
 import {
   ChatReactionSummary,
@@ -261,7 +271,9 @@ export const SocialTabContent = React.memo(function SocialTabContent({
       setChatLoadedOnce(true);
     });
     const refreshOnline = () => {
-      void fetchOnlineCount().then(setOnlineCount).catch(() => {});
+      void fetchOnlineCount()
+        .then(setOnlineCount)
+        .catch(() => {});
     };
     const refreshMute = () => {
       if (!me.uid) return;
@@ -319,7 +331,7 @@ export const SocialTabContent = React.memo(function SocialTabContent({
     Animated.timing(sectionAnim, {
       toValue: 1,
       duration: 180,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [sectionAnim, subTab]);
 
@@ -470,14 +482,16 @@ export const SocialTabContent = React.memo(function SocialTabContent({
         ? summary
         : await fetchChatReactionSummaryForMessage(messageId, me.uid);
 
-      setMessages(current => current.map(message => {
-        if (message.id !== messageId) return message;
-        return {
-          ...message,
-          reactions: resolvedSummary.counts,
-          myReaction: resolvedSummary.mine,
-        };
-      }));
+      setMessages(current =>
+        current.map(message => {
+          if (message.id !== messageId) return message;
+          return {
+            ...message,
+            reactions: resolvedSummary.counts,
+            myReaction: resolvedSummary.mine,
+          };
+        }),
+      );
       setChatError(null);
       void trackEvent('social_chat_reaction_toggled', { emoji });
     } catch {
@@ -593,10 +607,7 @@ export const SocialTabContent = React.memo(function SocialTabContent({
 
   const refreshGuildData = async () => {
     if (!me.uid) return;
-    const [guildInfo, browseRows] = await Promise.all([
-      fetchGuildInfo(me.uid),
-      fetchGuildBrowse(guildSearchInput),
-    ]);
+    const [guildInfo, browseRows] = await Promise.all([fetchGuildInfo(me.uid), fetchGuildBrowse(guildSearchInput)]);
     setMyGuild(guildInfo);
     setGuildList(browseRows);
     if (guildInfo?.guildId) {
@@ -619,25 +630,20 @@ export const SocialTabContent = React.memo(function SocialTabContent({
     void trackEvent('social_guild_refresh_success', { inGuild: !!guildInfo?.guildId });
   };
 
-  const addFriendLabel = activeUserRelationship === 'friends'
-    ? 'Already Friends'
-    : activeUserRelationship === 'outgoing'
-      ? 'Request Sent'
-      : activeUserRelationship === 'incoming'
-        ? 'Incoming Request'
-        : 'Add Friend';
+  const addFriendLabel =
+    activeUserRelationship === 'friends'
+      ? 'Already Friends'
+      : activeUserRelationship === 'outgoing'
+        ? 'Request Sent'
+        : activeUserRelationship === 'incoming'
+          ? 'Incoming Request'
+          : 'Add Friend';
 
   const canAddFriendFromMenu =
-    !!activeUserMenu
-    && activeUserMenu.uid !== me.uid
-    && activeUserRelationship === 'none'
-    && !friendsBusy;
+    !!activeUserMenu && activeUserMenu.uid !== me.uid && activeUserRelationship === 'none' && !friendsBusy;
 
-  const socialPulse = mutedUntil && mutedUntil > Date.now()
-    ? 'Muted'
-    : sending || friendsBusy || guildBusy
-      ? 'Syncing'
-      : 'Live';
+  const socialPulse =
+    mutedUntil && mutedUntil > Date.now() ? 'Muted' : sending || friendsBusy || guildBusy ? 'Syncing' : 'Live';
 
   const activeGuildLabel = myGuild ? `[${myGuild.tag}] ${myGuild.name}` : 'No Guild';
   const myGuildRole = guildMembers.find(member => member.uid === me.uid)?.rank ?? null;
@@ -663,6 +669,7 @@ export const SocialTabContent = React.memo(function SocialTabContent({
   };
 
   const handleTouchStart = (event: NativeSyntheticEvent<NativeTouchEvent>) => {
+    if (Platform.OS === 'web') return;
     touchStartRef.current = {
       x: event.nativeEvent.pageX,
       y: event.nativeEvent.pageY,
@@ -670,12 +677,14 @@ export const SocialTabContent = React.memo(function SocialTabContent({
   };
 
   const handleTouchEnd = (event: NativeSyntheticEvent<NativeTouchEvent>) => {
+    if (Platform.OS === 'web') return;
     const start = touchStartRef.current;
     touchStartRef.current = null;
     if (!start) return;
 
     const deltaX = event.nativeEvent.pageX - start.x;
     const deltaY = event.nativeEvent.pageY - start.y;
+    if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) return;
     if (Math.abs(deltaX) < 50 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
 
     setSubTab(current => shiftSocialTab(current, deltaX < 0 ? 1 : -1));
@@ -696,7 +705,9 @@ export const SocialTabContent = React.memo(function SocialTabContent({
           <Text style={styles.heroTitle}>Social Nexus</Text>
           <Text style={styles.heroPulse}>{socialPulse}</Text>
         </View>
-        <Text style={styles.heroSubtitle}>Build alliances, coordinate your guild, and stay visible in global chat.</Text>
+        <Text style={styles.heroSubtitle}>
+          Build alliances, coordinate your guild, and stay visible in global chat.
+        </Text>
         <View style={styles.heroMetaRow}>
           <View style={styles.heroChip}>
             <Text style={styles.heroChipLabel}>Online</Text>
@@ -849,17 +860,13 @@ export const SocialTabContent = React.memo(function SocialTabContent({
         )}
       </Animated.View>
 
-      <Modal
-        visible={!!activeUserMenu}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setActiveUserMenu(null)}
-      >
+      <Modal visible={!!activeUserMenu} transparent animationType="fade" onRequestClose={() => setActiveUserMenu(null)}>
         <Pressable style={styles.userMenuBackdrop} onPress={() => setActiveUserMenu(null)}>
           <Pressable style={styles.userMenuCard} onPress={() => {}}>
             <Text style={styles.cardTitle}>{activeUserMenu?.displayName ?? 'Player'}</Text>
             <Text style={styles.metaText}>
-              Lv.{activeUserMenu?.level ?? 1} VIP {activeUserMenu?.vipLevel ?? 0}{activeUserMenu?.guildTag ? ` • Guild [${activeUserMenu.guildTag}]` : ''}
+              Lv.{activeUserMenu?.level ?? 1} VIP {activeUserMenu?.vipLevel ?? 0}
+              {activeUserMenu?.guildTag ? ` • Guild [${activeUserMenu.guildTag}]` : ''}
             </Text>
             <Pressable
               style={[styles.sendBtn, !canAddFriendFromMenu && styles.sendBtnDisabled]}
@@ -918,8 +925,12 @@ export const SocialTabContent = React.memo(function SocialTabContent({
         <Pressable style={styles.confirmBackdrop} onPress={() => setConfirmKickMember(null)}>
           <Pressable style={styles.confirmCard} onPress={() => {}}>
             <Text style={styles.confirmTitle}>Confirm Kick Member</Text>
-            <Text style={styles.confirmText}>Are you sure you want to kick {confirmKickMember?.displayName} from the guild?</Text>
-            <Text style={styles.confirmWarning}>This action cannot be undone. They can rejoin if the guild accepts them.</Text>
+            <Text style={styles.confirmText}>
+              Are you sure you want to kick {confirmKickMember?.displayName} from the guild?
+            </Text>
+            <Text style={styles.confirmWarning}>
+              This action cannot be undone. They can rejoin if the guild accepts them.
+            </Text>
             <View style={styles.confirmButtonRow}>
               <Pressable
                 style={[styles.confirmBtn, styles.confirmBtnCancel]}
@@ -964,7 +975,10 @@ export const SocialTabContent = React.memo(function SocialTabContent({
           <Pressable style={styles.confirmCard} onPress={() => {}}>
             <Text style={styles.confirmTitle}>Transfer Leadership</Text>
             <Text style={styles.confirmText}>Transfer leadership to {confirmTransferLeader?.displayName}?</Text>
-            <Text style={styles.confirmWarning}>⚠️ This is a one-way action. {confirmTransferLeader?.displayName} will become the new leader. You will lose all leader powers unless they grant them back.</Text>
+            <Text style={styles.confirmWarning}>
+              ⚠️ This is a one-way action. {confirmTransferLeader?.displayName} will become the new leader. You will
+              lose all leader powers unless they grant them back.
+            </Text>
             <View style={styles.confirmButtonRow}>
               <Pressable
                 style={[styles.confirmBtn, styles.confirmBtnCancel]}
@@ -1009,7 +1023,9 @@ export const SocialTabContent = React.memo(function SocialTabContent({
           <Pressable style={styles.confirmCard} onPress={() => {}}>
             <Text style={styles.confirmTitleDanger}>⚠️ DISBAND GUILD ⚠️</Text>
             <Text style={styles.confirmText}>Permanently disband {myGuild?.name}?</Text>
-            <Text style={styles.confirmWarning}>This action is IRREVERSIBLE. All guild data will be lost including:</Text>
+            <Text style={styles.confirmWarning}>
+              This action is IRREVERSIBLE. All guild data will be lost including:
+            </Text>
             <Text style={styles.confirmWarning}>• Guild members ({myGuild?.memberCount})</Text>
             <Text style={styles.confirmWarning}>• Guild treasury and assets</Text>
             <Text style={styles.confirmWarning}>• All guild history and records</Text>
