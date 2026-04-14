@@ -130,7 +130,7 @@ export function useSummonCinematic({
     return () => clearTimeout(timer);
   }, [activeModal === 'cinematicSummon', heroTemplateIdByName, summonHistory]);
 
-  const triggerCinematicSummon = () => {
+  const triggerCinematicSummon = (_featuredHeroId?: string, payWithDiamonds?: boolean) => {
     if (!canGachaX10 || activeModal === 'cinematicSummon') return;
 
     clearCinematicTimers();
@@ -141,7 +141,7 @@ export function useSummonCinematic({
     const phaseWarp = setTimeout(() => {
       setCinematicSummonPhase('warp');
       pendingCinematicSummonRef.current = true;
-      summonHeroX10Cinematic(featuredHeroId);
+      summonHeroX10Cinematic(featuredHeroId, payWithDiamonds);
     }, 850);
 
     const fallbackReveal = setTimeout(() => {

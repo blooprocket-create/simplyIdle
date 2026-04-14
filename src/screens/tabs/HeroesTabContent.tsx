@@ -284,7 +284,12 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                   <Pressable
                     style={[styles.featuredSummonBtn, !canGachaX10 && styles.featuredSummonBtnDisabled]}
                     disabled={!canGachaX10}
-                    onPress={() => summonHeroX10Cinematic()}
+                    onPress={() => {
+                      const freeUses = Math.min(state.freeSummonCharges, 10);
+                      const paidNeeded = 10 - freeUses;
+                      const shouldPayDiamonds = state.bossTears < paidNeeded;
+                      summonHeroX10Cinematic(undefined, shouldPayDiamonds);
+                    }}
                   >
                     <Text style={styles.featuredSummonBtnText}>Cinematic x10 Summon (11 Heroes)</Text>
                   </Pressable>
