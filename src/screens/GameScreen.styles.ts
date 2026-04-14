@@ -214,6 +214,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   characterSlotList: {
     gap: 10,

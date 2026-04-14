@@ -15,6 +15,7 @@ import {
   Alert,
   Animated,
   Easing,
+  ActivityIndicator,
   useWindowDimensions,
   AppState,
 } from 'react-native';
@@ -1819,6 +1820,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       <SafeAreaView style={styles.safe}>
         <StatusBar barStyle="light-content" backgroundColor="#0A0A18" />
         <View style={styles.characterLoadingWrap}>
+          <ActivityIndicator size="large" color="#C77DFF" style={{ marginBottom: 18 }} />
           <Text style={styles.createTitle}>Loading Characters...</Text>
           <Text style={styles.createSubtitle}>Checking your class slots for this account.</Text>
         </View>
@@ -1900,6 +1902,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       <SafeAreaView style={styles.safe}>
         <StatusBar barStyle="light-content" backgroundColor="#0A0A18" />
         <View style={styles.characterLoadingWrap}>
+          <ActivityIndicator size="large" color="#C77DFF" style={{ marginBottom: 18 }} />
           <Text style={styles.createTitle}>Loading {selectedClassConfig?.name ?? 'Character'}...</Text>
           <Text style={styles.createSubtitle}>Preparing your save slot.</Text>
         </View>
