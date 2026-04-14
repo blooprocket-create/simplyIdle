@@ -266,10 +266,16 @@ export const SocialTabContent = React.memo(function SocialTabContent({
   useEffect(() => {
     if (tab !== 'social') return;
 
-    const stopChat = subscribeToChat(rows => {
-      setMessages(rows);
-      setChatLoadedOnce(true);
-    });
+    const stopChat = subscribeToChat(
+      rows => {
+        setMessages(rows);
+        setChatLoadedOnce(true);
+      },
+      err => {
+        setChatError(err.message || 'Chat sync failed.');
+        setChatLoadedOnce(true);
+      },
+    );
     const refreshOnline = () => {
       void fetchOnlineCount()
         .then(setOnlineCount)

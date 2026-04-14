@@ -47,7 +47,10 @@ export interface ChatReactionSummary {
   mine: string | null;
 }
 
-export async function fetchChatReactionSummaryForMessage(messageId: string, viewerUid: string): Promise<ChatReactionSummary> {
+export async function fetchChatReactionSummaryForMessage(
+  messageId: string,
+  viewerUid: string,
+): Promise<ChatReactionSummary> {
   const db = getFirebaseFirestore();
   if (!db || !messageId) return { counts: {}, mine: null };
 
@@ -75,12 +78,14 @@ async function resolveChatIdentity(uid: string): Promise<{ level: number; vipLev
     getDoc(doc(db, 'userGuild', uid)),
   ]);
 
-  const level = leaderboardSnap.exists() && typeof leaderboardSnap.data().level === 'number'
-    ? Math.max(1, Math.floor(leaderboardSnap.data().level))
-    : 1;
-  const vipLevel = leaderboardSnap.exists() && typeof leaderboardSnap.data().vipLevel === 'number'
-    ? Math.max(0, Math.floor(leaderboardSnap.data().vipLevel))
-    : 0;
+  const level =
+    leaderboardSnap.exists() && typeof leaderboardSnap.data().level === 'number'
+      ? Math.max(1, Math.floor(leaderboardSnap.data().level))
+      : 1;
+  const vipLevel =
+    leaderboardSnap.exists() && typeof leaderboardSnap.data().vipLevel === 'number'
+      ? Math.max(0, Math.floor(leaderboardSnap.data().vipLevel))
+      : 0;
 
   let guildTag = '';
   if (membershipSnap.exists()) {
@@ -163,9 +168,8 @@ export async function sendChatMessage(
   await runTransaction(db, async tx => {
     const now = Date.now();
     const rateSnap = await tx.get(rateRef);
-    const lastSentAt = rateSnap.exists() && typeof rateSnap.data().lastSentAt === 'number'
-      ? rateSnap.data().lastSentAt
-      : 0;
+    const lastSentAt =
+      rateSnap.exists() && typeof rateSnap.data().lastSentAt === 'number' ? rateSnap.data().lastSentAt : 0;
 
     if (now - lastSentAt < CHAT_SEND_COOLDOWN_MS) {
       throw new Error('Chat rate limit reached.');
@@ -185,7 +189,10 @@ export async function sendChatMessage(
   });
 }
 
-export function subscribeToChat(onMessages: (messages: GlobalChatMessage[]) => void): () => void {
+export function subscribeToChat(
+  onMessages: (messages: GlobalChatMessage[]) => void,
+  onError?: (error: Error) => void,
+): () => void {
   const db = getFirebaseFirestore();
   if (!db) return () => {};
 
@@ -223,67 +230,71 @@ export function subscribeToChat(onMessages: (messages: GlobalChatMessage[]) => v
 
     for (const messageId of messageIds) {
       if (reactionUnsubByMessageId.has(messageId)) continue;
-      const unsub = onSnapshot(
-        collection(db, CHAT_COLLECTION, messageId, CHAT_REACTIONS_COLLECTION),
-        reactionSnap => {
-          const counts: Record<string, number> = {};
-          let mine: string | null = null;
+      const unsub = onSnapshot(collection(db, CHAT_COLLECTION, messageId, CHAT_REACTIONS_COLLECTION), reactionSnap => {
+        const counts: Record<string, number> = {};
+        let mine: string | null = null;
 
-          reactionSnap.docs.forEach(reactionDoc => {
-            const data = reactionDoc.data() as { emoji?: unknown };
-            const reactionEmoji = typeof data.emoji === 'string' ? data.emoji : '';
-            if (!reactionEmoji || !ALLOWED_REACTIONS.has(reactionEmoji)) return;
-            counts[reactionEmoji] = (counts[reactionEmoji] ?? 0) + 1;
-            if (reactionDoc.id === viewerUid) mine = reactionEmoji;
-          });
+        reactionSnap.docs.forEach(reactionDoc => {
+          const data = reactionDoc.data() as { emoji?: unknown };
+          const reactionEmoji = typeof data.emoji === 'string' ? data.emoji : '';
+          if (!reactionEmoji || !ALLOWED_REACTIONS.has(reactionEmoji)) return;
+          counts[reactionEmoji] = (counts[reactionEmoji] ?? 0) + 1;
+          if (reactionDoc.id === viewerUid) mine = reactionEmoji;
+        });
 
-          reactionsByMessageId.set(messageId, { counts, mine });
-          emitRows();
-        },
-      );
+        reactionsByMessageId.set(messageId, { counts, mine });
+        emitRows();
+      });
       reactionUnsubByMessageId.set(messageId, unsub);
     }
   };
 
   const q = query(collection(db, CHAT_COLLECTION), orderBy('sentAt', 'desc'), limit(50));
-  const chatUnsub = onSnapshot(q, snap => {
-    baseRows = snap.docs
-      .map(docSnap => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          uid: typeof data.uid === 'string' ? data.uid : '',
-          displayName: typeof data.displayName === 'string' ? data.displayName : 'Player',
-          level: typeof data.level === 'number' ? data.level : 1,
-          vipLevel: typeof data.vipLevel === 'number' ? Math.max(0, Math.floor(data.vipLevel)) : 0,
-          guildTag: typeof data.guildTag === 'string' ? data.guildTag : '',
-          text: typeof data.text === 'string' ? data.text : '',
-          sentAt: typeof data.sentAt === 'number' ? data.sentAt : 0,
-          reactions: {},
-          myReaction: null,
-        } satisfies GlobalChatMessage;
-      })
-      .filter(row => !!row.uid && !!row.text)
-      .sort((a, b) => a.sentAt - b.sentAt);
-
-    const messageIds = new Set(baseRows.map(row => row.id));
-    ensureReactionListeners(messageIds);
-
-    const missingUids = [...new Set(baseRows.map(row => row.uid))].filter(uid => !identityByUid.has(uid));
-    if (missingUids.length > 0) {
-      void Promise.all(missingUids.map(async uid => [uid, await resolveChatIdentity(uid)] as const))
-        .then(identityPairs => {
-          if (disposed) return;
-          identityPairs.forEach(([uid, identity]) => identityByUid.set(uid, identity));
-          emitRows();
+  const chatUnsub = onSnapshot(
+    q,
+    snap => {
+      baseRows = snap.docs
+        .map(docSnap => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            uid: typeof data.uid === 'string' ? data.uid : '',
+            displayName: typeof data.displayName === 'string' ? data.displayName : 'Player',
+            level: typeof data.level === 'number' ? data.level : 1,
+            vipLevel: typeof data.vipLevel === 'number' ? Math.max(0, Math.floor(data.vipLevel)) : 0,
+            guildTag: typeof data.guildTag === 'string' ? data.guildTag : '',
+            text: typeof data.text === 'string' ? data.text : '',
+            sentAt: typeof data.sentAt === 'number' ? data.sentAt : 0,
+            reactions: {},
+            myReaction: null,
+          } satisfies GlobalChatMessage;
         })
-        .catch(() => {
-          emitRows();
-        });
-    }
+        .filter(row => !!row.uid && !!row.text)
+        .sort((a, b) => a.sentAt - b.sentAt);
 
-    emitRows();
-  });
+      const messageIds = new Set(baseRows.map(row => row.id));
+      ensureReactionListeners(messageIds);
+
+      const missingUids = [...new Set(baseRows.map(row => row.uid))].filter(uid => !identityByUid.has(uid));
+      if (missingUids.length > 0) {
+        void Promise.all(missingUids.map(async uid => [uid, await resolveChatIdentity(uid)] as const))
+          .then(identityPairs => {
+            if (disposed) return;
+            identityPairs.forEach(([uid, identity]) => identityByUid.set(uid, identity));
+            emitRows();
+          })
+          .catch(() => {
+            emitRows();
+          });
+      }
+
+      emitRows();
+    },
+    err => {
+      if (disposed) return;
+      if (onError) onError(err instanceof Error ? err : new Error('Chat sync failed.'));
+    },
+  );
 
   return () => {
     disposed = true;
@@ -319,30 +330,43 @@ export async function toggleChatReaction(uid: string, messageId: string, emoji: 
       return;
     }
 
-    tx.set(reactionRef, {
-      uid,
-      emoji,
-      updatedAt: Date.now(),
-    }, { merge: true });
+    tx.set(
+      reactionRef,
+      {
+        uid,
+        emoji,
+        updatedAt: Date.now(),
+      },
+      { merge: true },
+    );
   });
 
   return fetchChatReactionSummaryForMessage(messageId, uid);
 }
 
-export async function muteUser(targetUid: string, mutedByUid: string, durationMs: number, reason: string): Promise<void> {
+export async function muteUser(
+  targetUid: string,
+  mutedByUid: string,
+  durationMs: number,
+  reason: string,
+): Promise<void> {
   const db = getFirebaseFirestore();
   if (!db || !targetUid) return;
 
   const now = Date.now();
   const mutedUntil = durationMs <= 0 ? now + 10 * 365 * 24 * 60 * 60 * 1000 : now + durationMs;
 
-  await setDoc(doc(db, CHAT_MUTES_COLLECTION, targetUid), {
-    uid: targetUid,
-    mutedBy: mutedByUid,
-    reason: reason.trim().slice(0, 180) || 'Muted by admin',
-    mutedUntil,
-    updatedAt: now,
-  }, { merge: true });
+  await setDoc(
+    doc(db, CHAT_MUTES_COLLECTION, targetUid),
+    {
+      uid: targetUid,
+      mutedBy: mutedByUid,
+      reason: reason.trim().slice(0, 180) || 'Muted by admin',
+      mutedUntil,
+      updatedAt: now,
+    },
+    { merge: true },
+  );
 }
 
 export async function unmuteUser(targetUid: string): Promise<void> {
