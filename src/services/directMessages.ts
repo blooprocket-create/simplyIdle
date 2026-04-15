@@ -12,6 +12,7 @@ import {
   increment,
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase';
+import { SOCIAL_FEATURE_FLAGS } from '../socialFeatureFlags';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -46,6 +47,7 @@ export async function sendDirectMessage(
   toName: string,
   text: string,
 ): Promise<void> {
+  if (!SOCIAL_FEATURE_FLAGS.directMessages) throw new Error('Direct messages are currently disabled.');
   const db = getFirebaseFirestore();
   if (!db || !fromUid || !toUid || fromUid === toUid) return;
 

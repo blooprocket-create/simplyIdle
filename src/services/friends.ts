@@ -69,7 +69,9 @@ function progressToGiftScale(peakProgress: number): number {
   return Math.max(1, Math.floor(safeProgress / 10));
 }
 
-async function fetchPublicNameAndPreference(uid: string): Promise<{ displayName: string; giftPreference: GiftPreference }> {
+async function fetchPublicNameAndPreference(
+  uid: string,
+): Promise<{ displayName: string; giftPreference: GiftPreference }> {
   const db = getFirebaseFirestore();
   if (!db) return { displayName: 'Player', giftPreference: 'gold' };
 
@@ -81,11 +83,12 @@ async function fetchPublicNameAndPreference(uid: string): Promise<{ displayName:
   const profile = profileSnap.exists() ? profileSnap.data() : {};
   const board = boardSnap.exists() ? boardSnap.data() : {};
 
-  const displayName = typeof profile.publicUsername === 'string'
-    ? profile.publicUsername
-    : typeof board.publicUsername === 'string'
-      ? board.publicUsername
-      : 'Player';
+  const displayName =
+    typeof profile.publicUsername === 'string'
+      ? profile.publicUsername
+      : typeof board.publicUsername === 'string'
+        ? board.publicUsername
+        : 'Player';
 
   return {
     displayName,
@@ -107,13 +110,19 @@ function buildGiftAttachment(preference: GiftPreference, receiverPeakProgress: n
 export async function setGiftPreference(uid: string, preference: GiftPreference): Promise<void> {
   const db = getFirebaseFirestore();
   if (!db || !uid) return;
-  await setDoc(doc(db, 'userProfiles', uid), {
-    giftPreference: preference,
-    updatedAt: Date.now(),
-  }, { merge: true });
+  await setDoc(
+    doc(db, 'userProfiles', uid),
+    {
+      giftPreference: preference,
+      updatedAt: Date.now(),
+    },
+    { merge: true },
+  );
 }
 
-export async function fetchFriendProfile(uid: string): Promise<{ displayName: string; giftPreference: GiftPreference } | null> {
+export async function fetchFriendProfile(
+  uid: string,
+): Promise<{ displayName: string; giftPreference: GiftPreference } | null> {
   const db = getFirebaseFirestore();
   if (!db || !uid) return null;
   return fetchPublicNameAndPreference(uid);
@@ -124,19 +133,29 @@ export async function fetchFriends(uid: string): Promise<FriendListEntry[]> {
   if (!db || !uid) return [];
 
   const snap = await getDocs(collection(db, 'friends', uid, 'list'));
-  const rows = await Promise.all(snap.docs.map(async docSnap => {
-    const friendUid = docSnap.id;
-    const core = docSnap.data() as { addedAt?: unknown; level?: unknown; giftPreference?: unknown; displayName?: unknown };
-    const level = await fetchRecipientLevel(friendUid);
-    const profile = await fetchPublicNameAndPreference(friendUid);
-    return {
-      uid: friendUid,
-      displayName: typeof core.displayName === 'string' ? core.displayName : profile.displayName,
-      level,
-      giftPreference: normalizePreference(core.giftPreference ?? profile.giftPreference),
-      addedAt: typeof core.addedAt === 'number' ? core.addedAt : Date.now(),
-    } satisfies FriendListEntry;
-  }));
+  const results = await Promise.allSettled(
+    snap.docs.map(async docSnap => {
+      const friendUid = docSnap.id;
+      const core = docSnap.data() as {
+        addedAt?: unknown;
+        level?: unknown;
+        giftPreference?: unknown;
+        displayName?: unknown;
+      };
+      const level = await fetchRecipientLevel(friendUid);
+      const profile = await fetchPublicNameAndPreference(friendUid);
+      return {
+        uid: friendUid,
+        displayName: typeof core.displayName === 'string' ? core.displayName : profile.displayName,
+        level,
+        giftPreference: normalizePreference(core.giftPreference ?? profile.giftPreference),
+        addedAt: typeof core.addedAt === 'number' ? core.addedAt : Date.now(),
+      } satisfies FriendListEntry;
+    }),
+  );
+  const rows = results
+    .filter((r): r is PromiseFulfilledResult<FriendListEntry> => r.status === 'fulfilled')
+    .map(r => r.value);
 
   return rows.sort((a, b) => a.displayName.localeCompare(b.displayName));
 }
@@ -146,14 +165,16 @@ export async function fetchPendingRequests(uid: string): Promise<PendingFriendRe
   if (!db || !uid) return [];
 
   const snap = await getDocs(collection(db, 'friends', uid, 'requests'));
-  return snap.docs.map(docSnap => {
-    const data = docSnap.data() as { fromUid?: unknown; fromName?: unknown; createdAt?: unknown };
-    return {
-      fromUid: typeof data.fromUid === 'string' ? data.fromUid : docSnap.id,
-      fromName: typeof data.fromName === 'string' ? data.fromName : 'Player',
-      createdAt: typeof data.createdAt === 'number' ? data.createdAt : Date.now(),
-    } satisfies PendingFriendRequest;
-  }).sort((a, b) => b.createdAt - a.createdAt);
+  return snap.docs
+    .map(docSnap => {
+      const data = docSnap.data() as { fromUid?: unknown; fromName?: unknown; createdAt?: unknown };
+      return {
+        fromUid: typeof data.fromUid === 'string' ? data.fromUid : docSnap.id,
+        fromName: typeof data.fromName === 'string' ? data.fromName : 'Player',
+        createdAt: typeof data.createdAt === 'number' ? data.createdAt : Date.now(),
+      } satisfies PendingFriendRequest;
+    })
+    .sort((a, b) => b.createdAt - a.createdAt);
 }
 
 export async function fetchGiftCooldowns(uid: string): Promise<Record<string, number>> {
@@ -274,9 +295,10 @@ export async function sendGift(
 
   await runTransaction(db, async tx => {
     const cooldownSnap = await tx.get(cooldownRef);
-    const lastGiftSentAt = cooldownSnap.exists() && typeof cooldownSnap.data().lastGiftSentAt === 'number'
-      ? cooldownSnap.data().lastGiftSentAt
-      : 0;
+    const lastGiftSentAt =
+      cooldownSnap.exists() && typeof cooldownSnap.data().lastGiftSentAt === 'number'
+        ? cooldownSnap.data().lastGiftSentAt
+        : 0;
 
     const prevDate = new Date(lastGiftSentAt).toISOString().slice(0, 10);
     const nowDate = new Date(now).toISOString().slice(0, 10);
@@ -295,12 +317,16 @@ export async function sendGift(
       senderUid,
     });
 
-    tx.set(cooldownRef, {
-      senderUid,
-      friendUid,
-      lastGiftSentAt: now,
-      updatedAt: now,
-    }, { merge: true });
+    tx.set(
+      cooldownRef,
+      {
+        senderUid,
+        friendUid,
+        lastGiftSentAt: now,
+        updatedAt: now,
+      },
+      { merge: true },
+    );
   });
 }
 
@@ -350,18 +376,26 @@ export async function acceptFriendRequest(uid: string, fromUid: string): Promise
   ]);
 
   await runTransaction(db, async tx => {
-    tx.set(doc(db, 'friends', uid, 'list', fromUid), {
-      uid: fromUid,
-      displayName: fromMeta.displayName,
-      giftPreference: fromMeta.giftPreference,
-      addedAt: now,
-    }, { merge: true });
-    tx.set(doc(db, 'friends', fromUid, 'list', uid), {
-      uid,
-      displayName: selfMeta.displayName,
-      giftPreference: selfMeta.giftPreference,
-      addedAt: now,
-    }, { merge: true });
+    tx.set(
+      doc(db, 'friends', uid, 'list', fromUid),
+      {
+        uid: fromUid,
+        displayName: fromMeta.displayName,
+        giftPreference: fromMeta.giftPreference,
+        addedAt: now,
+      },
+      { merge: true },
+    );
+    tx.set(
+      doc(db, 'friends', fromUid, 'list', uid),
+      {
+        uid,
+        displayName: selfMeta.displayName,
+        giftPreference: selfMeta.giftPreference,
+        addedAt: now,
+      },
+      { merge: true },
+    );
     tx.delete(doc(db, 'friends', uid, 'requests', fromUid));
     tx.delete(doc(db, 'friends', fromUid, 'outgoing', uid));
   });

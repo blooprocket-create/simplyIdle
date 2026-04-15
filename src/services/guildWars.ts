@@ -12,6 +12,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase';
+import { SOCIAL_FEATURE_FLAGS } from '../socialFeatureFlags';
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -148,6 +149,7 @@ export async function findMatchableGuilds(uid: string): Promise<
 
 /** Send a war challenge to another guild. Leader only. */
 export async function sendWarChallenge(uid: string, targetGuildId: string): Promise<WarChallenge> {
+  if (!SOCIAL_FEATURE_FLAGS.guildWars) throw new Error('Guild wars are currently disabled.');
   const db = requireDb();
   const me = await resolveGuildForUser(uid);
   if (!me) throw new Error('You are not in a guild.');
@@ -323,6 +325,7 @@ export async function contributeWarDamage(input: {
   warId: string;
   dps: number;
 }): Promise<ActiveWar> {
+  if (!SOCIAL_FEATURE_FLAGS.guildWars) throw new Error('Guild wars are currently disabled.');
   const db = requireDb();
   const me = await resolveGuildForUser(input.uid);
   if (!me) throw new Error('You are not in a guild.');

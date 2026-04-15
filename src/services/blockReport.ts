@@ -1,5 +1,6 @@
 import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, setDoc } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase';
+import { SOCIAL_FEATURE_FLAGS } from '../socialFeatureFlags';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,7 @@ export interface ReportSubmission {
 // ─── Block API ───────────────────────────────────────────────────────────────
 
 export async function blockUser(uid: string, targetUid: string): Promise<void> {
+  if (!SOCIAL_FEATURE_FLAGS.blockReport) throw new Error('Block/report is currently disabled.');
   const db = getFirebaseFirestore();
   if (!db || !uid || !targetUid || uid === targetUid) return;
 
@@ -78,6 +80,7 @@ export async function reportUser(
   reason: ReportReason,
   details: string,
 ): Promise<void> {
+  if (!SOCIAL_FEATURE_FLAGS.blockReport) throw new Error('Block/report is currently disabled.');
   const db = getFirebaseFirestore();
   if (!db || !reporterUid || !targetUid || reporterUid === targetUid) return;
   if (!VALID_REASONS.has(reason)) return;

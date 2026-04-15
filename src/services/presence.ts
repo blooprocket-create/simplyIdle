@@ -5,7 +5,8 @@ const PRESENCE_COLLECTION = 'onlinePresence';
 const HEARTBEAT_MS = 45_000;
 const ONLINE_WINDOW_MS = 90_000;
 
-let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+/** Per-uid heartbeat timers — prevents global singleton conflicts with StrictMode / HMR. */
+const heartbeatTimers = new Map<string, ReturnType<typeof setInterval>>();
 
 function nowMs(): number {
   return Date.now();
@@ -38,19 +39,20 @@ export async function markPresenceOffline(uid: string): Promise<void> {
 export function startPresenceHeartbeat(uid: string, displayName: string, level: number): () => void {
   void writePresenceHeartbeat(uid, displayName, level).catch(() => {});
 
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer);
-    heartbeatTimer = null;
-  }
+  // Clear any existing timer for this uid (handles StrictMode double-mount / HMR)
+  const existing = heartbeatTimers.get(uid);
+  if (existing) clearInterval(existing);
 
-  heartbeatTimer = setInterval(() => {
+  const timer = setInterval(() => {
     void writePresenceHeartbeat(uid, displayName, level).catch(() => {});
   }, HEARTBEAT_MS);
+  heartbeatTimers.set(uid, timer);
 
   return () => {
-    if (heartbeatTimer) {
-      clearInterval(heartbeatTimer);
-      heartbeatTimer = null;
+    const t = heartbeatTimers.get(uid);
+    if (t) {
+      clearInterval(t);
+      heartbeatTimers.delete(uid);
     }
   };
 }

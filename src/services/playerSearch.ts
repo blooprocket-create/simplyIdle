@@ -1,6 +1,7 @@
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase';
 import { normalizePublicUsername } from './publicProfile';
+import { SOCIAL_FEATURE_FLAGS } from '../socialFeatureFlags';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,7 @@ export interface PlayerSearchResult {
  * Returns up to `maxResults` matches (default 15).
  */
 export async function searchPlayers(queryText: string, maxResults = 15): Promise<PlayerSearchResult[]> {
+  if (!SOCIAL_FEATURE_FLAGS.playerSearch) throw new Error('Player search is currently disabled.');
   const db = getFirebaseFirestore();
   if (!db) return [];
 

@@ -1,5 +1,6 @@
 import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, setDoc, where } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase';
+import { SOCIAL_FEATURE_FLAGS } from '../socialFeatureFlags';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -46,6 +47,7 @@ export async function publishActivity(
   type: ActivityType,
   data: Record<string, string | number | boolean> = {},
 ): Promise<void> {
+  if (!SOCIAL_FEATURE_FLAGS.activityFeed) return;
   const db = getFirebaseFirestore();
   if (!db || !uid || !VALID_TYPES.has(type)) return;
 

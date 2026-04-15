@@ -113,6 +113,7 @@ export const socialStyles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
   },
   subTabDot: {
     position: 'absolute',

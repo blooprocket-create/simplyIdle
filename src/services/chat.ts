@@ -220,15 +220,22 @@ export function subscribeToChat(
     onMessages(rows);
   };
 
+  const MAX_REACTION_LISTENERS = 50;
+
   const ensureReactionListeners = (messageIds: Set<string>) => {
+    // Only keep reaction listeners for the most recent messages (sliding window)
+    // to prevent unbounded listener accumulation in long sessions.
+    const idsToTrack =
+      messageIds.size <= MAX_REACTION_LISTENERS ? messageIds : new Set([...messageIds].slice(-MAX_REACTION_LISTENERS));
+
     for (const [messageId, unsub] of reactionUnsubByMessageId.entries()) {
-      if (messageIds.has(messageId)) continue;
+      if (idsToTrack.has(messageId)) continue;
       unsub();
       reactionUnsubByMessageId.delete(messageId);
       reactionsByMessageId.delete(messageId);
     }
 
-    for (const messageId of messageIds) {
+    for (const messageId of idsToTrack) {
       if (reactionUnsubByMessageId.has(messageId)) continue;
       const unsub = onSnapshot(collection(db, CHAT_COLLECTION, messageId, CHAT_REACTIONS_COLLECTION), reactionSnap => {
         const counts: Record<string, number> = {};
