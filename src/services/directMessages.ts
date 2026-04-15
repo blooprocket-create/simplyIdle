@@ -38,7 +38,13 @@ export function buildConversationId(uid1: string, uid2: string): string {
 
 // ─── Send DM ─────────────────────────────────────────────────────────────────
 
-export async function sendDirectMessage(fromUid: string, toUid: string, fromName: string, text: string): Promise<void> {
+export async function sendDirectMessage(
+  fromUid: string,
+  toUid: string,
+  fromName: string,
+  toName: string,
+  text: string,
+): Promise<void> {
   const db = getFirebaseFirestore();
   if (!db || !fromUid || !toUid || fromUid === toUid) return;
 
@@ -61,7 +67,7 @@ export async function sendDirectMessage(fromUid: string, toUid: string, fromName
     doc(db, 'dmThreads', fromUid, 'conversations', toUid),
     {
       partnerUid: toUid,
-      partnerName: '', // partner name resolved client-side from profile cache
+      partnerName: toName.trim().slice(0, 24),
       lastMessageText: cleaned.slice(0, 80),
       lastMessageAt: now,
       unreadCount: 0,
@@ -133,7 +139,7 @@ export async function fetchConversations(uid: string): Promise<DMThread[]> {
     const data = d.data();
     return {
       partnerUid: d.id,
-      partnerName: typeof data.partnerName === 'string' ? data.partnerName : 'Player',
+      partnerName: typeof data.partnerName === 'string' && data.partnerName ? data.partnerName : 'Player',
       lastMessageText: typeof data.lastMessageText === 'string' ? data.lastMessageText : '',
       lastMessageAt: typeof data.lastMessageAt === 'number' ? data.lastMessageAt : 0,
       unreadCount: typeof data.unreadCount === 'number' ? Math.max(0, data.unreadCount) : 0,

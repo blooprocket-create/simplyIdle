@@ -76,7 +76,7 @@ export function DMSection() {
     if (!me.uid || !activePartner || !draft.trim() || sending) return;
     setSending(true);
     try {
-      await sendDirectMessage(me.uid, activePartner.uid, me.name, draft.trim());
+      await sendDirectMessage(me.uid, activePartner.uid, me.name, activePartner.name, draft.trim());
       setDraft('');
       void trackEvent('social_dm_sent');
     } catch {
