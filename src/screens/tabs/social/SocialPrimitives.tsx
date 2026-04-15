@@ -69,7 +69,13 @@ export function SocialProgressBar({ styles, progress, label, tint }: SocialProgr
     <View style={styles.progressBlock}>
       {!!label && <Text style={styles.progressLabel}>{label}</Text>}
       <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${Math.round(clamped * 100)}%` }, tint ? { backgroundColor: tint } : null]} />
+        <View
+          style={[
+            styles.progressFill,
+            { width: `${Math.round(clamped * 100)}%` },
+            tint ? { backgroundColor: tint } : null,
+          ]}
+        />
       </View>
     </View>
   );
@@ -98,14 +104,10 @@ export function SocialAsyncState({
 }: SocialAsyncStateProps) {
   if (!isLoading && !isEmpty && !error) return null;
 
-  const title = error
-    ? 'Sync Issue'
-    : isLoading
-      ? 'Syncing...'
-      : (emptyTitle ?? 'Nothing Here Yet');
+  const title = error ? 'Sync Issue' : isLoading ? 'Syncing...' : (emptyTitle ?? 'Nothing Here Yet');
 
   const subtitle = error
-    ? error
+    ? `⚠️ ${error}`
     : isLoading
       ? 'Pulling latest social data.'
       : (emptySubtitle ?? 'Try checking back shortly.');

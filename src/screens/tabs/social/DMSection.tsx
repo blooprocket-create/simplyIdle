@@ -135,7 +135,7 @@ export function DMSection() {
 
   if (view === 'conversation' && activePartner) {
     return (
-      <SocialCard styles={styles} title={`Chat with ${activePartner.name}`}>
+      <SocialCard styles={styles} title={`Chat with ${activePartner.name ?? 'Player'}`}>
         <Pressable style={styles.smallBtn} onPress={goBackToInbox}>
           <Text style={styles.smallBtnText}>← Back to Inbox</Text>
         </Pressable>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { GiftPreference } from '../../../gameConfig';
 import { FriendListEntry, PendingFriendRequest } from '../../../services/friends';
@@ -51,7 +51,16 @@ export function FriendsSection({
   onRetryLoad,
   onViewProfile,
 }: FriendsSectionProps) {
-  const nowMs = Date.now();
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  // Auto-refresh at next UTC midnight so gift buttons re-enable
+  useEffect(() => {
+    const now = new Date();
+    const nextMidnightUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0);
+    const msUntilMidnight = Math.max(1000, nextMidnightUtc - Date.now());
+    const timer = setTimeout(() => setNowMs(Date.now()), msUntilMidnight);
+    return () => clearTimeout(timer);
+  }, [nowMs]);
 
   const friendsReadyToGift = friends.filter(friend => {
     const cooldownAt = giftCooldowns[friend.uid] ?? 0;
@@ -74,7 +83,9 @@ export function FriendsSection({
               onPress={() => void onUpdatePreference(pref)}
               disabled={friendsBusy}
             >
-              <Text style={styles.prefBtnText}>{giftIcon(pref)} {pref}</Text>
+              <Text style={styles.prefBtnText}>
+                {giftIcon(pref)} {pref}
+              </Text>
             </Pressable>
           ))}
         </View>
@@ -106,13 +117,25 @@ export function FriendsSection({
             <View key={request.fromUid} style={styles.friendRow}>
               <Text style={styles.friendName}>👤 {request.fromName}</Text>
               <View style={styles.friendActions}>
-                <Pressable style={styles.smallBtn} onPress={() => onViewProfile(request.fromUid)} disabled={friendsBusy}>
+                <Pressable
+                  style={styles.smallBtn}
+                  onPress={() => onViewProfile(request.fromUid)}
+                  disabled={friendsBusy}
+                >
                   <Text style={styles.smallBtnText}>Profile</Text>
                 </Pressable>
-                <Pressable style={styles.smallBtn} onPress={() => void onAcceptRequest(request.fromUid)} disabled={friendsBusy}>
+                <Pressable
+                  style={styles.smallBtn}
+                  onPress={() => void onAcceptRequest(request.fromUid)}
+                  disabled={friendsBusy}
+                >
                   <Text style={styles.smallBtnText}>Accept</Text>
                 </Pressable>
-                <Pressable style={[styles.smallBtn, styles.smallBtnDanger]} onPress={() => void onDeclineRequest(request.fromUid)} disabled={friendsBusy}>
+                <Pressable
+                  style={[styles.smallBtn, styles.smallBtnDanger]}
+                  onPress={() => void onDeclineRequest(request.fromUid)}
+                  disabled={friendsBusy}
+                >
                   <Text style={styles.smallBtnText}>Decline</Text>
                 </Pressable>
               </View>
@@ -140,32 +163,24 @@ export function FriendsSection({
         title={`Friends (${friends.length})`}
         subtitle={`Ready to gift: ${friendsReadyToGift.length} • Gifted today: ${friendsGiftedToday.length}`}
       >
-        {friendsReadyToGift.length > 0 && (
-          <Text style={styles.sectionLabel}>Ready To Gift</Text>
-        )}
+        {friendsReadyToGift.length > 0 && <Text style={styles.sectionLabel}>Ready To Gift</Text>}
         {friendsReadyToGift.map(friend => (
           <View key={friend.uid} style={styles.friendRow}>
             <View style={styles.friendMeta}>
               <Text style={styles.friendName}>{friend.displayName}</Text>
-              <Text style={styles.metaText}>Lv.{friend.level} • Wants {giftIcon(friend.giftPreference)} {friend.giftPreference}</Text>
+              <Text style={styles.metaText}>
+                Lv.{friend.level} • Wants {giftIcon(friend.giftPreference)} {friend.giftPreference}
+              </Text>
               <View style={styles.statusRow}>
                 <View style={[styles.statusDot, styles.statusDotReady]} />
                 <Text style={styles.statusText}>Gift Ready</Text>
               </View>
             </View>
             <View style={styles.friendActions}>
-              <Pressable
-                style={styles.smallBtn}
-                onPress={() => onViewProfile(friend.uid)}
-                disabled={friendsBusy}
-              >
+              <Pressable style={styles.smallBtn} onPress={() => onViewProfile(friend.uid)} disabled={friendsBusy}>
                 <Text style={styles.smallBtnText}>Profile</Text>
               </Pressable>
-              <Pressable
-                style={styles.smallBtn}
-                onPress={() => void onSendDailyGift(friend)}
-                disabled={friendsBusy}
-              >
+              <Pressable style={styles.smallBtn} onPress={() => void onSendDailyGift(friend)} disabled={friendsBusy}>
                 <Text style={styles.smallBtnText}>Send Gift</Text>
               </Pressable>
               <Pressable
@@ -179,14 +194,14 @@ export function FriendsSection({
           </View>
         ))}
 
-        {friendsGiftedToday.length > 0 && (
-          <Text style={styles.sectionLabel}>Gifted Today</Text>
-        )}
+        {friendsGiftedToday.length > 0 && <Text style={styles.sectionLabel}>Gifted Today</Text>}
         {friendsGiftedToday.map(friend => (
           <View key={friend.uid} style={styles.friendRow}>
             <View style={styles.friendMeta}>
               <Text style={styles.friendName}>{friend.displayName}</Text>
-              <Text style={styles.metaText}>Lv.{friend.level} • Wants {giftIcon(friend.giftPreference)} {friend.giftPreference}</Text>
+              <Text style={styles.metaText}>
+                Lv.{friend.level} • Wants {giftIcon(friend.giftPreference)} {friend.giftPreference}
+              </Text>
               <View style={styles.statusRow}>
                 <View style={[styles.statusDot, styles.statusDotCooldown]} />
                 <Text style={styles.statusText}>Gift Cooldown</Text>

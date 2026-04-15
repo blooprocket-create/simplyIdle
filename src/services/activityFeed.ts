@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, setDoc, where } from 'firebase/firestore';
+import { collection, doc, getDocs, limit, orderBy, query, setDoc, where } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase';
 import { SOCIAL_FEATURE_FLAGS } from '../socialFeatureFlags';
 
@@ -85,8 +85,8 @@ export async function fetchPlayerActivity(uid: string, maxRows = 20): Promise<Ac
  * Subscribe to activity from a list of friend UIDs.
  * Merges multiple friends' feeds and returns sorted by most recent.
  *
- * Note: Firestore doesn't support cross-subcollection queries,
- * so we subscribe to each friend individually (limited by friendCount).
+ * Uses periodic polling instead of per-friend real-time listeners
+ * to reduce Firestore connection overhead (30 listeners → 1 poll interval).
  */
 export function subscribeToFriendActivity(
   friendUids: string[],
@@ -95,40 +95,52 @@ export function subscribeToFriendActivity(
   const db = getFirebaseFirestore();
   if (!db || friendUids.length === 0) return () => {};
 
-  const cutoff = Date.now() - ACTIVITY_TTL_MS;
-  // Cap subscription count to prevent excessive Firestore listeners
   const cappedUids = friendUids.slice(0, 30);
-  const eventsByUid = new Map<string, ActivityEvent[]>();
-  const unsubs: (() => void)[] = [];
+  let cancelled = false;
 
-  const emitMerged = () => {
-    const all: ActivityEvent[] = [];
-    for (const events of eventsByUid.values()) {
-      all.push(...events);
+  const fetchAll = async () => {
+    const cutoff = Date.now() - ACTIVITY_TTL_MS;
+    const allEvents: ActivityEvent[] = [];
+
+    // Batch into groups of 10 for parallel fetching
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < cappedUids.length; i += BATCH_SIZE) {
+      const batch = cappedUids.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map(uid =>
+          getDocs(
+            query(
+              collection(db, 'activityFeed', uid, 'events'),
+              where('createdAt', '>', cutoff),
+              orderBy('createdAt', 'desc'),
+              limit(5),
+            ),
+          ),
+        ),
+      );
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          for (const d of result.value.docs) {
+            const event = parseActivityDoc(d.id, d.data());
+            if (event) allEvents.push(event);
+          }
+        }
+      }
     }
-    all.sort((a, b) => b.createdAt - a.createdAt);
-    onActivity(all.slice(0, 100)); // cap at 100 merged events
+
+    allEvents.sort((a, b) => b.createdAt - a.createdAt);
+    if (!cancelled) {
+      onActivity(allEvents.slice(0, 100));
+    }
   };
 
-  for (const friendUid of cappedUids) {
-    const q = query(
-      collection(db, 'activityFeed', friendUid, 'events'),
-      where('createdAt', '>', cutoff),
-      orderBy('createdAt', 'desc'),
-      limit(10),
-    );
-
-    const unsub = onSnapshot(q, snap => {
-      const events = snap.docs.map(d => parseActivityDoc(d.id, d.data())).filter((e): e is ActivityEvent => e !== null);
-      eventsByUid.set(friendUid, events);
-      emitMerged();
-    });
-
-    unsubs.push(unsub);
-  }
+  // Initial fetch + poll every 60 seconds
+  void fetchAll();
+  const timer = setInterval(() => void fetchAll(), 60_000);
 
   return () => {
-    unsubs.forEach(unsub => unsub());
+    cancelled = true;
+    clearInterval(timer);
   };
 }
 

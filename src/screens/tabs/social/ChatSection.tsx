@@ -8,7 +8,15 @@ type ChatChannel = 'global' | 'guild';
 
 type ChatListRow =
   | { key: string; type: 'day'; label: string }
-  | { key: string; type: 'message'; showHeader: boolean; mine: boolean; compact: boolean; source: 'global' | 'guild'; message: ChatRenderMessage };
+  | {
+      key: string;
+      type: 'message';
+      showHeader: boolean;
+      mine: boolean;
+      compact: boolean;
+      source: 'global' | 'guild';
+      message: ChatRenderMessage;
+    };
 
 interface ChatRenderMessage {
   id: string;
@@ -22,6 +30,8 @@ interface ChatRenderMessage {
   reactions?: Record<string, number>;
   myReaction?: string | null;
 }
+
+const MAX_CHAT_MESSAGES = 200;
 
 function dayKey(ts: number): string {
   return new Date(ts).toISOString().slice(0, 10);
@@ -108,7 +118,7 @@ export function ChatSection({
 
   const activeSourceMessages = useMemo<ChatRenderMessage[]>(() => {
     if (activeChannel === 'guild') {
-      return guildMessages.map(message => ({
+      return guildMessages.slice(-MAX_CHAT_MESSAGES).map(message => ({
         id: message.id,
         uid: message.uid,
         displayName: message.displayName,
@@ -117,7 +127,7 @@ export function ChatSection({
       }));
     }
 
-    return messages.map(message => ({
+    return messages.slice(-MAX_CHAT_MESSAGES).map(message => ({
       id: message.id,
       uid: message.uid,
       displayName: message.displayName,
@@ -329,7 +339,9 @@ export function ChatSection({
             style={[styles.chatChannelChip, activeChannel === 'global' && styles.chatChannelChipActive]}
             onPress={() => setActiveChannel('global')}
           >
-            <Text style={[styles.chatChannelChipText, activeChannel === 'global' && styles.chatChannelChipTextActive]}>Global</Text>
+            <Text style={[styles.chatChannelChipText, activeChannel === 'global' && styles.chatChannelChipTextActive]}>
+              Global
+            </Text>
             {unreadByChannel.global > 0 && activeChannel !== 'global' && (
               <View style={styles.chatChannelBadge}>
                 <Text style={styles.chatChannelBadgeText}>{unreadByChannel.global}</Text>
@@ -347,7 +359,9 @@ export function ChatSection({
               setActiveChannel('guild');
             }}
           >
-            <Text style={[styles.chatChannelChipText, activeChannel === 'guild' && styles.chatChannelChipTextActive]}>Guild</Text>
+            <Text style={[styles.chatChannelChipText, activeChannel === 'guild' && styles.chatChannelChipTextActive]}>
+              Guild
+            </Text>
             {unreadByChannel.guild > 0 && activeChannel !== 'guild' && (
               <View style={styles.chatChannelBadge}>
                 <Text style={styles.chatChannelBadgeText}>{unreadByChannel.guild}</Text>
@@ -363,7 +377,9 @@ export function ChatSection({
           emptyTitle={activeChannel === 'guild' ? 'No Guild Messages Yet' : 'No Messages Yet'}
           emptySubtitle={
             activeChannel === 'guild'
-              ? (hasGuild ? 'Kick off the strategy in guild channel.' : 'Join a guild to unlock guild chat channel.')
+              ? hasGuild
+                ? 'Kick off the strategy in guild channel.'
+                : 'Join a guild to unlock guild chat channel.'
               : 'Start the conversation and rally your alliance.'
           }
           variant="inline"
@@ -377,6 +393,8 @@ export function ChatSection({
             style={styles.chatStreamList}
             contentContainerStyle={styles.chatStreamContent}
             keyboardShouldPersistTaps="handled"
+            maxToRenderPerBatch={15}
+            windowSize={10}
             onContentSizeChange={() => {
               if (isNearBottom) scrollToLatest(false);
             }}
@@ -398,14 +416,10 @@ export function ChatSection({
 
               const { message } = item;
               return (
-                <View
-                  style={[
-                    styles.chatRow,
-                    item.mine && styles.chatRowMine,
-                    item.compact && styles.chatRowCompact,
-                  ]}
-                >
+                <View style={[styles.chatRow, item.mine && styles.chatRowMine, item.compact && styles.chatRowCompact]}>
                   <Pressable
+                    accessibilityLabel={`${message.displayName} at ${formatTime(message.sentAt)}: ${message.text}`}
+                    accessibilityRole="button"
                     onPress={() => {
                       if (item.mine) return;
                       onOpenProfile(message.uid);
@@ -453,6 +467,8 @@ export function ChatSection({
                             style={[styles.reactionChip, active && styles.reactionChipActive]}
                             hitSlop={8}
                             disabled={pending}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${emoji} reaction${count ? `, ${count} vote${count !== 1 ? 's' : ''}` : ''}. ${active ? 'Selected.' : ''} Double tap to toggle.`}
                             onPress={() => {
                               void onReactionPress(message, emoji);
                             }}
@@ -466,13 +482,22 @@ export function ChatSection({
                   )}
                   {isAdmin && !item.mine && item.source === 'global' && (
                     <View style={styles.muteActionsRow}>
-                      <Pressable style={styles.muteBtn} onPress={() => void onMute(message.uid, 60 * 60 * 1000, 'Muted by admin (1h)')}>
+                      <Pressable
+                        style={styles.muteBtn}
+                        onPress={() => void onMute(message.uid, 60 * 60 * 1000, 'Muted by admin (1h)')}
+                      >
                         <Text style={styles.muteBtnText}>Mute 1h</Text>
                       </Pressable>
-                      <Pressable style={styles.muteBtn} onPress={() => void onMute(message.uid, 24 * 60 * 60 * 1000, 'Muted by admin (24h)')}>
+                      <Pressable
+                        style={styles.muteBtn}
+                        onPress={() => void onMute(message.uid, 24 * 60 * 60 * 1000, 'Muted by admin (24h)')}
+                      >
                         <Text style={styles.muteBtnText}>Mute 24h</Text>
                       </Pressable>
-                      <Pressable style={[styles.muteBtn, styles.muteBtnPerm]} onPress={() => void onMute(message.uid, 0, 'Muted by admin (permanent)')}>
+                      <Pressable
+                        style={[styles.muteBtn, styles.muteBtnPerm]}
+                        onPress={() => void onMute(message.uid, 0, 'Muted by admin (permanent)')}
+                      >
                         <Text style={styles.muteBtnText}>Perm</Text>
                       </Pressable>
                     </View>
@@ -484,13 +509,16 @@ export function ChatSection({
         </View>
 
         {!isNearBottom && activeUnread > 0 && (
-          <Pressable style={styles.chatJumpToLatestBtn} onPress={() => {
-            setUnreadByChannel(current => ({
-              ...current,
-              [activeChannel]: 0,
-            }));
-            scrollToLatest();
-          }}>
+          <Pressable
+            style={styles.chatJumpToLatestBtn}
+            onPress={() => {
+              setUnreadByChannel(current => ({
+                ...current,
+                [activeChannel]: 0,
+              }));
+              scrollToLatest();
+            }}
+          >
             <Text style={styles.chatJumpToLatestText}>New {activeUnread} • Jump to Latest</Text>
           </Pressable>
         )}
@@ -509,9 +537,10 @@ export function ChatSection({
               onChangeText={setActiveDraft}
               placeholder={activeChannel === 'guild' ? 'Message guild...' : 'Type a message...'}
               maxLength={activeChannel === 'guild' ? 300 : 500}
-              editable={activeChannel === 'guild'
-                ? hasGuild && !guildSending
-                : !sending && !(mutedUntil && mutedUntil > Date.now())
+              editable={
+                activeChannel === 'guild'
+                  ? hasGuild && !guildSending
+                  : !sending && !(mutedUntil && mutedUntil > Date.now())
               }
             />
             <SocialPrimaryButton

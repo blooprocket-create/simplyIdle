@@ -72,7 +72,7 @@ export function SearchSection({ onViewProfile }: { onViewProfile: (uid: string) 
         />
       </View>
 
-      {!!error && <Text style={styles.errorText}>{error}</Text>}
+      {!!error && <Text style={styles.errorText}>⚠️ {error}</Text>}
 
       {searched && results.length === 0 && !error && (
         <Text style={styles.metaText}>No players found matching "{query.trim()}"</Text>

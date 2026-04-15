@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { THEME, RADIUS } from '../../../theme';
 import { fetchFriendRelationshipStatus, FriendRelationshipStatus, sendFriendRequest } from '../../../services/friends';
 import { fetchPublicPlayerProfile, PublicPlayerProfile } from '../../../services/publicProfile';
@@ -17,6 +17,8 @@ interface ProfileModalProps {
   socialSubTab: string;
   onClose: () => void;
 }
+
+const PROFILE_CACHE_MAX = 50;
 
 function buildProfileHighlights(profile: PublicPlayerProfile): string[] {
   const highlights: string[] = [];
@@ -51,7 +53,24 @@ export function ProfileModal({
   const [error, setError] = useState<string | null>(null);
   const [relationship, setRelationship] = useState<FriendRelationshipStatus>('none');
   const [actionBusy, setActionBusy] = useState(false);
-  const cacheRef = useRef<Record<string, PublicPlayerProfile>>({});
+  const cacheRef = useRef<Map<string, PublicPlayerProfile>>(new Map());
+
+  const handleClose = useCallback(() => {
+    setLoading(false);
+    setError(null);
+    setActionBusy(false);
+    onClose();
+  }, [onClose]);
+
+  // Escape key dismiss on web
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !targetUid) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [targetUid, handleClose]);
 
   useEffect(() => {
     if (!meUid || !targetUid) {
@@ -67,14 +86,16 @@ export function ProfileModal({
     if (!targetUid) return;
     setError(null);
 
-    const cached = cacheRef.current[targetUid];
+    const cached = cacheRef.current.get(targetUid);
     if (cached) {
       setProfile(cached);
       void trackEvent('social_profile_opened', { sourceTab: socialSubTab, source: 'modal', cached: true });
       void fetchPublicPlayerProfile(targetUid)
         .then(p => {
           if (!p) return;
-          cacheRef.current[targetUid] = p;
+          // LRU: delete and re-insert to move to end
+          cacheRef.current.delete(targetUid);
+          cacheRef.current.set(targetUid, p);
           setProfile(p);
         })
         .catch(() => {});
@@ -89,20 +110,18 @@ export function ProfileModal({
           setError('Profile unavailable right now.');
           return;
         }
-        cacheRef.current[targetUid] = p;
+        // LRU eviction: remove oldest entry if at capacity
+        if (cacheRef.current.size >= PROFILE_CACHE_MAX) {
+          const oldestKey = cacheRef.current.keys().next().value;
+          if (oldestKey !== undefined) cacheRef.current.delete(oldestKey);
+        }
+        cacheRef.current.set(targetUid, p);
         setProfile(p);
         void trackEvent('social_profile_opened', { sourceTab: socialSubTab, source: 'modal', cached: false });
       })
       .catch(() => setError('Failed to load player profile.'))
       .finally(() => setLoading(false));
   }, [targetUid, socialSubTab]);
-
-  const handleClose = () => {
-    setLoading(false);
-    setError(null);
-    setActionBusy(false);
-    onClose();
-  };
 
   return (
     <Modal visible={!!targetUid} transparent animationType="fade" onRequestClose={handleClose}>
@@ -111,7 +130,7 @@ export function ProfileModal({
           <Text style={styles.cardTitle}>Player Profile</Text>
 
           {loading && <Text style={styles.metaText}>Loading profile data...</Text>}
-          {!!error && <Text style={styles.errorText}>{error}</Text>}
+          {!!error && <Text style={styles.errorText}>⚠️ {error}</Text>}
 
           {!loading && !error && !!profile && (
             <>
@@ -119,19 +138,23 @@ export function ProfileModal({
               {buildProfileHighlights(profile).length > 0 && (
                 <View style={styles.tagRow}>
                   {buildProfileHighlights(profile).map(tag => (
-                    <Text key={tag} style={styles.tag}>{tag}</Text>
+                    <Text key={tag} style={styles.tag}>
+                      {tag}
+                    </Text>
                   ))}
                 </View>
               )}
               <View style={styles.metricGrid}>
-                {([
-                  ['Level', profile.level],
-                  ['VIP', profile.vipLevel],
-                  ['Prestige', profile.prestigeCount],
-                  ['Rank', profile.leaderboardRank ? `#${profile.leaderboardRank}` : 'N/A'],
-                  ['Friends', profile.friendCount],
-                  ['Guild Damage', profile.guildContribution.toLocaleString()],
-                ] as [string, string | number][]).map(([label, value]) => (
+                {(
+                  [
+                    ['Level', profile.level],
+                    ['VIP', profile.vipLevel],
+                    ['Prestige', profile.prestigeCount],
+                    ['Rank', profile.leaderboardRank ? `#${profile.leaderboardRank}` : 'N/A'],
+                    ['Friends', profile.friendCount],
+                    ['Guild Damage', profile.guildContribution.toLocaleString()],
+                  ] as [string, string | number][]
+                ).map(([label, value]) => (
                   <View key={label} style={styles.metricChip}>
                     <Text style={styles.metricLabel}>{label}</Text>
                     <Text style={styles.metricValue}>{value}</Text>
@@ -142,14 +165,19 @@ export function ProfileModal({
               <Text style={styles.metaText}>Score: {profile.score.toLocaleString()}</Text>
               <Text style={styles.metaText}>Gift Preference: {profile.giftPreference}</Text>
               <Text style={styles.metaText}>
-                Guild: {profile.guildName ? `${profile.guildName}${profile.guildRank ? ` (${profile.guildRank})` : ''}` : 'No guild'}
+                Guild:{' '}
+                {profile.guildName
+                  ? `${profile.guildName}${profile.guildRank ? ` (${profile.guildRank})` : ''}`
+                  : 'No guild'}
               </Text>
 
               <View style={styles.compareCard}>
                 <Text style={styles.compareTitle}>Compare With You</Text>
                 <Text style={styles.metaText}>Level Delta: {formatSigned(profile.level - meLevel)}</Text>
                 <Text style={styles.metaText}>VIP Delta: {formatSigned(profile.vipLevel - meVipLevel)}</Text>
-                <Text style={styles.metaText}>Wave Delta: {formatSigned(profile.highestWaveReached - meHighestWave)}</Text>
+                <Text style={styles.metaText}>
+                  Wave Delta: {formatSigned(profile.highestWaveReached - meHighestWave)}
+                </Text>
               </View>
 
               <View style={styles.actions}>
@@ -162,34 +190,49 @@ export function ProfileModal({
                   onPress={async () => {
                     if (!meUid || !profile || relationship !== 'none') return;
                     setActionBusy(true);
-                    void trackEvent('social_profile_friend_cta_clicked', { relation: relationship, sourceTab: socialSubTab });
+                    void trackEvent('social_profile_friend_cta_clicked', {
+                      relation: relationship,
+                      sourceTab: socialSubTab,
+                    });
                     try {
                       await sendFriendRequest(meUid, meName, profile.publicUsername);
                       setRelationship('outgoing');
-                      void trackEvent('social_profile_friend_request_sent', { sourceTab: socialSubTab, relationBefore: 'none' });
+                      void trackEvent('social_profile_friend_request_sent', {
+                        sourceTab: socialSubTab,
+                        relationBefore: 'none',
+                      });
                     } catch (err) {
                       const msg = err instanceof Error ? err.message : 'Failed to send friend request.';
                       setError(msg);
-                      void trackEvent('social_profile_friend_request_failed', { reason: msg.slice(0, 80), sourceTab: socialSubTab });
+                      void trackEvent('social_profile_friend_request_failed', {
+                        reason: msg.slice(0, 80),
+                        sourceTab: socialSubTab,
+                      });
                     } finally {
                       setActionBusy(false);
                     }
                   }}
                 >
                   <Text style={styles.btnText}>
-                    {actionBusy ? 'Sending...'
-                      : relationship === 'self' ? 'You'
-                      : relationship === 'friends' ? 'Friends'
-                      : relationship === 'outgoing' ? 'Request Sent'
-                      : relationship === 'incoming' ? 'Incoming Request'
-                      : 'Add Friend'}
+                    {actionBusy
+                      ? 'Sending...'
+                      : relationship === 'self'
+                        ? 'You'
+                        : relationship === 'friends'
+                          ? 'Friends'
+                          : relationship === 'outgoing'
+                            ? 'Request Sent'
+                            : relationship === 'incoming'
+                              ? 'Incoming Request'
+                              : 'Add Friend'}
                   </Text>
                 </Pressable>
 
                 <Pressable
                   style={[
                     styles.btn,
-                    (!canInviteToGuild || actionBusy || !profile || profile.uid === meUid || !!profile.guildName) && styles.btnDisabled,
+                    (!canInviteToGuild || actionBusy || !profile || profile.uid === meUid || !!profile.guildName) &&
+                      styles.btnDisabled,
                   ]}
                   disabled={!canInviteToGuild || actionBusy || !profile || profile.uid === meUid || !!profile.guildName}
                   onPress={async () => {
@@ -207,11 +250,15 @@ export function ProfileModal({
                   }}
                 >
                   <Text style={styles.btnText}>
-                    {!canInviteToGuild ? 'Invite Locked'
-                      : actionBusy ? 'Inviting...'
-                      : profile?.uid === meUid ? 'You'
-                      : profile?.guildName ? 'Already in Guild'
-                      : 'Invite to Guild'}
+                    {!canInviteToGuild
+                      ? 'Invite Locked'
+                      : actionBusy
+                        ? 'Inviting...'
+                        : profile?.uid === meUid
+                          ? 'You'
+                          : profile?.guildName
+                            ? 'Already in Guild'
+                            : 'Invite to Guild'}
                   </Text>
                 </Pressable>
               </View>

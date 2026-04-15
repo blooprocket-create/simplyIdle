@@ -7,6 +7,7 @@ import {
   orderBy,
   query,
   runTransaction,
+  updateDoc,
   where,
 } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseFirestore, isFirebaseConfigured } from './firebase';
@@ -137,6 +138,18 @@ export async function submitLeaderboardScore(input: SubmitLeaderboardScoreInput)
       submitGuardByUid.set(uid, current);
     }
   }
+
+  // Denormalize approximate rank (non-blocking, runs after transaction)
+  void (async () => {
+    try {
+      const higherScores = query(collection(db, LEADERBOARD_COLLECTION), where('score', '>', score));
+      const countSnap = await getCountFromServer(higherScores);
+      const approxRank = countSnap.data().count + 1;
+      await updateDoc(ref, { approxRank });
+    } catch {
+      // Non-critical — rank will update on next submission cycle
+    }
+  })();
 }
 
 export async function fetchLeaderboardTop(maxRows = 25): Promise<LeaderboardEntry[]> {

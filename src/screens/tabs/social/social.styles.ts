@@ -122,7 +122,7 @@ export const socialStyles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 99,
-    backgroundColor: '#FF5A7A',
+    backgroundColor: THEME.status.error,
   },
   subTabText: {
     color: '#AFC3D6',
@@ -191,7 +191,7 @@ export const socialStyles = StyleSheet.create({
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF5A7A',
+    backgroundColor: THEME.status.error,
     borderWidth: 1,
     borderColor: '#FFD2DC',
     paddingHorizontal: 4,
@@ -346,7 +346,7 @@ export const socialStyles = StyleSheet.create({
     marginTop: 3,
   },
   mutedText: {
-    color: '#F9D66D',
+    color: THEME.status.warning,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -490,7 +490,7 @@ export const socialStyles = StyleSheet.create({
     fontSize: 12,
   },
   errorText: {
-    color: '#FF8694',
+    color: THEME.status.error,
     fontSize: 12,
   },
 
@@ -565,10 +565,10 @@ export const socialStyles = StyleSheet.create({
     borderRadius: 999,
   },
   statusDotReady: {
-    backgroundColor: '#67E6B6',
+    backgroundColor: THEME.status.success,
   },
   statusDotCooldown: {
-    backgroundColor: '#F9D66D',
+    backgroundColor: THEME.status.warning,
   },
   statusText: {
     color: '#C6E2F5',
@@ -728,16 +728,16 @@ export const socialStyles = StyleSheet.create({
     fontWeight: '800',
   },
   confirmTitleDanger: {
-    color: '#FF5555',
+    color: THEME.status.error,
     fontSize: 17,
     fontWeight: '800',
   },
   confirmText: {
-    color: '#C8DAEA',
+    color: THEME.text.secondary,
     fontSize: 14,
   },
   confirmWarning: {
-    color: '#FFB347',
+    color: THEME.status.warning,
     fontSize: 12,
   },
   confirmButtonRow: {

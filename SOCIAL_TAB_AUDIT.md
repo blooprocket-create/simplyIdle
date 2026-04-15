@@ -653,7 +653,7 @@ The `socialFeatureFlags.ts` uses `Proxy` which is **not supported in IE 11** and
 | 4.1 | Fix shadow rendering cross-platform | `social.styles.ts` | 1 hr |
 | 5.3 | Friends list `Promise.allSettled` | `friends.ts` | 15 min |
 
-### Sprint 3 — Medium Priority (Post-Beta)
+### Sprint 3 — Medium Priority (Post-Beta) ✅ COMPLETED
 
 | # | Issue | Files | Effort |
 |---|-------|-------|--------|
@@ -664,7 +664,7 @@ The `socialFeatureFlags.ts` uses `Proxy` which is **not supported in IE 11** and
 | 6.1 | Denormalize leaderboard rank | `publicProfile.ts`, `leaderboard.ts` | 2 hr |
 | 6.2 | Activity feed listener consolidation | `activityFeed.ts` | 3 hr |
 
-### Sprint 4 — Polish (Pre-Launch)
+### Sprint 4 — Polish (Pre-Launch) ✅ COMPLETED
 
 | # | Issue | Files | Effort |
 |---|-------|-------|--------|

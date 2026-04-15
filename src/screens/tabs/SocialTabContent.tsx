@@ -115,6 +115,16 @@ function SocialTabRouter({
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const sectionAnim = useRef(new Animated.Value(1)).current;
 
+  // Escape key dismiss for user menu modal on web
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !activeUserMenu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setActiveUserMenu(null);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [activeUserMenu]);
+
   // Notify parent of pending request count changes
   useEffect(() => {
     onPendingRequestsCountChange?.(friends.pendingRequests.length);

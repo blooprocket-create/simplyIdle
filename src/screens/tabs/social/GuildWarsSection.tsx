@@ -266,7 +266,7 @@ export function GuildWarsSection() {
         ))}
       </View>
 
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {error && <Text style={styles.errorText}>⚠️ {error}</Text>}
 
       {/* ─── OVERVIEW ──────────────────────────────────────────────────── */}
       {subView === 'overview' && (

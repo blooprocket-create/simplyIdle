@@ -1,4 +1,4 @@
-import { collection, doc, getCountFromServer, getDoc, query, runTransaction, where } from 'firebase/firestore';
+import { collection, doc, getDoc, query, runTransaction } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseFirestore } from './firebase';
 
 const PUBLIC_USERNAMES_COLLECTION = 'publicUsernames';
@@ -52,22 +52,17 @@ export async function fetchPublicPlayerProfile(uid: string): Promise<PublicPlaye
   const boardData = boardSnap && boardSnap.exists() ? boardSnap.data() : {};
   const guildData = guildSnap && guildSnap.exists() ? guildSnap.data() : {};
 
-  const publicUsername = typeof profileData.publicUsername === 'string'
-    ? profileData.publicUsername
-    : typeof boardData.publicUsername === 'string'
-      ? boardData.publicUsername
-      : 'Player';
+  const publicUsername =
+    typeof profileData.publicUsername === 'string'
+      ? profileData.publicUsername
+      : typeof boardData.publicUsername === 'string'
+        ? boardData.publicUsername
+        : 'Player';
 
   const score = typeof boardData.score === 'number' ? Math.max(0, Math.floor(boardData.score)) : 0;
 
-  let leaderboardRank: number | null = null;
-  try {
-    const higherScores = query(collection(db, LEADERBOARD_COLLECTION), where('score', '>', score));
-    const rankCountSnap = await getCountFromServer(higherScores);
-    leaderboardRank = rankCountSnap.data().count + 1;
-  } catch {
-    leaderboardRank = null;
-  }
+  const leaderboardRank =
+    typeof boardData.approxRank === 'number' && boardData.approxRank > 0 ? boardData.approxRank : null;
 
   let guildContribution = 0;
   try {
@@ -76,9 +71,8 @@ export async function fetchPublicPlayerProfile(uid: string): Promise<PublicPlaye
       const memberSnap = await getDoc(doc(db, 'guilds', guildId, 'members', uid));
       if (memberSnap.exists()) {
         const memberData = memberSnap.data();
-        guildContribution = typeof memberData.guildContribution === 'number'
-          ? Math.max(0, Math.floor(memberData.guildContribution))
-          : 0;
+        guildContribution =
+          typeof memberData.guildContribution === 'number' ? Math.max(0, Math.floor(memberData.guildContribution)) : 0;
       }
     }
   } catch {
@@ -92,9 +86,8 @@ export async function fetchPublicPlayerProfile(uid: string): Promise<PublicPlaye
     level: typeof boardData.level === 'number' ? Math.max(1, Math.floor(boardData.level)) : 1,
     vipLevel: typeof boardData.vipLevel === 'number' ? Math.max(0, Math.floor(boardData.vipLevel)) : 0,
     score,
-    highestWaveReached: typeof boardData.highestWaveReached === 'number'
-      ? Math.max(0, Math.floor(boardData.highestWaveReached))
-      : 0,
+    highestWaveReached:
+      typeof boardData.highestWaveReached === 'number' ? Math.max(0, Math.floor(boardData.highestWaveReached)) : 0,
     prestigeCount: typeof boardData.prestigeCount === 'number' ? Math.max(0, Math.floor(boardData.prestigeCount)) : 0,
     guildName: typeof guildData.guildName === 'string' ? guildData.guildName : null,
     guildRank: typeof guildData.rank === 'string' ? guildData.rank : null,
