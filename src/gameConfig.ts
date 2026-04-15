@@ -3259,25 +3259,13 @@ export function rarityConfig(rarity: Rarity): RarityConfig {
 
 // ── Combat / Economy ───────────────────────────────────────────────────────
 
-export type PartyId = 'squire' | 'archer' | 'mage' | 'cleric' | 'paladin' | 'assassin' | 'dragonrider';
-
-export interface PartyConfig {
-  id: PartyId;
-  name: string;
-  emoji: string;
-  description: string;
-  baseCost: number;
-  baseDps: number;
-}
-
 export interface SkillConfig {
   id: string;
   name: string;
   description: string;
   cost: number;
-  targetId: PartyId | 'click';
+  targetId: 'click';
   multiplier: number;
-  requiresCount?: number;
 }
 
 export interface MonsterConfig {
@@ -3418,51 +3406,6 @@ export function expForLevel(level: number): number {
   return Math.floor(80 * Math.pow(1.22, level - 1));
 }
 
-export const PARTY: PartyConfig[] = [
-  { id: 'squire', name: 'Squire', emoji: '⚔️', description: 'A loyal beginner warrior.', baseCost: 70, baseDps: 2 },
-  { id: 'archer', name: 'Archer Squad', emoji: '🏹', description: 'Rain arrows from afar.', baseCost: 420, baseDps: 9 },
-  {
-    id: 'mage',
-    name: 'Mage Circle',
-    emoji: '🔮',
-    description: 'Arcane artillery battery.',
-    baseCost: 3_200,
-    baseDps: 48,
-  },
-  {
-    id: 'cleric',
-    name: 'Cleric Order',
-    emoji: '🙏',
-    description: 'Holy pressure and support.',
-    baseCost: 24_000,
-    baseDps: 240,
-  },
-  {
-    id: 'paladin',
-    name: 'Paladin Guard',
-    emoji: '🛡️',
-    description: 'Elite divine frontline.',
-    baseCost: 230_000,
-    baseDps: 1_100,
-  },
-  {
-    id: 'assassin',
-    name: 'Assassin Cell',
-    emoji: '🗡️',
-    description: 'Silent burst specialists.',
-    baseCost: 2_400_000,
-    baseDps: 7_200,
-  },
-  {
-    id: 'dragonrider',
-    name: 'Dragon Riders',
-    emoji: '🐉',
-    description: 'Skyborne annihilation.',
-    baseCost: 34_000_000,
-    baseDps: 55_000,
-  },
-];
-
 export const SKILLS: SkillConfig[] = [
   {
     id: 'click_1',
@@ -3487,69 +3430,6 @@ export const SKILLS: SkillConfig[] = [
     cost: 250_000,
     targetId: 'click',
     multiplier: 5,
-  },
-  {
-    id: 'squire_1',
-    name: 'Squire Bootcamp',
-    description: 'Squires ×2',
-    cost: 1_200,
-    targetId: 'squire',
-    multiplier: 2,
-    requiresCount: 10,
-  },
-  {
-    id: 'archer_1',
-    name: 'Volley Doctrine',
-    description: 'Archer Squad ×2',
-    cost: 8_000,
-    targetId: 'archer',
-    multiplier: 2,
-    requiresCount: 10,
-  },
-  {
-    id: 'mage_1',
-    name: 'Rune Matrix',
-    description: 'Mage Circle ×2',
-    cost: 80_000,
-    targetId: 'mage',
-    multiplier: 2,
-    requiresCount: 10,
-  },
-  {
-    id: 'cleric_1',
-    name: 'Sanctified Chorus',
-    description: 'Cleric Order ×2',
-    cost: 650_000,
-    targetId: 'cleric',
-    multiplier: 2,
-    requiresCount: 10,
-  },
-  {
-    id: 'paladin_1',
-    name: 'Vow of Steel',
-    description: 'Paladin Guard ×2',
-    cost: 6_500_000,
-    targetId: 'paladin',
-    multiplier: 2,
-    requiresCount: 10,
-  },
-  {
-    id: 'assassin_1',
-    name: 'Night Protocol',
-    description: 'Assassin Cell ×2',
-    cost: 65_000_000,
-    targetId: 'assassin',
-    multiplier: 2,
-    requiresCount: 10,
-  },
-  {
-    id: 'dragon_1',
-    name: 'Sky Dominion',
-    description: 'Dragon Riders ×2',
-    cost: 800_000_000,
-    targetId: 'dragonrider',
-    multiplier: 2,
-    requiresCount: 10,
   },
 ];
 

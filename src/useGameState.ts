@@ -1,12 +1,9 @@
 import { useEffect, useRef, useCallback, useReducer, useState } from 'react';
 import {
-  PARTY,
   SKILLS,
   ACHIEVEMENTS,
-  COST_SCALE,
   REBIRTH_BONUS,
   getRebirthWaveRequirement,
-  PartyId,
   PlayerClass,
   StatKey,
   StatBlock,
@@ -74,7 +71,7 @@ import {
   VIP_SUMMON_DISCOUNT_LEVEL,
   VIP_SUMMON_DISCOUNT,
 } from './gameConfig';
-import { buildingCost, bulkCost, safeDivide, roundTo4, safeMultiplier, fmt } from './utils';
+import { safeDivide, roundTo4, safeMultiplier, fmt } from './utils';
 import { debugLog, trackEvent, trackGameplayAction } from './telemetry';
 import { isOnlineSaveAvailable, loadOnlineSave, writeOnlineSave } from './services/onlineSave';
 import { claimCloudMail, fetchCloudMail } from './services/cloudMail';
@@ -404,7 +401,6 @@ export interface GameState {
   teamHp: number;
   teamMaxHp: number;
 
-  party: Record<PartyId, number>;
   skills: Set<string>;
 
   heroRoster: HeroUnit[];
@@ -531,9 +527,6 @@ export interface GameState {
   giftPreference: 'gold' | 'shards' | 'essence';
 }
 
-const initialParty = (): Record<PartyId, number> =>
-  Object.fromEntries(PARTY.map(p => [p.id, 0])) as Record<PartyId, number>;
-
 const blankStats: StatBlock = {
   strength: 0,
   vitality: 0,
@@ -593,7 +586,6 @@ export const DEFAULT_STATE: GameState = {
   teamHp: 100,
   teamMaxHp: 100,
 
-  party: initialParty(),
   skills: new Set(),
 
   heroRoster: [],
@@ -2682,13 +2674,6 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
   const teamMaxHp = Math.max(100, clampInt(payload.teamHp, 1, SAFE_INTEGER_CAP, 100));
   const teamHp = clampFloat(payload.teamHp, 0, teamMaxHp, teamMaxHp);
 
-  const party = initialParty();
-  if (isRecord(payload.party)) {
-    for (const partyId of Object.keys(party) as PartyId[]) {
-      party[partyId] = clampInt(payload.party[partyId], 0, SAFE_INTEGER_CAP, 0);
-    }
-  }
-
   const skills = sanitizeStringList(payload.skills, VALID_SKILL_IDS.size).filter(skillId =>
     VALID_SKILL_IDS.has(skillId),
   );
@@ -3020,7 +3005,6 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     monsterMaxHp: maxMonsterHp,
     teamHp,
     teamMaxHp,
-    party,
     skills,
     heroRoster,
     activeTeamHeroIds,
@@ -4042,7 +4026,6 @@ type Action =
   | { type: 'CREATE_CHARACTER'; name: string; playerClass: PlayerClass }
   | { type: 'TICK'; elapsed: number }
   | { type: 'ATTACK' }
-  | { type: 'BUY_PARTY'; id: PartyId; amount: number }
   | { type: 'BUY_SKILL'; id: string }
   | { type: 'ALLOCATE_STAT'; stat: StatKey }
   | { type: 'ALLOCATE_STAT_MAX'; stat: StatKey }
@@ -4141,7 +4124,6 @@ function reducer(state: GameState, action: Action): GameState {
     const result = progressionReducer(state, action as ProgressionAction, {
       normalizeTeamSelection: normalizeTeamSelectionByRules,
       getTeamMaxHp,
-      initialParty,
       withAchievement,
     });
     if (result) return result;
@@ -4372,7 +4354,6 @@ function reducer(state: GameState, action: Action): GameState {
           teamHp: p.teamHp,
           teamMaxHp: p.teamMaxHp,
 
-          party: p.party,
           skills: new Set(p.skills),
 
           heroRoster: p.heroRoster,
@@ -4518,7 +4499,6 @@ export interface SaveData {
   monsterHp: number;
   teamHp: number;
 
-  party: Record<string, number>;
   skills: string[];
 
   heroRoster: HeroUnit[];
@@ -4656,7 +4636,6 @@ export function serialize(state: GameState): SaveData {
     monsterHp: state.monsterHp,
     teamHp: state.teamHp,
 
-    party: state.party,
     skills: Array.from(state.skills),
 
     heroRoster: state.heroRoster,
@@ -5155,9 +5134,6 @@ export function useGameState(saveSlot: string = 'default') {
   }, []);
 
   const attack = useCallback(() => dispatch({ type: 'ATTACK' }), []);
-  const buyParty = useCallback((id: PartyId, amount: number) => {
-    dispatch({ type: 'BUY_PARTY', id, amount });
-  }, []);
   const buySkill = useCallback((id: string) => dispatch({ type: 'BUY_SKILL', id }), []);
   const allocateStat = useCallback((stat: StatKey) => dispatch({ type: 'ALLOCATE_STAT', stat }), []);
   const allocateStatMax = useCallback((stat: StatKey) => dispatch({ type: 'ALLOCATE_STAT_MAX', stat }), []);
@@ -5324,17 +5300,6 @@ export function useGameState(saveSlot: string = 'default') {
   const clearAchievement = useCallback(() => dispatch({ type: 'CLEAR_ACHIEVEMENT' }), []);
   const clearRewardPopup = useCallback(() => dispatch({ type: 'CLEAR_REWARD_POPUP' }), []);
 
-  const getPartyCost = useCallback(
-    (id: PartyId, amount: number) => {
-      const cfg = PARTY.find(p => p.id === id)!;
-      const owned = state.party[id] ?? 0;
-      return amount === 1
-        ? buildingCost(cfg.baseCost, owned, COST_SCALE)
-        : bulkCost(cfg.baseCost, owned, amount, COST_SCALE);
-    },
-    [state.party],
-  );
-
   const getEssenceCost = useCallback(
     (path: 'damage' | 'economy' | 'survival') => {
       const currentLevel =
@@ -5461,7 +5426,6 @@ export function useGameState(saveSlot: string = 'default') {
     stats,
     createCharacter,
     attack,
-    buyParty,
     buySkill,
     allocateStat,
     allocateStatMax,
@@ -5535,7 +5499,6 @@ export function useGameState(saveSlot: string = 'default') {
     rebirth,
     clearAchievement,
     clearRewardPopup,
-    getPartyCost,
     getEssenceCost,
     getRebirthCoreCost,
     getShardForgeCosts,

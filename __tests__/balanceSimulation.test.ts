@@ -5,10 +5,7 @@ import {
   expForLevel,
   getRebirthWaveRequirement,
   REBIRTH_BONUS,
-  PARTY,
-  COST_SCALE,
 } from '../src/gameConfig';
-import { buildingCost, bulkCost } from '../src/utils';
 
 /**
  * Balance simulation tests — validates progression pacing,
@@ -18,22 +15,21 @@ import { buildingCost, bulkCost } from '../src/utils';
 // ── Progression Pacing ────────────────────────────────────────────────────
 
 describe('Progression pacing', () => {
-  it('gold income outpaces first building cost within 10 waves', () => {
+  it('gold income from first 10 waves is meaningful', () => {
     let totalGold = 0;
     for (let w = 1; w <= 10; w++) {
       totalGold += getMonsterGold(w);
     }
-    const firstBuildingCost = buildingCost(PARTY[0].baseCost, 0, COST_SCALE);
-    expect(totalGold).toBeGreaterThan(firstBuildingCost);
+    // First 10 waves should yield enough gold to feel rewarding
+    expect(totalGold).toBeGreaterThan(100);
   });
 
-  it('gold income allows second building within 20 waves', () => {
-    let totalGold = 0;
-    for (let w = 1; w <= 20; w++) {
-      totalGold += getMonsterGold(w);
-    }
-    const secondBuildingCost = buildingCost(PARTY[1].baseCost, 0, COST_SCALE);
-    expect(totalGold).toBeGreaterThan(secondBuildingCost);
+  it('gold income grows steadily over 20 waves', () => {
+    let firstHalf = 0;
+    let secondHalf = 0;
+    for (let w = 1; w <= 10; w++) firstHalf += getMonsterGold(w);
+    for (let w = 11; w <= 20; w++) secondHalf += getMonsterGold(w);
+    expect(secondHalf).toBeGreaterThan(firstHalf);
   });
 
   it('exp from wave 1-10 is enough to reach at least level 2', () => {
@@ -77,7 +73,7 @@ describe('Gold curve', () => {
   });
 });
 
-// ── DPS Curve ─────────────────────────────────────────────────────────────
+// ── Monster HP Curve ──────────────────────────────────────────────────────
 
 describe('DPS vs HP parity', () => {
   it('monster HP growth rate 1.14x is consistent', () => {
@@ -85,32 +81,6 @@ describe('DPS vs HP parity', () => {
     const hp2 = getMonsterMaxHp(2);
     const ratio = hp2 / hp1;
     expect(ratio).toBeCloseTo(1.14, 1);
-  });
-
-  it('building DPS scales relative to cost (diminishing returns)', () => {
-    // Each successive building should offer incrementally less DPS per gold
-    const efficiency: number[] = [];
-    for (const building of PARTY) {
-      const cost = buildingCost(building.baseCost, 0, COST_SCALE);
-      efficiency.push(building.baseDps / cost);
-    }
-    // First building should be most efficient (best DPS/gold)
-    expect(efficiency[0]).toBeGreaterThan(efficiency[efficiency.length - 1]);
-  });
-
-  it('bulk building cost closely matches sum of individual costs', () => {
-    const baseCost = 100;
-    const owned = 5;
-    const scale = COST_SCALE;
-    const count = 10;
-
-    const bulk = bulkCost(baseCost, owned, count, scale);
-    let sum = 0;
-    for (let i = 0; i < count; i++) {
-      sum += buildingCost(baseCost, owned + i, scale);
-    }
-    // Geometric formula vs iteration can differ by floor rounding
-    expect(Math.abs(bulk - sum)).toBeLessThanOrEqual(count);
   });
 });
 
@@ -164,15 +134,6 @@ describe('Economy simulation', () => {
     // But not astronomically broken
     expect(totalGold).toBeLessThan(1e12);
     expect(totalExp).toBeLessThan(1e10);
-  });
-
-  it('building investment curve: buying 10 squires is affordable from wave 1-20 gold', () => {
-    let goldBudget = 0;
-    for (let w = 1; w <= 20; w++) {
-      goldBudget += getMonsterGold(w);
-    }
-    const cost10Squires = bulkCost(PARTY[0].baseCost, 0, 10, COST_SCALE);
-    expect(goldBudget).toBeGreaterThan(cost10Squires);
   });
 
   it('exp curve: level 10 is reachable from waves 1-50', () => {

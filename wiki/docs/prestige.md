@@ -49,7 +49,6 @@ Each prestige grants a flat **×1.5 multiplier** to your overall power. This sta
 
 - Current wave progress → back to wave 1
 - Gold → reset to starting amount
-- Party unit levels → reset
 - Hero EXP → reset
 
 ## What Persists

@@ -7,10 +7,7 @@
 
 import type { GameState, RewardPopup, EquipmentInstance, MailAttachments } from '../useGameState';
 import {
-  PARTY,
   SKILLS,
-  COST_SCALE,
-  type PartyId,
   type PlayerClass,
   type StatBlock,
   type EquipmentSlot,
@@ -28,7 +25,6 @@ import {
   getWeeklyEventByWeek,
   getEquipmentItem,
 } from '../gameConfig';
-import { buildingCost, bulkCost } from '../utils';
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -42,7 +38,6 @@ type ExpeditionRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'godly';
 type FacilityId = 'training' | 'treasury' | 'forge' | 'tactics';
 
 export type EconomyAction =
-  | { type: 'BUY_PARTY'; id: PartyId; amount: number }
   | { type: 'BUY_SKILL'; id: string }
   | { type: 'USE_USABLE_ITEM'; itemId: string; amount: number | 'all' }
   | { type: 'DISMANTLE_EQUIPMENT'; itemId: string }
@@ -63,7 +58,6 @@ export type EconomyAction =
   | { type: 'BUY_PREMIUM_COOLANT'; itemId: string; amount: number };
 
 export const ECONOMY_ACTION_TYPES = new Set<string>([
-  'BUY_PARTY',
   'BUY_SKILL',
   'USE_USABLE_ITEM',
   'DISMANTLE_EQUIPMENT',
@@ -401,19 +395,6 @@ const EQUIPMENT_RARITY_RANK: Record<string, number> = {
  */
 export function economyReducer(state: GameState, action: EconomyAction, ctx: EconomyContext): GameState | null {
   switch (action.type) {
-    case 'BUY_PARTY': {
-      const cfg = PARTY.find(p => p.id === action.id);
-      if (!cfg) return state;
-      const owned = state.party[action.id] ?? 0;
-      const cost =
-        action.amount === 1
-          ? buildingCost(cfg.baseCost, owned, COST_SCALE)
-          : bulkCost(cfg.baseCost, owned, action.amount, COST_SCALE);
-      if (state.gold < cost) return state;
-      const party = { ...state.party, [action.id]: owned + action.amount };
-      return { ...state, gold: state.gold - cost, party };
-    }
-
     case 'BUY_SKILL': {
       const skill = SKILLS.find(s => s.id === action.id);
       if (!skill || state.skills.has(skill.id) || state.gold < skill.cost) return state;

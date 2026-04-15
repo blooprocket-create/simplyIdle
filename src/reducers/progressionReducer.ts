@@ -66,8 +66,6 @@ export interface ProgressionContext {
   normalizeTeamSelection: (state: GameState, heroIds: string[]) => string[];
   /** Get team max HP for a given state */
   getTeamMaxHp: (state: GameState) => number;
-  /** Initial party record */
-  initialParty: () => Record<string, number>;
   /** Achievement check side-effect */
   withAchievement: (state: GameState) => GameState;
 }
@@ -191,38 +189,48 @@ export function progressionReducer(
     }
 
     case 'SPEND_ESSENCE_UPGRADE': {
-      const currentLevel = action.path === 'damage'
-        ? state.metaDamageLevel
-        : action.path === 'economy'
-          ? state.metaEconomyLevel
-          : state.metaSurvivalLevel;
+      const currentLevel =
+        action.path === 'damage'
+          ? state.metaDamageLevel
+          : action.path === 'economy'
+            ? state.metaEconomyLevel
+            : state.metaSurvivalLevel;
       const cost = getEssenceUpgradeCost(currentLevel);
       if (state.essence < cost) return state;
 
       const base = { ...state, essence: state.essence - cost };
 
       if (action.path === 'damage') {
-        return queueReward({ ...base, metaDamageLevel: state.metaDamageLevel + 1 }, {
-          id: `meta_damage_${Date.now()}`,
-          kind: 'system',
-          title: 'Meta Upgrade: Damage Path',
-          detail: `Level ${state.metaDamageLevel + 1}`,
-        });
+        return queueReward(
+          { ...base, metaDamageLevel: state.metaDamageLevel + 1 },
+          {
+            id: `meta_damage_${Date.now()}`,
+            kind: 'system',
+            title: 'Meta Upgrade: Damage Path',
+            detail: `Level ${state.metaDamageLevel + 1}`,
+          },
+        );
       }
       if (action.path === 'economy') {
-        return queueReward({ ...base, metaEconomyLevel: state.metaEconomyLevel + 1 }, {
-          id: `meta_econ_${Date.now()}`,
-          kind: 'system',
-          title: 'Meta Upgrade: Economy Path',
-          detail: `Level ${state.metaEconomyLevel + 1}`,
-        });
+        return queueReward(
+          { ...base, metaEconomyLevel: state.metaEconomyLevel + 1 },
+          {
+            id: `meta_econ_${Date.now()}`,
+            kind: 'system',
+            title: 'Meta Upgrade: Economy Path',
+            detail: `Level ${state.metaEconomyLevel + 1}`,
+          },
+        );
       }
-      return queueReward({ ...base, metaSurvivalLevel: state.metaSurvivalLevel + 1 }, {
-        id: `meta_survival_${Date.now()}`,
-        kind: 'system',
-        title: 'Meta Upgrade: Survival Path',
-        detail: `Level ${state.metaSurvivalLevel + 1}`,
-      });
+      return queueReward(
+        { ...base, metaSurvivalLevel: state.metaSurvivalLevel + 1 },
+        {
+          id: `meta_survival_${Date.now()}`,
+          kind: 'system',
+          title: 'Meta Upgrade: Survival Path',
+          detail: `Level ${state.metaSurvivalLevel + 1}`,
+        },
+      );
     }
 
     case 'APPLY_WEEKLY_ROLLOVER': {
@@ -230,18 +238,21 @@ export function progressionReducer(
       const week = weekNumberForTimestamp(action.nowMs);
       if (week === state.weeklyEventWeek) return state;
       const event = getWeeklyEventByWeek(week);
-      return queueReward({
-        ...state,
-        weeklyEventWeek: week,
-        weeklyEventId: event.id,
-        weeklyKills: 0,
-        weeklyTrackClaimed: [],
-      }, {
-        id: `weekly_rollover_${week}`,
-        kind: 'system',
-        title: `Weekly Event: ${event.name}`,
-        detail: event.description,
-      });
+      return queueReward(
+        {
+          ...state,
+          weeklyEventWeek: week,
+          weeklyEventId: event.id,
+          weeklyKills: 0,
+          weeklyTrackClaimed: [],
+        },
+        {
+          id: `weekly_rollover_${week}`,
+          kind: 'system',
+          title: `Weekly Event: ${event.name}`,
+          detail: event.description,
+        },
+      );
     }
 
     case 'CLAIM_WEEKLY_TRACK': {
@@ -253,19 +264,22 @@ export function progressionReducer(
       const shards = 18 + Math.floor(action.milestone * 1.8);
       const essence = action.milestone >= 150 ? 4 : action.milestone >= 75 ? 2 : 1;
 
-      return queueReward({
-        ...state,
-        weeklyTrackClaimed: [...state.weeklyTrackClaimed, action.milestone],
-        gold: state.gold + gold,
-        totalGold: state.totalGold + gold,
-        heroShards: state.heroShards + shards,
-        essence: state.essence + essence,
-      }, {
-        id: `weekly_track_${action.milestone}_${Date.now()}`,
-        kind: 'system',
-        title: 'Weekly Track Claimed',
-        detail: `+${gold} gold, +${shards} shards, +${essence} essence`,
-      });
+      return queueReward(
+        {
+          ...state,
+          weeklyTrackClaimed: [...state.weeklyTrackClaimed, action.milestone],
+          gold: state.gold + gold,
+          totalGold: state.totalGold + gold,
+          heroShards: state.heroShards + shards,
+          essence: state.essence + essence,
+        },
+        {
+          id: `weekly_track_${action.milestone}_${Date.now()}`,
+          kind: 'system',
+          title: 'Weekly Track Claimed',
+          detail: `+${gold} gold, +${shards} shards, +${essence} essence`,
+        },
+      );
     }
 
     case 'CLAIM_MISSION': {
@@ -279,20 +293,23 @@ export function progressionReducer(
       const rewardShards = mission.rewardShards ?? 0;
       const rewardEssence = mission.rewardEssence ?? 0;
       const rewardDiamonds = mission.rewardDiamonds ?? 0;
-      return queueReward({
-        ...state,
-        claimedMissionIds: [...state.claimedMissionIds, mission.id],
-        gold: state.gold + rewardGold,
-        totalGold: state.totalGold + rewardGold,
-        diamonds: state.diamonds + rewardDiamonds,
-        heroShards: state.heroShards + rewardShards,
-        essence: state.essence + rewardEssence,
-      }, {
-        id: `mission_${mission.id}_${Date.now()}`,
-        kind: 'system',
-        title: `Mission Complete: ${mission.title}`,
-        detail: `+${rewardGold} gold, +${rewardShards} shards, +${rewardEssence} essence${rewardDiamonds > 0 ? `, +${rewardDiamonds} diamonds` : ''}`,
-      });
+      return queueReward(
+        {
+          ...state,
+          claimedMissionIds: [...state.claimedMissionIds, mission.id],
+          gold: state.gold + rewardGold,
+          totalGold: state.totalGold + rewardGold,
+          diamonds: state.diamonds + rewardDiamonds,
+          heroShards: state.heroShards + rewardShards,
+          essence: state.essence + rewardEssence,
+        },
+        {
+          id: `mission_${mission.id}_${Date.now()}`,
+          kind: 'system',
+          title: `Mission Complete: ${mission.title}`,
+          detail: `+${rewardGold} gold, +${rewardShards} shards, +${rewardEssence} essence${rewardDiamonds > 0 ? `, +${rewardDiamonds} diamonds` : ''}`,
+        },
+      );
     }
 
     case 'APPLY_DAILY_LOGIN': {
@@ -302,7 +319,7 @@ export function progressionReducer(
 
       const daysSinceLast = state.lastDailyLoginDay === null ? null : today - state.lastDailyLoginDay;
       const usedInsurance = daysSinceLast === 2 && state.streakInsuranceCharges > 0;
-      const continued = (daysSinceLast === 1) || usedInsurance;
+      const continued = daysSinceLast === 1 || usedInsurance;
       const streak = continued ? state.dailyLoginStreak + 1 : 1;
       const goldReward = 250 + Math.min(9, streak - 1) * 80;
       const shardReward = 20 + Math.min(9, streak - 1) * 6;
@@ -310,21 +327,24 @@ export function progressionReducer(
       const insuranceEarned = streak % 7 === 0 ? 1 : 0;
       const nextInsurance = Math.min(3, state.streakInsuranceCharges - (usedInsurance ? 1 : 0) + insuranceEarned);
 
-      const next = queueReward({
-        ...state,
-        gold: state.gold + goldReward,
-        totalGold: state.totalGold + goldReward,
-        heroShards: state.heroShards + shardReward,
-        freeSummonCharges: state.freeSummonCharges + freeSummonBonus,
-        dailyLoginStreak: streak,
-        lastDailyLoginDay: today,
-        streakInsuranceCharges: nextInsurance,
-      }, {
-        id: `daily_login_${today}`,
-        kind: 'system',
-        title: `Daily Login • Day ${streak}`,
-        detail: `+${goldReward} gold, +${shardReward} shards${freeSummonBonus > 0 ? ', +1 free summon' : ''}${usedInsurance ? ', streak insurance consumed' : ''}${insuranceEarned > 0 ? ', +1 streak insurance' : ''}`,
-      });
+      const next = queueReward(
+        {
+          ...state,
+          gold: state.gold + goldReward,
+          totalGold: state.totalGold + goldReward,
+          heroShards: state.heroShards + shardReward,
+          freeSummonCharges: state.freeSummonCharges + freeSummonBonus,
+          dailyLoginStreak: streak,
+          lastDailyLoginDay: today,
+          streakInsuranceCharges: nextInsurance,
+        },
+        {
+          id: `daily_login_${today}`,
+          kind: 'system',
+          title: `Daily Login • Day ${streak}`,
+          detail: `+${goldReward} gold, +${shardReward} shards${freeSummonBonus > 0 ? ', +1 free summon' : ''}${usedInsurance ? ', streak insurance consumed' : ''}${insuranceEarned > 0 ? ', +1 streak insurance' : ''}`,
+        },
+      );
 
       return ctx.withAchievement(next);
     }
@@ -346,7 +366,6 @@ export function progressionReducer(
         wave: 1,
         monsterHp: getMonsterMaxHp(1),
         monsterMaxHp: getMonsterMaxHp(1),
-        party: ctx.initialParty(),
         activeTeamHeroIds: preservedActiveTeam,
         prestigeCount: state.prestigeCount + 1,
         newAchievement: null,
@@ -357,16 +376,19 @@ export function progressionReducer(
       };
       const nextTeamMaxHp = ctx.getTeamMaxHp(rebirthState);
 
-      return queueReward({
-        ...rebirthState,
-        teamMaxHp: nextTeamMaxHp,
-        teamHp: nextTeamMaxHp,
-      }, {
-        id: `rebirth_cores_${Date.now()}`,
-        kind: 'system',
-        title: 'Rebirth Complete',
-        detail: `+${gainedCores} rebirth cores • requirement was Wave ${rebirthRequirement} • surplus ${surplusWaves}`,
-      });
+      return queueReward(
+        {
+          ...rebirthState,
+          teamMaxHp: nextTeamMaxHp,
+          teamHp: nextTeamMaxHp,
+        },
+        {
+          id: `rebirth_cores_${Date.now()}`,
+          kind: 'system',
+          title: 'Rebirth Complete',
+          detail: `+${gainedCores} rebirth cores • requirement was Wave ${rebirthRequirement} • surplus ${surplusWaves}`,
+        },
+      );
     }
 
     case 'CLEAR_ACHIEVEMENT':
@@ -379,38 +401,48 @@ export function progressionReducer(
       };
 
     case 'SPEND_REBIRTH_CORE': {
-      const currentLevel = action.path === 'damage'
-        ? state.rebirthDamagePath
-        : action.path === 'economy'
-          ? state.rebirthEconomyPath
-          : state.rebirthSurvivalPath;
+      const currentLevel =
+        action.path === 'damage'
+          ? state.rebirthDamagePath
+          : action.path === 'economy'
+            ? state.rebirthEconomyPath
+            : state.rebirthSurvivalPath;
       const cost = getRebirthPathCost(currentLevel);
       if (state.rebirthCores < cost) return state;
 
       const base = { ...state, rebirthCores: state.rebirthCores - cost };
 
       if (action.path === 'damage') {
-        return queueReward({ ...base, rebirthDamagePath: state.rebirthDamagePath + 1 }, {
-          id: `rebirth_path_dmg_${Date.now()}`,
-          kind: 'system',
-          title: 'Rebirth Tree: Damage Path',
-          detail: `Level ${state.rebirthDamagePath + 1}`,
-        });
+        return queueReward(
+          { ...base, rebirthDamagePath: state.rebirthDamagePath + 1 },
+          {
+            id: `rebirth_path_dmg_${Date.now()}`,
+            kind: 'system',
+            title: 'Rebirth Tree: Damage Path',
+            detail: `Level ${state.rebirthDamagePath + 1}`,
+          },
+        );
       }
       if (action.path === 'economy') {
-        return queueReward({ ...base, rebirthEconomyPath: state.rebirthEconomyPath + 1 }, {
-          id: `rebirth_path_econ_${Date.now()}`,
-          kind: 'system',
-          title: 'Rebirth Tree: Economy Path',
-          detail: `Level ${state.rebirthEconomyPath + 1}`,
-        });
+        return queueReward(
+          { ...base, rebirthEconomyPath: state.rebirthEconomyPath + 1 },
+          {
+            id: `rebirth_path_econ_${Date.now()}`,
+            kind: 'system',
+            title: 'Rebirth Tree: Economy Path',
+            detail: `Level ${state.rebirthEconomyPath + 1}`,
+          },
+        );
       }
-      return queueReward({ ...base, rebirthSurvivalPath: state.rebirthSurvivalPath + 1 }, {
-        id: `rebirth_path_surv_${Date.now()}`,
-        kind: 'system',
-        title: 'Rebirth Tree: Survival Path',
-        detail: `Level ${state.rebirthSurvivalPath + 1}`,
-      });
+      return queueReward(
+        { ...base, rebirthSurvivalPath: state.rebirthSurvivalPath + 1 },
+        {
+          id: `rebirth_path_surv_${Date.now()}`,
+          kind: 'system',
+          title: 'Rebirth Tree: Survival Path',
+          detail: `Level ${state.rebirthSurvivalPath + 1}`,
+        },
+      );
     }
 
     case 'CLAIM_VIP_REWARD': {
@@ -421,20 +453,23 @@ export function progressionReducer(
       const reward = VIP_MILESTONE_REWARDS[action.level];
       if (!reward) return state;
 
-      return queueReward({
-        ...state,
-        vipRewardClaimedLevels: [...state.vipRewardClaimedLevels, action.level],
-        diamonds: state.diamonds + reward.diamonds,
-        gold: state.gold + reward.gold,
-        totalGold: state.totalGold + reward.gold,
-        heroShards: state.heroShards + reward.shards,
-        essence: state.essence + reward.essence,
-      }, {
-        id: `vip_reward_${action.level}_${Date.now()}`,
-        kind: 'system',
-        title: `VIP ${action.level} Reward Claimed`,
-        detail: `+${reward.diamonds} diamonds, +${reward.gold} gold, +${reward.shards} shards, +${reward.essence} essence`,
-      });
+      return queueReward(
+        {
+          ...state,
+          vipRewardClaimedLevels: [...state.vipRewardClaimedLevels, action.level],
+          diamonds: state.diamonds + reward.diamonds,
+          gold: state.gold + reward.gold,
+          totalGold: state.totalGold + reward.gold,
+          heroShards: state.heroShards + reward.shards,
+          essence: state.essence + reward.essence,
+        },
+        {
+          id: `vip_reward_${action.level}_${Date.now()}`,
+          kind: 'system',
+          title: `VIP ${action.level} Reward Claimed`,
+          detail: `+${reward.diamonds} diamonds, +${reward.gold} gold, +${reward.shards} shards, +${reward.essence} essence`,
+        },
+      );
     }
 
     case 'CLAIM_CODEX_HERO_VIP': {
@@ -448,17 +483,20 @@ export function progressionReducer(
       const nextLevel = getVipLevelFromPoints(nextPoints);
       const leveledUp = nextLevel > state.vipLevel;
 
-      let nextState = queueReward({
-        ...state,
-        codexVipClaimedHeroIds: [...state.codexVipClaimedHeroIds, action.heroId],
-        vipPoints: nextPoints,
-        vipLevel: nextLevel,
-      }, {
-        id: `codex_vip_${action.heroId}_${Date.now()}`,
-        kind: 'system',
-        title: 'Codex Insight Reward',
-        detail: `+${pointsGain} VIP points for recording hero lore`,
-      });
+      let nextState = queueReward(
+        {
+          ...state,
+          codexVipClaimedHeroIds: [...state.codexVipClaimedHeroIds, action.heroId],
+          vipPoints: nextPoints,
+          vipLevel: nextLevel,
+        },
+        {
+          id: `codex_vip_${action.heroId}_${Date.now()}`,
+          kind: 'system',
+          title: 'Codex Insight Reward',
+          detail: `+${pointsGain} VIP points for recording hero lore`,
+        },
+      );
 
       if (leveledUp) {
         nextState = queueReward(nextState, {
@@ -483,17 +521,20 @@ export function progressionReducer(
       const nextLevel = getVipLevelFromPoints(nextPoints);
       const leveledUp = nextLevel > state.vipLevel;
 
-      let nextState = queueReward({
-        ...state,
-        codexVipClaimedUniqueIds: [...state.codexVipClaimedUniqueIds, action.heroId],
-        vipPoints: nextPoints,
-        vipLevel: nextLevel,
-      }, {
-        id: `codex_unique_vip_${action.heroId}_${Date.now()}`,
-        kind: 'system',
-        title: 'Unique Gear Codex Reward',
-        detail: `+${pointsGain} VIP points for recording unique weapon data`,
-      });
+      let nextState = queueReward(
+        {
+          ...state,
+          codexVipClaimedUniqueIds: [...state.codexVipClaimedUniqueIds, action.heroId],
+          vipPoints: nextPoints,
+          vipLevel: nextLevel,
+        },
+        {
+          id: `codex_unique_vip_${action.heroId}_${Date.now()}`,
+          kind: 'system',
+          title: 'Unique Gear Codex Reward',
+          detail: `+${pointsGain} VIP points for recording unique weapon data`,
+        },
+      );
 
       if (leveledUp) {
         nextState = queueReward(nextState, {
