@@ -3,61 +3,104 @@ import { defineConfig } from 'vitepress';
 export default defineConfig({
   base: '/wiki/',
   title: 'SimplyIdle Wiki',
-  description: 'Player reference for systems, progression, and live features.',
+  description: 'Complete player reference for SimplyIdle — mechanics, heroes, gear, social, and strategy.',
   cleanUrls: false,
   lastUpdated: true,
+  head: [
+    ['link', { rel: 'icon', href: '/wiki/favicon.ico' }],
+  ],
   themeConfig: {
     search: {
-      provider: 'local'
+      provider: 'local',
     },
     nav: [
-      { text: 'Getting Started', link: '/getting-started' },
-      { text: 'Core', link: '/core-mechanics' },
-      { text: 'Heroes', link: '/heroes' },
-      { text: 'Hero DB', link: '/heroes-database' },
-      { text: 'Equipment', link: '/equipment' },
-      { text: 'Gear DB', link: '/equipment-database' },
-      { text: 'Social', link: '/social' },
-      { text: 'Seasons', link: '/seasons-leaderboard' },
+      { text: 'Home', link: '/' },
+      {
+        text: 'Systems',
+        items: [
+          { text: 'Core Mechanics', link: '/core-mechanics' },
+          { text: 'Heroes & Summoning', link: '/heroes' },
+          { text: 'Equipment & Gear', link: '/equipment' },
+          { text: 'Prestige & Rebirth', link: '/prestige' },
+        ],
+      },
+      {
+        text: 'Social',
+        items: [
+          { text: 'Social Overview', link: '/social' },
+          { text: 'Guilds', link: '/guilds' },
+          { text: 'Seasons & Leaderboard', link: '/seasons-leaderboard' },
+        ],
+      },
+      {
+        text: 'Reference',
+        items: [
+          { text: 'Hero Database', link: '/heroes-database' },
+          { text: 'Equipment Database', link: '/equipment-database' },
+          { text: 'VIP Program', link: '/vip' },
+        ],
+      },
       { text: 'Strategy', link: '/strategy' },
-      { text: 'Standards', link: '/contributing' },
-      { text: 'Ops', link: '/wiki-ops' }
     ],
     sidebar: [
       {
         text: 'Start Here',
         items: [
-          { text: 'Overview', link: '/' },
-          { text: 'Getting Started', link: '/getting-started' }
-        ]
+          { text: 'Home', link: '/' },
+          { text: 'Getting Started', link: '/getting-started' },
+        ],
       },
       {
-        text: 'Systems',
+        text: 'Core Systems',
+        collapsed: false,
         items: [
           { text: 'Core Mechanics', link: '/core-mechanics' },
-          { text: 'Heroes', link: '/heroes' },
-          { text: 'Hero Database', link: '/heroes-database' },
-          { text: 'Equipment', link: '/equipment' },
-          { text: 'Equipment Database', link: '/equipment-database' },
-          { text: 'Social Systems', link: '/social' },
-          { text: 'Seasons and Leaderboard', link: '/seasons-leaderboard' }
-        ]
+          { text: 'Heroes & Summoning', link: '/heroes' },
+          { text: 'Equipment & Gear', link: '/equipment' },
+          { text: 'Prestige & Rebirth', link: '/prestige' },
+          { text: 'VIP Program', link: '/vip' },
+        ],
       },
       {
-        text: 'Guides and Ops',
+        text: 'Reference Tables',
+        collapsed: false,
+        items: [
+          { text: 'Hero Database', link: '/heroes-database' },
+          { text: 'Equipment Database', link: '/equipment-database' },
+        ],
+      },
+      {
+        text: 'Social & Multiplayer',
+        collapsed: false,
+        items: [
+          { text: 'Social Overview', link: '/social' },
+          { text: 'Guilds', link: '/guilds' },
+          { text: 'Seasons & Leaderboard', link: '/seasons-leaderboard' },
+        ],
+      },
+      {
+        text: 'Guides & Meta',
+        collapsed: true,
         items: [
           { text: 'Strategy Guides', link: '/strategy' },
           { text: 'Known Issues', link: '/known-issues' },
           { text: 'Patch Notes', link: '/patch-notes' },
+        ],
+      },
+      {
+        text: 'Wiki Ops',
+        collapsed: true,
+        items: [
           { text: 'Wiki Standards', link: '/contributing' },
           { text: 'Wiki Ops', link: '/wiki-ops' },
-          { text: 'Page Template', link: '/page-template' }
-        ]
-      }
+          { text: 'Page Template', link: '/page-template' },
+        ],
+      },
     ],
     footer: {
-      message: 'SimplyIdle Wiki. Values marked Planned are not fully live.',
-      copyright: 'SimplyIdle'
-    }
-  }
+      message: 'SimplyIdle Wiki v2 — Values marked Planned are not fully live.',
+      copyright: '© SimplyIdle',
+    },
+    outline: { level: [2, 3] },
+  },
 });
