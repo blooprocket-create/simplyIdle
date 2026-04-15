@@ -2204,6 +2204,27 @@ export const TIER_GROWTH_MULT: Record<number, number> = {
   5: 2.0,
 };
 
+/** Min/max rarity a hero of a given tier can be assigned. */
+export const TIER_RARITY_RANGE: Record<number, { min: Rarity; max: Rarity }> = {
+  1: { min: 'common', max: 'legendary' },
+  2: { min: 'common', max: 'legendary' },
+  3: { min: 'rare', max: 'godly' },
+  4: { min: 'epic', max: 'transcendent' },
+  5: { min: 'epic', max: 'transcendent' },
+};
+
+/** Clamp a rarity to the allowed range for a hero tier. */
+export function clampRarityToTier(rarity: Rarity, tier: number): Rarity {
+  const range = TIER_RARITY_RANGE[tier];
+  if (!range) return rarity;
+  const idx = RARITIES.findIndex(r => r.id === rarity);
+  const minIdx = RARITIES.findIndex(r => r.id === range.min);
+  const maxIdx = RARITIES.findIndex(r => r.id === range.max);
+  if (idx < minIdx) return range.min;
+  if (idx > maxIdx) return range.max;
+  return rarity;
+}
+
 /** Deterministic ±15% stat variance per hero per stat key. Stable across sessions. */
 function heroStatVariance(heroId: string, statKey: string): number {
   let hash = 0;

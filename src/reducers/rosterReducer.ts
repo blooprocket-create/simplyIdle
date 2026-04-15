@@ -22,6 +22,7 @@ import {
   getHeroUniqueSkillDescription,
   getHeroUniqueWeaponName,
   pickHeroForRarity,
+  clampRarityToTier,
   SPARK_TOKEN_BY_RARITY,
   BANNER_RATE_UP_BY_RARITY,
   SUMMON_MILESTONES,
@@ -465,8 +466,8 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
         const postgameUnlocked = isPostgameSummonUnlocked(state);
 
         const roll = rollRarityWithPity(state.gachaPityCounter, postgameUnlocked, state.guaranteedMinRarity);
-        const rarity = roll.rarity;
-        const { template } = pickHeroWithBanner(rarity, undefined);
+        const { template } = pickHeroWithBanner(roll.rarity, undefined);
+        const rarity = clampRarityToTier(roll.rarity, template.tier);
         const rarityMult = rarityConfig(rarity).boostMultiplier;
         const uid = `${template.id}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
         const hero: HeroUnit = {
@@ -550,8 +551,8 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
       const postgameUnlocked = isPostgameSummonUnlocked(state);
 
       const roll = rollRarityWithPity(state.gachaPityCounter, postgameUnlocked, state.guaranteedMinRarity);
-      const rarity = roll.rarity;
-      const { template } = pickHeroWithBanner(rarity, undefined);
+      const { template } = pickHeroWithBanner(roll.rarity, undefined);
+      const rarity = clampRarityToTier(roll.rarity, template.tier);
       const rarityMult = rarityConfig(rarity).boostMultiplier;
       const uid = `${template.id}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
       const hero: HeroUnit = {
@@ -660,10 +661,10 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
         const roll = rollRarityWithPity(pityCounter, postgameUnlocked, guaranteedMin);
         pityCounter = roll.nextCounter;
         if (roll.pityTriggered) pityHits++;
-        const rarity = roll.rarity;
         // Consume guaranteed floor on first pull only
         if (guaranteedMin) guaranteedMin = null;
-        const { template } = pickHeroWithBanner(rarity, featuredHeroId);
+        const { template } = pickHeroWithBanner(roll.rarity, featuredHeroId);
+        const rarity = clampRarityToTier(roll.rarity, template.tier);
         const rarityMult = rarityConfig(rarity).boostMultiplier;
         const uid = `${template.id}_${Date.now()}_${i}_${Math.floor(Math.random() * 10000)}`;
         const summonedHero: HeroUnit = {
@@ -1151,7 +1152,7 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
       } else if (option.kind === 'targeted_hero' && option.minRarity) {
         const targetTemplate = action.targetHeroId ? (HERO_POOL.find(h => h.id === action.targetHeroId) ?? null) : null;
         const template = targetTemplate ?? pickHeroForRarity(option.minRarity);
-        const rarity = option.minRarity;
+        const rarity = clampRarityToTier(option.minRarity, template.tier);
         const rarityMult = rarityConfig(rarity).boostMultiplier;
         const uid = `${template.id}_${Date.now()}_spark_${Math.floor(Math.random() * 10000)}`;
         const hero: HeroUnit = {
