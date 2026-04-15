@@ -181,7 +181,9 @@ export function GuildSection({
   const [treasuryReasonInput, setTreasuryReasonInput] = useState('');
   const [treasuryLoading, setTreasuryLoading] = useState(false);
   const [walletGold, setWalletGold] = useState(0);
-  const [eventLastContributionById, setEventLastContributionById] = useState<Record<string, { amount: number; at: number }>>({});
+  const [eventLastContributionById, setEventLastContributionById] = useState<
+    Record<string, { amount: number; at: number }>
+  >({});
   const treasuryEnabled = isGuildTreasuryEnabled();
 
   useEffect(() => {
@@ -257,9 +259,7 @@ export function GuildSection({
   useEffect(() => {
     if (guildSubTab !== 'events' || !me.uid || !myGuild) return;
 
-    const eventIds = guildEvents
-      .map(event => event.eventId)
-      .filter(id => !!id);
+    const eventIds = guildEvents.map(event => event.eventId).filter(id => !!id);
 
     if (eventIds.length === 0) {
       setEventContribByEventId({});
@@ -267,10 +267,12 @@ export function GuildSection({
     }
 
     let cancelled = false;
-    void Promise.all(eventIds.map(async eventId => {
-      const rows = await fetchGuildEventContributors(me.uid, eventId, 12).catch(() => []);
-      return { eventId, rows };
-    })).then(results => {
+    void Promise.all(
+      eventIds.map(async eventId => {
+        const rows = await fetchGuildEventContributors(me.uid, eventId, 12).catch(() => []);
+        return { eventId, rows };
+      }),
+    ).then(results => {
       if (cancelled) return;
       const next: Record<string, GuildEventContributor[]> = {};
       for (const result of results) {
@@ -297,23 +299,24 @@ export function GuildSection({
         fetchGuildTreasuryState(me.uid),
         fetchGuildTreasuryLedger(me.uid, 18),
         fetchPlayerTreasuryGold(me.uid, saveSlotId),
-      ]).then(([state, ledger, gold]) => {
-        if (cancelled) return;
-        setTreasuryState(state);
-        setTreasuryLedger(ledger);
-        setWalletGold(gold);
-      }).catch(err => {
-        if (cancelled) return;
-        const msg = err instanceof Error ? err.message : 'Failed to load guild treasury.';
-        setError(msg);
-      }).finally(() => {
-        if (!cancelled) setTreasuryLoading(false);
-      });
+      ])
+        .then(([state, ledger, gold]) => {
+          if (cancelled) return;
+          setTreasuryState(state);
+          setTreasuryLedger(ledger);
+          setWalletGold(gold);
+        })
+        .catch(err => {
+          if (cancelled) return;
+          const msg = err instanceof Error ? err.message : 'Failed to load guild treasury.';
+          setError(msg);
+        })
+        .finally(() => {
+          if (!cancelled) setTreasuryLoading(false);
+        });
     } else {
-      void Promise.all([
-        fetchGuildTreasuryState(me.uid),
-        fetchPlayerTreasuryGold(me.uid, saveSlotId),
-      ]).then(([state, gold]) => {
+      void Promise.all([fetchGuildTreasuryState(me.uid), fetchPlayerTreasuryGold(me.uid, saveSlotId)])
+        .then(([state, gold]) => {
           if (cancelled) return;
           setTreasuryState(state);
           setWalletGold(gold);
@@ -346,32 +349,29 @@ export function GuildSection({
   const treasuryRemainingWithdrawToday = Math.max(0, treasuryDailyCap - (treasuryState?.dailyWithdrawn ?? 0));
   const treasuryAmountParsed = parsePositiveInt(treasuryAmountInput);
   const treasuryBalance = treasuryState?.balance ?? 0;
-  const canDepositTreasury = !guildBusy
-    && !treasuryLoading
-    && treasuryAmountParsed > 0
-    && walletGold >= treasuryAmountParsed;
-  const canWithdrawTreasury = canWithdrawFromTreasury
-    && !guildBusy
-    && !treasuryLoading
-    && treasuryAmountParsed > 0
-    && treasuryBalance >= treasuryAmountParsed
-    && treasuryRemainingWithdrawToday >= treasuryAmountParsed;
+  const canDepositTreasury =
+    !guildBusy && !treasuryLoading && treasuryAmountParsed > 0 && walletGold >= treasuryAmountParsed;
+  const canWithdrawTreasury =
+    canWithdrawFromTreasury &&
+    !guildBusy &&
+    !treasuryLoading &&
+    treasuryAmountParsed > 0 &&
+    treasuryBalance >= treasuryAmountParsed &&
+    treasuryRemainingWithdrawToday >= treasuryAmountParsed;
   const roleLabel = isLeader ? 'Leader' : isOfficer ? 'Officer' : 'Member';
 
   const persistedBossCooldownUntil = (myGuildMember?.lastBossAttackAt ?? 0) + BOSS_ATTACK_COOLDOWN_MS;
   const bossCooldownUntil = Math.max(localBossCooldownUntil, persistedBossCooldownUntil);
   const bossCooldownRemainingMs = Math.max(0, bossCooldownUntil - nowMs);
   const canAttackBoss = !guildBusy && !!guildBoss && guildBoss.status === 'active' && bossCooldownRemainingMs <= 0;
-  const attackButtonLabel = !guildBoss || guildBoss.status !== 'active'
-    ? 'Attack Unavailable'
-    : bossCooldownRemainingMs > 0
-      ? `Attack ${formatCooldownHoursMinutes(bossCooldownRemainingMs)}`
-      : 'Attack Ready';
+  const attackButtonLabel =
+    !guildBoss || guildBoss.status !== 'active'
+      ? 'Attack Unavailable'
+      : bossCooldownRemainingMs > 0
+        ? `Attack ${formatCooldownHoursMinutes(bossCooldownRemainingMs)}`
+        : 'Attack Ready';
 
-  const activeEvents = useMemo(
-    () => guildEvents.filter(event => event.status === 'active'),
-    [guildEvents],
-  );
+  const activeEvents = useMemo(() => guildEvents.filter(event => event.status === 'active'), [guildEvents]);
 
   const activeWarEvent = useMemo(
     () => guildEvents.find(event => event.type === 'war' && event.status === 'active') ?? null,
@@ -389,9 +389,7 @@ export function GuildSection({
   );
 
   const topRaiders = useMemo(
-    () => [...guildMembers]
-      .sort((a, b) => b.guildContribution - a.guildContribution)
-      .slice(0, 3),
+    () => [...guildMembers].sort((a, b) => b.guildContribution - a.guildContribution).slice(0, 3),
     [guildMembers],
   );
 
@@ -414,9 +412,10 @@ export function GuildSection({
     for (const event of guildEvents.slice(0, 4)) {
       items.push({
         label: `${event.type === 'war' ? 'Warfront' : 'Expedition'} ${event.status}`,
-        detail: event.status === 'active'
-          ? `Ends ${new Date(event.endsAt).toLocaleString()}`
-          : `Started ${new Date(event.startedAt).toLocaleString()}`,
+        detail:
+          event.status === 'active'
+            ? `Ends ${new Date(event.endsAt).toLocaleString()}`
+            : `Started ${new Date(event.startedAt).toLocaleString()}`,
         timestamp: event.startedAt,
       });
     }
@@ -424,20 +423,20 @@ export function GuildSection({
     return items.sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
   }, [guildBoss, guildEvents]);
 
-  const canSaveDescription = isLeader
-    && !guildBusy
-    && !!myGuild
-    && isEditingDescription
-    && descriptionDraft.trim().slice(0, 140) !== (myGuild.description || '');
+  const canSaveDescription =
+    isLeader &&
+    !guildBusy &&
+    !!myGuild &&
+    isEditingDescription &&
+    descriptionDraft.trim().slice(0, 140) !== (myGuild.description || '');
   const joinLevelParsed = Math.max(1, Math.min(999_999, parsePositiveInt(joinLevelDraft) || 1));
-  const canSaveGuildSettings = isLeader
-    && !guildBusy
-    && !!myGuild
-    && isEditingGuildSettings
-    && (
-      joinLevelParsed !== Math.max(1, myGuild.minPeakProgressToJoin || 1)
-      || isPublicDraft !== (myGuild.isPublic !== false)
-    );
+  const canSaveGuildSettings =
+    isLeader &&
+    !guildBusy &&
+    !!myGuild &&
+    isEditingGuildSettings &&
+    (joinLevelParsed !== Math.max(1, myGuild.minPeakProgressToJoin || 1) ||
+      isPublicDraft !== (myGuild.isPublic !== false));
 
   const startGuildEvent = async (type: 'war' | 'expedition', forceRestart = false) => {
     if (!me.uid) return;
@@ -476,8 +475,12 @@ export function GuildSection({
               {pendingInvites.map(invite => (
                 <View key={invite.id} style={styles.friendRow}>
                   <View style={styles.friendMeta}>
-                    <Text style={styles.friendName}>[{invite.guildTag}] {invite.guildName}</Text>
-                    <Text style={styles.metaText}>From {invite.inviterName} • Min Peak W{invite.minPeakProgressToJoin}</Text>
+                    <Text style={styles.friendName}>
+                      [{invite.guildTag}] {invite.guildName}
+                    </Text>
+                    <Text style={styles.metaText}>
+                      From {invite.inviterName} • Min Peak W{invite.minPeakProgressToJoin}
+                    </Text>
                   </View>
                   <View style={styles.friendActions}>
                     <Pressable
@@ -607,7 +610,9 @@ export function GuildSection({
 
       {myGuild && (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>My Guild: [{myGuild.tag}] {myGuild.name}</Text>
+          <Text style={styles.cardTitle}>
+            My Guild: [{myGuild.tag}] {myGuild.name}
+          </Text>
           <Text style={styles.metaText}>Your Role: {roleLabel}</Text>
           <View style={styles.prefRow} accessibilityRole="tablist">
             <Pressable
@@ -656,7 +661,9 @@ export function GuildSection({
             <View style={styles.metricGrid}>
               <View style={styles.metricChip}>
                 <Text style={styles.metricLabel}>Boss Front</Text>
-                <Text style={styles.metricValue}>{guildBoss ? `${guildBoss.name} (${guildBoss.status})` : 'No active boss'}</Text>
+                <Text style={styles.metricValue}>
+                  {guildBoss ? `${guildBoss.name} (${guildBoss.status})` : 'No active boss'}
+                </Text>
               </View>
               <View style={styles.metricChip}>
                 <Text style={styles.metricLabel}>Active Ops</Text>
@@ -761,8 +768,12 @@ export function GuildSection({
               </>
             )}
 
-            <Text style={styles.metaText}>Leader: {myGuild.leaderName} • Members: {myGuild.memberCount}/{myGuild.maxMembers}</Text>
-            <Text style={styles.metaText}>Min Peak Progress: W{myGuild.minPeakProgressToJoin} • Public: {myGuild.isPublic ? 'Yes' : 'No'}</Text>
+            <Text style={styles.metaText}>
+              Leader: {myGuild.leaderName} • Members: {myGuild.memberCount}/{myGuild.maxMembers}
+            </Text>
+            <Text style={styles.metaText}>
+              Min Peak Progress: W{myGuild.minPeakProgressToJoin} • Public: {myGuild.isPublic ? 'Yes' : 'No'}
+            </Text>
             {!isEditingGuildSettings && isLeader && (
               <View style={styles.friendActions}>
                 <Pressable
@@ -867,20 +878,31 @@ export function GuildSection({
                 </View>
               </>
             )}
-            <Text style={styles.metaText}>Boss Damage Pool: {formatCompactNumber(totalBossDamage)} • Active Ops: {activeEvents.length}</Text>
+            <Text style={styles.metaText}>
+              Boss Damage Pool: {formatCompactNumber(totalBossDamage)} • Active Ops: {activeEvents.length}
+            </Text>
             {guildBoss && (
-              <Text style={styles.metaText}>Boss Front: {guildBoss.name} ({guildBoss.status}) • Tier {guildBoss.tier}</Text>
+              <Text style={styles.metaText}>
+                Boss Front: {guildBoss.name} ({guildBoss.status}) • Tier {guildBoss.tier}
+              </Text>
             )}
             {recentCompletedEvents.length > 0 && (
-              <Text style={styles.metaText}>Recent Wins: {recentCompletedEvents.map(event => event.type === 'war' ? 'Warfront' : 'Expedition').join(', ')}</Text>
+              <Text style={styles.metaText}>
+                Recent Wins:{' '}
+                {recentCompletedEvents.map(event => (event.type === 'war' ? 'Warfront' : 'Expedition')).join(', ')}
+              </Text>
             )}
           </SocialCard>
 
           <SocialCard styles={styles} title="Role Matrix" subtitle="Clear authority lines reduce guild chaos.">
             <Text style={styles.metaText}>Leader: full control, role assignments, disband, event launch.</Text>
-            <Text style={styles.metaText}>Officer: combat specialist and roster anchor (expanded command tools planned).</Text>
+            <Text style={styles.metaText}>
+              Officer: combat specialist and roster anchor (expanded command tools planned).
+            </Text>
             <Text style={styles.metaText}>Member: contributes in boss/events and strengthens guild progression.</Text>
-            <Text style={styles.metaText}>Current Access: {isLeader ? 'Full Command' : isOfficer ? 'Combat Operations' : 'Participant'}</Text>
+            <Text style={styles.metaText}>
+              Current Access: {isLeader ? 'Full Command' : isOfficer ? 'Combat Operations' : 'Participant'}
+            </Text>
           </SocialCard>
 
           <SocialCard styles={styles} title="Top Raiders" subtitle="Highest recorded boss damage contributors.">
@@ -888,8 +910,12 @@ export function GuildSection({
             {topRaiders.map((member, index) => (
               <View key={member.uid} style={styles.friendRow}>
                 <View style={styles.friendMeta}>
-                  <Text style={styles.friendName}>#{index + 1} {member.displayName}</Text>
-                  <Text style={styles.metaText}>{member.rank} • Boss Damage {formatCompactNumber(member.guildContribution)}</Text>
+                  <Text style={styles.friendName}>
+                    #{index + 1} {member.displayName}
+                  </Text>
+                  <Text style={styles.metaText}>
+                    {member.rank} • Boss Damage {formatCompactNumber(member.guildContribution)}
+                  </Text>
                 </View>
                 <Pressable style={styles.smallBtn} onPress={() => onViewProfile(member.uid)}>
                   <Text style={styles.smallBtnText}>Profile</Text>
@@ -898,7 +924,11 @@ export function GuildSection({
             ))}
           </SocialCard>
 
-          <SocialCard styles={styles} title="Roster" subtitle="Boss Damage tracks boss-only impact. Event progress is shown in Events tab.">
+          <SocialCard
+            styles={styles}
+            title="Roster"
+            subtitle="Boss Damage tracks boss-only impact. Event progress is shown in Events tab."
+          >
             {guildMembers.slice(0, 12).map(member => (
               <View key={member.uid} style={styles.friendRow}>
                 <View style={styles.friendMeta}>
@@ -906,15 +936,13 @@ export function GuildSection({
                   <View style={styles.statusRow}>
                     <Text style={styles.statusBadge}>{member.rank.toUpperCase()}</Text>
                   </View>
-                  <Text style={styles.metaText}>{member.rank} • Boss Damage {Math.floor(member.guildContribution).toLocaleString()}</Text>
+                  <Text style={styles.metaText}>
+                    {member.rank} • Boss Damage {Math.floor(member.guildContribution).toLocaleString()}
+                  </Text>
                 </View>
                 {isLeader && member.uid !== me.uid && (
                   <View style={styles.friendActions}>
-                    <Pressable
-                      style={styles.smallBtn}
-                      disabled={guildBusy}
-                      onPress={() => onViewProfile(member.uid)}
-                    >
+                    <Pressable style={styles.smallBtn} disabled={guildBusy} onPress={() => onViewProfile(member.uid)}>
                       <Text style={styles.smallBtnText}>Profile</Text>
                     </Pressable>
                     <Pressable
@@ -990,7 +1018,9 @@ export function GuildSection({
             )}
             {isLeader && (
               <>
-                <Text style={styles.metaText}>Leaders can transfer leadership to another member, or disband the guild.</Text>
+                <Text style={styles.metaText}>
+                  Leaders can transfer leadership to another member, or disband the guild.
+                </Text>
                 <Pressable
                   style={[styles.smallBtn, styles.smallBtnDanger]}
                   disabled={guildBusy}
@@ -1022,15 +1052,21 @@ export function GuildSection({
           {!guildBoss && <Text style={styles.metaText}>No active boss right now.</Text>}
           {guildBoss && (
             <>
-              <Text style={styles.metaText}>{guildBoss.name} • Tier {guildBoss.tier}</Text>
-              <Text style={styles.metaText}>HP: {Math.floor(guildBoss.currentHp).toLocaleString()} / {Math.floor(guildBoss.maxHp).toLocaleString()}</Text>
+              <Text style={styles.metaText}>
+                {guildBoss.name} • Tier {guildBoss.tier}
+              </Text>
+              <Text style={styles.metaText}>
+                HP: {Math.floor(guildBoss.currentHp).toLocaleString()} / {Math.floor(guildBoss.maxHp).toLocaleString()}
+              </Text>
               <SocialProgressBar
                 styles={styles}
                 progress={guildBoss.currentHp / Math.max(1, guildBoss.maxHp)}
                 label={`${Math.floor((guildBoss.currentHp / Math.max(1, guildBoss.maxHp)) * 100)}% Boss HP`}
                 tint={guildBoss.currentHp / Math.max(1, guildBoss.maxHp) < 0.25 ? '#FF7A90' : '#7EC8FF'}
               />
-              <Text style={styles.metaText}>Status: {guildBoss.status} • Expires: {new Date(guildBoss.expiresAt).toLocaleString()}</Text>
+              <Text style={styles.metaText}>
+                Status: {guildBoss.status} • Expires: {new Date(guildBoss.expiresAt).toLocaleString()}
+              </Text>
               <Text style={styles.metaText}>Participants: {guildBoss.participantUids.length}</Text>
             </>
           )}
@@ -1084,6 +1120,14 @@ export function GuildSection({
                   const msg = err instanceof Error ? err.message : 'Failed to attack boss.';
                   const minutesLeft = parseCooldownMinutes(msg);
                   if (minutesLeft) setLocalBossCooldownUntil(Date.now() + minutesLeft * 60_000);
+                  // Stale boss state — auto-refresh so the UI re-syncs
+                  if (msg.includes('not active') || msg.includes('not found') || msg.includes('membership')) {
+                    try {
+                      await refreshGuildData();
+                    } catch {
+                      /* best effort */
+                    }
+                  }
                   setError(msg);
                 } finally {
                   setGuildBusy(false);
@@ -1094,7 +1138,9 @@ export function GuildSection({
             </Pressable>
           </View>
           {guildBoss && guildBoss.status === 'active' && bossCooldownRemainingMs > 0 && (
-            <Text style={styles.metaText}>Boss attack cooldown active. Ready in {formatCooldownHoursMinutes(bossCooldownRemainingMs)}.</Text>
+            <Text style={styles.metaText}>
+              Boss attack cooldown active. Ready in {formatCooldownHoursMinutes(bossCooldownRemainingMs)}.
+            </Text>
           )}
         </View>
       )}
@@ -1136,7 +1182,9 @@ export function GuildSection({
                 void startGuildEvent('expedition', false);
               }}
             >
-              <Text style={styles.smallBtnText}>{activeExpeditionEvent ? 'Restart Expedition' : 'Start Expedition'}</Text>
+              <Text style={styles.smallBtnText}>
+                {activeExpeditionEvent ? 'Restart Expedition' : 'Start Expedition'}
+              </Text>
             </Pressable>
           </View>
           {!isLeader && (
@@ -1153,17 +1201,17 @@ export function GuildSection({
               <Text style={styles.metaText}>
                 {pendingEventRestartType === 'war'
                   ? (() => {
-                    const total = Number(activeWarEvent?.details.totalDamage ?? 0);
-                    const target = Number(activeWarEvent?.details.targetDamage ?? 1);
-                    const pct = Math.min(100, Math.floor((total / Math.max(1, target)) * 100));
-                    return `Current progress: ${total.toLocaleString()} / ${target.toLocaleString()} (${pct}%)`;
-                  })()
+                      const total = Number(activeWarEvent?.details.totalDamage ?? 0);
+                      const target = Number(activeWarEvent?.details.targetDamage ?? 1);
+                      const pct = Math.min(100, Math.floor((total / Math.max(1, target)) * 100));
+                      return `Current progress: ${total.toLocaleString()} / ${target.toLocaleString()} (${pct}%)`;
+                    })()
                   : (() => {
-                    const total = Number(activeExpeditionEvent?.details.totalKills ?? 0);
-                    const target = Number(activeExpeditionEvent?.details.targetKills ?? 1);
-                    const pct = Math.min(100, Math.floor((total / Math.max(1, target)) * 100));
-                    return `Current progress: ${total.toLocaleString()} / ${target.toLocaleString()} (${pct}%)`;
-                  })()}
+                      const total = Number(activeExpeditionEvent?.details.totalKills ?? 0);
+                      const target = Number(activeExpeditionEvent?.details.targetKills ?? 1);
+                      const pct = Math.min(100, Math.floor((total / Math.max(1, target)) * 100));
+                      return `Current progress: ${total.toLocaleString()} / ${target.toLocaleString()} (${pct}%)`;
+                    })()}
               </Text>
               <View style={styles.friendActions}>
                 <Pressable
@@ -1209,14 +1257,19 @@ export function GuildSection({
             const persistedCooldownUntil = (myContributionRow?.lastContributedAt ?? 0) + EVENT_CONTRIBUTION_COOLDOWN_MS;
             const localCooldownUntil = eventCooldownUntilById[event.eventId] ?? 0;
             const eventCooldownRemainingMs = Math.max(0, Math.max(persistedCooldownUntil, localCooldownUntil) - nowMs);
-            const canContribute = !guildBusy && contributorsLoaded && event.status === 'active' && eventCooldownRemainingMs <= 0;
+            const canContribute =
+              !guildBusy && contributorsLoaded && event.status === 'active' && eventCooldownRemainingMs <= 0;
             const topContributors = contributors.slice(0, 3);
             return (
               <View key={event.eventId} style={styles.friendRow}>
                 <View style={styles.friendMeta}>
-                  <Text style={styles.friendName}>{isWar ? 'Warfront Assault' : 'Expedition'} • {event.status}</Text>
+                  <Text style={styles.friendName}>
+                    {isWar ? 'Warfront Assault' : 'Expedition'} • {event.status}
+                  </Text>
                   <Text style={styles.metaText}>Lifecycle: {lifecycleLabel}</Text>
-                  <Text style={styles.metaText}>Progress: {total.toLocaleString()} / {target.toLocaleString()} ({pct}%)</Text>
+                  <Text style={styles.metaText}>
+                    Progress: {total.toLocaleString()} / {target.toLocaleString()} ({pct}%)
+                  </Text>
                   <SocialProgressBar
                     styles={styles}
                     progress={pct / 100}
@@ -1225,18 +1278,23 @@ export function GuildSection({
                   />
                   <Text style={styles.metaText}>Ends: {new Date(event.endsAt).toLocaleString()}</Text>
                   {myContributionRow && (
-                    <Text style={styles.metaText}>Your total contribution: {formatCompactNumber(myContributionRow.totalContributed)}</Text>
+                    <Text style={styles.metaText}>
+                      Your total contribution: {formatCompactNumber(myContributionRow.totalContributed)}
+                    </Text>
                   )}
                   {localContribution && (
                     <Text style={styles.metaText}>
-                      Last contribution: +{formatCompactNumber(localContribution.amount)} at {new Date(localContribution.at).toLocaleTimeString()}
+                      Last contribution: +{formatCompactNumber(localContribution.amount)} at{' '}
+                      {new Date(localContribution.at).toLocaleTimeString()}
                     </Text>
                   )}
                   {topContributors.length > 0 && (
                     <Text style={styles.metaText}>
-                      Top contributors: {topContributors
+                      Top contributors:{' '}
+                      {topContributors
                         .map((row, idx) => {
-                          const memberName = guildMembers.find(member => member.uid === row.uid)?.displayName ?? row.uid.slice(0, 8);
+                          const memberName =
+                            guildMembers.find(member => member.uid === row.uid)?.displayName ?? row.uid.slice(0, 8);
                           return `#${idx + 1} ${memberName} ${formatCompactNumber(row.totalContributed)}`;
                         })
                         .join(' • ')}
@@ -1246,7 +1304,9 @@ export function GuildSection({
                     <Text style={styles.metaText}>Syncing your cooldown status...</Text>
                   )}
                   {eventCooldownRemainingMs > 0 && (
-                    <Text style={styles.metaText}>Your cooldown: {formatCooldownMinutesSeconds(eventCooldownRemainingMs)}</Text>
+                    <Text style={styles.metaText}>
+                      Your cooldown: {formatCooldownMinutesSeconds(eventCooldownRemainingMs)}
+                    </Text>
                   )}
                 </View>
                 <Pressable
@@ -1452,23 +1512,29 @@ export function GuildSection({
               )}
               {canWithdrawFromTreasury && (
                 <Text style={styles.metaText}>
-                  Daily withdrawal cap: {treasuryDailyCap.toLocaleString()} • Remaining today: {treasuryRemainingWithdrawToday.toLocaleString()}
+                  Daily withdrawal cap: {treasuryDailyCap.toLocaleString()} • Remaining today:{' '}
+                  {treasuryRemainingWithdrawToday.toLocaleString()}
                 </Text>
               )}
               {treasuryAmountParsed <= 0 && (
                 <Text style={styles.metaText}>Enter a positive amount to enable treasury actions.</Text>
               )}
               {treasuryAmountParsed > 0 && walletGold < treasuryAmountParsed && (
-                <Text style={styles.metaText}>Insufficient gold for deposit. You have {walletGold.toLocaleString()}.</Text>
+                <Text style={styles.metaText}>
+                  Insufficient gold for deposit. You have {walletGold.toLocaleString()}.
+                </Text>
               )}
               {treasuryAmountParsed > 0 && treasuryBalance < treasuryAmountParsed && (
                 <Text style={styles.metaText}>Treasury balance is too low for that withdrawal.</Text>
               )}
-              {treasuryAmountParsed > 0 && canWithdrawFromTreasury && treasuryRemainingWithdrawToday < treasuryAmountParsed && (
-                <Text style={styles.metaText}>
-                  Withdrawal exceeds remaining daily cap by {(treasuryAmountParsed - treasuryRemainingWithdrawToday).toLocaleString()}.
-                </Text>
-              )}
+              {treasuryAmountParsed > 0 &&
+                canWithdrawFromTreasury &&
+                treasuryRemainingWithdrawToday < treasuryAmountParsed && (
+                  <Text style={styles.metaText}>
+                    Withdrawal exceeds remaining daily cap by{' '}
+                    {(treasuryAmountParsed - treasuryRemainingWithdrawToday).toLocaleString()}.
+                  </Text>
+                )}
             </SocialCard>
           )}
 
@@ -1485,8 +1551,12 @@ export function GuildSection({
               {treasuryLedger.map(entry => (
                 <View key={entry.id} style={styles.friendRow}>
                   <View style={styles.friendMeta}>
-                    <Text style={styles.friendName}>{entry.type === 'deposit' ? 'Deposit' : 'Withdrawal'} • {entry.amount.toLocaleString()}</Text>
-                    <Text style={styles.metaText}>{entry.actorName} ({entry.actorRank}) • {new Date(entry.createdAt).toLocaleString()}</Text>
+                    <Text style={styles.friendName}>
+                      {entry.type === 'deposit' ? 'Deposit' : 'Withdrawal'} • {entry.amount.toLocaleString()}
+                    </Text>
+                    <Text style={styles.metaText}>
+                      {entry.actorName} ({entry.actorRank}) • {new Date(entry.createdAt).toLocaleString()}
+                    </Text>
                     {!!entry.reason && <Text style={styles.metaText}>Reason: {entry.reason}</Text>}
                   </View>
                 </View>
@@ -1516,8 +1586,12 @@ export function GuildSection({
           {guildList.map(row => (
             <View key={row.guildId} style={styles.friendRow}>
               <View style={styles.friendMeta}>
-                <Text style={styles.friendName}>[{row.tag}] {row.name}</Text>
-                <Text style={styles.metaText}>Leader: {row.leaderName} • Members: {row.memberCount} • Lv.{row.level}</Text>
+                <Text style={styles.friendName}>
+                  [{row.tag}] {row.name}
+                </Text>
+                <Text style={styles.metaText}>
+                  Leader: {row.leaderName} • Members: {row.memberCount} • Lv.{row.level}
+                </Text>
               </View>
               <Pressable
                 style={styles.smallBtn}

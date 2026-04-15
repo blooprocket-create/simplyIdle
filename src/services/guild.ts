@@ -294,6 +294,26 @@ function readGoldFromSavePayload(payload: Record<string, unknown>): number {
   return Math.max(0, Math.floor(value));
 }
 
+/** Extract the save payload from a raw Firestore save-slot document.
+ *  Handles both the current `payloadJson` (JSON string) format
+ *  and the legacy `payload` (structured map) format.              */
+function extractSavePayload(rawDoc: Record<string, unknown>): Record<string, unknown> {
+  if (typeof rawDoc.payloadJson === 'string') {
+    try {
+      const parsed = JSON.parse(rawDoc.payloadJson);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      /* fall through to legacy */
+    }
+  }
+  if (rawDoc.payload && typeof rawDoc.payload === 'object' && !Array.isArray(rawDoc.payload)) {
+    return rawDoc.payload as Record<string, unknown>;
+  }
+  return {};
+}
+
 export async function fetchPlayerTreasuryGold(uid: string, saveSlotId: string): Promise<number> {
   const db = requireDb();
   const cleanUid = uid.trim();
@@ -303,8 +323,8 @@ export async function fetchPlayerTreasuryGold(uid: string, saveSlotId: string): 
   const saveRef = doc(db, 'users', cleanUid, 'saveSlots', cleanSlot);
   const snap = await getDoc(saveRef);
   if (!snap.exists()) return 0;
-  const saveData = snap.data() as { payload?: Record<string, unknown> };
-  return readGoldFromSavePayload((saveData.payload ?? {}) as Record<string, unknown>);
+  const saveData = snap.data() as Record<string, unknown>;
+  return readGoldFromSavePayload(extractSavePayload(saveData));
 }
 
 export async function createGuild(input: {
@@ -1808,13 +1828,8 @@ export async function transactGuildTreasury(input: {
       throw new Error('Active save slot not found.');
     }
 
-    const saveData = saveSnap.data() as {
-      revision?: unknown;
-      payload?: Record<string, unknown>;
-      schemaVersion?: unknown;
-      saveSlot?: unknown;
-    };
-    const savePayload = (saveData.payload ?? {}) as Record<string, unknown>;
+    const saveData = saveSnap.data() as Record<string, unknown>;
+    const savePayload = extractSavePayload(saveData);
     const currentPlayerGold = readGoldFromSavePayload(savePayload);
 
     const state = stateSnap.exists()
@@ -1874,16 +1889,16 @@ export async function transactGuildTreasury(input: {
             updatedByUid: uid,
           };
 
-    const nextRevision = typeof saveData.revision === 'number' ? saveData.revision + 1 : 1;
+    const nextRevision = typeof saveData.revision === 'number' ? (saveData.revision as number) + 1 : 1;
     tx.set(saveRef, {
       revision: nextRevision,
       updatedAt: now,
       schemaVersion: typeof saveData.schemaVersion === 'number' ? saveData.schemaVersion : 1,
       saveSlot: typeof saveData.saveSlot === 'string' ? saveData.saveSlot : saveSlotId,
-      payload: {
+      payloadJson: JSON.stringify({
         ...savePayload,
         gold: nextPlayerGold,
-      },
+      }),
     });
 
     tx.set(stateRef, nextState, { merge: true });

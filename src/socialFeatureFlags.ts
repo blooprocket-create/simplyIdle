@@ -11,7 +11,7 @@ const FLAG_DEFAULTS = {
   playerSearch: true,
   activityFeed: true,
   blockReport: true,
-  guildWars: false,
+  guildWars: true,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FLAG_DEFAULTS;

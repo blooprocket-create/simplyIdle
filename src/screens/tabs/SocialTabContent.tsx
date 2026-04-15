@@ -12,6 +12,7 @@ import { ProfileModal } from './social/ProfileModal';
 import { SearchSection } from './social/SearchSection';
 import { DMSection } from './social/DMSection';
 import { ActivityFeedSection } from './social/ActivityFeedSection';
+import { GuildWarsSection } from './social/GuildWarsSection';
 import { SocialProvider, useSocialChat, useSocialFriends, useSocialGuild, useSocialMe } from './social/SocialContext';
 import { socialStyles as styles } from './social/social.styles';
 
@@ -28,10 +29,11 @@ export interface SocialTabContentProps {
   onPendingRequestsCountChange?: (count: number) => void;
 }
 
-type SocialSubTab = 'chat' | 'friends' | 'guild' | 'search' | 'dm' | 'feed';
+type SocialSubTab = 'chat' | 'friends' | 'guild' | 'search' | 'dm' | 'feed' | 'wars';
 
 function getSocialTabs(): SocialSubTab[] {
   const tabs: SocialSubTab[] = ['chat', 'friends', 'guild'];
+  if (SOCIAL_FEATURE_FLAGS.guildWars) tabs.push('wars');
   if (SOCIAL_FEATURE_FLAGS.playerSearch) tabs.push('search');
   if (SOCIAL_FEATURE_FLAGS.directMessages) tabs.push('dm');
   if (SOCIAL_FEATURE_FLAGS.activityFeed) tabs.push('feed');
@@ -253,6 +255,17 @@ function SocialTabRouter({
         >
           <Text style={[styles.subTabText, subTab === 'guild' && styles.subTabTextActive]}>Guild Ops</Text>
         </Pressable>
+        {SOCIAL_FEATURE_FLAGS.guildWars && (
+          <Pressable
+            style={[styles.subTabBtn, subTab === 'wars' && styles.subTabBtnActive]}
+            onPress={() => setSubTab('wars')}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: subTab === 'wars' }}
+            accessibilityLabel="Guild wars tab"
+          >
+            <Text style={[styles.subTabText, subTab === 'wars' && styles.subTabTextActive]}>Wars</Text>
+          </Pressable>
+        )}
         {SOCIAL_FEATURE_FLAGS.playerSearch && (
           <Pressable
             style={[styles.subTabBtn, subTab === 'search' && styles.subTabBtnActive]}
@@ -388,6 +401,8 @@ function SocialTabRouter({
         {subTab === 'search' && SOCIAL_FEATURE_FLAGS.playerSearch && (
           <SearchSection onViewProfile={uid => openProfileCard(uid)} />
         )}
+
+        {subTab === 'wars' && SOCIAL_FEATURE_FLAGS.guildWars && <GuildWarsSection />}
 
         {subTab === 'dm' && SOCIAL_FEATURE_FLAGS.directMessages && <DMSection />}
 
