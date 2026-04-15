@@ -33,6 +33,7 @@ import {
   VIP_SUMMON_DISCOUNT_LEVEL,
   VIP_SUMMON_DISCOUNT,
   type HeroUnit,
+  type HeroTemplate,
   type Rarity,
   type PlayerClass,
   type HeroPassiveTraitId,
