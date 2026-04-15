@@ -314,10 +314,14 @@ export function subscribeToActiveWar(warId: string, onUpdate: (war: ActiveWar) =
   const db = getFirebaseFirestore();
   if (!db || !warId) return () => {};
 
-  return onSnapshot(doc(db, 'guildWars', warId), snap => {
-    if (!snap.exists()) return;
-    onUpdate(parseWar(snap.data()));
-  });
+  return onSnapshot(
+    doc(db, 'guildWars', warId),
+    snap => {
+      if (!snap.exists()) return;
+      onUpdate(parseWar(snap.data()));
+    },
+    () => {},
+  );
 }
 
 /** Contribute damage to the active war. */

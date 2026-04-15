@@ -44,28 +44,25 @@ export async function fetchCloudMail(uid: string): Promise<CloudMailMessage[]> {
   const db = getFirebaseFirestore();
   if (!db || !uid) return [];
 
-  const q = query(
-    collection(db, 'playerMail', uid, 'messages'),
-    orderBy('sentAt', 'desc'),
-  );
+  const q = query(collection(db, 'playerMail', uid, 'messages'), orderBy('sentAt', 'desc'));
   const snap = await getDocs(q);
   return snap.docs.map(docSnap => toCloudMail(docSnap.id, docSnap.data() as Record<string, unknown>));
 }
 
-export function subscribeToCloudMail(
-  uid: string,
-  onMessages: (messages: CloudMailMessage[]) => void,
-): () => void {
+export function subscribeToCloudMail(uid: string, onMessages: (messages: CloudMailMessage[]) => void): () => void {
   const db = getFirebaseFirestore();
   if (!db || !uid) return () => {};
 
-  const q = query(
-    collection(db, 'playerMail', uid, 'messages'),
-    orderBy('sentAt', 'desc'),
-  );
+  const q = query(collection(db, 'playerMail', uid, 'messages'), orderBy('sentAt', 'desc'));
 
-  return onSnapshot(q, snap => {
-    const messages = snap.docs.map(docSnap => toCloudMail(docSnap.id, docSnap.data() as Record<string, unknown>));
-    onMessages(messages);
-  });
+  return onSnapshot(
+    q,
+    snap => {
+      const messages = snap.docs.map(docSnap => toCloudMail(docSnap.id, docSnap.data() as Record<string, unknown>));
+      onMessages(messages);
+    },
+    () => {
+      onMessages([]);
+    },
+  );
 }

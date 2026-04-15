@@ -1712,6 +1712,9 @@ export function subscribeGuildChat(uid: string, onMessages: (messages: GuildChat
             .sort((a, b) => a.sentAt - b.sentAt);
           onMessages(rows);
         },
+        () => {
+          onMessages([]);
+        },
       );
     })
     .catch(() => {});

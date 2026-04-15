@@ -1,4 +1,4 @@
-import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase';
 import { normalizePublicUsername } from './publicProfile';
 import { SOCIAL_FEATURE_FLAGS } from '../socialFeatureFlags';
@@ -34,58 +34,92 @@ export async function searchPlayers(queryText: string, maxResults = 15): Promise
   // Firestore prefix range query: [normalized, normalized + \uf8ff]
   const endPrefix = normalized + '\uf8ff';
 
-  const snap = await getDocs(
-    query(
-      collection(db, 'publicUsernames'),
-      where('__name__', '>=', normalized),
-      where('__name__', '<=', endPrefix),
-      orderBy('__name__'),
-      limit(maxResults),
+  // Search both publicUsernames AND leaderboard by accountName prefix
+  const [pubSnap, boardSnap] = await Promise.all([
+    getDocs(
+      query(
+        collection(db, 'publicUsernames'),
+        where('__name__', '>=', normalized),
+        where('__name__', '<=', endPrefix),
+        orderBy('__name__'),
+        limit(maxResults),
+      ),
     ),
-  );
+    getDocs(
+      query(
+        collection(db, 'leaderboard_global_v1'),
+        where('accountName', '>=', normalized),
+        where('accountName', '<=', endPrefix),
+        orderBy('accountName'),
+        limit(maxResults),
+      ),
+    ),
+  ]);
 
-  if (snap.empty) return [];
-
+  const seen = new Set<string>();
   const results: PlayerSearchResult[] = [];
-  for (const docSnap of snap.docs) {
+
+  // Add results from publicUsernames
+  for (const docSnap of pubSnap.docs) {
     const data = docSnap.data();
     const uid = typeof data.uid === 'string' ? data.uid : '';
-    if (!uid) continue;
-
+    if (!uid || seen.has(uid)) continue;
+    seen.add(uid);
     results.push({
       uid,
       publicUsername: docSnap.id,
-      level: 0, // enriched below
-      vipLevel: 0, // enriched below
-      guildName: null, // enriched below
-      guildTag: null, // enriched below
+      level: 0,
+      vipLevel: 0,
+      guildName: null,
+      guildTag: null,
     });
   }
+
+  // Add results from leaderboard (fallback for players without a public username)
+  for (const docSnap of boardSnap.docs) {
+    const uid = docSnap.id;
+    if (seen.has(uid)) continue;
+    seen.add(uid);
+    const data = docSnap.data();
+    results.push({
+      uid,
+      publicUsername:
+        typeof data.publicUsername === 'string'
+          ? data.publicUsername
+          : typeof data.accountName === 'string'
+            ? data.accountName
+            : uid,
+      level: typeof data.level === 'number' ? Math.max(1, Math.floor(data.level)) : 0,
+      vipLevel: typeof data.vipLevel === 'number' ? Math.max(0, Math.floor(data.vipLevel)) : 0,
+      guildName: null,
+      guildTag: null,
+    });
+  }
+
+  if (results.length === 0) return [];
 
   // Enrich with leaderboard + guild data (best-effort, won't block results)
   try {
     const enrichPromises = results.map(async player => {
       try {
-        const [boardSnap, guildSnap] = await Promise.all([
-          getDocs(query(collection(db, 'leaderboard_global_v1'), where('__name__', '==', player.uid), limit(1))),
-          getDocs(query(collection(db, 'userGuild'), where('__name__', '==', player.uid), limit(1))),
+        const [boardDoc, guildDoc] = await Promise.all([
+          getDoc(doc(db, 'leaderboard_global_v1', player.uid)),
+          getDoc(doc(db, 'userGuild', player.uid)),
         ]);
 
-        if (!boardSnap.empty) {
-          const boardData = boardSnap.docs[0].data();
+        if (boardDoc.exists()) {
+          const boardData = boardDoc.data();
           player.level = typeof boardData.level === 'number' ? Math.max(1, Math.floor(boardData.level)) : 0;
           player.vipLevel = typeof boardData.vipLevel === 'number' ? Math.max(0, Math.floor(boardData.vipLevel)) : 0;
         }
 
-        if (!guildSnap.empty) {
-          const guildData = guildSnap.docs[0].data();
+        if (guildDoc.exists()) {
+          const guildData = guildDoc.data();
           const guildId = typeof guildData.guildId === 'string' ? guildData.guildId : '';
           if (guildId) {
-            const guildDocSnap = await getDocs(
-              query(collection(db, 'guilds'), where('__name__', '==', guildId), limit(1)),
-            );
-            if (!guildDocSnap.empty) {
-              const guild = guildDocSnap.docs[0].data();
+            const guildSnap = await getDoc(doc(db, 'guilds', guildId));
+            if (guildSnap.exists()) {
+              const guild = guildSnap.data();
               player.guildName = typeof guild.name === 'string' ? guild.name : null;
               player.guildTag = typeof guild.tag === 'string' ? guild.tag : null;
             }
@@ -100,5 +134,5 @@ export async function searchPlayers(queryText: string, maxResults = 15): Promise
     // Non-blocking enrichment.
   }
 
-  return results;
+  return results.slice(0, maxResults);
 }

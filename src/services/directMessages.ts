@@ -54,15 +54,15 @@ export async function sendDirectMessage(
   const cleaned = text.replace(/\s+/g, ' ').trim().slice(0, 500);
   if (!cleaned) return;
 
-  // Validate recipient exists and neither party has blocked the other
-  const [recipientSnap, senderBlockSnap, recipientBlockSnap] = await Promise.all([
+  // Validate recipient exists and sender hasn't blocked them
+  // Note: we can only read our OWN block list (rules enforce uid == auth.uid).
+  // Recipient-side block enforcement must happen via Cloud Function or rules.
+  const [recipientSnap, senderBlockSnap] = await Promise.all([
     getDoc(doc(db, 'leaderboard_global_v1', toUid)),
     getDoc(doc(db, 'blocks', fromUid, 'list', toUid)),
-    getDoc(doc(db, 'blocks', toUid, 'list', fromUid)),
   ]);
   if (!recipientSnap.exists()) throw new Error('Recipient not found.');
   if (senderBlockSnap.exists()) throw new Error('You have blocked this player.');
-  if (recipientBlockSnap.exists()) throw new Error('Cannot message this player.');
 
   const conversationId = buildConversationId(fromUid, toUid);
   const now = Date.now();
@@ -116,21 +116,27 @@ export function subscribeToConversation(
   const conversationId = buildConversationId(uid, partnerUid);
   const q = query(collection(db, 'directMessages', conversationId, 'messages'), orderBy('sentAt', 'desc'), limit(100));
 
-  return onSnapshot(q, snap => {
-    const msgs: DirectMessage[] = snap.docs
-      .map(d => {
-        const data = d.data();
-        return {
-          id: d.id,
-          senderUid: typeof data.senderUid === 'string' ? data.senderUid : '',
-          text: typeof data.text === 'string' ? data.text : '',
-          sentAt: typeof data.sentAt === 'number' ? data.sentAt : 0,
-        };
-      })
-      .filter(m => m.senderUid && m.text)
-      .sort((a, b) => a.sentAt - b.sentAt);
-    onMessages(msgs);
-  });
+  return onSnapshot(
+    q,
+    snap => {
+      const msgs: DirectMessage[] = snap.docs
+        .map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            senderUid: typeof data.senderUid === 'string' ? data.senderUid : '',
+            text: typeof data.text === 'string' ? data.text : '',
+            sentAt: typeof data.sentAt === 'number' ? data.sentAt : 0,
+          };
+        })
+        .filter(m => m.senderUid && m.text)
+        .sort((a, b) => a.sentAt - b.sentAt);
+      onMessages(msgs);
+    },
+    () => {
+      onMessages([]);
+    },
+  );
 }
 
 export async function fetchConversations(uid: string): Promise<DMThread[]> {
@@ -158,5 +164,9 @@ export async function markConversationRead(uid: string, partnerUid: string): Pro
   if (!db || !uid || !partnerUid) return;
 
   const threadRef = doc(db, 'dmThreads', uid, 'conversations', partnerUid);
-  await updateDoc(threadRef, { unreadCount: 0 });
+  try {
+    await updateDoc(threadRef, { unreadCount: 0 });
+  } catch {
+    // Thread may not exist yet (first conversation) — safe to ignore.
+  }
 }

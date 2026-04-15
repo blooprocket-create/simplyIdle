@@ -53,13 +53,19 @@ export function subscribeBlockList(uid: string, onBlocks: (blocks: BlockRecord[]
   const db = getFirebaseFirestore();
   if (!db || !uid) return () => {};
 
-  return onSnapshot(collection(db, 'blocks', uid, 'list'), snap => {
-    const blocks = snap.docs.map(d => ({
-      targetUid: d.id,
-      blockedAt: typeof d.data().blockedAt === 'number' ? d.data().blockedAt : 0,
-    }));
-    onBlocks(blocks);
-  });
+  return onSnapshot(
+    collection(db, 'blocks', uid, 'list'),
+    snap => {
+      const blocks = snap.docs.map(d => ({
+        targetUid: d.id,
+        blockedAt: typeof d.data().blockedAt === 'number' ? d.data().blockedAt : 0,
+      }));
+      onBlocks(blocks);
+    },
+    () => {
+      onBlocks([]);
+    },
+  );
 }
 
 export async function isBlocked(uid: string, targetUid: string): Promise<boolean> {

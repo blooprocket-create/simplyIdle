@@ -212,9 +212,15 @@ export async function fetchFriendRelationshipStatus(uid: string, targetUid: stri
 export function subscribePendingRequestCount(uid: string, onCount: (count: number) => void): () => void {
   const db = getFirebaseFirestore();
   if (!db || !uid) return () => {};
-  return onSnapshot(collection(db, 'friends', uid, 'requests'), snap => {
-    onCount(snap.size);
-  });
+  return onSnapshot(
+    collection(db, 'friends', uid, 'requests'),
+    snap => {
+      onCount(snap.size);
+    },
+    () => {
+      onCount(0);
+    },
+  );
 }
 
 export function subscribeFriendsRealtime(
@@ -257,16 +263,33 @@ export function subscribeFriendsRealtime(
     }
   };
 
+  const handleListenerError = (err: unknown) => {
+    if (!active || !onError) return;
+    onError(err instanceof Error ? err : new Error('Friends listener failed.'));
+  };
+
   const unsubscribers = [
-    onSnapshot(collection(db, 'friends', uid, 'list'), () => {
-      void publishSnapshot();
-    }),
-    onSnapshot(collection(db, 'friends', uid, 'requests'), () => {
-      void publishSnapshot();
-    }),
-    onSnapshot(collection(db, 'friends', uid, 'giftCooldowns'), () => {
-      void publishSnapshot();
-    }),
+    onSnapshot(
+      collection(db, 'friends', uid, 'list'),
+      () => {
+        void publishSnapshot();
+      },
+      handleListenerError,
+    ),
+    onSnapshot(
+      collection(db, 'friends', uid, 'requests'),
+      () => {
+        void publishSnapshot();
+      },
+      handleListenerError,
+    ),
+    onSnapshot(
+      collection(db, 'friends', uid, 'giftCooldowns'),
+      () => {
+        void publishSnapshot();
+      },
+      handleListenerError,
+    ),
   ];
 
   void publishSnapshot();

@@ -237,21 +237,25 @@ export function subscribeToChat(
 
     for (const messageId of idsToTrack) {
       if (reactionUnsubByMessageId.has(messageId)) continue;
-      const unsub = onSnapshot(collection(db, CHAT_COLLECTION, messageId, CHAT_REACTIONS_COLLECTION), reactionSnap => {
-        const counts: Record<string, number> = {};
-        let mine: string | null = null;
+      const unsub = onSnapshot(
+        collection(db, CHAT_COLLECTION, messageId, CHAT_REACTIONS_COLLECTION),
+        reactionSnap => {
+          const counts: Record<string, number> = {};
+          let mine: string | null = null;
 
-        reactionSnap.docs.forEach(reactionDoc => {
-          const data = reactionDoc.data() as { emoji?: unknown };
-          const reactionEmoji = typeof data.emoji === 'string' ? data.emoji : '';
-          if (!reactionEmoji || !ALLOWED_REACTIONS.has(reactionEmoji)) return;
-          counts[reactionEmoji] = (counts[reactionEmoji] ?? 0) + 1;
-          if (reactionDoc.id === viewerUid) mine = reactionEmoji;
-        });
+          reactionSnap.docs.forEach(reactionDoc => {
+            const data = reactionDoc.data() as { emoji?: unknown };
+            const reactionEmoji = typeof data.emoji === 'string' ? data.emoji : '';
+            if (!reactionEmoji || !ALLOWED_REACTIONS.has(reactionEmoji)) return;
+            counts[reactionEmoji] = (counts[reactionEmoji] ?? 0) + 1;
+            if (reactionDoc.id === viewerUid) mine = reactionEmoji;
+          });
 
-        reactionsByMessageId.set(messageId, { counts, mine });
-        emitRows();
-      });
+          reactionsByMessageId.set(messageId, { counts, mine });
+          emitRows();
+        },
+        () => {},
+      );
       reactionUnsubByMessageId.set(messageId, unsub);
     }
   };
