@@ -170,3 +170,30 @@ export async function markConversationRead(uid: string, partnerUid: string): Pro
     // Thread may not exist yet (first conversation) — safe to ignore.
   }
 }
+
+export function subscribeToDmThreads(uid: string, onThreads: (threads: DMThread[]) => void): () => void {
+  const db = getFirebaseFirestore();
+  if (!db || !uid) return () => {};
+
+  const q = query(collection(db, 'dmThreads', uid, 'conversations'), orderBy('lastMessageAt', 'desc'), limit(50));
+
+  return onSnapshot(
+    q,
+    snap => {
+      const threads = snap.docs.map(d => {
+        const data = d.data();
+        return {
+          partnerUid: d.id,
+          partnerName: typeof data.partnerName === 'string' && data.partnerName ? data.partnerName : 'Player',
+          lastMessageText: typeof data.lastMessageText === 'string' ? data.lastMessageText : '',
+          lastMessageAt: typeof data.lastMessageAt === 'number' ? data.lastMessageAt : 0,
+          unreadCount: typeof data.unreadCount === 'number' ? Math.max(0, data.unreadCount) : 0,
+        };
+      });
+      onThreads(threads);
+    },
+    () => {
+      onThreads([]);
+    },
+  );
+}

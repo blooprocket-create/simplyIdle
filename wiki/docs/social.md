@@ -41,7 +41,7 @@ Friends can send gifts based on the recipient's **gift preference** (gold, shard
 Private 1-on-1 messaging between any two players:
 - **Max length:** 500 characters
 - **Message history:** Last 100 messages per conversation
-- **Unread tracking:** Badge count updates in real-time
+- **Unread tracking:** Red dot badge on the DM tab and Social nav tab when you have unread messages
 - **Block protection:** Blocked players cannot message you
 
 ### Inbox

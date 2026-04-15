@@ -15,6 +15,7 @@ import { ActivityFeedSection } from './social/ActivityFeedSection';
 import { GuildWarsSection } from './social/GuildWarsSection';
 import { SocialProvider, useSocialChat, useSocialFriends, useSocialGuild, useSocialMe } from './social/SocialContext';
 import { socialStyles as styles } from './social/social.styles';
+import { subscribeToDmThreads } from '../../services/directMessages';
 
 export interface SocialTabContentProps {
   tab: string;
@@ -112,6 +113,7 @@ function SocialTabRouter({
   const [activeUserRelationship, setActiveUserRelationship] = useState<FriendRelationshipStatus>('none');
   const [activeProfileUid, setActiveProfileUid] = useState<string | null>(null);
   const [friendAddBusy, setFriendAddBusy] = useState(false);
+  const [dmUnreadCount, setDmUnreadCount] = useState(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const sectionAnim = useRef(new Animated.Value(1)).current;
 
@@ -125,10 +127,20 @@ function SocialTabRouter({
     return () => document.removeEventListener('keydown', onKey);
   }, [activeUserMenu]);
 
-  // Notify parent of pending request count changes
+  // Subscribe to DM threads for unread count
   useEffect(() => {
-    onPendingRequestsCountChange?.(friends.pendingRequests.length);
-  }, [onPendingRequestsCountChange, friends.pendingRequests.length]);
+    if (!me.uid || !SOCIAL_FEATURE_FLAGS.directMessages) return;
+    const unsub = subscribeToDmThreads(me.uid, threads => {
+      const total = threads.reduce((sum, t) => sum + t.unreadCount, 0);
+      setDmUnreadCount(total);
+    });
+    return unsub;
+  }, [me.uid]);
+
+  // Notify parent of pending request count + DM unread count
+  useEffect(() => {
+    onPendingRequestsCountChange?.(friends.pendingRequests.length + dmUnreadCount);
+  }, [onPendingRequestsCountChange, friends.pendingRequests.length, dmUnreadCount]);
 
   // Animate sub-tab transitions
   useEffect(() => {
@@ -293,9 +305,22 @@ function SocialTabRouter({
             onPress={() => setSubTab('dm')}
             accessibilityRole="tab"
             accessibilityState={{ selected: subTab === 'dm' }}
-            accessibilityLabel="Direct messages tab"
+            accessibilityLabel={`Direct messages tab${dmUnreadCount > 0 ? `, ${dmUnreadCount} unread` : ''}`}
           >
             <Text style={[styles.subTabText, subTab === 'dm' && styles.subTabTextActive]}>DMs</Text>
+            {dmUnreadCount > 0 && (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: -2,
+                  width: 10,
+                  height: 10,
+                  borderRadius: 5,
+                  backgroundColor: '#B3261E',
+                }}
+              />
+            )}
           </Pressable>
         )}
         {SOCIAL_FEATURE_FLAGS.activityFeed && (
