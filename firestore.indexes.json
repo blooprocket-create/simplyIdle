@@ -1,0 +1,41 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "guildWars",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "guildAId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "completedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "guildWars",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "guildBId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "completedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "guildWarChallenges",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "defenderGuildId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "guildWarChallenges",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "challengerGuildId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { THEME, RADIUS } from '../../../theme';
-import { fetchFriendRelationshipStatus, FriendRelationshipStatus, sendFriendRequest } from '../../../services/friends';
+import {
+  fetchFriendRelationshipStatus,
+  FriendRelationshipStatus,
+  sendFriendRequestByUid,
+} from '../../../services/friends';
 import { fetchPublicPlayerProfile, PublicPlayerProfile } from '../../../services/publicProfile';
 import { sendGuildInvite } from '../../../services/guild';
 import { trackEvent } from '../../../telemetry';
@@ -195,7 +199,7 @@ export function ProfileModal({
                       sourceTab: socialSubTab,
                     });
                     try {
-                      await sendFriendRequest(meUid, meName, profile.publicUsername);
+                      await sendFriendRequestByUid(meUid, meName, profile.uid);
                       setRelationship('outgoing');
                       void trackEvent('social_profile_friend_request_sent', {
                         sourceTab: socialSubTab,

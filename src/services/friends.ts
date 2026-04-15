@@ -388,6 +388,36 @@ export async function sendFriendRequest(fromUid: string, fromName: string, toUse
   });
 }
 
+/** Send a friend request by UID directly (for search results with known UIDs). */
+export async function sendFriendRequestByUid(fromUid: string, fromName: string, toUid: string): Promise<void> {
+  const db = getFirebaseFirestore();
+  if (!db || !fromUid || !toUid) return;
+  if (toUid === fromUid) throw new Error('Cannot friend yourself.');
+  const now = Date.now();
+
+  // Verify target exists on leaderboard
+  const targetSnap = await getDoc(doc(db, 'leaderboard_global_v1', toUid));
+  if (!targetSnap.exists()) throw new Error('Player not found.');
+
+  await runTransaction(db, async tx => {
+    const existingFriendSnap = await tx.get(doc(db, 'friends', fromUid, 'list', toUid));
+    if (existingFriendSnap.exists()) {
+      throw new Error('You are already friends.');
+    }
+
+    tx.set(doc(db, 'friends', toUid, 'requests', fromUid), {
+      fromUid,
+      fromName: fromName.slice(0, 24) || 'Player',
+      createdAt: now,
+    });
+
+    tx.set(doc(db, 'friends', fromUid, 'outgoing', toUid), {
+      toUid,
+      createdAt: now,
+    });
+  });
+}
+
 export async function acceptFriendRequest(uid: string, fromUid: string): Promise<void> {
   const db = getFirebaseFirestore();
   if (!db || !uid || !fromUid) return;
