@@ -1284,6 +1284,7 @@ export async function respondToGuildInvite(input: {
     });
 
     tx.set(userGuildRef, {
+      uid,
       guildId: invite.guildId,
       guildName: typeof guild.name === 'string' ? guild.name : invite.guildName,
       rank: 'member',
