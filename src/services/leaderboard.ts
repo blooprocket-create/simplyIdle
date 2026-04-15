@@ -106,6 +106,14 @@ export async function submitLeaderboardScore(input: SubmitLeaderboardScoreInput)
     await runTransaction(db, async tx => {
       const snap = await tx.get(ref);
       const remoteData = snap.exists() ? snap.data() : null;
+
+      // Respect the Firestore-rules 10s rate limit even after page reload
+      // (in-memory guard state is lost on refresh).
+      const remoteUpdatedAt = remoteData && typeof remoteData.updatedAt === 'number' ? remoteData.updatedAt : 0;
+      if (remoteUpdatedAt > 0 && now - remoteUpdatedAt < MIN_SUBMIT_INTERVAL_MS) {
+        return;
+      }
+
       const remoteScore = remoteData && typeof remoteData.score === 'number' ? clampScore(remoteData.score) : 0;
       const remoteVipLevel =
         remoteData && typeof remoteData.vipLevel === 'number' ? Math.max(0, Math.floor(remoteData.vipLevel)) : 0;
@@ -126,8 +134,8 @@ export async function submitLeaderboardScore(input: SubmitLeaderboardScoreInput)
     });
   } catch (error) {
     const code = typeof error === 'object' && error && 'code' in error ? String((error as { code: unknown }).code) : '';
-    if (code.includes('failed-precondition') || code.includes('aborted')) {
-      // Firestore transaction retries can emit transient precondition errors under contention.
+    if (code.includes('failed-precondition') || code.includes('aborted') || code.includes('permission-denied')) {
+      // Transient errors: transaction contention, rate-limit near boundary, or rule timing edge.
       return;
     }
     throw error;
