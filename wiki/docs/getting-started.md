@@ -20,19 +20,7 @@ Last reviewed: 2026-04-15
 Enemies spawn in waves. Clear them to earn **gold**, **EXP**, and **boss tears**. Boss waves appear every 10 waves with bigger rewards.
 
 ### 2. Recruit Your Team
-Spend gold on **party units** (Squire → Archer Squad → Mage Circle → ...) or summon **heroes** using Boss Tears or Diamonds.
-
-| Unit | Cost | Base DPS |
-|------|------|----------|
-| Squire | 70 | 2 |
-| Archer Squad | 420 | 9 |
-| Mage Circle | 3,200 | 48 |
-| Cleric Order | 24,000 | 240 |
-| Paladin Guard | 230,000 | 1,100 |
-| Assassin Cell | 2,400,000 | 7,200 |
-| Dragon Riders | 34,000,000 | 55,000 |
-
-Unit costs scale at **×1.15** per purchase.
+Summon **heroes** using Boss Tears or Diamonds. Build a team with class coverage and role synergy.
 
 ### 3. Equip Gear
 Drops come from wave clears. Equip **Weapon**, **Armor**, and **Accessory** slots. Match gear to your heroes' class for best results.

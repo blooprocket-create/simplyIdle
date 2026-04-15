@@ -29,14 +29,13 @@ Last reviewed: 2026-04-15
 
 ## Social
 
-| Issue | Status | Notes |
-|-------|--------|-------|
-| Player report UI not yet connected | Planned | Backend service ready; awaiting UI |
+_No open social issues._
 
 ## Recently Fixed
 
 | Issue | Fixed In |
 |-------|----------|
+| Player report UI not connected | April 2026 |
 | Friends count console 403 for other players' lists | April 2026 |
 | Modal transitions inconsistent | April 2026 |
 | DM notifications not surfacing to bottom nav | April 2026 |

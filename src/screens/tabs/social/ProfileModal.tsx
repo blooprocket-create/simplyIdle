@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { THEME, RADIUS } from '../../../theme';
 import {
   fetchFriendRelationshipStatus,
@@ -8,6 +8,8 @@ import {
 } from '../../../services/friends';
 import { fetchPublicPlayerProfile, PublicPlayerProfile } from '../../../services/publicProfile';
 import { sendGuildInvite } from '../../../services/guild';
+import { blockUser, unblockUser, reportUser, subscribeBlockList, ReportReason } from '../../../services/blockReport';
+import { SOCIAL_FEATURE_FLAGS } from '../../../socialFeatureFlags';
 import { trackEvent } from '../../../telemetry';
 
 interface ProfileModalProps {
@@ -57,14 +59,31 @@ export function ProfileModal({
   const [error, setError] = useState<string | null>(null);
   const [relationship, setRelationship] = useState<FriendRelationshipStatus>('none');
   const [actionBusy, setActionBusy] = useState(false);
+  const [blockedUids, setBlockedUids] = useState<Set<string>>(new Set());
+  const [showReportForm, setShowReportForm] = useState(false);
+  const [reportReason, setReportReason] = useState<ReportReason>('harassment');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportSent, setReportSent] = useState(false);
   const cacheRef = useRef<Map<string, PublicPlayerProfile>>(new Map());
 
   const handleClose = useCallback(() => {
     setLoading(false);
     setError(null);
     setActionBusy(false);
+    setShowReportForm(false);
+    setReportReason('harassment');
+    setReportDetails('');
+    setReportSent(false);
     onClose();
   }, [onClose]);
+
+  // Subscribe to block list
+  useEffect(() => {
+    if (!meUid || !SOCIAL_FEATURE_FLAGS.blockReport) return;
+    return subscribeBlockList(meUid, blocks => {
+      setBlockedUids(new Set(blocks.map(b => b.targetUid)));
+    });
+  }, [meUid]);
 
   // Escape key dismiss on web
   useEffect(() => {
@@ -266,6 +285,101 @@ export function ProfileModal({
                   </Text>
                 </Pressable>
               </View>
+
+              {/* Block & Report buttons */}
+              {SOCIAL_FEATURE_FLAGS.blockReport && profile?.uid !== meUid && (
+                <View style={styles.actions}>
+                  <Pressable
+                    style={[styles.blockBtn, actionBusy && styles.btnDisabled]}
+                    disabled={actionBusy}
+                    onPress={async () => {
+                      if (!meUid || !profile) return;
+                      setActionBusy(true);
+                      try {
+                        if (blockedUids.has(profile.uid)) {
+                          await unblockUser(meUid, profile.uid);
+                          void trackEvent('social_unblock', { targetUid: profile.uid });
+                        } else {
+                          await blockUser(meUid, profile.uid);
+                          void trackEvent('social_block', { targetUid: profile.uid });
+                        }
+                      } catch {
+                        setError('Failed to update block status.');
+                      } finally {
+                        setActionBusy(false);
+                      }
+                    }}
+                  >
+                    <Text style={styles.blockBtnText}>
+                      {actionBusy ? '...' : blockedUids.has(profile?.uid ?? '') ? '🔓 Unblock' : '🚫 Block'}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.reportBtn, (actionBusy || reportSent) && styles.btnDisabled]}
+                    disabled={actionBusy || reportSent}
+                    onPress={() => setShowReportForm(v => !v)}
+                  >
+                    <Text style={styles.reportBtnText}>{reportSent ? '✓ Reported' : '⚠️ Report'}</Text>
+                  </Pressable>
+                </View>
+              )}
+
+              {/* Report form */}
+              {showReportForm && !reportSent && (
+                <View style={styles.reportCard}>
+                  <Text style={styles.reportLabel}>Reason</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      {(['harassment', 'spam', 'inappropriate_name', 'cheating', 'other'] as ReportReason[]).map(r => (
+                        <Pressable
+                          key={r}
+                          style={[styles.reasonChip, reportReason === r && styles.reasonChipActive]}
+                          onPress={() => setReportReason(r)}
+                        >
+                          <Text style={[styles.reasonChipText, reportReason === r && styles.reasonChipTextActive]}>
+                            {r.replace('_', ' ')}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </ScrollView>
+                  <Text style={styles.reportLabel}>Details (optional)</Text>
+                  <TextInput
+                    style={styles.reportInput}
+                    value={reportDetails}
+                    onChangeText={t => setReportDetails(t.slice(0, 500))}
+                    placeholder="Describe the issue..."
+                    placeholderTextColor="#5a7a9a"
+                    multiline
+                    maxLength={500}
+                    numberOfLines={3}
+                  />
+                  <Text style={styles.reportCharCount}>{reportDetails.length}/500</Text>
+                  <Pressable
+                    style={[styles.submitReportBtn, actionBusy && styles.btnDisabled]}
+                    disabled={actionBusy}
+                    onPress={async () => {
+                      if (!meUid || !profile) return;
+                      setActionBusy(true);
+                      try {
+                        await reportUser(meUid, profile.uid, reportReason, reportDetails);
+                        setReportSent(true);
+                        setShowReportForm(false);
+                        void trackEvent('social_report_submitted', {
+                          targetUid: profile.uid,
+                          reason: reportReason,
+                        });
+                      } catch {
+                        setError('Failed to submit report.');
+                      } finally {
+                        setActionBusy(false);
+                      }
+                    }}
+                  >
+                    <Text style={styles.submitReportBtnText}>{actionBusy ? 'Submitting...' : 'Submit Report'}</Text>
+                  </Pressable>
+                </View>
+              )}
             </>
           )}
 
@@ -407,6 +521,98 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
   },
   closeBtnText: {
+    fontWeight: '800',
+    fontSize: 12,
+    color: '#FFFFFF',
+  },
+  blockBtn: {
+    flex: 1,
+    backgroundColor: '#3D2A1A',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#7A5C3C',
+  },
+  blockBtnText: {
+    fontWeight: '800',
+    fontSize: 12,
+    color: '#FFB866',
+  },
+  reportBtn: {
+    flex: 1,
+    backgroundColor: '#4D2230',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FF7A90',
+  },
+  reportBtnText: {
+    fontWeight: '800',
+    fontSize: 12,
+    color: '#FF7A90',
+  },
+  reportCard: {
+    backgroundColor: '#1A2232',
+    borderRadius: RADIUS.md,
+    padding: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#3C5060',
+  },
+  reportLabel: {
+    fontWeight: '700',
+    fontSize: 11,
+    color: THEME.text.secondary,
+    textTransform: 'uppercase',
+  },
+  reasonChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#3C5D77',
+    backgroundColor: '#132133',
+  },
+  reasonChipActive: {
+    borderColor: '#FF7A90',
+    backgroundColor: '#4D2230',
+  },
+  reasonChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.text.secondary,
+    textTransform: 'capitalize',
+  },
+  reasonChipTextActive: {
+    color: '#FF7A90',
+  },
+  reportInput: {
+    backgroundColor: '#0E1A28',
+    borderWidth: 1,
+    borderColor: '#3C5060',
+    borderRadius: RADIUS.md,
+    padding: 10,
+    color: THEME.text.primary,
+    fontSize: 13,
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+  reportCharCount: {
+    fontSize: 10,
+    color: THEME.text.secondary,
+    textAlign: 'right',
+  },
+  submitReportBtn: {
+    backgroundColor: THEME.status.error,
+    paddingVertical: 10,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+  },
+  submitReportBtnText: {
     fontWeight: '800',
     fontSize: 12,
     color: '#FFFFFF',

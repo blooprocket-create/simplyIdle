@@ -104,12 +104,12 @@ Heartbeat-based system showing who's online:
 
 ### Reporting
 
-<span class="status-badge planned">Backend Only</span>
+<span class="status-badge live">Live</span>
 
-The report service is implemented server-side but no player-facing UI is connected yet. When the UI ships, reports will support:
+Report players via their profile card or the chat user menu:
 - **Reasons:** Harassment, Spam, Inappropriate Name, Cheating, Other
-- **Details:** Up to 500 characters
-- Reports reviewed by admins
+- **Details:** Up to 500 characters (optional from chat menu, full form in profile)
+- Reports are reviewed by admins
 
 ## Cloud Mail
 

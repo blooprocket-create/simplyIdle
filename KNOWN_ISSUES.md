@@ -11,9 +11,11 @@
 - Some dense panels may need additional mobile-first spacing tweaks.
 
 ## Social
-- Player report UI not yet connected (backend service ready).
+
+_No open social issues._
 
 ## Recently Fixed
+- Player report UI not connected.
 - Friends count console 403 for other players' lists.
 - Modal transitions inconsistent.
 - DM notifications not surfacing to bottom nav.

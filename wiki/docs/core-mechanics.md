@@ -73,20 +73,6 @@ Permanent upgrades that persist through prestige cycles. Each starts with fixed 
 
 ## Team Composition
 
-### Party Units
-
-Buildings that add passive DPS. Each purchase costs ×1.15 more than the last.
-
-| Unit | Base Cost | Base DPS |
-|------|-----------|----------|
-| Squire | 70 | 2 |
-| Archer Squad | 420 | 9 |
-| Mage Circle | 3,200 | 48 |
-| Cleric Order | 24,000 | 240 |
-| Paladin Guard | 230,000 | 1,100 |
-| Assassin Cell | 2,400,000 | 7,200 |
-| Dragon Riders | 34,000,000 | 55,000 |
-
 ### Hero Slots
 
 - **Default slots:** 4 heroes + player

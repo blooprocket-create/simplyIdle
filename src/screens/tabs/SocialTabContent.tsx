@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Modal, NativeSyntheticEvent, NativeTouchEvent, Platform, Pressable, Text, View } from 'react-native';
 import { GlobalChatMessage } from '../../services/chat';
 import { fetchFriendRelationshipStatus, FriendRelationshipStatus, sendFriendRequest } from '../../services/friends';
+import { blockUser, unblockUser, reportUser, subscribeBlockList, ReportReason } from '../../services/blockReport';
 import { GiftPreference } from '../../gameConfig';
 import { trackEvent } from '../../telemetry';
 import { SOCIAL_FEATURE_FLAGS } from '../../socialFeatureFlags';
@@ -114,6 +115,8 @@ function SocialTabRouter({
   const [activeProfileUid, setActiveProfileUid] = useState<string | null>(null);
   const [friendAddBusy, setFriendAddBusy] = useState(false);
   const [dmUnreadCount, setDmUnreadCount] = useState(0);
+  const [blockedUids, setBlockedUids] = useState<Set<string>>(new Set());
+  const [menuReportSent, setMenuReportSent] = useState(false);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const sectionAnim = useRef(new Animated.Value(1)).current;
 
@@ -135,6 +138,14 @@ function SocialTabRouter({
       setDmUnreadCount(total);
     });
     return unsub;
+  }, [me.uid]);
+
+  // Subscribe to block list
+  useEffect(() => {
+    if (!me.uid || !SOCIAL_FEATURE_FLAGS.blockReport) return;
+    return subscribeBlockList(me.uid, blocks => {
+      setBlockedUids(new Set(blocks.map(b => b.targetUid)));
+    });
   }, [me.uid]);
 
   // Notify parent of pending request count + DM unread count
@@ -159,6 +170,7 @@ function SocialTabRouter({
       setActiveUserRelationship('none');
       return;
     }
+    setMenuReportSent(false);
     void fetchFriendRelationshipStatus(me.uid, activeUserMenu.uid)
       .then(setActiveUserRelationship)
       .catch(() => setActiveUserRelationship('none'));
@@ -484,6 +496,56 @@ function SocialTabRouter({
               >
                 <Text style={styles.smallBtnText}>View Profile</Text>
               </Pressable>
+            )}
+            {SOCIAL_FEATURE_FLAGS.blockReport && !!activeUserMenu?.uid && activeUserMenu.uid !== me.uid && (
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 2 }}>
+                <Pressable
+                  style={[styles.smallBtn, { borderColor: '#7A5C3C', backgroundColor: '#3D2A1A', flex: 1 }]}
+                  disabled={friendAddBusy}
+                  onPress={async () => {
+                    if (!me.uid || !activeUserMenu?.uid) return;
+                    setFriendAddBusy(true);
+                    try {
+                      if (blockedUids.has(activeUserMenu.uid)) {
+                        await unblockUser(me.uid, activeUserMenu.uid);
+                      } else {
+                        await blockUser(me.uid, activeUserMenu.uid);
+                      }
+                    } catch {
+                      /* handled by subscription update */
+                    } finally {
+                      setFriendAddBusy(false);
+                    }
+                  }}
+                >
+                  <Text style={[styles.smallBtnText, { color: '#FFB866' }]}>
+                    {blockedUids.has(activeUserMenu?.uid ?? '') ? '🔓 Unblock' : '🚫 Block'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.smallBtn, styles.smallBtnDanger, { flex: 1 }]}
+                  disabled={friendAddBusy || menuReportSent}
+                  onPress={async () => {
+                    if (!me.uid || !activeUserMenu?.uid || menuReportSent) return;
+                    setFriendAddBusy(true);
+                    try {
+                      await reportUser(me.uid, activeUserMenu.uid, 'other', '');
+                      setMenuReportSent(true);
+                      void trackEvent('social_report_submitted', {
+                        targetUid: activeUserMenu.uid,
+                        reason: 'other',
+                        source: 'chat_menu',
+                      });
+                    } catch {
+                      /* swallow */
+                    } finally {
+                      setFriendAddBusy(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.smallBtnText}>{menuReportSent ? '✓ Reported' : '⚠️ Report'}</Text>
+                </Pressable>
+              </View>
             )}
           </Pressable>
         </Pressable>
