@@ -28,6 +28,7 @@ export type ActiveWarStatus = 'active' | 'completed';
 
 export interface WarChallenge {
   challengeId: string;
+  challengerUid: string;
   challengerGuildId: string;
   challengerName: string;
   challengerTag: string;
@@ -165,6 +166,7 @@ export async function sendWarChallenge(uid: string, targetGuildId: string): Prom
   const challenge: WarChallenge = {
     challengeId,
     challengerGuildId: me.guildId,
+    challengerUid: uid,
     challengerName: me.guildName,
     challengerTag: me.guildTag,
     challengerLevel: me.guildLevel,
