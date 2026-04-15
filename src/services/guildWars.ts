@@ -330,7 +330,23 @@ export async function contributeWarDamage(input: {
   const warRef = doc(db, 'guildWars', input.warId);
   const contribRef = doc(db, 'guildWars', input.warId, 'contributors', input.uid);
   const now = Date.now();
-  const dealt = Math.max(0, Math.floor((input.dps || 1) * 30));
+
+  // Cap DPS: hard ceiling + cross-reference against leaderboard score for sanity
+  const MAX_ALLOWED_DPS = 1_000_000_000;
+  let dpsCeiling = MAX_ALLOWED_DPS;
+  try {
+    const boardSnap = await getDoc(doc(db, 'leaderboard_global_v1', input.uid));
+    if (boardSnap.exists()) {
+      const boardData = boardSnap.data();
+      const score = typeof boardData.score === 'number' ? Math.max(1, boardData.score) : 1;
+      // Allow DPS up to 10× the player's leaderboard score (generous buffer for lag/burst)
+      dpsCeiling = Math.min(MAX_ALLOWED_DPS, Math.max(1, score * 10));
+    }
+  } catch {
+    // If leaderboard lookup fails, fall back to hard cap
+  }
+  const safeDps = Math.min(dpsCeiling, Math.max(1, Math.floor(input.dps || 1)));
+  const dealt = safeDps * 30;
 
   return runTransaction(db, async tx => {
     const [warSnap, contribSnap] = await Promise.all([tx.get(warRef), tx.get(contribRef)]);

@@ -885,9 +885,21 @@ export async function attackBoss(input: {
   const now = Date.now();
   const memberRef = doc(db, GUILD_COLLECTION, guildId, 'members', input.uid);
   const bossRef = doc(db, GUILD_COLLECTION, guildId, 'boss', 'active');
-  // Cap DPS to prevent inflated client values (1 billion ceiling)
+  // Cap DPS: hard ceiling + cross-reference against leaderboard score for sanity
   const MAX_ALLOWED_DPS = 1_000_000_000;
-  const safeDps = Math.min(MAX_ALLOWED_DPS, Math.max(1, Math.floor(input.dps || 1)));
+  let dpsCeiling = MAX_ALLOWED_DPS;
+  try {
+    const boardSnap = await getDoc(doc(db, 'leaderboard_global_v1', input.uid));
+    if (boardSnap.exists()) {
+      const boardData = boardSnap.data();
+      const score = typeof boardData.score === 'number' ? Math.max(1, boardData.score) : 1;
+      // Allow DPS up to 10× the player's leaderboard score (generous buffer for lag/burst)
+      dpsCeiling = Math.min(MAX_ALLOWED_DPS, Math.max(1, score * 10));
+    }
+  } catch {
+    // If leaderboard lookup fails, fall back to hard cap
+  }
+  const safeDps = Math.min(dpsCeiling, Math.max(1, Math.floor(input.dps || 1)));
   const strikeDamage = safeDps * 30;
 
   const txResult = await runTransaction<{
@@ -937,6 +949,11 @@ export async function attackBoss(input: {
     );
 
     const defeated = nextHp <= 0;
+    // Prevent duplicate reward mailing: only grant if this transaction is the one
+    // that transitions the boss to defeated (rewardedAt not yet set).
+    const alreadyRewarded = typeof bossData.rewardedAt === 'number' && bossData.rewardedAt > 0;
+    const shouldReward = defeated && !alreadyRewarded;
+
     tx.set(
       bossRef,
       {
@@ -944,6 +961,7 @@ export async function attackBoss(input: {
         status: defeated ? 'defeated' : 'active',
         participantUids,
         defeatedAt: defeated ? now : null,
+        ...(shouldReward ? { rewardedAt: now } : {}),
         updatedAt: now,
       },
       { merge: true },
@@ -951,7 +969,7 @@ export async function attackBoss(input: {
 
     return {
       dealt: effectiveDamage,
-      rewardGranted: defeated,
+      rewardGranted: shouldReward,
       rewardAmount: Math.max(100, Math.floor(maxHp / 5_000_000_000)),
       boss: {
         bossId: 'active',

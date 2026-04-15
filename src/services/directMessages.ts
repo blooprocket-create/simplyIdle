@@ -9,6 +9,7 @@ import {
   setDoc,
   getDoc,
   updateDoc,
+  increment,
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase';
 
@@ -51,6 +52,16 @@ export async function sendDirectMessage(
   const cleaned = text.replace(/\s+/g, ' ').trim().slice(0, 500);
   if (!cleaned) return;
 
+  // Validate recipient exists and neither party has blocked the other
+  const [recipientSnap, senderBlockSnap, recipientBlockSnap] = await Promise.all([
+    getDoc(doc(db, 'leaderboard_global_v1', toUid)),
+    getDoc(doc(db, 'blocks', fromUid, 'list', toUid)),
+    getDoc(doc(db, 'blocks', toUid, 'list', fromUid)),
+  ]);
+  if (!recipientSnap.exists()) throw new Error('Recipient not found.');
+  if (senderBlockSnap.exists()) throw new Error('You have blocked this player.');
+  if (recipientBlockSnap.exists()) throw new Error('Cannot message this player.');
+
   const conversationId = buildConversationId(fromUid, toUid);
   const now = Date.now();
 
@@ -75,15 +86,8 @@ export async function sendDirectMessage(
     { merge: true },
   );
 
-  // Update thread index for receiver (+1 unread)
+  // Update thread index for receiver (+1 unread, atomic increment)
   const receiverThreadRef = doc(db, 'dmThreads', toUid, 'conversations', fromUid);
-  const receiverThreadSnap = await getDoc(receiverThreadRef);
-  const prevUnread = receiverThreadSnap.exists()
-    ? typeof receiverThreadSnap.data().unreadCount === 'number'
-      ? receiverThreadSnap.data().unreadCount
-      : 0
-    : 0;
-
   await setDoc(
     receiverThreadRef,
     {
@@ -91,7 +95,7 @@ export async function sendDirectMessage(
       partnerName: fromName.trim().slice(0, 24),
       lastMessageText: cleaned.slice(0, 80),
       lastMessageAt: now,
-      unreadCount: prevUnread + 1,
+      unreadCount: increment(1),
     },
     { merge: true },
   );
