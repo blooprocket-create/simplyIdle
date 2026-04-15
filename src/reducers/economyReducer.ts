@@ -5,12 +5,7 @@
  * Extracted from the monolithic reducer in useGameState.ts.
  */
 
-import type {
-  GameState,
-  RewardPopup,
-  EquipmentInstance,
-  MailAttachments,
-} from '../useGameState';
+import type { GameState, RewardPopup, EquipmentInstance, MailAttachments } from '../useGameState';
 import {
   PARTY,
   SKILLS,
@@ -60,8 +55,8 @@ export type EconomyAction =
   | { type: 'START_EXPEDITION'; expeditionType: ExpeditionType; offeredRarity?: ExpeditionRarity }
   | { type: 'REFRESH_EXPEDITION_CONTRACTS' }
   | { type: 'COMPLETE_EXPEDITION'; expeditionId: string }
-  | { type: 'CONVERT_SCRAP_TO_ESSENCE' }
-  | { type: 'CONVERT_SCRAP_TO_SHARDS' }
+  | { type: 'CONVERT_SCRAP_TO_ESSENCE'; count?: number }
+  | { type: 'CONVERT_SCRAP_TO_SHARDS'; count?: number }
   | { type: 'BUY_GOLD_SHOP_ITEM'; offerId: GoldShopOfferId }
   | { type: 'BUY_DIAMOND_SHOP_ITEM'; offerId: DiamondShopOfferId }
   | { type: 'SIMULATE_DOLLAR_PURCHASE'; offerId: DollarShopOfferId }
@@ -94,7 +89,10 @@ export const ECONOMY_ACTION_TYPES = new Set<string>([
 export interface EconomyContext {
   withAchievement: (state: GameState) => GameState;
   getEquipmentEntry: (state: GameState, itemId: string) => EquipmentInstance | EquipmentItem | null;
-  getEquipmentUpgradePlan: (state: GameState, itemId: string) => {
+  getEquipmentUpgradePlan: (
+    state: GameState,
+    itemId: string,
+  ) => {
     canUpgrade: boolean;
     targetItemId: string | null;
     targetRarity: string | null;
@@ -102,7 +100,12 @@ export interface EconomyContext {
     essenceCost: number;
     goldCost: number;
   };
-  createEquipmentInstance: (baseItem: EquipmentItem, itemLevel: number, source: EquipmentSource, statMultiplier?: number) => EquipmentInstance;
+  createEquipmentInstance: (
+    baseItem: EquipmentItem,
+    itemLevel: number,
+    source: EquipmentSource,
+    statMultiplier?: number,
+  ) => EquipmentInstance;
   hasUnlock: (state: GameState, unlock: PermanentUnlockId) => boolean;
   getForgeStatMultiplier: (forgeLevel: number) => number;
   processLevelUp: (exp: number, level: number) => { exp: number; level: number; gainedLevels: number };
@@ -180,14 +183,18 @@ function getAchievementBonusMultiplier(state: GameState): number {
 }
 
 function equipmentScrapValue(rarity: string): number {
-  return ({
-    common: 10,
-    rare: 24,
-    epic: 60,
-    legendary: 160,
-    mythic: 360,
-    transcendent: 760,
-  } as Record<string, number>)[rarity] ?? 10;
+  return (
+    (
+      {
+        common: 10,
+        rare: 24,
+        epic: 60,
+        legendary: 160,
+        mythic: 360,
+        transcendent: 760,
+      } as Record<string, number>
+    )[rarity] ?? 10
+  );
 }
 
 function getEquipmentScrapGain(item: EquipmentInstance | EquipmentItem): number {
@@ -210,7 +217,13 @@ function emptyAttachments(): MailAttachments {
 }
 
 function hasAnyAttachment(attachments: MailAttachments): boolean {
-  return attachments.shards > 0 || attachments.gold > 0 || attachments.diamonds > 0 || attachments.tears > 0 || attachments.essence > 0;
+  return (
+    attachments.shards > 0 ||
+    attachments.gold > 0 ||
+    attachments.diamonds > 0 ||
+    attachments.tears > 0 ||
+    attachments.essence > 0
+  );
 }
 
 function claimMailAttachments(state: GameState, mailId: string, keys: MailAttachmentKey[]): GameState {
@@ -279,9 +292,7 @@ function claimMailAttachments(state: GameState, mailId: string, keys: MailAttach
 }
 
 function claimAllMailAttachments(state: GameState): GameState {
-  const claimable = state.mailbox
-    .filter(mail => hasAnyAttachment(mail.attachments))
-    .map(mail => mail.id);
+  const claimable = state.mailbox.filter(mail => hasAnyAttachment(mail.attachments)).map(mail => mail.id);
   if (claimable.length === 0) return state;
 
   let nextState = state;
@@ -298,17 +309,31 @@ function getUsableProgressScale(state: GameState): number {
   return levelFactor * waveFactor * prestigeFactor;
 }
 
-function getScaledUsableGoldGain(state: GameState, baseValue: number, itemType: 'basic' | 'advanced', ctx: EconomyContext): number {
+function getScaledUsableGoldGain(
+  state: GameState,
+  baseValue: number,
+  itemType: 'basic' | 'advanced',
+  ctx: EconomyContext,
+): number {
   const scaledBase = Math.ceil(baseValue * getUsableProgressScale(state) * ctx.getVipGoldMultiplier(state));
-  const waveFloor = Math.ceil(getMonsterGold(Math.max(1, state.highestWaveReached)) * (itemType === 'advanced' ? 8 : 3));
+  const waveFloor = Math.ceil(
+    getMonsterGold(Math.max(1, state.highestWaveReached)) * (itemType === 'advanced' ? 8 : 3),
+  );
   if (!Number.isFinite(scaledBase) && !Number.isFinite(waveFloor)) return 1;
   const safeScaledBase = Number.isFinite(scaledBase) ? scaledBase : 0;
   const safeWaveFloor = Number.isFinite(waveFloor) ? waveFloor : 0;
   return Math.max(1, Math.floor(Math.max(safeScaledBase, safeWaveFloor)));
 }
 
-function getScaledUsableExpGain(state: GameState, baseValue: number, itemType: 'basic' | 'advanced', ctx: EconomyContext): number {
-  const scaledBase = Math.ceil(baseValue * getUsableProgressScale(state) * getAchievementBonusMultiplier(state) * ctx.getVipExpMultiplier(state));
+function getScaledUsableExpGain(
+  state: GameState,
+  baseValue: number,
+  itemType: 'basic' | 'advanced',
+  ctx: EconomyContext,
+): number {
+  const scaledBase = Math.ceil(
+    baseValue * getUsableProgressScale(state) * getAchievementBonusMultiplier(state) * ctx.getVipExpMultiplier(state),
+  );
   const waveFloor = Math.ceil(getMonsterExp(Math.max(1, state.highestWaveReached)) * (itemType === 'advanced' ? 6 : 2));
   if (!Number.isFinite(scaledBase) && !Number.isFinite(waveFloor)) return 1;
   const safeScaledBase = Number.isFinite(scaledBase) ? scaledBase : 0;
@@ -327,7 +352,12 @@ function getScaledUsableShardGain(state: GameState, baseValue: number, itemType:
   return Math.max(1, Math.floor(Math.max(safeScaledBase, safeWaveFloor)));
 }
 
-function getScaledUsableHeatReduction(state: GameState, baseValue: number, itemType: 'basic' | 'advanced', ctx: EconomyContext): number {
+function getScaledUsableHeatReduction(
+  state: GameState,
+  baseValue: number,
+  itemType: 'basic' | 'advanced',
+  ctx: EconomyContext,
+): number {
   const maxHeat = ctx.getMaxHeatForLevel(state.level);
   const pctFloor = itemType === 'advanced' ? 0.22 : 0.1;
   return Math.max(Math.ceil(baseValue), Math.ceil(maxHeat * pctFloor));
@@ -353,6 +383,17 @@ function getFacilityUpgradeCostLocal(facilityId: FacilityId, currentLevel: numbe
   return cost;
 }
 
+// ─── Helpers ──────────────────────────────────────────────────
+
+const EQUIPMENT_RARITY_RANK: Record<string, number> = {
+  common: 0,
+  rare: 1,
+  epic: 2,
+  legendary: 3,
+  mythic: 4,
+  transcendent: 5,
+};
+
 // ─── Reducer ───────────────────────────────────────────────────
 
 /**
@@ -364,9 +405,10 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
       const cfg = PARTY.find(p => p.id === action.id);
       if (!cfg) return state;
       const owned = state.party[action.id] ?? 0;
-      const cost = action.amount === 1
-        ? buildingCost(cfg.baseCost, owned, COST_SCALE)
-        : bulkCost(cfg.baseCost, owned, action.amount, COST_SCALE);
+      const cost =
+        action.amount === 1
+          ? buildingCost(cfg.baseCost, owned, COST_SCALE)
+          : bulkCost(cfg.baseCost, owned, action.amount, COST_SCALE);
       if (state.gold < cost) return state;
       const party = { ...state.party, [action.id]: owned + action.amount };
       return { ...state, gold: state.gold - cost, party };
@@ -384,9 +426,7 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
       const qty = state.usableItemCounts[action.itemId] ?? 0;
       if (qty <= 0) return state;
 
-      const requestedUses = action.amount === 'all'
-        ? qty
-        : ctx.clampInt(action.amount, 1, qty, 1);
+      const requestedUses = action.amount === 'all' ? qty : ctx.clampInt(action.amount, 1, qty, 1);
       if (requestedUses <= 0) return state;
 
       const item = getUsableItem(action.itemId);
@@ -400,15 +440,18 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
 
       if (item.effect === 'heal_team_percent') {
         const healed = Math.ceil(nextState.teamMaxHp * item.value) * requestedUses;
-        nextState = queueReward({
-          ...nextState,
-          teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + healed),
-        }, {
-          id: `use_${item.id}_${Date.now()}`,
-          kind: 'item',
-          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
-          detail: `Restored ${healed} team HP`,
-        });
+        nextState = queueReward(
+          {
+            ...nextState,
+            teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + healed),
+          },
+          {
+            id: `use_${item.id}_${Date.now()}`,
+            kind: 'item',
+            title: `Used ${item.emoji} ${item.name}${useSuffix}`,
+            detail: `Restored ${healed} team HP`,
+          },
+        );
       }
 
       if (item.effect === 'gain_gold_flat') {
@@ -417,16 +460,19 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
         const gain = Number.isFinite(rawGain) ? Math.max(0, Math.floor(rawGain)) : 0;
         const safeCurrentGold = Number.isFinite(nextState.gold) ? nextState.gold : 0;
         const safeTotalGold = Number.isFinite(nextState.totalGold) ? nextState.totalGold : 0;
-        nextState = queueReward({
-          ...nextState,
-          gold: safeCurrentGold + gain,
-          totalGold: safeTotalGold + gain,
-        }, {
-          id: `use_${item.id}_${Date.now()}`,
-          kind: 'gold',
-          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
-          detail: `+${gain} gold`,
-        });
+        nextState = queueReward(
+          {
+            ...nextState,
+            gold: safeCurrentGold + gain,
+            totalGold: safeTotalGold + gain,
+          },
+          {
+            id: `use_${item.id}_${Date.now()}`,
+            kind: 'gold',
+            title: `Used ${item.emoji} ${item.name}${useSuffix}`,
+            detail: `+${gain} gold`,
+          },
+        );
       }
 
       if (item.effect === 'gain_exp_flat') {
@@ -436,18 +482,21 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
         const safeCurrentExp = Number.isFinite(nextState.exp) ? nextState.exp : 0;
         const safeTotalExp = Number.isFinite(nextState.totalExp) ? nextState.totalExp : 0;
         const lvl = ctx.processLevelUp(safeCurrentExp + gain, nextState.level);
-        nextState = queueReward({
-          ...nextState,
-          exp: lvl.exp,
-          totalExp: safeTotalExp + gain,
-          level: lvl.level,
-          unspentStatPoints: nextState.unspentStatPoints + lvl.gainedLevels * STAT_POINTS_PER_LEVEL,
-        }, {
-          id: `use_${item.id}_${Date.now()}`,
-          kind: 'item',
-          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
-          detail: `+${gain} EXP`,
-        });
+        nextState = queueReward(
+          {
+            ...nextState,
+            exp: lvl.exp,
+            totalExp: safeTotalExp + gain,
+            level: lvl.level,
+            unspentStatPoints: nextState.unspentStatPoints + lvl.gainedLevels * STAT_POINTS_PER_LEVEL,
+          },
+          {
+            id: `use_${item.id}_${Date.now()}`,
+            kind: 'item',
+            title: `Used ${item.emoji} ${item.name}${useSuffix}`,
+            detail: `+${gain} EXP`,
+          },
+        );
       }
 
       if (item.effect === 'gain_shards_flat') {
@@ -455,29 +504,35 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
         const rawGain = gainPerUse * requestedUses;
         const gain = Number.isFinite(rawGain) ? Math.max(0, Math.floor(rawGain)) : 0;
         const safeCurrentShards = Number.isFinite(nextState.heroShards) ? nextState.heroShards : 0;
-        nextState = queueReward({
-          ...nextState,
-          heroShards: safeCurrentShards + gain,
-        }, {
-          id: `use_${item.id}_${Date.now()}`,
-          kind: 'shard',
-          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
-          detail: `+${gain} shards`,
-        });
+        nextState = queueReward(
+          {
+            ...nextState,
+            heroShards: safeCurrentShards + gain,
+          },
+          {
+            id: `use_${item.id}_${Date.now()}`,
+            kind: 'shard',
+            title: `Used ${item.emoji} ${item.name}${useSuffix}`,
+            detail: `+${gain} shards`,
+          },
+        );
       }
 
       if (item.effect === 'reduce_heat_flat') {
         const reducePerUse = getScaledUsableHeatReduction(nextState, item.value, item.itemType, ctx);
         const reduced = Math.max(0, nextState.combatHeat - reducePerUse * requestedUses);
-        nextState = queueReward({
-          ...nextState,
-          combatHeat: reduced,
-        }, {
-          id: `use_${item.id}_${Date.now()}`,
-          kind: 'system',
-          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
-          detail: `Heat ${Math.ceil(nextState.combatHeat)} -> ${Math.ceil(reduced)} (${Math.ceil(reducePerUse)} each)`,
-        });
+        nextState = queueReward(
+          {
+            ...nextState,
+            combatHeat: reduced,
+          },
+          {
+            id: `use_${item.id}_${Date.now()}`,
+            kind: 'system',
+            title: `Used ${item.emoji} ${item.name}${useSuffix}`,
+            detail: `Heat ${Math.ceil(nextState.combatHeat)} -> ${Math.ceil(reduced)} (${Math.ceil(reducePerUse)} each)`,
+          },
+        );
       }
 
       if (item.effect === 'gain_vip_points_flat') {
@@ -490,16 +545,19 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
         const nextLevel = ctx.getVipLevelFromPoints(nextPoints);
         const leveledUp = nextLevel > nextState.vipLevel;
 
-        nextState = queueReward({
-          ...nextState,
-          vipPoints: nextPoints,
-          vipLevel: nextLevel,
-        }, {
-          id: `use_${item.id}_${Date.now()}`,
-          kind: 'system',
-          title: `Used ${item.emoji} ${item.name}${useSuffix}`,
-          detail: `+${gain} VIP points`,
-        });
+        nextState = queueReward(
+          {
+            ...nextState,
+            vipPoints: nextPoints,
+            vipLevel: nextLevel,
+          },
+          {
+            id: `use_${item.id}_${Date.now()}`,
+            kind: 'system',
+            title: `Used ${item.emoji} ${item.name}${useSuffix}`,
+            detail: `+${gain} VIP points`,
+          },
+        );
 
         if (leveledUp) {
           nextState = queueReward(nextState, {
@@ -523,46 +581,54 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
       const gain = getEquipmentScrapGain(item);
       const nextEquipmentInventory = { ...state.equipmentInventory };
       delete nextEquipmentInventory[action.itemId];
-      return queueReward({
-        ...state,
-        inventoryItemIds: state.inventoryItemIds.filter(id => id !== action.itemId),
-        equipmentInventory: nextEquipmentInventory,
-        equipmentScrap: state.equipmentScrap + gain,
-      }, {
-        id: `dismantle_${action.itemId}_${Date.now()}`,
-        kind: 'item',
-        title: `Dismantled ${item.emoji} ${item.name}`,
-        detail: `+${gain} scrap`,
-      });
+      return queueReward(
+        {
+          ...state,
+          inventoryItemIds: state.inventoryItemIds.filter(id => id !== action.itemId),
+          equipmentInventory: nextEquipmentInventory,
+          equipmentScrap: state.equipmentScrap + gain,
+        },
+        {
+          id: `dismantle_${action.itemId}_${Date.now()}`,
+          kind: 'item',
+          title: `Dismantled ${item.emoji} ${item.name}`,
+          detail: `+${gain} scrap`,
+        },
+      );
     }
 
     case 'AUTO_DISMANTLE_EQUIPMENT': {
-      const equippedIds = new Set(
-        Object.values(state.equippedItems).filter((id): id is string => !!id),
-      );
+      const equippedIds = new Set(Object.values(state.equippedItems).filter((id): id is string => !!id));
+      const floorRank = EQUIPMENT_RARITY_RANK[state.autoDismantleRarityFloor ?? 'common'] ?? 0;
       const candidates = state.inventoryItemIds
         .filter(itemId => !equippedIds.has(itemId))
         .map(itemId => ({ itemId, item: ctx.getEquipmentEntry(state, itemId) }))
-        .filter((entry): entry is { itemId: string; item: EquipmentInstance | EquipmentItem } => (
-          !!entry.item && (!('source' in entry.item) || entry.item.source !== 'hero_unique')
-        ));
+        .filter(
+          (entry): entry is { itemId: string; item: EquipmentInstance | EquipmentItem } =>
+            !!entry.item &&
+            (!('source' in entry.item) || entry.item.source !== 'hero_unique') &&
+            (EQUIPMENT_RARITY_RANK[entry.item.rarity] ?? 0) <= floorRank,
+        );
       if (candidates.length === 0) return state;
 
       const dismantleIds = new Set(candidates.map(entry => entry.itemId));
       const gain = candidates.reduce((sum, entry) => sum + getEquipmentScrapGain(entry.item), 0);
       const nextEquipmentInventory = { ...state.equipmentInventory };
       for (const itemId of dismantleIds) delete nextEquipmentInventory[itemId];
-      return queueReward({
-        ...state,
-        inventoryItemIds: state.inventoryItemIds.filter(id => !dismantleIds.has(id)),
-        equipmentInventory: nextEquipmentInventory,
-        equipmentScrap: state.equipmentScrap + gain,
-      }, {
-        id: `auto_dismantle_${Date.now()}`,
-        kind: 'item',
-        title: 'Auto Dismantle Complete',
-        detail: `+${gain} scrap from ${candidates.length} unequipped items`,
-      });
+      return queueReward(
+        {
+          ...state,
+          inventoryItemIds: state.inventoryItemIds.filter(id => !dismantleIds.has(id)),
+          equipmentInventory: nextEquipmentInventory,
+          equipmentScrap: state.equipmentScrap + gain,
+        },
+        {
+          id: `auto_dismantle_${Date.now()}`,
+          kind: 'item',
+          title: 'Auto Dismantle Complete',
+          detail: `+${gain} scrap from ${candidates.length} unequipped items`,
+        },
+      );
     }
 
     case 'CRAFT_EQUIPMENT': {
@@ -570,8 +636,8 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
       const cost = getEquipmentCraftCost(action.slot);
       if (state.equipmentScrap < cost.scrap || state.gold < cost.gold) return state;
 
-      const classSlotItems = EQUIPMENT_CATALOG.filter(item =>
-        item.allowedClasses.includes(state.playerClass as PlayerClass) && item.slot === action.slot,
+      const classSlotItems = EQUIPMENT_CATALOG.filter(
+        item => item.allowedClasses.includes(state.playerClass as PlayerClass) && item.slot === action.slot,
       );
       if (classSlotItems.length === 0) return state;
 
@@ -579,23 +645,31 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
       const rarityPool = classSlotItems.filter(i => i.rarity === rolledRarity);
       const source = rarityPool.length > 0 ? rarityPool : classSlotItems;
       const forgeMult = ctx.getForgeStatMultiplier(state.guildhallFacilities.forge.level);
-      const item = ctx.createEquipmentInstance(source[Math.floor(Math.random() * source.length)], Math.max(1, state.level), 'craft', forgeMult);
+      const item = ctx.createEquipmentInstance(
+        source[Math.floor(Math.random() * source.length)],
+        Math.max(1, state.level),
+        'craft',
+        forgeMult,
+      );
 
-      return queueReward({
-        ...state,
-        equipmentScrap: state.equipmentScrap - cost.scrap,
-        gold: state.gold - cost.gold,
-        equipmentInventory: {
-          ...state.equipmentInventory,
-          [item.id]: item,
+      return queueReward(
+        {
+          ...state,
+          equipmentScrap: state.equipmentScrap - cost.scrap,
+          gold: state.gold - cost.gold,
+          equipmentInventory: {
+            ...state.equipmentInventory,
+            [item.id]: item,
+          },
+          inventoryItemIds: [...state.inventoryItemIds, item.id],
         },
-        inventoryItemIds: [...state.inventoryItemIds, item.id],
-      }, {
-        id: `craft_${item.id}_${Date.now()}`,
-        kind: 'item',
-        title: `Crafted ${item.emoji} ${item.name}`,
-        detail: `${equipmentRarityConfig(item.rarity).label} ${item.slot} • iLv ${item.itemLevel} • -${cost.gold} gold`,
-      });
+        {
+          id: `craft_${item.id}_${Date.now()}`,
+          kind: 'item',
+          title: `Crafted ${item.emoji} ${item.name}`,
+          detail: `${equipmentRarityConfig(item.rarity).label} ${item.slot} • iLv ${item.itemLevel} • -${cost.gold} gold`,
+        },
+      );
     }
 
     case 'UPGRADE_EQUIPMENT_RARITY': {
@@ -605,33 +679,44 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
       if (!item || !ownedItem) return state;
       const plan = ctx.getEquipmentUpgradePlan(state, action.itemId);
       if (!plan.targetItemId || !plan.targetRarity) return state;
-      if (state.equipmentScrap < plan.scrapCost || state.essence < plan.essenceCost || state.gold < plan.goldCost) return state;
+      if (state.equipmentScrap < plan.scrapCost || state.essence < plan.essenceCost || state.gold < plan.goldCost)
+        return state;
       const target = getEquipmentItem(plan.targetItemId);
       if (!target) return state;
 
-      const upgradedItem = ctx.createEquipmentInstance(target, 'itemLevel' in ownedItem ? ownedItem.itemLevel + 2 : Math.max(1, state.level), 'upgrade');
+      const upgradedItem = ctx.createEquipmentInstance(
+        target,
+        'itemLevel' in ownedItem ? ownedItem.itemLevel + 2 : Math.max(1, state.level),
+        'upgrade',
+      );
       const withReplacedInventory = state.inventoryItemIds.filter(id => id !== action.itemId);
       const nextInventory = [...withReplacedInventory, upgradedItem.id];
       const nextEquipmentInventory = { ...state.equipmentInventory };
       delete nextEquipmentInventory[action.itemId];
       nextEquipmentInventory[upgradedItem.id] = upgradedItem;
 
-      return queueReward({
-        ...state,
-        inventoryItemIds: nextInventory,
-        equipmentInventory: nextEquipmentInventory,
-        equipmentScrap: state.equipmentScrap - plan.scrapCost,
-        essence: state.essence - plan.essenceCost,
-        gold: state.gold - plan.goldCost,
-        equippedItems: Object.fromEntries(
-          Object.entries(state.equippedItems).map(([slot, equippedId]) => [slot, equippedId === action.itemId ? upgradedItem.id : equippedId]),
-        ) as Record<EquipmentSlot, string | null>,
-      }, {
-        id: `upgrade_${action.itemId}_${Date.now()}`,
-        kind: 'item',
-        title: `Upgraded ${item.name}`,
-        detail: `Now ${target.emoji} ${target.name} (${plan.targetRarity.toUpperCase()}) • iLv ${upgradedItem.itemLevel} • -${plan.goldCost} gold`,
-      });
+      return queueReward(
+        {
+          ...state,
+          inventoryItemIds: nextInventory,
+          equipmentInventory: nextEquipmentInventory,
+          equipmentScrap: state.equipmentScrap - plan.scrapCost,
+          essence: state.essence - plan.essenceCost,
+          gold: state.gold - plan.goldCost,
+          equippedItems: Object.fromEntries(
+            Object.entries(state.equippedItems).map(([slot, equippedId]) => [
+              slot,
+              equippedId === action.itemId ? upgradedItem.id : equippedId,
+            ]),
+          ) as Record<EquipmentSlot, string | null>,
+        },
+        {
+          id: `upgrade_${action.itemId}_${Date.now()}`,
+          kind: 'item',
+          title: `Upgraded ${item.name}`,
+          detail: `Now ${target.emoji} ${target.name} (${plan.targetRarity.toUpperCase()}) • iLv ${upgradedItem.itemLevel} • -${plan.goldCost} gold`,
+        },
+      );
     }
 
     case 'CLAIM_MAIL_ATTACHMENT': {
@@ -662,11 +747,20 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
       const refreshedState = ctx.maybeAutoRefreshExpeditionContracts(state, Date.now());
 
       const rarityPool = ['common', 'rare', 'epic', 'legendary', 'godly'] as const;
-      const rarity = action.offeredRarity && rarityPool.includes(action.offeredRarity)
-        ? action.offeredRarity
-        : refreshedState.expeditionContractOffers[action.expeditionType] ?? rarityPool[Math.floor(Math.random() * rarityPool.length)];
+      const rarity =
+        action.offeredRarity && rarityPool.includes(action.offeredRarity)
+          ? action.offeredRarity
+          : (refreshedState.expeditionContractOffers[action.expeditionType] ??
+            rarityPool[Math.floor(Math.random() * rarityPool.length)]);
 
-      const configByRarity: Record<typeof rarityPool[number], { goldCost: number; durationMs: number; reward: { diamonds: number; shards: number; essence: number; artifacts: number } }> = {
+      const configByRarity: Record<
+        (typeof rarityPool)[number],
+        {
+          goldCost: number;
+          durationMs: number;
+          reward: { diamonds: number; shards: number; essence: number; artifacts: number };
+        }
+      > = {
         common: {
           goldCost: 25_000,
           durationMs: 5 * 60 * 1000,
@@ -735,48 +829,64 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
       const expedition = state.expeditionQueue[expIndex];
       const newQueue = state.expeditionQueue.filter((_, i) => i !== expIndex);
 
-      return queueReward({
-        ...state,
-        diamonds: state.diamonds + expedition.reward.diamonds,
-        heroShards: state.heroShards + expedition.reward.shards,
-        essence: state.essence + expedition.reward.essence,
-        expeditionQueue: newQueue,
-      }, {
-        id: `expedition_${expedition.id}`,
-        kind: 'system',
-        title: 'Expedition Complete',
-        detail: `${expedition.type} returned +${expedition.reward.diamonds} diamonds, +${expedition.reward.shards} shards${expedition.reward.essence > 0 ? `, +${expedition.reward.essence} essence` : ''}`,
-      });
+      return queueReward(
+        {
+          ...state,
+          diamonds: state.diamonds + expedition.reward.diamonds,
+          heroShards: state.heroShards + expedition.reward.shards,
+          essence: state.essence + expedition.reward.essence,
+          expeditionQueue: newQueue,
+        },
+        {
+          id: `expedition_${expedition.id}`,
+          kind: 'system',
+          title: 'Expedition Complete',
+          detail: `${expedition.type} returned +${expedition.reward.diamonds} diamonds, +${expedition.reward.shards} shards${expedition.reward.essence > 0 ? `, +${expedition.reward.essence} essence` : ''}`,
+        },
+      );
     }
 
     case 'CONVERT_SCRAP_TO_ESSENCE': {
-      const cost = ctx.getScrapToEssenceCost(state);
-      if (state.equipmentScrap < cost) return state;
-      return queueReward({
-        ...state,
-        equipmentScrap: state.equipmentScrap - cost,
-        essence: state.essence + 1,
-      }, {
-        id: `scrap_to_essence_${Date.now()}`,
-        kind: 'system',
-        title: 'Essence Forge',
-        detail: `Refined ${cost} scrap into +1 essence`,
-      });
+      const costPer = ctx.getScrapToEssenceCost(state);
+      if (state.equipmentScrap < costPer) return state;
+      const maxAffordable = Math.floor(state.equipmentScrap / costPer);
+      const count = Math.max(1, Math.min(action.count ?? 1, maxAffordable));
+      const totalCost = costPer * count;
+      return queueReward(
+        {
+          ...state,
+          equipmentScrap: state.equipmentScrap - totalCost,
+          essence: state.essence + count,
+        },
+        {
+          id: `scrap_to_essence_${Date.now()}`,
+          kind: 'system',
+          title: 'Essence Forge',
+          detail: `Refined ${totalCost} scrap into +${count} essence`,
+        },
+      );
     }
 
     case 'CONVERT_SCRAP_TO_SHARDS': {
-      const cost = ctx.getScrapToShardCost();
-      if (state.equipmentScrap < cost) return state;
-      return queueReward({
-        ...state,
-        equipmentScrap: state.equipmentScrap - cost,
-        heroShards: state.heroShards + 140,
-      }, {
-        id: `scrap_to_shards_${Date.now()}`,
-        kind: 'system',
-        title: 'Shard Forge',
-        detail: `Refined ${cost} scrap into +140 shards`,
-      });
+      const costPer = ctx.getScrapToShardCost();
+      if (state.equipmentScrap < costPer) return state;
+      const maxAffordable = Math.floor(state.equipmentScrap / costPer);
+      const count = Math.max(1, Math.min(action.count ?? 1, maxAffordable));
+      const totalCost = costPer * count;
+      const totalShards = 140 * count;
+      return queueReward(
+        {
+          ...state,
+          equipmentScrap: state.equipmentScrap - totalCost,
+          heroShards: state.heroShards + totalShards,
+        },
+        {
+          id: `scrap_to_shards_${Date.now()}`,
+          kind: 'system',
+          title: 'Shard Forge',
+          detail: `Refined ${totalCost} scrap into +${totalShards} shards`,
+        },
+      );
     }
 
     case 'BUY_GOLD_SHOP_ITEM': {
@@ -815,28 +925,37 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
       }
 
       if (!state.playerClass) return state;
-      const classItems = EQUIPMENT_CATALOG.filter(item => item.allowedClasses.includes(state.playerClass as PlayerClass));
+      const classItems = EQUIPMENT_CATALOG.filter(item =>
+        item.allowedClasses.includes(state.playerClass as PlayerClass),
+      );
       if (classItems.length === 0) return state;
       const rolledRarity = rollEquipmentRarityByTier(Math.random(), ctx.hasUnlock(state, 'mythic_equipment'));
       const rarityPool = classItems.filter(item => item.rarity === rolledRarity);
       const source = rarityPool.length > 0 ? rarityPool : classItems;
-      const item = ctx.createEquipmentInstance(source[Math.floor(Math.random() * source.length)], Math.max(1, state.level), 'crate');
+      const item = ctx.createEquipmentInstance(
+        source[Math.floor(Math.random() * source.length)],
+        Math.max(1, state.level),
+        'crate',
+      );
       if (!item) return state;
 
-      return queueReward({
-        ...state,
-        gold: state.gold - cost,
-        equipmentInventory: {
-          ...state.equipmentInventory,
-          [item.id]: item,
+      return queueReward(
+        {
+          ...state,
+          gold: state.gold - cost,
+          equipmentInventory: {
+            ...state.equipmentInventory,
+            [item.id]: item,
+          },
+          inventoryItemIds: [...state.inventoryItemIds, item.id],
         },
-        inventoryItemIds: [...state.inventoryItemIds, item.id],
-      }, {
-        id: `shop_gold_gear_${Date.now()}`,
-        kind: 'item',
-        title: `Gold Shop Purchase: ${item.emoji} ${item.name}`,
-        detail: `${equipmentRarityConfig(item.rarity).label} gear • iLv ${item.itemLevel} • -${cost} gold`,
-      });
+        {
+          id: `shop_gold_gear_${Date.now()}`,
+          kind: 'item',
+          title: `Gold Shop Purchase: ${item.emoji} ${item.name}`,
+          detail: `${equipmentRarityConfig(item.rarity).label} gear • iLv ${item.itemLevel} • -${cost} gold`,
+        },
+      );
     }
 
     case 'BUY_DIAMOND_SHOP_ITEM': {
@@ -852,16 +971,19 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
         counts = ctx.addUsableItemCount(counts, 'coolant_mk2', 3);
         detail = `-${cost} diamonds, +3 Coolant Capsule II`;
       } else if (action.offerId === 'rift_raid_ticket') {
-        return queueReward({
-          ...state,
-          diamonds: state.diamonds - cost,
-          riftRaidTickets: state.riftRaidTickets + 1,
-        }, {
-          id: `shop_diamond_rift_ticket_${Date.now()}`,
-          kind: 'item',
-          title: 'Diamond Shop Purchase: Dungeon Raid Ticket',
-          detail: `-${cost} diamonds, +1 Dungeon Raid Ticket`,
-        });
+        return queueReward(
+          {
+            ...state,
+            diamonds: state.diamonds - cost,
+            riftRaidTickets: state.riftRaidTickets + 1,
+          },
+          {
+            id: `shop_diamond_rift_ticket_${Date.now()}`,
+            kind: 'item',
+            title: 'Diamond Shop Purchase: Dungeon Raid Ticket',
+            detail: `-${cost} diamonds, +1 Dungeon Raid Ticket`,
+          },
+        );
       } else {
         counts = ctx.addUsableItemCount(counts, 'coolant_mk1', 5);
         counts = ctx.addUsableItemCount(counts, 'coolant_mk2', 3);
@@ -869,16 +991,19 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
         detail = `-${cost} diamonds, +5 Coolant I, +3 Coolant II, +2 Grand Potions`;
       }
 
-      return queueReward({
-        ...state,
-        diamonds: state.diamonds - cost,
-        usableItemCounts: counts,
-      }, {
-        id: `shop_diamond_${action.offerId}_${Date.now()}`,
-        kind: 'system',
-        title: 'Diamond Shop Purchase Complete',
-        detail,
-      });
+      return queueReward(
+        {
+          ...state,
+          diamonds: state.diamonds - cost,
+          usableItemCounts: counts,
+        },
+        {
+          id: `shop_diamond_${action.offerId}_${Date.now()}`,
+          kind: 'system',
+          title: 'Diamond Shop Purchase Complete',
+          detail,
+        },
+      );
     }
 
     case 'SIMULATE_DOLLAR_PURCHASE': {
@@ -894,28 +1019,31 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
       const priceLabel = `$${(pack.usdCents / 100).toFixed(2)}`;
       const bonusDiamonds = firstPurchaseActive ? pack.diamonds : 0;
 
-      const purchasedState = queueReward({
-        ...state,
-        diamonds: state.diamonds + pack.diamonds + bonusDiamonds,
-        vipPoints: nextPoints,
-        vipLevel: nextLevel,
-        dollarFirstPurchaseClaimedOfferIds: firstPurchaseActive
-          ? [...state.dollarFirstPurchaseClaimedOfferIds, action.offerId]
-          : state.dollarFirstPurchaseClaimedOfferIds,
-      }, {
-        id: `shop_cash_${action.offerId}_${Date.now()}`,
-        kind: 'system',
-        title: 'Dollar Shop Purchase (Simulated)',
-        detail: `${priceLabel} pack: +${pack.diamonds + bonusDiamonds} diamonds${firstPurchaseActive ? ' (first purchase x2 bonus)' : ''}, +${pointsGain} VIP points`,
-      });
+      const purchasedState = queueReward(
+        {
+          ...state,
+          diamonds: state.diamonds + pack.diamonds + bonusDiamonds,
+          vipPoints: nextPoints,
+          vipLevel: nextLevel,
+          dollarFirstPurchaseClaimedOfferIds: firstPurchaseActive
+            ? [...state.dollarFirstPurchaseClaimedOfferIds, action.offerId]
+            : state.dollarFirstPurchaseClaimedOfferIds,
+        },
+        {
+          id: `shop_cash_${action.offerId}_${Date.now()}`,
+          kind: 'system',
+          title: 'Dollar Shop Purchase (Simulated)',
+          detail: `${priceLabel} pack: +${pack.diamonds + bonusDiamonds} diamonds${firstPurchaseActive ? ' (first purchase x2 bonus)' : ''}, +${pointsGain} VIP points`,
+        },
+      );
 
       const withFirstBonus = firstPurchaseActive
         ? queueReward(purchasedState, {
-          id: `shop_cash_first_bonus_${action.offerId}_${Date.now()}`,
-          kind: 'system',
-          title: 'First Purchase Bonus',
-          detail: `+${bonusDiamonds} bonus diamonds (one-time for this pack)`,
-        })
+            id: `shop_cash_first_bonus_${action.offerId}_${Date.now()}`,
+            kind: 'system',
+            title: 'First Purchase Bonus',
+            detail: `+${bonusDiamonds} bonus diamonds (one-time for this pack)`,
+          })
         : purchasedState;
 
       if (!leveledUp) return withFirstBonus;
@@ -934,16 +1062,19 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
       if (state.diamonds < cost) return state;
       const item = getUsableItem(action.itemId);
       if (!item) return state;
-      return queueReward({
-        ...state,
-        diamonds: state.diamonds - cost,
-        usableItemCounts: ctx.addUsableItemCount(state.usableItemCounts, action.itemId, amount),
-      }, {
-        id: `buy_${action.itemId}_${Date.now()}`,
-        kind: 'system',
-        title: `Purchased ${item.emoji} ${item.name}`,
-        detail: `-${cost} diamonds • +${amount}`,
-      });
+      return queueReward(
+        {
+          ...state,
+          diamonds: state.diamonds - cost,
+          usableItemCounts: ctx.addUsableItemCount(state.usableItemCounts, action.itemId, amount),
+        },
+        {
+          id: `buy_${action.itemId}_${Date.now()}`,
+          kind: 'system',
+          title: `Purchased ${item.emoji} ${item.name}`,
+          detail: `-${cost} diamonds • +${amount}`,
+        },
+      );
     }
 
     default:

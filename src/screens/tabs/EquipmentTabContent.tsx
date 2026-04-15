@@ -14,6 +14,20 @@ import { fmt } from '../../utils';
 import { styles } from './EquipmentTabContent.styles';
 import { t } from '../../i18n';
 
+const GEAR_RARITY_POINTS: Record<string, number> = {
+  common: 40,
+  rare: 90,
+  epic: 170,
+  legendary: 280,
+  mythic: 430,
+  transcendent: 680,
+};
+
+function itemGearScore(item: { rarity: string; bonus: Record<string, number | null | undefined> }): number {
+  const statValue = Object.values(item.bonus).reduce<number>((s, v) => s + (v ?? 0), 0);
+  return (GEAR_RARITY_POINTS[item.rarity] ?? 0) + statValue * 12;
+}
+
 export interface EquipmentTabContentProps {
   tab: string;
   state: GameState;
@@ -29,13 +43,14 @@ export interface EquipmentTabContentProps {
   equipmentRarityConfig: (rarity: EquipmentRarity) => any;
   optimizeEquipment: () => void;
   autoDismantleEquipment: () => void;
+  setAutoDismantleRarityFloor: (rarity: EquipmentRarity) => void;
   craftEquipment: (slot: EquipmentSlot) => void;
   equipItem: (itemId: string) => void;
   toggleHeroUniqueWeapon: (heroUid: string) => void;
   upgradeEquipmentRarity: (itemId: string) => void;
   dismantleEquipment: (itemId: string) => void;
-  convertScrapToEssence: () => void;
-  convertScrapToShards: () => void;
+  convertScrapToEssence: (count?: number) => void;
+  convertScrapToShards: (count?: number) => void;
   renderSubTabBar: (tabs: any[]) => React.ReactNode;
 }
 
@@ -55,6 +70,7 @@ export const EquipmentTabContent = React.memo<EquipmentTabContentProps>(
     equipmentRarityConfig,
     optimizeEquipment,
     autoDismantleEquipment,
+    setAutoDismantleRarityFloor,
     craftEquipment,
     equipItem,
     toggleHeroUniqueWeapon,
@@ -171,9 +187,33 @@ export const EquipmentTabContent = React.memo<EquipmentTabContentProps>(
                 >
                   <Text style={styles.equipDismantleBtnText}>🧰 Auto Dismantle</Text>
                 </Pressable>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  <Text style={styles.equipOptimizeHint}>Dismantle floor:</Text>
+                  {(['common', 'rare', 'epic', 'legendary', 'mythic', 'transcendent'] as EquipmentRarity[]).map(r => {
+                    const isActive = r === (state.autoDismantleRarityFloor ?? 'common');
+                    const cfg = equipmentRarityConfig(r);
+                    return (
+                      <Pressable
+                        key={r}
+                        style={{
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 4,
+                          borderWidth: 1,
+                          borderColor: isActive ? cfg.color : '#444',
+                          backgroundColor: isActive ? cfg.color + '33' : 'transparent',
+                        }}
+                        onPress={() => setAutoDismantleRarityFloor(r)}
+                      >
+                        <Text style={{ color: cfg.color, fontSize: 10, fontWeight: isActive ? '700' : '400' }}>
+                          {r.slice(0, 3).toUpperCase()}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
                 <Text style={styles.equipOptimizeHint}>
-                  Optimize equips the highest-scoring rolled item per slot for your class. Auto dismantle scraps all
-                  unequipped items.
+                  Auto dismantle scraps unequipped items at or below the selected rarity.
                 </Text>
               </View>
             )}
@@ -314,7 +354,7 @@ export const EquipmentTabContent = React.memo<EquipmentTabContentProps>(
                         <Text style={[styles.invEquipRarity2, { color: rarity.color }]}>{item.rarity}</Text>
                       </View>
                       <Text style={styles.invEquipSlot}>
-                        {item.slot.toUpperCase()} • iLv {item.itemLevel ?? 1}
+                        {item.slot.toUpperCase()} • iLv {item.itemLevel ?? 1} • GS {fmt(itemGearScore(item))}
                       </Text>
                       <Text style={styles.invEquipBonus}>
                         {Object.entries(item.bonus)
@@ -406,6 +446,7 @@ export const EquipmentTabContent = React.memo<EquipmentTabContentProps>(
                   <Text style={styles.shardForgeDesc}>
                     Refine excess scrap into essence or shards to keep forge progression flowing.
                   </Text>
+                  {/* Essence conversion */}
                   <View style={styles.shardForgeRow}>
                     <Pressable
                       style={[
@@ -413,11 +454,59 @@ export const EquipmentTabContent = React.memo<EquipmentTabContentProps>(
                         state.equipmentScrap < shardForgeCosts.essenceRefineScrapCost && styles.shardForgeBtnDisabled,
                       ]}
                       disabled={state.equipmentScrap < shardForgeCosts.essenceRefineScrapCost}
-                      onPress={convertScrapToEssence}
+                      onPress={() => convertScrapToEssence(1)}
                     >
                       <Text style={styles.shardForgeBtnText}>
-                        Essence • {shardForgeCosts.essenceRefineScrapCost} 🔩
+                        ×1 Essence • {shardForgeCosts.essenceRefineScrapCost} 🔩
                       </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.shardForgeBtn,
+                        state.equipmentScrap < shardForgeCosts.essenceRefineScrapCost * 5 &&
+                          styles.shardForgeBtnDisabled,
+                      ]}
+                      disabled={state.equipmentScrap < shardForgeCosts.essenceRefineScrapCost * 5}
+                      onPress={() => convertScrapToEssence(5)}
+                    >
+                      <Text style={styles.shardForgeBtnText}>×5</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.shardForgeBtn,
+                        state.equipmentScrap < shardForgeCosts.essenceRefineScrapCost && styles.shardForgeBtnDisabled,
+                      ]}
+                      disabled={state.equipmentScrap < shardForgeCosts.essenceRefineScrapCost}
+                      onPress={() =>
+                        convertScrapToEssence(Math.floor(state.equipmentScrap / shardForgeCosts.essenceRefineScrapCost))
+                      }
+                    >
+                      <Text style={styles.shardForgeBtnText}>MAX</Text>
+                    </Pressable>
+                  </View>
+                  {/* Shard conversion */}
+                  <View style={styles.shardForgeRow}>
+                    <Pressable
+                      style={[
+                        styles.shardForgeBtn,
+                        state.equipmentScrap < shardForgeCosts.shardRefineScrapCost && styles.shardForgeBtnDisabled,
+                      ]}
+                      disabled={state.equipmentScrap < shardForgeCosts.shardRefineScrapCost}
+                      onPress={() => convertScrapToShards(1)}
+                    >
+                      <Text style={styles.shardForgeBtnText}>
+                        ×1 Shards • {shardForgeCosts.shardRefineScrapCost} 🔩
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.shardForgeBtn,
+                        state.equipmentScrap < shardForgeCosts.shardRefineScrapCost * 5 && styles.shardForgeBtnDisabled,
+                      ]}
+                      disabled={state.equipmentScrap < shardForgeCosts.shardRefineScrapCost * 5}
+                      onPress={() => convertScrapToShards(5)}
+                    >
+                      <Text style={styles.shardForgeBtnText}>×5</Text>
                     </Pressable>
                     <Pressable
                       style={[
@@ -425,9 +514,11 @@ export const EquipmentTabContent = React.memo<EquipmentTabContentProps>(
                         state.equipmentScrap < shardForgeCosts.shardRefineScrapCost && styles.shardForgeBtnDisabled,
                       ]}
                       disabled={state.equipmentScrap < shardForgeCosts.shardRefineScrapCost}
-                      onPress={convertScrapToShards}
+                      onPress={() =>
+                        convertScrapToShards(Math.floor(state.equipmentScrap / shardForgeCosts.shardRefineScrapCost))
+                      }
                     >
-                      <Text style={styles.shardForgeBtnText}>Shards • {shardForgeCosts.shardRefineScrapCost} 🔩</Text>
+                      <Text style={styles.shardForgeBtnText}>MAX</Text>
                     </Pressable>
                   </View>
                 </View>

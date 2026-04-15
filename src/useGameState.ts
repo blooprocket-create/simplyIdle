@@ -112,6 +112,7 @@ const HEAT_MAX_PER_LEVEL = 2;
 export const FACILITY_MAX_LEVEL = 999;
 const BURST_COST = 15;
 const BURST_BOSS_CHARGE_GAIN = 3;
+const EQUIPMENT_RARITY_SET = new Set<string>(['common', 'rare', 'epic', 'legendary', 'mythic', 'transcendent']);
 const ACTIVE_STRIKE_DPS_MULT = 0.9;
 const BURST_STRIKE_DPS_MULT = 1.8;
 const PREMIUM_COOLANT_COSTS = {
@@ -500,6 +501,7 @@ export interface GameState {
   inventoryItemIds: string[];
   equipmentInventory: Record<string, EquipmentInstance>;
   equippedItems: Record<EquipmentSlot, string | null>;
+  autoDismantleRarityFloor: EquipmentRarity;
   usableItemCounts: Record<string, number>;
   autoUsePotionEnabled: boolean;
   autoUseCoolantEnabled: boolean;
@@ -684,6 +686,7 @@ export const DEFAULT_STATE: GameState = {
 
   inventoryItemIds: [],
   equipmentInventory: {},
+  autoDismantleRarityFloor: 'common' as EquipmentRarity,
   equippedItems: {
     weapon: null,
     armor: null,
@@ -3152,6 +3155,9 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     inventoryItemIds: cleanedInventoryItemIds,
     equipmentInventory: cleanedEquipmentInventory,
     equippedItems: cleanedEquippedItems,
+    autoDismantleRarityFloor: (EQUIPMENT_RARITY_SET.has(payload.autoDismantleRarityFloor)
+      ? payload.autoDismantleRarityFloor
+      : 'common') as EquipmentRarity,
     usableItemCounts,
     autoUsePotionEnabled: clampBoolean(payload.autoUsePotionEnabled, false),
     autoUseCoolantEnabled: clampBoolean(payload.autoUseCoolantEnabled, false),
@@ -4069,8 +4075,8 @@ type Action =
   | { type: 'SET_AUTO_RECYCLE_ENABLED'; enabled: boolean }
   | { type: 'TOGGLE_HERO_UNIQUE_WEAPON'; heroUid: string }
   | { type: 'RANK_UP_HERO'; uid: string }
-  | { type: 'CONVERT_SCRAP_TO_ESSENCE' }
-  | { type: 'CONVERT_SCRAP_TO_SHARDS' }
+  | { type: 'CONVERT_SCRAP_TO_ESSENCE'; count?: number }
+  | { type: 'CONVERT_SCRAP_TO_SHARDS'; count?: number }
   | { type: 'SPEND_REBIRTH_CORE'; path: 'damage' | 'economy' | 'survival' }
   | { type: 'SET_AUTO_SUMMON_ENABLED'; enabled: boolean }
   | { type: 'SET_AUTO_SUMMON_MODE'; mode: 'single' | 'x10' }
@@ -4087,6 +4093,7 @@ type Action =
   | { type: 'BUY_PREMIUM_COOLANT'; itemId: 'coolant_mk1' | 'coolant_mk2'; amount?: number }
   | { type: 'USE_USABLE_ITEM'; itemId: string; amount?: number | 'all' }
   | { type: 'AUTO_DISMANTLE_EQUIPMENT' }
+  | { type: 'SET_AUTO_DISMANTLE_RARITY_FLOOR'; rarity: EquipmentRarity }
   | { type: 'DISMANTLE_EQUIPMENT'; itemId: string }
   | { type: 'CRAFT_EQUIPMENT'; slot: EquipmentSlot }
   | { type: 'UPGRADE_EQUIPMENT_RARITY'; itemId: string }
@@ -4448,6 +4455,9 @@ function reducer(state: GameState, action: Action): GameState {
           inventoryItemIds: p.inventoryItemIds,
           equipmentInventory: p.equipmentInventory,
           equippedItems: p.equippedItems,
+          autoDismantleRarityFloor: EQUIPMENT_RARITY_SET.has(p.autoDismantleRarityFloor)
+            ? p.autoDismantleRarityFloor
+            : 'common',
           usableItemCounts: p.usableItemCounts,
           autoUsePotionEnabled: p.autoUsePotionEnabled,
           autoUseCoolantEnabled: p.autoUseCoolantEnabled,
@@ -5211,8 +5221,14 @@ export function useGameState(saveSlot: string = 'default') {
   }, []);
   const rankUpHero = useCallback((uid: string) => dispatch({ type: 'RANK_UP_HERO', uid }), []);
   const levelUpHeroGold = useCallback((uid: string) => dispatch({ type: 'LEVEL_UP_HERO_GOLD', uid }), []);
-  const convertScrapToEssence = useCallback(() => dispatch({ type: 'CONVERT_SCRAP_TO_ESSENCE' }), []);
-  const convertScrapToShards = useCallback(() => dispatch({ type: 'CONVERT_SCRAP_TO_SHARDS' }), []);
+  const convertScrapToEssence = useCallback(
+    (count?: number) => dispatch({ type: 'CONVERT_SCRAP_TO_ESSENCE', count }),
+    [],
+  );
+  const convertScrapToShards = useCallback(
+    (count?: number) => dispatch({ type: 'CONVERT_SCRAP_TO_SHARDS', count }),
+    [],
+  );
   const spendRebirthCore = useCallback((path: 'damage' | 'economy' | 'survival') => {
     dispatch({ type: 'SPEND_REBIRTH_CORE', path });
   }, []);
@@ -5274,6 +5290,9 @@ export function useGameState(saveSlot: string = 'default') {
     dispatch({ type: 'BUY_PREMIUM_COOLANT', itemId, amount });
   }, []);
   const autoDismantleEquipment = useCallback(() => dispatch({ type: 'AUTO_DISMANTLE_EQUIPMENT' }), []);
+  const setAutoDismantleRarityFloor = useCallback((rarity: EquipmentRarity) => {
+    dispatch({ type: 'SET_AUTO_DISMANTLE_RARITY_FLOOR', rarity });
+  }, []);
   const spendEssenceUpgrade = useCallback((path: 'damage' | 'economy' | 'survival') => {
     dispatch({ type: 'SPEND_ESSENCE_UPGRADE', path });
   }, []);
@@ -5503,6 +5522,7 @@ export function useGameState(saveSlot: string = 'default') {
     claimVipReward,
     buyPremiumCoolant,
     autoDismantleEquipment,
+    setAutoDismantleRarityFloor,
     spendEssenceUpgrade,
     claimWeeklyTrack,
     claimMission,

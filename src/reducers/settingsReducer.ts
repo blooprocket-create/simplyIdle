@@ -6,7 +6,7 @@
  */
 
 import type { GameState, MailMessage, MailAttachments } from '../useGameState';
-import type { Rarity } from '../gameConfig';
+import type { Rarity, EquipmentRarity } from '../gameConfig';
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -28,7 +28,8 @@ export type SettingsAction =
   | { type: 'SET_COMBAT_TEMPO'; tempo: CombatTempo }
   | { type: 'SET_AUTO_TEMPO_ENABLED'; enabled: boolean }
   | { type: 'SET_AUTO_TEMPO_TARGET'; target: AutoTempoTarget }
-  | { type: 'SET_AUTO_SUMMON_RESERVE_GOLD'; reserveGold: number };
+  | { type: 'SET_AUTO_SUMMON_RESERVE_GOLD'; reserveGold: number }
+  | { type: 'SET_AUTO_DISMANTLE_RARITY_FLOOR'; rarity: EquipmentRarity };
 
 export const SETTINGS_ACTION_TYPES = new Set<string>([
   'SET_AUTO_USE_POTION',
@@ -46,6 +47,7 @@ export const SETTINGS_ACTION_TYPES = new Set<string>([
   'SET_AUTO_TEMPO_ENABLED',
   'SET_AUTO_TEMPO_TARGET',
   'SET_AUTO_SUMMON_RESERVE_GOLD',
+  'SET_AUTO_DISMANTLE_RARITY_FLOOR',
 ]);
 
 // ─── Context ───────────────────────────────────────────────────
@@ -130,7 +132,9 @@ export function settingsReducer(state: GameState, action: SettingsAction, ctx: S
 
     case 'SET_LAST_ACTIVE_AT': {
       if (!state.characterCreated) return state;
-      const timestampMs = Number.isFinite(action.timestampMs) ? Math.max(0, Math.floor(action.timestampMs)) : Date.now();
+      const timestampMs = Number.isFinite(action.timestampMs)
+        ? Math.max(0, Math.floor(action.timestampMs))
+        : Date.now();
       return { ...state, lastActiveAt: timestampMs };
     }
 
@@ -168,6 +172,10 @@ export function settingsReducer(state: GameState, action: SettingsAction, ctx: S
 
     case 'SET_AUTO_SUMMON_RESERVE_GOLD': {
       return { ...state, autoSummonReserveGold: Math.max(0, action.reserveGold) };
+    }
+
+    case 'SET_AUTO_DISMANTLE_RARITY_FLOOR': {
+      return { ...state, autoDismantleRarityFloor: action.rarity };
     }
 
     default:

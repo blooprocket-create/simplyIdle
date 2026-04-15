@@ -372,6 +372,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     claimVipReward,
     buyPremiumCoolant,
     autoDismantleEquipment,
+    setAutoDismantleRarityFloor,
     spendEssenceUpgrade,
     claimWeeklyTrack,
     claimMission,
@@ -2517,6 +2518,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 equipmentRarityConfig,
                 optimizeEquipment,
                 autoDismantleEquipment,
+                setAutoDismantleRarityFloor,
                 craftEquipment,
                 equipItem,
                 toggleHeroUniqueWeapon,
@@ -3666,9 +3668,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     <Text style={styles.settingsCycleBtnText}>{state.autoSummonMode.toUpperCase()}</Text>
                   </Pressable>
                 </View>
-                <Text style={styles.settingsHintText}>
-                  Summons consume Boss Tears, so reserve gold controls were removed.
-                </Text>
               </View>
 
               <View style={styles.settingsCard}>
@@ -3683,7 +3682,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                   </Pressable>
                 </View>
                 <Text style={styles.settingsHintText}>
-                  When burst charge reaches 20, it auto-fires with tempo-scaled hits.
+                  When burst charge reaches 15, it auto-fires with tempo-scaled hits.
                 </Text>
               </View>
 
