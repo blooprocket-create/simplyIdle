@@ -13,6 +13,10 @@ export default {
             class: 'back-to-game',
             href: '/',
             title: 'Return to SimplyIdle',
+            onClick: (e: MouseEvent) => {
+              e.preventDefault();
+              window.location.href = '/';
+            },
           },
           ['🎮 Back to Game'],
         ),

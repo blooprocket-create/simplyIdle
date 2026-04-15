@@ -38,9 +38,9 @@ SimplyIdle features a roster of **65 heroes** across 6 classes. Each hero has a 
 ## Summoning System
 
 ### Summon Costs
-- **Boss Tears Summon:** 500 tears (free summon every 10th boss kill)
+- **Boss Tears Summon:** 500 tears
 - **Diamond Summon:** 500 diamonds (VIP 3+ pays 450)
-- **Free charges:** 1 per 10 kills, first one free
+- **Free charges:** First kill grants 1 free charge; additional charges from Spark Exchange (50 tokens each) and summon milestones
 
 ### Soft Pity
 Starting at pull **20**, the Legendary+ rate gains **+3% cumulative** per pull. Resets on Legendary+ pull.

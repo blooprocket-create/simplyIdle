@@ -20,14 +20,29 @@ Last reviewed: 2026-04-15
 | Issue | Status | Notes |
 |-------|--------|-------|
 | Early-mid wave pacing (waves 20–60) still being tuned | In Progress | Adjustments coming in next balance patch |
-| Friends count shows console 403 for other players' lists | Cosmetic | Does not affect functionality; shows 0 |
 
 ## UX
 
 | Issue | Status | Notes |
 |-------|--------|-------|
 | Some dense panels need additional mobile spacing | In Progress | Mobile-first polish ongoing |
-| Modal transitions still being refined | In Progress | — |
+
+## Social
+
+| Issue | Status | Notes |
+|-------|--------|-------|
+| Player report UI not yet connected | Planned | Backend service ready; awaiting UI |
+
+## Recently Fixed
+
+| Issue | Fixed In |
+|-------|----------|
+| Friends count console 403 for other players' lists | April 2026 |
+| Modal transitions inconsistent | April 2026 |
+| DM notifications not surfacing to bottom nav | April 2026 |
+| Burst charge threshold displayed as 20 instead of 15 | April 2026 |
+| Settings hint text referencing removed reserve-gold controls | April 2026 |
+| Wiki referenced manual tapping / tap-to-attack combat | April 2026 |
 
 ## Reporting Bugs
 

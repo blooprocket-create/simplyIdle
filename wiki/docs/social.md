@@ -103,10 +103,13 @@ Heartbeat-based system showing who's online:
 - Unblock at any time
 
 ### Reporting
-Reports are submitted with a reason and details:
+
+<span class="status-badge planned">Backend Only</span>
+
+The report service is implemented server-side but no player-facing UI is connected yet. When the UI ships, reports will support:
 - **Reasons:** Harassment, Spam, Inappropriate Name, Cheating, Other
 - **Details:** Up to 500 characters
-- Reports are reviewed by admins
+- Reports reviewed by admins
 
 ## Cloud Mail
 
