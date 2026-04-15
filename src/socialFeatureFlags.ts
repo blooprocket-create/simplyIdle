@@ -6,11 +6,11 @@ const FLAG_DEFAULTS = {
   friendGifting: true,
   globalChat: true,
   leaderboard: true,
-  // v2 social features — default OFF for staged rollout
-  directMessages: false,
-  playerSearch: false,
-  activityFeed: false,
-  blockReport: false,
+  // v2 social features
+  directMessages: true,
+  playerSearch: true,
+  activityFeed: true,
+  blockReport: true,
   guildWars: false,
 } as const;
 
