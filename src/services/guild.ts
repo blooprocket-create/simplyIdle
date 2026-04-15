@@ -162,20 +162,29 @@ function normalizeGuildName(name: string): string {
 }
 
 function normalizeGuildTag(tag: string): string {
-  return tag.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+  return tag
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 5);
 }
 
 function makeGuildId(normalizedName: string): string {
-  const base = normalizedName.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24) || 'guild';
+  const base =
+    normalizedName
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 24) || 'guild';
   return `${base}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
 function parseGuildSummary(guildId: string, data: Record<string, unknown>): GuildSummary {
-  const minPeakProgressToJoin = typeof data.minPeakProgressToJoin === 'number'
-    ? Math.max(1, Math.floor(data.minPeakProgressToJoin))
-    : typeof data.minLevelToJoin === 'number'
-      ? Math.max(1, Math.floor(data.minLevelToJoin))
-      : 1;
+  const minPeakProgressToJoin =
+    typeof data.minPeakProgressToJoin === 'number'
+      ? Math.max(1, Math.floor(data.minPeakProgressToJoin))
+      : typeof data.minLevelToJoin === 'number'
+        ? Math.max(1, Math.floor(data.minLevelToJoin))
+        : 1;
 
   return {
     guildId,
@@ -249,13 +258,14 @@ function parseGuildTreasuryState(data: Record<string, unknown>): GuildTreasurySt
 
 function parseGuildInvite(inviteId: string, data: Record<string, unknown>): GuildInvite {
   const statusRaw = typeof data.status === 'string' ? data.status : 'pending';
-  const status: GuildInvite['status'] = statusRaw === 'accepted'
-    ? 'accepted'
-    : statusRaw === 'declined'
-      ? 'declined'
-      : statusRaw === 'expired'
-        ? 'expired'
-        : 'pending';
+  const status: GuildInvite['status'] =
+    statusRaw === 'accepted'
+      ? 'accepted'
+      : statusRaw === 'declined'
+        ? 'declined'
+        : statusRaw === 'expired'
+          ? 'expired'
+          : 'pending';
   return {
     id: inviteId,
     guildId: typeof data.guildId === 'string' ? data.guildId : '',
@@ -264,11 +274,12 @@ function parseGuildInvite(inviteId: string, data: Record<string, unknown>): Guil
     inviterUid: typeof data.inviterUid === 'string' ? data.inviterUid : '',
     inviterName: typeof data.inviterName === 'string' ? data.inviterName : 'Leader',
     invitedUid: typeof data.invitedUid === 'string' ? data.invitedUid : '',
-    minPeakProgressToJoin: typeof data.minPeakProgressToJoin === 'number'
-      ? Math.max(1, Math.floor(data.minPeakProgressToJoin))
-      : typeof data.minLevelToJoin === 'number'
-        ? Math.max(1, Math.floor(data.minLevelToJoin))
-        : 1,
+    minPeakProgressToJoin:
+      typeof data.minPeakProgressToJoin === 'number'
+        ? Math.max(1, Math.floor(data.minPeakProgressToJoin))
+        : typeof data.minLevelToJoin === 'number'
+          ? Math.max(1, Math.floor(data.minLevelToJoin))
+          : 1,
     isPublic: data.isPublic !== false,
     status,
     createdAt: typeof data.createdAt === 'number' ? data.createdAt : 0,
@@ -347,7 +358,12 @@ export async function createGuild(input: {
       throw new Error('Save slot not found.');
     }
 
-    const saveData = saveSnap.data() as { revision?: unknown; payload?: Record<string, unknown>; schemaVersion?: unknown; saveSlot?: unknown };
+    const saveData = saveSnap.data() as {
+      revision?: unknown;
+      payload?: Record<string, unknown>;
+      schemaVersion?: unknown;
+      saveSlot?: unknown;
+    };
     const payload = (saveData.payload ?? {}) as Record<string, unknown>;
     const currentDiamonds = typeof payload.diamonds === 'number' ? payload.diamonds : 0;
     if (currentDiamonds < CREATE_GUILD_DIAMOND_COST) {
@@ -446,10 +462,7 @@ export async function joinGuild(input: {
   const memberRef = doc(db, GUILD_COLLECTION, guildId, 'members', uid);
 
   await runTransaction(db, async tx => {
-    const [membershipSnap, guildSnap] = await Promise.all([
-      tx.get(userGuildRef),
-      tx.get(guildRef),
-    ]);
+    const [membershipSnap, guildSnap] = await Promise.all([tx.get(userGuildRef), tx.get(guildRef)]);
 
     if (membershipSnap.exists()) {
       throw new Error('You are already in a guild.');
@@ -461,14 +474,16 @@ export async function joinGuild(input: {
     const guild = guildSnap.data();
     const memberCount = typeof guild.memberCount === 'number' ? guild.memberCount : 0;
     const maxMembers = typeof guild.maxMembers === 'number' ? guild.maxMembers : 30;
-    const minPeakProgress = typeof guild.minPeakProgressToJoin === 'number'
-      ? Math.max(1, Math.floor(guild.minPeakProgressToJoin))
-      : typeof guild.minLevelToJoin === 'number'
-        ? Math.max(1, Math.floor(guild.minLevelToJoin))
-        : 1;
+    const minPeakProgress =
+      typeof guild.minPeakProgressToJoin === 'number'
+        ? Math.max(1, Math.floor(guild.minPeakProgressToJoin))
+        : typeof guild.minLevelToJoin === 'number'
+          ? Math.max(1, Math.floor(guild.minLevelToJoin))
+          : 1;
 
     if (memberCount >= maxMembers) throw new Error('Guild is full.');
-    if (input.playerPeakProgress < minPeakProgress) throw new Error(`Peak progress ${minPeakProgress}+ required to join.`);
+    if (input.playerPeakProgress < minPeakProgress)
+      throw new Error(`Peak progress ${minPeakProgress}+ required to join.`);
 
     tx.set(memberRef, {
       displayName: input.displayName.trim().slice(0, 24) || 'Member',
@@ -479,6 +494,7 @@ export async function joinGuild(input: {
     });
 
     tx.set(userGuildRef, {
+      uid,
       guildId,
       guildName: typeof guild.name === 'string' ? guild.name : 'Guild',
       rank: 'member',
@@ -526,7 +542,11 @@ export async function leaveGuild(input: { uid: string }): Promise<void> {
 
     const normalizedName = typeof guild.normalizedName === 'string' ? guild.normalizedName : '';
     if (normalizedName) {
-      tx.set(doc(db, GUILD_LOOKUP_COLLECTION, normalizedName), { memberCount: nextCount, updatedAt: now }, { merge: true });
+      tx.set(
+        doc(db, GUILD_LOOKUP_COLLECTION, normalizedName),
+        { memberCount: nextCount, updatedAt: now },
+        { merge: true },
+      );
     }
   });
 }
@@ -585,12 +605,20 @@ export async function kickGuildMember(input: { actorUid: string; targetUid: stri
     tx.delete(targetMembershipRef);
     tx.set(guildRef, { memberCount: nextCount, updatedAt: now }, { merge: true });
     if (normalizedName) {
-      tx.set(doc(db, GUILD_LOOKUP_COLLECTION, normalizedName), { memberCount: nextCount, updatedAt: now }, { merge: true });
+      tx.set(
+        doc(db, GUILD_LOOKUP_COLLECTION, normalizedName),
+        { memberCount: nextCount, updatedAt: now },
+        { merge: true },
+      );
     }
   });
 }
 
-export async function setMemberRank(input: { actorUid: string; targetUid: string; rank: 'officer' | 'member' }): Promise<void> {
+export async function setMemberRank(input: {
+  actorUid: string;
+  targetUid: string;
+  rank: 'officer' | 'member';
+}): Promise<void> {
   const db = requireDb();
   const actorUid = input.actorUid.trim();
   const targetUid = input.targetUid.trim();
@@ -657,10 +685,7 @@ export async function transferGuildLeadership(input: { actorUid: string; newLead
     const actorMemberRef = doc(db, GUILD_COLLECTION, guildId, 'members', actorUid);
     const newLeaderMemberRef = doc(db, GUILD_COLLECTION, guildId, 'members', newLeaderUid);
 
-    const [guildSnap, newLeaderMemberSnap] = await Promise.all([
-      tx.get(guildRef),
-      tx.get(newLeaderMemberRef),
-    ]);
+    const [guildSnap, newLeaderMemberSnap] = await Promise.all([tx.get(guildRef), tx.get(newLeaderMemberRef)]);
     if (!guildSnap.exists()) throw new Error('Guild not found.');
     if (!newLeaderMemberSnap.exists()) throw new Error('Target member not found.');
 
@@ -673,18 +698,26 @@ export async function transferGuildLeadership(input: { actorUid: string; newLead
     tx.set(actorMemberRef, { rank: 'officer' }, { merge: true });
     tx.set(newLeaderMembershipRef, { rank: 'leader' }, { merge: true });
     tx.set(actorMembershipRef, { rank: 'officer' }, { merge: true });
-    tx.set(guildRef, {
-      leaderId: newLeaderUid,
-      leaderName: newLeaderName,
-      updatedAt: now,
-    }, { merge: true });
-
-    if (normalizedName) {
-      tx.set(doc(db, GUILD_LOOKUP_COLLECTION, normalizedName), {
+    tx.set(
+      guildRef,
+      {
         leaderId: newLeaderUid,
         leaderName: newLeaderName,
         updatedAt: now,
-      }, { merge: true });
+      },
+      { merge: true },
+    );
+
+    if (normalizedName) {
+      tx.set(
+        doc(db, GUILD_LOOKUP_COLLECTION, normalizedName),
+        {
+          leaderId: newLeaderUid,
+          leaderName: newLeaderName,
+          updatedAt: now,
+        },
+        { merge: true },
+      );
     }
   });
 }
@@ -775,12 +808,12 @@ export async function ensureActiveBoss(uid: string): Promise<GuildBossState> {
     if (!guildSnap.exists()) throw new Error('Guild not found.');
 
     const guild = guildSnap.data();
-    const tier = Math.max(1, Math.floor((typeof guild.level === 'number' ? guild.level : 1)));
+    const tier = Math.max(1, Math.floor(typeof guild.level === 'number' ? guild.level : 1));
     const maxHp = bossHpForTier(tier);
 
     if (bossSnap.exists()) {
       const bossData = bossSnap.data();
-      const status = (bossData.status === 'defeated' || bossData.status === 'expired') ? bossData.status : 'active';
+      const status = bossData.status === 'defeated' || bossData.status === 'expired' ? bossData.status : 'active';
       const expiresAt = typeof bossData.expiresAt === 'number' ? bossData.expiresAt : now;
       if (status === 'active' && expiresAt > now) {
         return {
@@ -792,7 +825,9 @@ export async function ensureActiveBoss(uid: string): Promise<GuildBossState> {
           status: 'active',
           startedAt: typeof bossData.startedAt === 'number' ? bossData.startedAt : now,
           expiresAt,
-          participantUids: Array.isArray(bossData.participantUids) ? bossData.participantUids.filter(v => typeof v === 'string') as string[] : [],
+          participantUids: Array.isArray(bossData.participantUids)
+            ? (bossData.participantUids.filter(v => typeof v === 'string') as string[])
+            : [],
         };
       }
     }
@@ -818,7 +853,11 @@ export async function ensureActiveBoss(uid: string): Promise<GuildBossState> {
   });
 }
 
-export async function attackBoss(input: { uid: string; displayName: string; dps: number }): Promise<{ dealt: number; boss: GuildBossState; rewardGranted: boolean }> {
+export async function attackBoss(input: {
+  uid: string;
+  displayName: string;
+  dps: number;
+}): Promise<{ dealt: number; boss: GuildBossState; rewardGranted: boolean }> {
   const db = requireDb();
   const guildId = await resolveGuildIdForUser(input.uid);
   if (!guildId) throw new Error('You are not in a guild.');
@@ -831,7 +870,12 @@ export async function attackBoss(input: { uid: string; displayName: string; dps:
   const safeDps = Math.min(MAX_ALLOWED_DPS, Math.max(1, Math.floor(input.dps || 1)));
   const strikeDamage = safeDps * 30;
 
-  const txResult = await runTransaction<{ dealt: number; rewardGranted: boolean; rewardAmount: number; boss: GuildBossState }>(db, async tx => {
+  const txResult = await runTransaction<{
+    dealt: number;
+    rewardGranted: boolean;
+    rewardAmount: number;
+    boss: GuildBossState;
+  }>(db, async tx => {
     const [memberSnap, bossSnap] = await Promise.all([tx.get(memberRef), tx.get(bossRef)]);
     if (!memberSnap.exists()) throw new Error('Guild membership not found.');
     if (!bossSnap.exists()) throw new Error('No active boss.');
@@ -857,24 +901,33 @@ export async function attackBoss(input: { uid: string; displayName: string; dps:
     const effectiveDamage = Math.min(strikeDamage, currentHp);
     const nextHp = Math.max(0, currentHp - effectiveDamage);
     const participantUids = Array.isArray(bossData.participantUids)
-      ? [...new Set((bossData.participantUids as unknown[]).filter(v => typeof v === 'string') as string[]) ]
+      ? [...new Set((bossData.participantUids as unknown[]).filter(v => typeof v === 'string') as string[])]
       : [];
     if (!participantUids.includes(input.uid)) participantUids.push(input.uid);
 
-    tx.set(memberRef, {
-      lastBossAttackAt: now,
-      guildContribution: (typeof memberData.guildContribution === 'number' ? memberData.guildContribution : 0) + effectiveDamage,
-      displayName: input.displayName.trim().slice(0, 24) || memberData.displayName || 'Member',
-    }, { merge: true });
+    tx.set(
+      memberRef,
+      {
+        lastBossAttackAt: now,
+        guildContribution:
+          (typeof memberData.guildContribution === 'number' ? memberData.guildContribution : 0) + effectiveDamage,
+        displayName: input.displayName.trim().slice(0, 24) || memberData.displayName || 'Member',
+      },
+      { merge: true },
+    );
 
     const defeated = nextHp <= 0;
-    tx.set(bossRef, {
-      currentHp: nextHp,
-      status: defeated ? 'defeated' : 'active',
-      participantUids,
-      defeatedAt: defeated ? now : null,
-      updatedAt: now,
-    }, { merge: true });
+    tx.set(
+      bossRef,
+      {
+        currentHp: nextHp,
+        status: defeated ? 'defeated' : 'active',
+        participantUids,
+        defeatedAt: defeated ? now : null,
+        updatedAt: now,
+      },
+      { merge: true },
+    );
 
     return {
       dealt: effectiveDamage,
@@ -897,25 +950,33 @@ export async function attackBoss(input: { uid: string; displayName: string; dps:
   if (txResult.rewardGranted) {
     const membersCol = collection(db, GUILD_COLLECTION, guildId, 'members');
     const memberSnaps = await getDocs(query(membersCol, limit(200)));
-    await Promise.all(memberSnaps.docs.map(async memberSnap => {
-      const memberUid = memberSnap.id;
-      const mailRef = doc(db, 'playerMail', memberUid, 'messages', `guild_boss_${guildId}_${now}_${memberUid.slice(0, 6)}`);
-      await setDoc(mailRef, {
-        subject: 'Guild Boss Defeated',
-        message: `Your guild defeated ${txResult.boss.name}!`,
-        from: 'Guild Command',
-        sentAt: now,
-        kind: 'guild_reward',
-        guildId,
-        attachments: {
-          shards: txResult.rewardAmount,
-          gold: txResult.rewardAmount * 1000,
-          diamonds: 0,
-          tears: Math.max(1, Math.floor(txResult.rewardAmount / 50)),
-          essence: Math.max(1, Math.floor(txResult.rewardAmount / 4)),
-        },
-      });
-    }));
+    await Promise.all(
+      memberSnaps.docs.map(async memberSnap => {
+        const memberUid = memberSnap.id;
+        const mailRef = doc(
+          db,
+          'playerMail',
+          memberUid,
+          'messages',
+          `guild_boss_${guildId}_${now}_${memberUid.slice(0, 6)}`,
+        );
+        await setDoc(mailRef, {
+          subject: 'Guild Boss Defeated',
+          message: `Your guild defeated ${txResult.boss.name}!`,
+          from: 'Guild Command',
+          sentAt: now,
+          kind: 'guild_reward',
+          guildId,
+          attachments: {
+            shards: txResult.rewardAmount,
+            gold: txResult.rewardAmount * 1000,
+            diamonds: 0,
+            tears: Math.max(1, Math.floor(txResult.rewardAmount / 50)),
+            essence: Math.max(1, Math.floor(txResult.rewardAmount / 4)),
+          },
+        });
+      }),
+    );
   }
 
   return {
@@ -1031,12 +1092,16 @@ export async function updateGuildSettings(input: {
     const guild = guildSnap.data();
     const normalizedName = typeof guild.normalizedName === 'string' ? guild.normalizedName : '';
 
-    tx.set(guildRef, {
-      minPeakProgressToJoin,
-      minLevelToJoin: minPeakProgressToJoin,
-      isPublic,
-      updatedAt: now,
-    }, { merge: true });
+    tx.set(
+      guildRef,
+      {
+        minPeakProgressToJoin,
+        minLevelToJoin: minPeakProgressToJoin,
+        isPublic,
+        updatedAt: now,
+      },
+      { merge: true },
+    );
 
     if (normalizedName) {
       tx.set(doc(db, GUILD_LOOKUP_COLLECTION, normalizedName), { isPublic, updatedAt: now }, { merge: true });
@@ -1074,7 +1139,8 @@ export async function sendGuildInvite(input: {
     const guildId = typeof actorMembership.guildId === 'string' ? actorMembership.guildId : '';
     const actorRank = typeof actorMembership.rank === 'string' ? actorMembership.rank : 'member';
     if (!guildId) throw new Error('Guild data invalid.');
-    if (actorRank !== 'leader' && actorRank !== 'officer') throw new Error('Only leader or officer can invite players.');
+    if (actorRank !== 'leader' && actorRank !== 'officer')
+      throw new Error('Only leader or officer can invite players.');
 
     const guildRef = doc(db, GUILD_COLLECTION, guildId);
     const guildSnap = await tx.get(guildRef);
@@ -1096,30 +1162,36 @@ export async function sendGuildInvite(input: {
       }
     }
 
-    tx.set(inviteRef, {
-      guildId,
-      guildName: typeof guild.name === 'string' ? guild.name : 'Guild',
-      guildTag: typeof guild.tag === 'string' ? guild.tag : 'TAG',
-      inviterUid: actorUid,
-      inviterName: actorDisplayName,
-      invitedUid: targetUid,
-      minPeakProgressToJoin: typeof guild.minPeakProgressToJoin === 'number'
-        ? Math.max(1, Math.floor(guild.minPeakProgressToJoin))
-        : typeof guild.minLevelToJoin === 'number'
-          ? Math.max(1, Math.floor(guild.minLevelToJoin))
-          : 1,
-      minLevelToJoin: typeof guild.minPeakProgressToJoin === 'number'
-        ? Math.max(1, Math.floor(guild.minPeakProgressToJoin))
-        : typeof guild.minLevelToJoin === 'number'
-          ? Math.max(1, Math.floor(guild.minLevelToJoin))
-          : 1,
-      isPublic: guild.isPublic !== false,
-      status: 'pending',
-      createdAt: now,
-      expiresAt,
-      updatedAt: now,
-      respondedAt: null,
-    }, { merge: true });
+    tx.set(
+      inviteRef,
+      {
+        guildId,
+        guildName: typeof guild.name === 'string' ? guild.name : 'Guild',
+        guildTag: typeof guild.tag === 'string' ? guild.tag : 'TAG',
+        inviterUid: actorUid,
+        inviterName: actorDisplayName,
+        invitedUid: targetUid,
+        minPeakProgressToJoin:
+          typeof guild.minPeakProgressToJoin === 'number'
+            ? Math.max(1, Math.floor(guild.minPeakProgressToJoin))
+            : typeof guild.minLevelToJoin === 'number'
+              ? Math.max(1, Math.floor(guild.minLevelToJoin))
+              : 1,
+        minLevelToJoin:
+          typeof guild.minPeakProgressToJoin === 'number'
+            ? Math.max(1, Math.floor(guild.minPeakProgressToJoin))
+            : typeof guild.minLevelToJoin === 'number'
+              ? Math.max(1, Math.floor(guild.minLevelToJoin))
+              : 1,
+        isPublic: guild.isPublic !== false,
+        status: 'pending',
+        createdAt: now,
+        expiresAt,
+        updatedAt: now,
+        respondedAt: null,
+      },
+      { merge: true },
+    );
   });
 }
 
@@ -1129,11 +1201,9 @@ export async function fetchGuildInvites(uid: string): Promise<GuildInvite[]> {
   if (!cleanUid) return [];
   const now = Date.now();
 
-  const snap = await getDocs(query(
-    collection(db, GUILD_INVITES_COLLECTION, cleanUid, 'incoming'),
-    orderBy('createdAt', 'desc'),
-    limit(25),
-  ));
+  const snap = await getDocs(
+    query(collection(db, GUILD_INVITES_COLLECTION, cleanUid, 'incoming'), orderBy('createdAt', 'desc'), limit(25)),
+  );
 
   const invites = snap.docs
     .map(docSnap => parseGuildInvite(docSnap.id, docSnap.data() as Record<string, unknown>))
@@ -1165,10 +1235,7 @@ export async function respondToGuildInvite(input: {
   const userGuildRef = doc(db, USER_GUILD_COLLECTION, uid);
 
   await runTransaction(db, async tx => {
-    const [inviteSnap, existingMembershipSnap] = await Promise.all([
-      tx.get(inviteRef),
-      tx.get(userGuildRef),
-    ]);
+    const [inviteSnap, existingMembershipSnap] = await Promise.all([tx.get(inviteRef), tx.get(userGuildRef)]);
 
     if (!inviteSnap.exists()) throw new Error('Invite not found.');
     if (existingMembershipSnap.exists()) throw new Error('You are already in a guild.');
@@ -1193,11 +1260,12 @@ export async function respondToGuildInvite(input: {
 
     const memberCount = typeof guild.memberCount === 'number' ? guild.memberCount : 0;
     const maxMembers = typeof guild.maxMembers === 'number' ? guild.maxMembers : 30;
-    const minPeakProgressToJoin = typeof guild.minPeakProgressToJoin === 'number'
-      ? Math.max(1, Math.floor(guild.minPeakProgressToJoin))
-      : typeof guild.minLevelToJoin === 'number'
-        ? Math.max(1, Math.floor(guild.minLevelToJoin))
-        : 1;
+    const minPeakProgressToJoin =
+      typeof guild.minPeakProgressToJoin === 'number'
+        ? Math.max(1, Math.floor(guild.minPeakProgressToJoin))
+        : typeof guild.minLevelToJoin === 'number'
+          ? Math.max(1, Math.floor(guild.minLevelToJoin))
+          : 1;
     if (memberCount >= maxMembers) throw new Error('Guild is full.');
     if (Math.max(1, Math.floor(input.playerPeakProgress || 1)) < minPeakProgressToJoin) {
       throw new Error(`Peak progress ${minPeakProgressToJoin}+ required to join.`);
@@ -1224,7 +1292,11 @@ export async function respondToGuildInvite(input: {
 
     tx.set(guildRef, { memberCount: nextCount, updatedAt: now }, { merge: true });
     if (normalizedName) {
-      tx.set(doc(db, GUILD_LOOKUP_COLLECTION, normalizedName), { memberCount: nextCount, updatedAt: now }, { merge: true });
+      tx.set(
+        doc(db, GUILD_LOOKUP_COLLECTION, normalizedName),
+        { memberCount: nextCount, updatedAt: now },
+        { merge: true },
+      );
     }
 
     tx.set(inviteRef, { status: 'accepted', respondedAt: now, updatedAt: now }, { merge: true });
@@ -1234,20 +1306,22 @@ export async function respondToGuildInvite(input: {
 export async function fetchGuildMembers(guildId: string): Promise<GuildMember[]> {
   const db = requireDb();
   const snap = await getDocs(collection(db, GUILD_COLLECTION, guildId, 'members'));
-  return snap.docs.map(docSnap => {
-    const data = docSnap.data();
-    return {
-      uid: docSnap.id,
-      displayName: typeof data.displayName === 'string' ? data.displayName : 'Member',
-      rank: data.rank === 'leader' || data.rank === 'officer' ? data.rank : 'member',
-      joinedAt: typeof data.joinedAt === 'number' ? data.joinedAt : 0,
-      guildContribution: typeof data.guildContribution === 'number' ? data.guildContribution : 0,
-      lastBossAttackAt: typeof data.lastBossAttackAt === 'number' ? data.lastBossAttackAt : 0,
-    } satisfies GuildMember;
-  }).sort((a, b) => {
-    const rankWeight = (rank: GuildMemberRank) => rank === 'leader' ? 3 : rank === 'officer' ? 2 : 1;
-    return rankWeight(b.rank) - rankWeight(a.rank) || a.displayName.localeCompare(b.displayName);
-  });
+  return snap.docs
+    .map(docSnap => {
+      const data = docSnap.data();
+      return {
+        uid: docSnap.id,
+        displayName: typeof data.displayName === 'string' ? data.displayName : 'Member',
+        rank: data.rank === 'leader' || data.rank === 'officer' ? data.rank : 'member',
+        joinedAt: typeof data.joinedAt === 'number' ? data.joinedAt : 0,
+        guildContribution: typeof data.guildContribution === 'number' ? data.guildContribution : 0,
+        lastBossAttackAt: typeof data.lastBossAttackAt === 'number' ? data.lastBossAttackAt : 0,
+      } satisfies GuildMember;
+    })
+    .sort((a, b) => {
+      const rankWeight = (rank: GuildMemberRank) => (rank === 'leader' ? 3 : rank === 'officer' ? 2 : 1);
+      return rankWeight(b.rank) - rankWeight(a.rank) || a.displayName.localeCompare(b.displayName);
+    });
 }
 
 export async function fetchActiveBoss(uid: string): Promise<GuildBossState | null> {
@@ -1266,11 +1340,17 @@ export async function fetchActiveBoss(uid: string): Promise<GuildBossState | nul
     status: data.status === 'defeated' || data.status === 'expired' ? data.status : 'active',
     startedAt: typeof data.startedAt === 'number' ? data.startedAt : 0,
     expiresAt: typeof data.expiresAt === 'number' ? data.expiresAt : 0,
-    participantUids: Array.isArray(data.participantUids) ? data.participantUids.filter(v => typeof v === 'string') as string[] : [],
+    participantUids: Array.isArray(data.participantUids)
+      ? (data.participantUids.filter(v => typeof v === 'string') as string[])
+      : [],
   };
 }
 
-export async function startEvent(input: { uid: string; type: 'war' | 'expedition'; forceRestart?: boolean }): Promise<GuildEventState> {
+export async function startEvent(input: {
+  uid: string;
+  type: 'war' | 'expedition';
+  forceRestart?: boolean;
+}): Promise<GuildEventState> {
   const db = requireDb();
   const guildId = await resolveGuildIdForUser(input.uid);
   if (!guildId) throw new Error('You are not in a guild.');
@@ -1293,19 +1373,24 @@ export async function startEvent(input: { uid: string; type: 'war' | 'expedition
     }
   }
 
-  const details = input.type === 'war'
-    ? { totalDamage: 0, targetDamage: 2_000_000_000_000 }
-    : { totalKills: 0, targetKills: 250_000 };
+  const details =
+    input.type === 'war'
+      ? { totalDamage: 0, targetDamage: 2_000_000_000_000 }
+      : { totalKills: 0, targetKills: 250_000 };
 
-  await setDoc(eventRef, {
-    eventId,
-    type: input.type,
-    status: 'active',
-    startedAt: now,
-    endsAt,
-    details,
-    updatedAt: now,
-  }, { merge: true });
+  await setDoc(
+    eventRef,
+    {
+      eventId,
+      type: input.type,
+      status: 'active',
+      startedAt: now,
+      endsAt,
+      details,
+      updatedAt: now,
+    },
+    { merge: true },
+  );
 
   return {
     eventId,
@@ -1322,30 +1407,38 @@ export async function fetchGuildEvents(uid: string): Promise<GuildEventState[]> 
   const guildId = await resolveGuildIdForUser(uid);
   if (!guildId) return [];
   const snap = await getDocs(collection(db, GUILD_COLLECTION, guildId, 'events'));
-  return snap.docs.map(docSnap => {
-    const data = docSnap.data();
-    return {
-      eventId: typeof data.eventId === 'string' ? data.eventId : docSnap.id,
-      type: data.type === 'war' ? 'war' : 'expedition',
-      status: data.status === 'completed' || data.status === 'expired' ? data.status : 'active',
-      startedAt: typeof data.startedAt === 'number' ? data.startedAt : 0,
-      endsAt: typeof data.endsAt === 'number' ? data.endsAt : 0,
-      details: data.details && typeof data.details === 'object' ? data.details as Record<string, unknown> : {},
-    } satisfies GuildEventState;
-  }).sort((a, b) => b.startedAt - a.startedAt);
+  return snap.docs
+    .map(docSnap => {
+      const data = docSnap.data();
+      return {
+        eventId: typeof data.eventId === 'string' ? data.eventId : docSnap.id,
+        type: data.type === 'war' ? 'war' : 'expedition',
+        status: data.status === 'completed' || data.status === 'expired' ? data.status : 'active',
+        startedAt: typeof data.startedAt === 'number' ? data.startedAt : 0,
+        endsAt: typeof data.endsAt === 'number' ? data.endsAt : 0,
+        details: data.details && typeof data.details === 'object' ? (data.details as Record<string, unknown>) : {},
+      } satisfies GuildEventState;
+    })
+    .sort((a, b) => b.startedAt - a.startedAt);
 }
 
-export async function fetchGuildEventContributors(uid: string, eventId: string, maxRows = 20): Promise<GuildEventContributor[]> {
+export async function fetchGuildEventContributors(
+  uid: string,
+  eventId: string,
+  maxRows = 20,
+): Promise<GuildEventContributor[]> {
   const db = requireDb();
   const guildId = await resolveGuildIdForUser(uid);
   if (!guildId) return [];
   const normalizedEventId = eventId.trim();
   if (!normalizedEventId) return [];
 
-  const snap = await getDocs(query(
-    collection(db, GUILD_COLLECTION, guildId, 'events', normalizedEventId, 'contrib'),
-    limit(Math.max(1, Math.min(100, Math.floor(maxRows || 20)))),
-  ));
+  const snap = await getDocs(
+    query(
+      collection(db, GUILD_COLLECTION, guildId, 'events', normalizedEventId, 'contrib'),
+      limit(Math.max(1, Math.min(100, Math.floor(maxRows || 20)))),
+    ),
+  );
 
   return snap.docs
     .map(docSnap => {
@@ -1360,7 +1453,12 @@ export async function fetchGuildEventContributors(uid: string, eventId: string, 
     .sort((a, b) => b.totalContributed - a.totalContributed || b.lastContributedAt - a.lastContributedAt);
 }
 
-export async function contributeToGuildEvent(input: { uid: string; eventId: string; dps?: number; kills?: number }): Promise<GuildEventState> {
+export async function contributeToGuildEvent(input: {
+  uid: string;
+  eventId: string;
+  dps?: number;
+  kills?: number;
+}): Promise<GuildEventState> {
   const db = requireDb();
   const guildId = await resolveGuildIdForUser(input.uid);
   if (!guildId) throw new Error('You are not in a guild.');
@@ -1368,16 +1466,22 @@ export async function contributeToGuildEvent(input: { uid: string; eventId: stri
   const contribRef = doc(db, GUILD_COLLECTION, guildId, 'events', input.eventId, 'contrib', input.uid);
   const now = Date.now();
 
-  const result = await runTransaction<{ event: GuildEventState; shouldReward: boolean; rewardAmount: number; guildId: string }>(db, async tx => {
+  const result = await runTransaction<{
+    event: GuildEventState;
+    shouldReward: boolean;
+    rewardAmount: number;
+    guildId: string;
+  }>(db, async tx => {
     const [eventSnap, contribSnap] = await Promise.all([tx.get(eventRef), tx.get(contribRef)]);
     if (!eventSnap.exists()) throw new Error('Event not found.');
     const data = eventSnap.data();
     if (data.status !== 'active') throw new Error('Event is not active.');
     if (typeof data.endsAt === 'number' && data.endsAt <= now) throw new Error('Event expired.');
 
-    const lastContributedAt = contribSnap.exists() && typeof contribSnap.data().lastContributedAt === 'number'
-      ? contribSnap.data().lastContributedAt
-      : 0;
+    const lastContributedAt =
+      contribSnap.exists() && typeof contribSnap.data().lastContributedAt === 'number'
+        ? contribSnap.data().lastContributedAt
+        : 0;
     if (now - lastContributedAt < EVENT_CONTRIBUTION_COOLDOWN_MS) {
       const secondsLeft = Math.ceil((EVENT_CONTRIBUTION_COOLDOWN_MS - (now - lastContributedAt)) / 1000);
       throw new Error(`Contribution cooldown active (${secondsLeft}s remaining).`);
@@ -1410,21 +1514,32 @@ export async function contributeToGuildEvent(input: { uid: string; eventId: stri
 
     const rewardAlreadySent = typeof data.rewardSentAt === 'number' && data.rewardSentAt > 0;
     const shouldReward = status === 'completed' && !rewardAlreadySent;
-    tx.set(eventRef, {
-      status,
-      details: nextDetails,
-      updatedAt: now,
-      completedAt: status === 'completed' ? now : null,
-      rewardSentAt: shouldReward ? now : data.rewardSentAt ?? null,
-    }, { merge: true });
+    tx.set(
+      eventRef,
+      {
+        status,
+        details: nextDetails,
+        updatedAt: now,
+        completedAt: status === 'completed' ? now : null,
+        rewardSentAt: shouldReward ? now : (data.rewardSentAt ?? null),
+      },
+      { merge: true },
+    );
 
-    tx.set(contribRef, {
-      uid: input.uid,
-      totalContributed: (contribSnap.exists() && typeof contribSnap.data().totalContributed === 'number' ? contribSnap.data().totalContributed : 0) + rawContribution,
-      lastContribution: rawContribution,
-      lastContributedAt: now,
-      updatedAt: now,
-    }, { merge: true });
+    tx.set(
+      contribRef,
+      {
+        uid: input.uid,
+        totalContributed:
+          (contribSnap.exists() && typeof contribSnap.data().totalContributed === 'number'
+            ? contribSnap.data().totalContributed
+            : 0) + rawContribution,
+        lastContribution: rawContribution,
+        lastContributedAt: now,
+        updatedAt: now,
+      },
+      { merge: true },
+    );
 
     return {
       event: {
@@ -1443,25 +1558,37 @@ export async function contributeToGuildEvent(input: { uid: string; eventId: stri
 
   if (result.shouldReward) {
     const members = await getDocs(query(collection(db, GUILD_COLLECTION, result.guildId, 'members'), limit(200)));
-    await Promise.all(members.docs.map(async member => {
-      const memberUid = member.id;
-      const mailRef = doc(db, 'playerMail', memberUid, 'messages', `guild_event_${result.event.eventId}_${memberUid}`);
-      await setDoc(mailRef, {
-        subject: `Guild ${result.event.type === 'war' ? 'War' : 'Expedition'} Complete`,
-        message: `Your guild completed the ${result.event.type} event. Rewards enclosed.`,
-        from: 'Guild Command',
-        sentAt: now,
-        kind: 'guild_reward',
-        guildId: result.guildId,
-        attachments: {
-          shards: result.rewardAmount,
-          gold: result.rewardAmount * 1000,
-          diamonds: 0,
-          tears: Math.max(1, Math.floor(result.rewardAmount / 60)),
-          essence: Math.max(1, Math.floor(result.rewardAmount / 5)),
-        },
-      }, { merge: true });
-    }));
+    await Promise.all(
+      members.docs.map(async member => {
+        const memberUid = member.id;
+        const mailRef = doc(
+          db,
+          'playerMail',
+          memberUid,
+          'messages',
+          `guild_event_${result.event.eventId}_${memberUid}`,
+        );
+        await setDoc(
+          mailRef,
+          {
+            subject: `Guild ${result.event.type === 'war' ? 'War' : 'Expedition'} Complete`,
+            message: `Your guild completed the ${result.event.type} event. Rewards enclosed.`,
+            from: 'Guild Command',
+            sentAt: now,
+            kind: 'guild_reward',
+            guildId: result.guildId,
+            attachments: {
+              shards: result.rewardAmount,
+              gold: result.rewardAmount * 1000,
+              diamonds: 0,
+              tears: Math.max(1, Math.floor(result.rewardAmount / 60)),
+              essence: Math.max(1, Math.floor(result.rewardAmount / 5)),
+            },
+          },
+          { merge: true },
+        );
+      }),
+    );
   }
 
   return result.event;
@@ -1501,17 +1628,22 @@ export async function fetchGuildChat(uid: string, maxRows = 60): Promise<GuildCh
   const db = requireDb();
   const guildId = await resolveGuildIdForUser(uid);
   if (!guildId) return [];
-  const snap = await getDocs(query(collection(db, GUILD_COLLECTION, guildId, 'chat'), orderBy('sentAt', 'desc'), limit(maxRows)));
-  return snap.docs.map(docSnap => {
-    const data = docSnap.data();
-    return {
-      id: docSnap.id,
-      uid: typeof data.uid === 'string' ? data.uid : '',
-      displayName: typeof data.displayName === 'string' ? data.displayName : 'Member',
-      text: typeof data.text === 'string' ? data.text : '',
-      sentAt: typeof data.sentAt === 'number' ? data.sentAt : 0,
-    } satisfies GuildChatMessage;
-  }).filter(r => !!r.uid && !!r.text).sort((a, b) => a.sentAt - b.sentAt);
+  const snap = await getDocs(
+    query(collection(db, GUILD_COLLECTION, guildId, 'chat'), orderBy('sentAt', 'desc'), limit(maxRows)),
+  );
+  return snap.docs
+    .map(docSnap => {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        uid: typeof data.uid === 'string' ? data.uid : '',
+        displayName: typeof data.displayName === 'string' ? data.displayName : 'Member',
+        text: typeof data.text === 'string' ? data.text : '',
+        sentAt: typeof data.sentAt === 'number' ? data.sentAt : 0,
+      } satisfies GuildChatMessage;
+    })
+    .filter(r => !!r.uid && !!r.text)
+    .sort((a, b) => a.sentAt - b.sentAt);
 }
 
 export function subscribeGuildChat(uid: string, onMessages: (messages: GuildChatMessage[]) => void): () => void {
@@ -1520,25 +1652,30 @@ export function subscribeGuildChat(uid: string, onMessages: (messages: GuildChat
   if (!uid) return stopNoop;
 
   let unsub: (() => void) | null = null;
-  void resolveGuildIdForUser(uid).then(guildId => {
-    if (!guildId) return;
-    unsub = onSnapshot(
-      query(collection(db, GUILD_COLLECTION, guildId, 'chat'), orderBy('sentAt', 'desc'), limit(60)),
-      snap => {
-        const rows = snap.docs.map(docSnap => {
-          const data = docSnap.data();
-          return {
-            id: docSnap.id,
-            uid: typeof data.uid === 'string' ? data.uid : '',
-            displayName: typeof data.displayName === 'string' ? data.displayName : 'Member',
-            text: typeof data.text === 'string' ? data.text : '',
-            sentAt: typeof data.sentAt === 'number' ? data.sentAt : 0,
-          } satisfies GuildChatMessage;
-        }).filter(r => !!r.uid && !!r.text).sort((a, b) => a.sentAt - b.sentAt);
-        onMessages(rows);
-      },
-    );
-  }).catch(() => {});
+  void resolveGuildIdForUser(uid)
+    .then(guildId => {
+      if (!guildId) return;
+      unsub = onSnapshot(
+        query(collection(db, GUILD_COLLECTION, guildId, 'chat'), orderBy('sentAt', 'desc'), limit(60)),
+        snap => {
+          const rows = snap.docs
+            .map(docSnap => {
+              const data = docSnap.data();
+              return {
+                id: docSnap.id,
+                uid: typeof data.uid === 'string' ? data.uid : '',
+                displayName: typeof data.displayName === 'string' ? data.displayName : 'Member',
+                text: typeof data.text === 'string' ? data.text : '',
+                sentAt: typeof data.sentAt === 'number' ? data.sentAt : 0,
+              } satisfies GuildChatMessage;
+            })
+            .filter(r => !!r.uid && !!r.text)
+            .sort((a, b) => a.sentAt - b.sentAt);
+          onMessages(rows);
+        },
+      );
+    })
+    .catch(() => {});
 
   return () => {
     if (unsub) unsub();
@@ -1551,26 +1688,28 @@ export async function fetchGuildBrowse(searchTerm = ''): Promise<GuildBrowseRow[
 
   const q = normalized
     ? query(
-      collection(db, GUILD_LOOKUP_COLLECTION),
-      where('normalizedName', '>=', normalized),
-      where('normalizedName', '<=', `${normalized}\uf8ff`),
-      limit(20),
-    )
+        collection(db, GUILD_LOOKUP_COLLECTION),
+        where('normalizedName', '>=', normalized),
+        where('normalizedName', '<=', `${normalized}\uf8ff`),
+        limit(20),
+      )
     : query(collection(db, GUILD_LOOKUP_COLLECTION), orderBy('memberCount', 'desc'), limit(30));
 
   const snap = await getDocs(q);
-  return snap.docs.map(docSnap => {
-    const data = docSnap.data() as Record<string, unknown>;
-    return {
-      guildId: typeof data.guildId === 'string' ? data.guildId : '',
-      name: typeof data.displayName === 'string' ? data.displayName : 'Guild',
-      tag: typeof data.tag === 'string' ? data.tag : 'TAG',
-      leaderName: typeof data.leaderName === 'string' ? data.leaderName : 'Leader',
-      memberCount: typeof data.memberCount === 'number' ? data.memberCount : 0,
-      level: typeof data.level === 'number' ? data.level : 1,
-      isPublic: data.isPublic !== false,
-    } satisfies GuildBrowseRow;
-  }).filter(row => !!row.guildId);
+  return snap.docs
+    .map(docSnap => {
+      const data = docSnap.data() as Record<string, unknown>;
+      return {
+        guildId: typeof data.guildId === 'string' ? data.guildId : '',
+        name: typeof data.displayName === 'string' ? data.displayName : 'Guild',
+        tag: typeof data.tag === 'string' ? data.tag : 'TAG',
+        leaderName: typeof data.leaderName === 'string' ? data.leaderName : 'Leader',
+        memberCount: typeof data.memberCount === 'number' ? data.memberCount : 0,
+        level: typeof data.level === 'number' ? data.level : 1,
+        isPublic: data.isPublic !== false,
+      } satisfies GuildBrowseRow;
+    })
+    .filter(row => !!row.guildId);
 }
 
 export async function fetchGuildTreasuryState(uid: string): Promise<GuildTreasuryState> {
@@ -1606,25 +1745,29 @@ export async function fetchGuildTreasuryLedger(uid: string, maxRows = 25): Promi
   if (!membership) throw new Error('You are not in a guild.');
 
   const limitRows = Math.max(1, Math.min(80, Math.floor(maxRows || 25)));
-  const snap = await getDocs(query(
-    collection(db, GUILD_COLLECTION, membership.guildId, GUILD_TREASURY_LEDGER_COLLECTION),
-    orderBy('createdAt', 'desc'),
-    limit(limitRows),
-  ));
+  const snap = await getDocs(
+    query(
+      collection(db, GUILD_COLLECTION, membership.guildId, GUILD_TREASURY_LEDGER_COLLECTION),
+      orderBy('createdAt', 'desc'),
+      limit(limitRows),
+    ),
+  );
 
-  return snap.docs.map(entrySnap => {
-    const data = entrySnap.data() as Record<string, unknown>;
-    return {
-      id: entrySnap.id,
-      type: data.type === 'withdrawal' ? 'withdrawal' : 'deposit',
-      amount: typeof data.amount === 'number' ? Math.max(0, Math.floor(data.amount)) : 0,
-      actorUid: typeof data.actorUid === 'string' ? data.actorUid : '',
-      actorName: typeof data.actorName === 'string' ? data.actorName : 'Member',
-      actorRank: data.actorRank === 'leader' || data.actorRank === 'officer' ? data.actorRank : 'member',
-      reason: typeof data.reason === 'string' ? data.reason : '',
-      createdAt: typeof data.createdAt === 'number' ? data.createdAt : 0,
-    } satisfies GuildTreasuryEntry;
-  }).filter(entry => !!entry.actorUid && entry.amount > 0);
+  return snap.docs
+    .map(entrySnap => {
+      const data = entrySnap.data() as Record<string, unknown>;
+      return {
+        id: entrySnap.id,
+        type: data.type === 'withdrawal' ? 'withdrawal' : 'deposit',
+        amount: typeof data.amount === 'number' ? Math.max(0, Math.floor(data.amount)) : 0,
+        actorUid: typeof data.actorUid === 'string' ? data.actorUid : '',
+        actorName: typeof data.actorName === 'string' ? data.actorName : 'Member',
+        actorRank: data.actorRank === 'leader' || data.actorRank === 'officer' ? data.actorRank : 'member',
+        reason: typeof data.reason === 'string' ? data.reason : '',
+        createdAt: typeof data.createdAt === 'number' ? data.createdAt : 0,
+      } satisfies GuildTreasuryEntry;
+    })
+    .filter(entry => !!entry.actorUid && entry.amount > 0);
 }
 
 export async function transactGuildTreasury(input: {
@@ -1658,10 +1801,7 @@ export async function transactGuildTreasury(input: {
   const saveRef = doc(db, 'users', uid, 'saveSlots', saveSlotId);
 
   return runTransaction(db, async tx => {
-    const [stateSnap, saveSnap] = await Promise.all([
-      tx.get(stateRef),
-      tx.get(saveRef),
-    ]);
+    const [stateSnap, saveSnap] = await Promise.all([tx.get(stateRef), tx.get(saveRef)]);
 
     if (!saveSnap.exists()) {
       throw new Error('Active save slot not found.');
@@ -1679,14 +1819,14 @@ export async function transactGuildTreasury(input: {
     const state = stateSnap.exists()
       ? parseGuildTreasuryState(stateSnap.data() as Record<string, unknown>)
       : {
-        balance: 0,
-        totalDeposited: 0,
-        totalWithdrawn: 0,
-        dailyWithdrawn: 0,
-        dailyWindowStart,
-        updatedAt: 0,
-        updatedByUid: '',
-      };
+          balance: 0,
+          totalDeposited: 0,
+          totalWithdrawn: 0,
+          dailyWithdrawn: 0,
+          dailyWindowStart,
+          updatedAt: 0,
+          updatedByUid: '',
+        };
 
     const withinToday = state.dailyWindowStart === dailyWindowStart;
     const currentDailyWithdrawn = withinToday ? state.dailyWithdrawn : 0;
@@ -1699,9 +1839,8 @@ export async function transactGuildTreasury(input: {
         throw new Error('Treasury does not have enough balance for this withdrawal.');
       }
 
-      const cap = membership.rank === 'leader'
-        ? TREASURY_DAILY_WITHDRAW_CAP_LEADER
-        : TREASURY_DAILY_WITHDRAW_CAP_OFFICER;
+      const cap =
+        membership.rank === 'leader' ? TREASURY_DAILY_WITHDRAW_CAP_LEADER : TREASURY_DAILY_WITHDRAW_CAP_OFFICER;
       if (currentDailyWithdrawn + amount > cap) {
         throw new Error(`Daily withdrawal cap exceeded (${cap.toLocaleString()}).`);
       }
@@ -1711,29 +1850,28 @@ export async function transactGuildTreasury(input: {
       }
     }
 
-    const nextPlayerGold = input.type === 'deposit'
-      ? currentPlayerGold - amount
-      : currentPlayerGold + amount;
+    const nextPlayerGold = input.type === 'deposit' ? currentPlayerGold - amount : currentPlayerGold + amount;
 
-    const nextState: GuildTreasuryState = input.type === 'deposit'
-      ? {
-        balance: state.balance + amount,
-        totalDeposited: state.totalDeposited + amount,
-        totalWithdrawn: state.totalWithdrawn,
-        dailyWithdrawn: currentDailyWithdrawn,
-        dailyWindowStart,
-        updatedAt: now,
-        updatedByUid: uid,
-      }
-      : {
-        balance: Math.max(0, state.balance - amount),
-        totalDeposited: state.totalDeposited,
-        totalWithdrawn: state.totalWithdrawn + amount,
-        dailyWithdrawn: currentDailyWithdrawn + amount,
-        dailyWindowStart,
-        updatedAt: now,
-        updatedByUid: uid,
-      };
+    const nextState: GuildTreasuryState =
+      input.type === 'deposit'
+        ? {
+            balance: state.balance + amount,
+            totalDeposited: state.totalDeposited + amount,
+            totalWithdrawn: state.totalWithdrawn,
+            dailyWithdrawn: currentDailyWithdrawn,
+            dailyWindowStart,
+            updatedAt: now,
+            updatedByUid: uid,
+          }
+        : {
+            balance: Math.max(0, state.balance - amount),
+            totalDeposited: state.totalDeposited,
+            totalWithdrawn: state.totalWithdrawn + amount,
+            dailyWithdrawn: currentDailyWithdrawn + amount,
+            dailyWindowStart,
+            updatedAt: now,
+            updatedByUid: uid,
+          };
 
     const nextRevision = typeof saveData.revision === 'number' ? saveData.revision + 1 : 1;
     tx.set(saveRef, {
