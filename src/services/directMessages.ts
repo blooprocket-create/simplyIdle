@@ -1,0 +1,150 @@
+import {
+  collection,
+  doc,
+  getDocs,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  setDoc,
+  getDoc,
+  updateDoc,
+} from 'firebase/firestore';
+import { getFirebaseFirestore } from './firebase';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+export interface DirectMessage {
+  id: string;
+  senderUid: string;
+  text: string;
+  sentAt: number;
+}
+
+export interface DMThread {
+  partnerUid: string;
+  partnerName: string;
+  lastMessageText: string;
+  lastMessageAt: number;
+  unreadCount: number;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Deterministic conversation ID from two UIDs (sorted pair). */
+export function buildConversationId(uid1: string, uid2: string): string {
+  return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
+}
+
+// ─── Send DM ─────────────────────────────────────────────────────────────────
+
+export async function sendDirectMessage(fromUid: string, toUid: string, fromName: string, text: string): Promise<void> {
+  const db = getFirebaseFirestore();
+  if (!db || !fromUid || !toUid || fromUid === toUid) return;
+
+  const cleaned = text.replace(/\s+/g, ' ').trim().slice(0, 500);
+  if (!cleaned) return;
+
+  const conversationId = buildConversationId(fromUid, toUid);
+  const now = Date.now();
+
+  // Write message
+  const msgRef = doc(collection(db, 'directMessages', conversationId, 'messages'));
+  await setDoc(msgRef, {
+    senderUid: fromUid,
+    text: cleaned,
+    sentAt: now,
+  });
+
+  // Update thread index for sender (unreadCount stays 0)
+  await setDoc(
+    doc(db, 'dmThreads', fromUid, 'conversations', toUid),
+    {
+      partnerUid: toUid,
+      partnerName: '', // partner name resolved client-side from profile cache
+      lastMessageText: cleaned.slice(0, 80),
+      lastMessageAt: now,
+      unreadCount: 0,
+    },
+    { merge: true },
+  );
+
+  // Update thread index for receiver (+1 unread)
+  const receiverThreadRef = doc(db, 'dmThreads', toUid, 'conversations', fromUid);
+  const receiverThreadSnap = await getDoc(receiverThreadRef);
+  const prevUnread = receiverThreadSnap.exists()
+    ? typeof receiverThreadSnap.data().unreadCount === 'number'
+      ? receiverThreadSnap.data().unreadCount
+      : 0
+    : 0;
+
+  await setDoc(
+    receiverThreadRef,
+    {
+      partnerUid: fromUid,
+      partnerName: fromName.trim().slice(0, 24),
+      lastMessageText: cleaned.slice(0, 80),
+      lastMessageAt: now,
+      unreadCount: prevUnread + 1,
+    },
+    { merge: true },
+  );
+}
+
+// ─── Subscriptions ───────────────────────────────────────────────────────────
+
+export function subscribeToConversation(
+  uid: string,
+  partnerUid: string,
+  onMessages: (messages: DirectMessage[]) => void,
+): () => void {
+  const db = getFirebaseFirestore();
+  if (!db || !uid || !partnerUid) return () => {};
+
+  const conversationId = buildConversationId(uid, partnerUid);
+  const q = query(collection(db, 'directMessages', conversationId, 'messages'), orderBy('sentAt', 'desc'), limit(100));
+
+  return onSnapshot(q, snap => {
+    const msgs: DirectMessage[] = snap.docs
+      .map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          senderUid: typeof data.senderUid === 'string' ? data.senderUid : '',
+          text: typeof data.text === 'string' ? data.text : '',
+          sentAt: typeof data.sentAt === 'number' ? data.sentAt : 0,
+        };
+      })
+      .filter(m => m.senderUid && m.text)
+      .sort((a, b) => a.sentAt - b.sentAt);
+    onMessages(msgs);
+  });
+}
+
+export async function fetchConversations(uid: string): Promise<DMThread[]> {
+  const db = getFirebaseFirestore();
+  if (!db || !uid) return [];
+
+  const snap = await getDocs(
+    query(collection(db, 'dmThreads', uid, 'conversations'), orderBy('lastMessageAt', 'desc'), limit(50)),
+  );
+
+  return snap.docs.map(d => {
+    const data = d.data();
+    return {
+      partnerUid: d.id,
+      partnerName: typeof data.partnerName === 'string' ? data.partnerName : 'Player',
+      lastMessageText: typeof data.lastMessageText === 'string' ? data.lastMessageText : '',
+      lastMessageAt: typeof data.lastMessageAt === 'number' ? data.lastMessageAt : 0,
+      unreadCount: typeof data.unreadCount === 'number' ? Math.max(0, data.unreadCount) : 0,
+    };
+  });
+}
+
+export async function markConversationRead(uid: string, partnerUid: string): Promise<void> {
+  const db = getFirebaseFirestore();
+  if (!db || !uid || !partnerUid) return;
+
+  const threadRef = doc(db, 'dmThreads', uid, 'conversations', partnerUid);
+  await updateDoc(threadRef, { unreadCount: 0 });
+}

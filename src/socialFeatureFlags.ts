@@ -6,6 +6,12 @@ const FLAG_DEFAULTS = {
   friendGifting: true,
   globalChat: true,
   leaderboard: true,
+  // v2 social features — default OFF for staged rollout
+  directMessages: false,
+  playerSearch: false,
+  activityFeed: false,
+  blockReport: false,
+  guildWars: false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FLAG_DEFAULTS;
