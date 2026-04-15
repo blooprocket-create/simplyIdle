@@ -4,65 +4,106 @@ title: Core Mechanics
 
 # Core Mechanics
 
-## Combat and Wave Progression
+<span class="status-badge live">Live</span>
 
-- Enemies scale each wave.
-- Boss waves appear at regular intervals and apply reward multipliers.
-- Team output is influenced by hero stats, class passives, formation, and gear.
+Last reviewed: 2026-04-15
 
-## Core Formulas
+## Wave Combat
 
-### Enemy HP
+Enemies spawn in sequential waves. Each wave increases enemy stats. Boss waves appear at every **10th wave** with amplified HP, damage, and rewards.
 
-HP formula:
+## Enemy Scaling Formulas
 
-$$
-\text{HP}(w) = \lfloor 30 \cdot 1.14^{(w-1)} \rfloor
-$$
-
-Boss HP modifier: $\times 5$.
-
-### Enemy Gold
+### Hit Points
 
 $$
-\text{Gold}(w) = \max(8, \lfloor 8 \cdot 1.14^{(w-1)} \rfloor)
+\text{HP}(w) = \lfloor 30 \times 1.14^{(w-1)} \rfloor
 $$
 
-Boss gold modifier: $\times 7$.
+Boss HP: base × **5**
 
-### Enemy EXP
-
-$$
-\text{EXP}(w) = \max(5, \lfloor 5 \cdot 1.10^{(w-1)} \rfloor)
-$$
-
-Boss EXP modifier: $\times 4$.
-
-### Rebirth Requirement
+### Gold Reward
 
 $$
-\text{RequiredWave}(p) = \lceil 100 \cdot 1.12^p \rceil
+\text{Gold}(w) = \max\!\bigl(8,\; \lfloor 8 \times 1.14^{(w-1)} \rfloor\bigr)
 $$
 
-where $p$ is prestige count.
+- **Mid-game boost** (waves 20–60): base × $(1.5 + 0.5 \times \frac{w-20}{40})$
+- **Boss gold:** base × **7**
 
-## Meta Tracks
+### Experience
 
-- Damage track increases clear speed.
-- Economy track increases income and progression velocity.
-- Survival track improves durability and consistency.
+$$
+\text{EXP}(w) = \max\!\bigl(5,\; \lfloor 5 \times 1.10^{(w-1)} \rfloor\bigr)
+$$
+
+Boss EXP: base × **4**
+
+### Enemy Damage
+
+$$
+\text{DMG}(w) = \max\!\bigl(0.5,\; \lfloor 0.8 \times 1.12^{(w-1)} \rfloor / 10\bigr)
+$$
+
+Boss damage: base × **2.5**
 
 ## Facilities
 
-- Training
-- Treasury
-- Forge
-- Tactics
+Permanent upgrades that persist through prestige cycles. Each starts with fixed costs for levels 1–5, then doubles every level after.
 
-Each facility has fixed early levels then escalates by exponential cost.
+| Facility | Effect | Per Level |
+|----------|--------|-----------|
+| Training | EXP boost | +5% |
+| Treasury | Gold boost | +2% |
+| Forge | Stat multiplier | +3% |
+| Tactics | Power boost | +1% |
 
-## Truth Sources
+**Max level:** 999
 
-- src/gameConfig.ts
-- src/useGameState.ts
-- GDD.MD
+### Cost Table (Levels 1–5)
+
+| Facility | L1 | L2 | L3 | L4 | L5 |
+|----------|-----|-------|---------|--------|----------|
+| Training | 5,000 | 12,000 | 30,000 | 75,000 | 150,000 |
+| Treasury | 4,000 | 10,000 | 25,000 | 60,000 | 120,000 |
+| Forge | 6,000 | 15,000 | 40,000 | 90,000 | 180,000 |
+| Tactics | 5,000 | 12,000 | 30,000 | 75,000 | 150,000 |
+
+**Level 6+:** Previous cost × 2
+
+## Team Composition
+
+### Party Units
+
+Buildings that add passive DPS. Each purchase costs ×1.15 more than the last.
+
+| Unit | Base Cost | Base DPS |
+|------|-----------|----------|
+| Squire | 70 | 2 |
+| Archer Squad | 420 | 9 |
+| Mage Circle | 3,200 | 48 |
+| Cleric Order | 24,000 | 240 |
+| Paladin Guard | 230,000 | 1,100 |
+| Assassin Cell | 2,400,000 | 7,200 |
+| Dragon Riders | 34,000,000 | 55,000 |
+
+### Hero Slots
+
+- **Default slots:** 4 heroes + player
+- **Slot 5:** Unlocks at wave 50 — costs 125,000 gold + 450 shards
+- **Slot 6:** Unlocks at wave 100 — costs 550,000 gold + 1,600 shards
+- **Formation:** Front / Mid / Back (max 2 per row)
+
+## Meta Tracks
+
+Three progression tracks shape your overall power curve:
+
+| Track | Focus |
+|-------|-------|
+| Damage | Clear speed and burst output |
+| Economy | Income velocity and compound growth |
+| Survival | Durability and consistency |
+
+## Achievement Bonuses
+
+Each unlocked achievement grants **+3%** to your global power multiplier, capped at **+75%** total (25 achievements).

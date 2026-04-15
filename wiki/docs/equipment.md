@@ -1,57 +1,76 @@
 ---
-title: Equipment
+title: Equipment & Gear
 ---
 
-# Equipment
+# Equipment & Gear
 
-Status: Partial
+<span class="status-badge live">Live</span>
 
-Last reviewed: 2026-04-03
+Last reviewed: 2026-04-15
 
-## Slots and Role
+## Overview
 
-- Weapon
-- Armor
-- Accessory
+**75 equipment items** across 3 slots and 6 rarities. Every item has class restrictions and stat bonuses. Drops come from wave clears with rarity determined by weighted random roll.
 
-Equipment adds stat blocks and shapes class effectiveness. Slot balance is often stronger than single-slot overinvestment.
+## Equipment Slots
 
-## Rarity Reference
+| Slot | Role |
+|------|------|
+| Weapon | Primary stat scaling and class identity |
+| Armor | Survivability and defensive stats |
+| Accessory | Utility and secondary stat boosts |
 
-- Common
-- Rare
-- Epic
-- Legendary
-- Mythic
-- Transcendent
+## Rarity Tiers
 
-## Drop Weight Snapshot
+| Rarity | Color | Drop Weight | Stat Multiplier |
+|--------|-------|-------------|-----------------|
+| Common | ⬜ | 60 | 1.00× |
+| Rare | 🔵 | 26 | 1.25× |
+| Epic | 🟣 | 11 | 1.60× |
+| Legendary | 🟠 | 3 | 2.00× |
+| Mythic | 🔴 | 1 | 2.55× |
+| Transcendent | 🔷 | 0.4 | 3.10× |
 
-- Common: 60
-- Rare: 26
-- Epic: 11
-- Legendary: 3
-- Mythic: 1
-- Transcendent: 0.4
+### Drop Rate Context
 
-## Upgrade Guidance
+To put rarity weights in perspective:
 
-1. Raise weakest slot first when survivability collapses.
-2. Prioritize class-compatible gear over raw rarity mismatch.
-3. Reassess after rebirth because stat context shifts.
+| Rarity | Approx. % |
+|--------|-----------|
+| Common | ~59.2% |
+| Rare | ~25.7% |
+| Epic | ~10.9% |
+| Legendary | ~2.96% |
+| Mythic | ~0.99% |
+| Transcendent | ~0.39% |
 
-## Planned Expansion for This Page
+## Class Restrictions
 
-- Generated full catalog by class and slot
-- Tier breakpoints and expected value table
-- Upgrade priority matrix by game phase
+Each item is locked to one hero class:
+- **Warrior** — Strength + Vitality focused
+- **Berserker** — Strength + Agility focused
+- **Archer** — Agility dominant
+- **Mage** — Intelligence + Spirit focused
+- **Monk** — Spirit + Vitality balanced
 
-## Database
+## Upgrade Strategy
 
-- Full generated list: [Equipment Database](/equipment-database)
-- Regenerate source-driven data: run `npm run wiki:generate` from repo root
+### Priority Rules
 
-## Truth Sources
+1. **Raise your weakest slot first** — If your team is dying, fix armor before chasing a weapon upgrade.
+2. **Class compatibility > raw rarity** — A Rare weapon for your hero's class beats an Epic weapon for the wrong class.
+3. **Re-evaluate after prestige** — Stat context shifts with each rebirth cycle.
+4. **Slot balance matters** — Three decent items outperform one godly item with two empty slots.
 
-- src/gameConfig.ts
-- EXPANSION_NOTES.md
+### Stat Priorities by Role
+
+| Role | Primary Stat | Secondary |
+|------|-------------|-----------|
+| DPS Carry | Strength/Intelligence | Agility |
+| Tank | Vitality | Spirit |
+| Support | Spirit | Vitality |
+| Hybrid | Balanced | — |
+
+## Full Database
+
+See the [Equipment Database](/equipment-database) for the complete item list with stats, classes, and drop weights.

@@ -4,20 +4,31 @@ title: Known Issues
 
 # Known Issues
 
-This page mirrors active items from the game issue tracker docs.
+<span class="status-badge live">Live</span>
 
-## Current Notes
+Last reviewed: 2026-04-15
 
-- Web launch reliability can vary when conflicting local dev ports are active.
-- Some UX polish and pacing targets remain in-flight.
-- Certain social and seasonal surfaces are still maturing.
+## Runtime / Platform
 
-## Update Policy
+| Issue | Status | Workaround |
+|-------|--------|------------|
+| Web can fail to launch if another Metro instance is running | Known | Close other dev servers before launching |
+| Some browsers require hard refresh after dependency updates | Known | Ctrl+Shift+R / Cmd+Shift+R |
 
-- Patch day updates: Tuesday and Friday
-- Hotfix updates: as needed for blocking issues
+## Gameplay / Balance
 
-## Source
+| Issue | Status | Notes |
+|-------|--------|-------|
+| Early-mid wave pacing (waves 20–60) still being tuned | In Progress | Adjustments coming in next balance patch |
+| Friends count shows console 403 for other players' lists | Cosmetic | Does not affect functionality; shows 0 |
 
-- KNOWN_ISSUES.md
-- BETA_READINESS.md
+## UX
+
+| Issue | Status | Notes |
+|-------|--------|-------|
+| Some dense panels need additional mobile spacing | In Progress | Mobile-first polish ongoing |
+| Modal transitions still being refined | In Progress | — |
+
+## Reporting Bugs
+
+Use the **Open Feedback Form** button in Settings to report issues directly from the game.
