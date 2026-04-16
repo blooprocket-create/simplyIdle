@@ -779,7 +779,7 @@ function getTreasuryGoldMultiplier(state: Pick<GameState, 'guildhallFacilities'>
 
 function getTacticsPowerMultiplier(state: Pick<GameState, 'guildhallFacilities'>): number {
   const lvl = Math.max(0, Math.floor(state.guildhallFacilities.tactics.level));
-  return 1 + lvl * 0.01;
+  return 1 + lvl * 0.025;
 }
 
 function getEquipmentStatWeights(playerClass: PlayerClass, slot: EquipmentSlot): Record<keyof StatBlock, number> {
@@ -2014,7 +2014,7 @@ export function getDpsBreakdown(state: GameState): {
       const heroPhy = heroStr * 2 + heroAgi * 1.2 + hero.level * 0.5;
       const heroMag = heroInt * 2 + heroSpr * 1.1;
 
-      const heroDmg = (heroPhy * heroClass.physWeight * 0.4 + heroMag * heroClass.magicWeight * 0.3) / 3;
+      const heroDmg = (heroPhy * heroClass.physWeight * 0.4 + heroMag * heroClass.magicWeight * 0.3) / 2;
       heroDps += heroDmg;
     }
   }
@@ -3218,7 +3218,7 @@ export function computeStats(state: GameState) {
 
     const heroPhy = hStr * 2 + hAgi * 1.2 + hero.level * 0.5;
     const heroMag = hInt * 2 + hSpr * 1.1;
-    const heroDps = (heroPhy * heroClass.physWeight * 0.4 + heroMag * heroClass.magicWeight * 0.3) / 3;
+    const heroDps = (heroPhy * heroClass.physWeight * 0.4 + heroMag * heroClass.magicWeight * 0.3) / 2;
     heroDetails[hero.uid] = {
       dps: heroDps,
       hp: Math.ceil((hVit + 3) * 8),

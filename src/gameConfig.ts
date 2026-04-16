@@ -3371,7 +3371,7 @@ export function getMonsterForWave(wave: number): MonsterConfig {
 
 export function getMonsterMaxHp(wave: number): number {
   const isBoss = wave % 10 === 0;
-  const base = Math.floor(30 * Math.pow(1.14, wave - 1));
+  const base = Math.floor(30 * Math.pow(1.12, wave - 1));
   return isBoss ? base * 5 : base;
 }
 
@@ -3391,7 +3391,7 @@ export function getMonsterGold(wave: number): number {
 
 export function getMonsterExp(wave: number): number {
   const isBoss = wave % 10 === 0;
-  const base = Math.max(5, Math.floor(5 * Math.pow(1.1, wave - 1)));
+  const base = Math.max(5, Math.floor(5 * Math.pow(1.12, wave - 1)));
   return isBoss ? base * 4 : base;
 }
 
@@ -3403,7 +3403,7 @@ export function getMonsterDamage(wave: number): number {
 }
 
 export function expForLevel(level: number): number {
-  return Math.floor(80 * Math.pow(1.22, level - 1));
+  return Math.floor(80 * Math.pow(1.16, level - 1));
 }
 
 export const SKILLS: SkillConfig[] = [

@@ -103,7 +103,7 @@ describe('getMonsterMaxHp', () => {
   });
 
   it('boss waves have 5x HP', () => {
-    const normalApprox = Math.floor(30 * Math.pow(1.14, 9)); // wave 10 base
+    const normalApprox = Math.floor(30 * Math.pow(1.12, 9)); // wave 10 base
     expect(getMonsterMaxHp(10)).toBe(normalApprox * 5);
   });
 
@@ -145,7 +145,7 @@ describe('getMonsterExp', () => {
   });
 
   it('boss waves give 4x exp', () => {
-    const base = Math.max(5, Math.floor(5 * Math.pow(1.10, 9)));
+    const base = Math.max(5, Math.floor(5 * Math.pow(1.12, 9)));
     expect(getMonsterExp(10)).toBe(base * 4);
   });
 });

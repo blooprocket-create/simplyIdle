@@ -76,11 +76,11 @@ describe('Gold curve', () => {
 // ── Monster HP Curve ──────────────────────────────────────────────────────
 
 describe('DPS vs HP parity', () => {
-  it('monster HP growth rate 1.14x is consistent', () => {
+  it('monster HP growth rate 1.12x is consistent', () => {
     const hp1 = getMonsterMaxHp(1);
     const hp2 = getMonsterMaxHp(2);
     const ratio = hp2 / hp1;
-    expect(ratio).toBeCloseTo(1.14, 1);
+    expect(ratio).toBeCloseTo(1.12, 1);
   });
 });
 
@@ -149,13 +149,13 @@ describe('Economy simulation', () => {
   });
 
   it('monster HP doesnt outpace gold income scaling', () => {
-    // Verify HP and gold scale at similar rates (both use 1.14x base).
-    // Mid-game catchup boost (waves 20-60) intentionally pushes gold
-    // ahead of HP so the ratio can reach ~3x in that range.
+    // Gold scales at 1.14x while HP scales at 1.12x, so gold grows
+    // faster — by design, higher waves should feel more rewarding.
+    // Mid-game catchup boost (waves 20-60) pushes gold even further ahead.
     const hpGrowth = getMonsterMaxHp(50) / getMonsterMaxHp(1);
     const goldGrowth = getMonsterGold(50) / getMonsterGold(1);
     const ratio = goldGrowth / hpGrowth;
-    expect(ratio).toBeGreaterThan(0.5);
-    expect(ratio).toBeLessThan(3.5);
+    expect(ratio).toBeGreaterThan(1);
+    expect(ratio).toBeLessThan(7);
   });
 });
