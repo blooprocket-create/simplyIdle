@@ -110,7 +110,6 @@ export const FACILITY_MAX_LEVEL = 999;
 const BURST_COST = 15;
 const BURST_BOSS_CHARGE_GAIN = 3;
 const EQUIPMENT_RARITY_SET = new Set<string>(['common', 'rare', 'epic', 'legendary', 'mythic', 'transcendent']);
-const ACTIVE_STRIKE_DPS_MULT = 0.9;
 const BURST_STRIKE_DPS_MULT = 1.8;
 const PREMIUM_COOLANT_COSTS = {
   coolant_mk1: 8,
@@ -2079,10 +2078,6 @@ function getDps(state: GameState): number {
   return getDpsBreakdown(state).finalDps;
 }
 
-function getActiveStrikeDamage(state: GameState): number {
-  return Math.max(1, getDps(state) * ACTIVE_STRIKE_DPS_MULT);
-}
-
 function getAchievementBonusMultiplier(state: GameState): number {
   const pct = state.achievements.size * ACHIEVEMENT_BONUS_PER_UNLOCK;
   return 1 + pct;
@@ -4025,7 +4020,6 @@ function maybeAutoRefreshExpeditionContracts(state: GameState, nowMs: number): G
 type Action =
   | { type: 'CREATE_CHARACTER'; name: string; playerClass: PlayerClass }
   | { type: 'TICK'; elapsed: number }
-  | { type: 'ATTACK' }
   | { type: 'BUY_SKILL'; id: string }
   | { type: 'ALLOCATE_STAT'; stat: StatKey }
   | { type: 'ALLOCATE_STAT_MAX'; stat: StatKey }
@@ -4215,17 +4209,6 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'TICK': {
       return advanceCombatStep(state, action.elapsed);
-    }
-
-    case 'ATTACK': {
-      if (!state.characterCreated) return state;
-      const affix = getMonsterAffixModifiers(state.wave);
-      const crit = Math.random() < 0.2;
-      const dmg = (getActiveStrikeDamage(state) * (crit ? 1.8 : 1)) / affix.hpMult;
-      const hp = state.monsterHp - dmg;
-      const logged = queueCombatLog(state, `${crit ? 'CRIT' : 'Hit'} for ${Math.ceil(dmg)} dmg`);
-      if (hp <= 0) return withAchievement(killMonster(logged));
-      return { ...logged, monsterHp: hp };
     }
 
     case 'BURST': {
@@ -5133,7 +5116,6 @@ export function useGameState(saveSlot: string = 'default') {
     dispatch({ type: 'CREATE_CHARACTER', name, playerClass });
   }, []);
 
-  const attack = useCallback(() => dispatch({ type: 'ATTACK' }), []);
   const buySkill = useCallback((id: string) => dispatch({ type: 'BUY_SKILL', id }), []);
   const allocateStat = useCallback((stat: StatKey) => dispatch({ type: 'ALLOCATE_STAT', stat }), []);
   const allocateStatMax = useCallback((stat: StatKey) => dispatch({ type: 'ALLOCATE_STAT_MAX', stat }), []);
@@ -5425,7 +5407,6 @@ export function useGameState(saveSlot: string = 'default') {
     state,
     stats,
     createCharacter,
-    attack,
     buySkill,
     allocateStat,
     allocateStatMax,
