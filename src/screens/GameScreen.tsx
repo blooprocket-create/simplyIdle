@@ -321,6 +321,7 @@ const VIP_UNLOCK_FEATURES = [
   { level: 2, label: 'Rift + Treasury daily cap increased to 4' },
   { level: 3, label: '10% summon cost discount (Boss Tears & Diamonds)' },
   { level: 4, label: 'Rift + Treasury daily cap increased to 5' },
+  { level: 5, label: 'Equipment inventory cap increased from 250 to 500' },
 ] as const;
 
 export const EXPEDITION_TYPES: ExpeditionType[] = ['artifact', 'merchant', 'ruins', 'vault', 'abyss'];
