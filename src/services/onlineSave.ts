@@ -346,7 +346,7 @@ export async function loadOnlineSave<TPayload extends Record<string, unknown>>(
     if (Array.isArray(raw.chunkKeys) && raw.chunkKeys.length > 0) {
       const envelope = toEnvelope<TPayload>(raw);
       if (!envelope) return { ok: true, data: null };
-      const payload = await loadChunksForSlot(db, 'users', uid, 'saveSlots', safeSlot, raw.chunkKeys, onProgress);
+      const payload = await loadChunksForSlot(db, ['users', uid, 'saveSlots', safeSlot], raw.chunkKeys, onProgress);
       envelope.payload = payload as TPayload;
       return { ok: true, data: envelope };
     }
@@ -365,23 +365,17 @@ export async function loadOnlineSave<TPayload extends Record<string, unknown>>(
  */
 async function loadChunksForSlot(
   db: ReturnType<typeof getFirebaseFirestore>,
-  ...args: [...string[], string]
+  slotPath: string[],
+  chunkKeys: string[],
+  onProgress?: LoadProgressCallback,
 ): Promise<Record<string, unknown>> {
-  // Extract the optional onProgress callback and chunkKeys from the varargs
-  // Call pattern: loadChunksForSlot(db, 'users', uid, 'saveSlots', slotId, chunkKeys, onProgress?)
-  const allArgs = args as unknown[];
-  const onProgress =
-    typeof allArgs[allArgs.length - 1] === 'function' ? (allArgs.pop() as LoadProgressCallback) : undefined;
-  const chunkKeys = allArgs.pop() as string[];
-  const pathSegments = allArgs as string[];
-
   const total = chunkKeys.length;
   let loaded = 0;
   const chunks: Record<string, Record<string, unknown>> = {};
 
   // Load chunks in parallel for speed, report progress as each resolves
   const promises = chunkKeys.map(async chunkName => {
-    const chunkRef = doc(db!, ...pathSegments, 'chunks', chunkName);
+    const chunkRef = doc(db!, ...slotPath, 'chunks', chunkName);
     const chunkSnap = await getDoc(chunkRef);
     loaded++;
     if (chunkSnap.exists()) {
@@ -431,7 +425,7 @@ export async function writeOnlineSave<TPayload extends Record<string, unknown>>(
         if (remote && snap.exists()) {
           const rawData = snap.data() as SaveDocRecord;
           if (Array.isArray(rawData.chunkKeys) && rawData.chunkKeys.length > 0) {
-            const remotePayload = await loadChunksForSlot(db, 'users', uid, 'saveSlots', safeSlot, rawData.chunkKeys);
+            const remotePayload = await loadChunksForSlot(db, ['users', uid, 'saveSlots', safeSlot], rawData.chunkKeys);
             remote.payload = remotePayload as TPayload;
           }
         }
@@ -507,7 +501,7 @@ export async function loadOnlineSaveForUid<TPayload extends Record<string, unkno
 
     // Chunked save — load chunks
     if (Array.isArray(raw.chunkKeys) && raw.chunkKeys.length > 0) {
-      const payload = await loadChunksForSlot(db, 'users', uid, 'saveSlots', saveSlotId, raw.chunkKeys);
+      const payload = await loadChunksForSlot(db, ['users', uid, 'saveSlots', saveSlotId], raw.chunkKeys);
       envelope.payload = payload as TPayload;
     }
 
