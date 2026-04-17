@@ -358,6 +358,21 @@ function decodeChunkFromFirestore(data: Record<string, unknown>): Record<string,
   return decodeFirestorePayload(data);
 }
 
+/**
+ * Chunks with deeply nested or high-cardinality data that would exceed
+ * Firestore's 40,000 index-entry limit when stored as native fields.
+ * These are kept as a single payloadJson string.
+ */
+const JSON_ONLY_CHUNKS = new Set(['roster', 'equipment', 'settings', '_extra']);
+
+/** Encode a chunk for Firestore write — native fields or payloadJson depending on complexity. */
+function serializeChunkForWrite(chunkName: string, chunkPayload: Record<string, unknown>): Record<string, unknown> {
+  if (JSON_ONLY_CHUNKS.has(chunkName)) {
+    return { payloadJson: JSON.stringify(chunkPayload) };
+  }
+  return encodeChunkForFirestore(chunkPayload);
+}
+
 export function isOnlineSaveAvailable(): boolean {
   if (!isFirebaseConfigured()) return false;
   if (!getFirebaseFirestore()) return false;
@@ -485,10 +500,10 @@ export async function writeOnlineSave<TPayload extends Record<string, unknown>>(
         chunkKeys: chunkKeyList,
       });
 
-      // Write each chunk as native Firestore fields
+      // Write each chunk
       for (const [chunkName, chunkPayload] of chunkEntries) {
         const chunkRef = doc(db, 'users', uid, 'saveSlots', safeSlot, 'chunks', chunkName);
-        tx.set(chunkRef, encodeChunkForFirestore(chunkPayload));
+        tx.set(chunkRef, serializeChunkForWrite(chunkName, chunkPayload));
       }
 
       return { ok: true, revision: nextRevision } as OnlineSaveWriteResult<TPayload>;
@@ -583,7 +598,7 @@ export async function writeOnlineSaveForUid<TPayload extends Record<string, unkn
     });
     for (const [chunkName, chunkPayload] of chunkEntries) {
       const chunkRef = doc(db, 'users', uid, 'saveSlots', saveSlotId, 'chunks', chunkName);
-      batch.set(chunkRef, encodeChunkForFirestore(chunkPayload));
+      batch.set(chunkRef, serializeChunkForWrite(chunkName, chunkPayload));
     }
     await batch.commit();
 
