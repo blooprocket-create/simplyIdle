@@ -136,22 +136,25 @@ import { deleteOnlineSave, loadOnlineSave } from '../services/onlineSave';
 import { getFirebaseAuth } from '../services/firebase';
 import { t } from '../i18n';
 
-/** Smoothly animated progress bar for save-slot hydration (single async op). */
-function HydrationProgressBar() {
+/** Smoothly animated progress bar for save-slot hydration, driven by real load progress. */
+function HydrationProgressBar({ progress }: { progress: number }) {
   const [anim] = useState(() => new Animated.Value(0));
   const [displayPct, setDisplayPct] = useState(0);
   const [widthPct] = useState(() => anim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }));
 
   useEffect(() => {
     const listener = anim.addListener(({ value }) => setDisplayPct(Math.round(value)));
+    return () => anim.removeListener(listener);
+  }, [anim]);
+
+  useEffect(() => {
     Animated.timing(anim, {
-      toValue: 85,
-      duration: 2400,
+      toValue: progress,
+      duration: 300,
       easing: Easing.out(Easing.quad),
       useNativeDriver: false,
     }).start();
-    return () => anim.removeListener(listener);
-  }, [anim]);
+  }, [anim, progress]);
 
   return (
     <>
@@ -352,6 +355,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [selectedCharacterClass, setSelectedCharacterClass] = useState<PlayerClass | null>(null);
   const {
     hydrated,
+    loadProgress,
     onlineSyncState,
     onlineSyncAt,
     state,
@@ -1960,7 +1964,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         <StatusBar barStyle="light-content" backgroundColor="#0A0A18" />
         <View style={styles.characterLoadingWrap}>
           <Text style={styles.createTitle}>Loading {selectedClassConfig?.name ?? 'Character'}...</Text>
-          <HydrationProgressBar />
+          <HydrationProgressBar progress={loadProgress} />
           <Text style={styles.createSubtitle}>Preparing your save slot.</Text>
         </View>
       </SafeAreaView>

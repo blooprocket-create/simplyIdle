@@ -4780,6 +4780,7 @@ export function useGameState(saveSlot: string = 'default') {
   const onlineSlotEligible = !saveSlot.startsWith('__character_slot_preview__');
   const [state, rawDispatch] = useReducer(reducer, DEFAULT_STATE);
   const [hydrated, setHydrated] = useState(false);
+  const [loadProgress, setLoadProgress] = useState(0);
   const [onlineSyncState, setOnlineSyncState] = useState<'local-only' | 'syncing' | 'synced' | 'conflict' | 'error'>(
     'local-only',
   );
@@ -4943,6 +4944,7 @@ export function useGameState(saveSlot: string = 'default') {
 
   useEffect(() => {
     setHydrated(false);
+    setLoadProgress(0);
     debugLog('save', 'Loading save slot', { saveSlot });
     dispatch({ type: 'LOAD', payload: {} });
     sessionStartedRef.current = false;
@@ -4965,9 +4967,18 @@ export function useGameState(saveSlot: string = 'default') {
       const onlineAvailable = onlineSlotEligible && isOnlineSaveAvailable();
       if (!onlineAvailable) {
         debugLog('save', 'No online save available; using defaults', { saveSlot });
+        setLoadProgress(100);
         return;
       }
-      const remoteResult = await loadOnlineSave<Record<string, unknown>>(saveSlot);
+      setLoadProgress(5); // header fetch started
+      const remoteResult = await loadOnlineSave<Record<string, unknown>>(saveSlot, (loaded, total, chunkName) => {
+        if (!cancelled) {
+          // Map chunk progress into the 5–85% range (header=5%, chunks=5-85%, post-processing=85-100%)
+          const pct = Math.round(5 + (loaded / total) * 80);
+          setLoadProgress(pct);
+          debugLog('save', `Loaded chunk ${chunkName}`, { loaded, total });
+        }
+      });
       if (cancelled) return;
 
       if (!remoteResult.ok) {
@@ -4977,6 +4988,7 @@ export function useGameState(saveSlot: string = 'default') {
         } else {
           setOnlineSyncState('error');
         }
+        setLoadProgress(100);
         return;
       }
 
@@ -4985,6 +4997,7 @@ export function useGameState(saveSlot: string = 'default') {
       if (!remote) {
         debugLog('save', 'No existing save found; using defaults', { saveSlot });
         setOnlineSyncState('synced');
+        setLoadProgress(100);
         return;
       }
 
@@ -4999,6 +5012,7 @@ export function useGameState(saveSlot: string = 'default') {
       });
 
       let payloadWithCloudMail = remote.payload as Partial<SaveData>;
+      setLoadProgress(88);
       const uid = getFirebaseAuth()?.currentUser?.uid;
       if (uid) {
         try {
@@ -5033,11 +5047,13 @@ export function useGameState(saveSlot: string = 'default') {
         }
       }
 
+      setLoadProgress(95);
       dispatch({ type: 'LOAD', payload: payloadWithCloudMail });
       const elapsed = Date.now() - (payloadWithCloudMail.lastActiveAt ?? Date.now());
       dispatch({ type: 'APPLY_OFFLINE_PROGRESS', elapsedMs: elapsed });
       dispatch({ type: 'APPLY_DAILY_LOGIN', nowMs: Date.now() });
       dispatch({ type: 'APPLY_WEEKLY_ROLLOVER', nowMs: Date.now() });
+      setLoadProgress(100);
     })().finally(() => {
       if (!cancelled) setHydrated(true);
     });
@@ -5462,6 +5478,7 @@ export function useGameState(saveSlot: string = 'default') {
 
   return {
     hydrated,
+    loadProgress,
     onlineSyncState,
     onlineSyncAt,
     state,
