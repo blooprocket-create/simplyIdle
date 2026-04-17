@@ -2,6 +2,7 @@ import { collection, doc, getDoc, getDocs, onSnapshot, runTransaction, setDoc, d
 import { getFirebaseFirestore } from './firebase';
 import { GIFT_AMOUNTS, GiftPreference } from '../gameConfig';
 import { normalizePublicUsername } from './publicProfile';
+import { SOCIAL_FEATURE_FLAGS } from '../socialFeatureFlags';
 
 export interface FriendListEntry {
   uid: string;
@@ -306,6 +307,7 @@ export async function sendGift(
   friendUid: string,
   friendPreference: GiftPreference,
 ): Promise<void> {
+  if (!SOCIAL_FEATURE_FLAGS.friendGifting) throw new Error('Friend gifting is currently disabled.');
   const db = getFirebaseFirestore();
   if (!db) return;
 

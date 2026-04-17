@@ -502,6 +502,7 @@ export async function joinGuild(input: {
           : 1;
 
     if (memberCount >= maxMembers) throw new Error('Guild is full.');
+    if (guild.disbanding === true) throw new Error('Guild is being disbanded.');
     if (input.playerPeakProgress < minPeakProgress)
       throw new Error(`Peak progress ${minPeakProgress}+ required to join.`);
 
@@ -759,13 +760,24 @@ export async function disbandGuild(input: { actorUid: string }): Promise<void> {
   if (rank !== 'leader') throw new Error('Only guild leader can disband.');
 
   const guildRef = doc(db, GUILD_COLLECTION, guildId);
-  const guildSnap = await getDoc(guildRef);
-  if (!guildSnap.exists()) {
-    await deleteDoc(doc(db, USER_GUILD_COLLECTION, actorUid));
-    return;
-  }
 
-  const guild = guildSnap.data() as Record<string, unknown>;
+  // Atomically mark the guild as disbanding to block new joins,
+  // then proceed with cleanup. If the guild is already gone, just
+  // remove the leader's own mapping and bail out.
+  const guild = await runTransaction(db, async tx => {
+    const guildSnap = await tx.get(guildRef);
+    if (!guildSnap.exists()) {
+      tx.delete(doc(db, USER_GUILD_COLLECTION, actorUid));
+      return null;
+    }
+    const data = guildSnap.data() as Record<string, unknown>;
+    if (data.disbanding === true) throw new Error('Guild is already being disbanded.');
+    tx.set(guildRef, { disbanding: true, maxMembers: 0, updatedAt: Date.now() }, { merge: true });
+    return data;
+  });
+
+  if (!guild) return;
+
   const normalizedName = typeof guild.normalizedName === 'string' ? guild.normalizedName : '';
   const [memberSnaps, eventSnaps, chatSnaps, treasuryLedgerSnaps] = await Promise.all([
     getDocs(collection(db, GUILD_COLLECTION, guildId, 'members')),
@@ -818,6 +830,7 @@ export async function disbandGuild(input: { actorUid: string }): Promise<void> {
 }
 
 export async function ensureActiveBoss(uid: string): Promise<GuildBossState> {
+  if (!SOCIAL_FEATURE_FLAGS.guildBoss) throw new Error('Guild boss is currently disabled.');
   const db = requireDb();
   const guildId = await resolveGuildIdForUser(uid);
   if (!guildId) throw new Error('You are not in a guild.');
@@ -881,6 +894,7 @@ export async function attackBoss(input: {
   displayName: string;
   dps: number;
 }): Promise<{ dealt: number; boss: GuildBossState; rewardGranted: boolean }> {
+  if (!SOCIAL_FEATURE_FLAGS.guildBoss) throw new Error('Guild boss is currently disabled.');
   const db = requireDb();
   const guildId = await resolveGuildIdForUser(input.uid);
   if (!guildId) throw new Error('You are not in a guild.');
@@ -1393,6 +1407,7 @@ export async function startEvent(input: {
   type: 'war' | 'expedition';
   forceRestart?: boolean;
 }): Promise<GuildEventState> {
+  if (!SOCIAL_FEATURE_FLAGS.guildEvents) throw new Error('Guild events are currently disabled.');
   const db = requireDb();
   const guildId = await resolveGuildIdForUser(input.uid);
   if (!guildId) throw new Error('You are not in a guild.');
@@ -1501,6 +1516,7 @@ export async function contributeToGuildEvent(input: {
   dps?: number;
   kills?: number;
 }): Promise<GuildEventState> {
+  if (!SOCIAL_FEATURE_FLAGS.guildEvents) throw new Error('Guild events are currently disabled.');
   const db = requireDb();
   const guildId = await resolveGuildIdForUser(input.uid);
   if (!guildId) throw new Error('You are not in a guild.');
@@ -1634,6 +1650,19 @@ export async function contributeToGuildEvent(input: {
   }
 
   return result.event;
+}
+
+export async function deleteGuildChatMessage(actorUid: string, messageId: string): Promise<void> {
+  const db = requireDb();
+  const guildId = await resolveGuildIdForUser(actorUid);
+  if (!guildId) throw new Error('You are not in a guild.');
+
+  const memberSnap = await getDoc(doc(db, GUILD_COLLECTION, guildId, 'members', actorUid));
+  if (!memberSnap.exists()) throw new Error('You are not a guild member.');
+  const rank = typeof memberSnap.data().rank === 'string' ? memberSnap.data().rank : 'member';
+  if (rank !== 'leader') throw new Error('Only guild leader can delete messages.');
+
+  await deleteDoc(doc(db, GUILD_COLLECTION, guildId, 'chat', messageId));
 }
 
 export async function sendGuildChatMessage(input: { uid: string; displayName: string; text: string }): Promise<void> {

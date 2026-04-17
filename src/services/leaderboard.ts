@@ -11,6 +11,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseFirestore, isFirebaseConfigured } from './firebase';
+import { SOCIAL_FEATURE_FLAGS } from '../socialFeatureFlags';
 
 const LEADERBOARD_COLLECTION = 'leaderboard_global_v1';
 const MIN_SUBMIT_INTERVAL_MS = 12_000;
@@ -78,6 +79,7 @@ export function isLiveLeaderboardAvailable(): boolean {
 }
 
 export async function submitLeaderboardScore(input: SubmitLeaderboardScoreInput): Promise<void> {
+  if (!SOCIAL_FEATURE_FLAGS.leaderboard) return;
   const db = getFirebaseFirestore();
   const uid = getFirebaseAuth()?.currentUser?.uid;
   if (!db || !uid) return;

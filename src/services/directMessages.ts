@@ -54,15 +54,17 @@ export async function sendDirectMessage(
   const cleaned = text.replace(/\s+/g, ' ').trim().slice(0, 500);
   if (!cleaned) return;
 
-  // Validate recipient exists and sender hasn't blocked them
-  // Note: we can only read our OWN block list (rules enforce uid == auth.uid).
-  // Recipient-side block enforcement must happen via Cloud Function or rules.
-  const [recipientSnap, senderBlockSnap] = await Promise.all([
+  // Validate recipient exists and check blocks in both directions.
+  // Sender's block list is readable by sender; recipient's block list read
+  // may fail if rules restrict it, so we catch and treat as "not blocked".
+  const [recipientSnap, senderBlockSnap, recipientBlockSnap] = await Promise.all([
     getDoc(doc(db, 'leaderboard_global_v1', toUid)),
     getDoc(doc(db, 'blocks', fromUid, 'list', toUid)),
+    getDoc(doc(db, 'blocks', toUid, 'list', fromUid)).catch(() => null),
   ]);
   if (!recipientSnap.exists()) throw new Error('Recipient not found.');
   if (senderBlockSnap.exists()) throw new Error('You have blocked this player.');
+  if (recipientBlockSnap?.exists()) throw new Error('This player is not accepting messages.');
 
   const conversationId = buildConversationId(fromUid, toUid);
   const now = Date.now();

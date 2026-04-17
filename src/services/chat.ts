@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase';
 import { getFirebaseAuth } from './firebase';
+import { SOCIAL_FEATURE_FLAGS } from '../socialFeatureFlags';
 
 const CHAT_COLLECTION = 'globalChat';
 const CHAT_MUTES_COLLECTION = 'chatMutes';
@@ -150,6 +151,7 @@ export async function sendChatMessage(
   text: string,
   vipLevel = 0,
 ): Promise<void> {
+  if (!SOCIAL_FEATURE_FLAGS.globalChat) throw new Error('Global chat is currently disabled.');
   const db = getFirebaseFirestore();
   if (!db || !uid) return;
 
