@@ -1,11 +1,12 @@
 import 'react-native-reanimated';
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Platform, ActivityIndicator, Animated } from 'react-native';
+import { View, Text, StyleSheet, Platform, Animated } from 'react-native';
 import { onAuthStateChanged } from 'firebase/auth';
 import GameScreen from './src/screens/GameScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import TitleScreen from './src/screens/TitleScreen';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { ProgressBar } from './src/components/ProgressBar';
 import { debugLog, identifyTelemetryDevice, initTelemetry, reportCrash, trackEvent, trackTelemetryHeartbeat } from './src/telemetry';
 import { getValidOnlineSession, isOnlineAuthAvailable, logoutOnline } from './src/services/onlineAuth';
 import { getFirebaseAuth } from './src/services/firebase';
@@ -19,7 +20,7 @@ const LOADING_HINTS = [
   'Consulting the oracle…',
 ];
 
-function LoadingSplash() {
+function LoadingSplash({ progress }: { progress: number }) {
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
   const [hint, setHint] = useState(() => LOADING_HINTS[Math.floor(Math.random() * LOADING_HINTS.length)]);
 
@@ -41,8 +42,11 @@ function LoadingSplash() {
 
   return (
     <View style={styles.loadingWrap}>
-      <ActivityIndicator size="large" color="#7B68EE" style={styles.spinner} />
       <Text style={styles.loadingTitle}>SIMPLY IDLE</Text>
+      <View style={styles.progressWrap}>
+        <ProgressBar percent={progress} color="#7B68EE" height={10} borderRadius={5} />
+      </View>
+      <Text style={styles.progressPercent}>{Math.round(progress)}%</Text>
       <Animated.Text style={[styles.loadingHint, { opacity: pulseAnim }]}>
         {hint}
       </Animated.Text>
@@ -52,16 +56,19 @@ function LoadingSplash() {
 
 export default function App() {
   const [loading, setLoading] = useState(true);
+  const [loadProgress, setLoadProgress] = useState(0);
   const [accountName, setAccountName] = useState<string | null>(null);
   const [showTitle, setShowTitle] = useState(true);
 
   useEffect(() => {
     initTelemetry();
+    setLoadProgress(20);
     void trackEvent('app_boot', {
       platform: Platform.OS,
       source: 'App.tsx',
     });
     void trackTelemetryHeartbeat('app_boot');
+    setLoadProgress(35);
 
     // Global unhandled error reporting
     const handler = (event: ErrorEvent) => {
@@ -101,20 +108,25 @@ export default function App() {
 
   useEffect(() => {
     if (!isOnlineAuthAvailable()) {
+      setLoadProgress(100);
       setLoading(false);
       return;
     }
 
     const auth = getFirebaseAuth();
     if (!auth) {
+      setLoadProgress(100);
       setLoading(false);
       return;
     }
 
+    setLoadProgress(50);
     const unsubscribe = onAuthStateChanged(auth, () => {
+      setLoadProgress(70);
       void (async () => {
         const online = await getValidOnlineSession();
         setAccountName(online);
+        setLoadProgress(100);
       })().finally(() => setLoading(false));
     });
 
@@ -148,7 +160,7 @@ export default function App() {
   }, [accountName]);
 
   if (loading) {
-    return <LoadingSplash />;
+    return <LoadingSplash progress={loadProgress} />;
   }
 
   if (showTitle) {
@@ -207,15 +219,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#0A0A18',
   },
-  spinner: {
-    marginBottom: 20,
-  },
   loadingTitle: {
     color: '#FFF',
     fontSize: 22,
     fontWeight: '700',
     letterSpacing: 2,
-    marginBottom: 12,
+    marginBottom: 24,
+  },
+  progressWrap: {
+    width: '60%',
+    maxWidth: 280,
+    marginBottom: 8,
+  },
+  progressPercent: {
+    color: '#7B68EE',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 16,
   },
   loadingHint: {
     color: '#9B8FCC',
