@@ -530,14 +530,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     });
     return map;
   }, []);
-  const [warPanels, setWarPanels] = useState({
-    frontline: true,
-    roster: true,
-    armory: false,
-    growth: false,
-    objectives: true,
-    prestige: false,
-  });
+  // warPanels state removed — War Room redesigned without accordion panels
 
   const [diceRollResult, setDiceRollResult] = useState<{ roll: number; diamonds: number; shards: number } | null>(null);
   const [diceIsRolling, setDiceIsRolling] = useState(false);
@@ -786,7 +779,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const treasuryEntriesRemaining = Math.max(0, treasuryEntryCap - treasuryEntriesUsed);
   const canRunTreasuryEntry = state.highestWaveReached >= 80 && treasuryEntriesRemaining > 0;
   const canRaidTreasury = state.highestWaveReached >= 80 && state.riftRaidTickets > 0 && state.treasureDungeonLevel > 1;
-  const rebirthWavesLeft = Math.max(0, rebirthWaveRequirement - state.highestWaveReached);
+  // rebirthWavesLeft removed — no longer needed after War Room redesign
   const expeditionClaimableCount = state.expeditionQueue.filter(
     exp => Date.now() - exp.startTime >= exp.durationMs,
   ).length;
@@ -823,8 +816,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     if (canRebirthNow) {
       recs.push({
         title: 'Rebirth Ready',
-        detail: 'Open War Room and trigger rebirth for permanent cores.',
-        tab: 'warroom',
+        detail: 'Tap the ♾️ icon in the header or the banner on the battle tab to ascend.',
+        tab: 'battle',
       });
     }
     if (state.activeTeamHeroIds.length < teamSlotCap) {
@@ -1535,9 +1528,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     });
   };
 
-  const toggleWarPanel = (key: keyof typeof warPanels) => {
-    setWarPanels(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+  // toggleWarPanel removed — War Room redesigned without accordion panels
 
   const claimAllRewards = () => {
     claimableWeeklyMilestones.forEach(ms => claimWeeklyTrack(ms));
@@ -2165,6 +2156,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         dps={Math.max(1, Math.floor(stats.dps))}
         power={teamPowerIndex}
         mailUnreadCount={unreadMailCount}
+        canRebirthNow={canRebirthNow}
         onActionPress={action => {
           debugLog('ui', 'Header action pressed', { action });
           if (action === 'settings') setActiveModal('settings');
@@ -2180,6 +2172,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
             setAchievementsSubTab('overview');
           }
         }}
+        onRebirthPress={() => setActiveModal('rebirth')}
       />
 
       {(onlineSyncState === 'local-only' || onlineSyncState === 'error') && (
@@ -2414,7 +2407,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
               {...{
                 tab,
                 state,
-                stats,
                 campaignChapter,
                 campaignStage,
                 campaignBossStage,
@@ -2422,18 +2414,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 teamPowerIndex,
                 powerTier,
                 nearUnlockAchievements,
-                isBoss,
-                monster,
-                canRebirthNow,
-                rebirthWaveRequirement,
-                rebirthWavesLeft,
                 currentAct,
                 actProgressPct,
                 nextBossUnlock,
                 unlockLabel,
-                dangerLabel,
-                dangerScore,
-                teamSlotCap,
                 missionCards,
                 weeklyEvent,
                 hasClaimableRewards,
@@ -2444,14 +2428,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 prestige10Done,
                 prestige25Done,
                 prestige50Done,
-                warPanels,
-                toggleWarPanel,
+                guidanceList,
                 onTabChange,
                 setAchievementsSubTab,
-                setRebirthOpen: () => setActiveModal('rebirth'),
-                autoEquipBestHeroes,
                 claimAllRewards,
-                craftEquipment,
               }}
             />
           </ErrorBoundary>
@@ -2469,12 +2449,15 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 burstCost,
                 burstChargePct,
                 teamSlotCap,
+                canRebirthNow,
+                rebirthWaveRequirement,
                 getClassConfig,
                 usableInventory,
                 setCombatTempo,
                 burst,
                 buyPremiumCoolant,
                 applyUsableItem,
+                setRebirthOpen: (open: boolean) => open && setActiveModal('rebirth'),
               }}
             />
           </ErrorBoundary>

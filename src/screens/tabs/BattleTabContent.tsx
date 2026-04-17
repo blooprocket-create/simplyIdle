@@ -15,12 +15,15 @@ export interface BattleTabContentProps {
   burstCost: number;
   burstChargePct: number;
   teamSlotCap: number;
+  canRebirthNow: boolean;
+  rebirthWaveRequirement: number;
   getClassConfig: (heroClass: PlayerClass) => any;
   usableInventory: any[];
   setCombatTempo: (tempo: 1 | 2 | 4) => void;
   burst: (hits: number) => void;
   buyPremiumCoolant: (itemId: 'coolant_mk1' | 'coolant_mk2', amount?: number) => void;
   applyUsableItem: (itemId: string, amount?: number | 'all') => void;
+  setRebirthOpen: (open: boolean) => void;
 }
 
 export const BattleTabContent = React.memo<BattleTabContentProps>(
@@ -35,12 +38,15 @@ export const BattleTabContent = React.memo<BattleTabContentProps>(
     burstCost,
     burstChargePct,
     teamSlotCap,
+    canRebirthNow,
+    rebirthWaveRequirement,
     getClassConfig,
     usableInventory,
     setCombatTempo,
     burst,
     buyPremiumCoolant,
     applyUsableItem,
+    setRebirthOpen,
   }) => {
     const hasTempo4Access = (state.vipLevel ?? 0) >= 1;
 
@@ -75,6 +81,18 @@ export const BattleTabContent = React.memo<BattleTabContentProps>(
       <>
         {tab === 'battle' && (
           <View style={styles.battleTab}>
+            {canRebirthNow && (
+              <Pressable style={styles.rebirthBanner} onPress={() => setRebirthOpen(true)}>
+                <Text style={styles.rebirthBannerIcon}>♾️</Text>
+                <View style={styles.rebirthBannerTextWrap}>
+                  <Text style={styles.rebirthBannerTitle}>Rebirth Ready</Text>
+                  <Text style={styles.rebirthBannerSub}>
+                    Wave {rebirthWaveRequirement} reached — ascend for permanent power
+                  </Text>
+                </View>
+                <Text style={styles.rebirthBannerCta}>Rebirth Now →</Text>
+              </Pressable>
+            )}
             <Text style={styles.sectionTitle}>⚔️ Battle Overview</Text>
 
             <View style={styles.battleTempoCard}>

@@ -11,11 +11,6 @@ export const styles = StyleSheet.create({
     marginTop: -6,
     marginBottom: 4,
   },
-  warRoomAlertHint: {
-    fontSize: 10,
-    color: '#FF9B9B',
-    fontWeight: '700',
-  },
 
   // ── Campaign Rail ────────────────────────────────────────
   campaignRail: {
@@ -46,6 +41,147 @@ export const styles = StyleSheet.create({
   campaignRailHint: {
     fontSize: 10,
     color: '#78A6C9',
+  },
+
+  // ── Act Card ─────────────────────────────────────────────
+  actCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2F4B66',
+    backgroundColor: '#101C2A',
+    padding: 10,
+    gap: 4,
+  },
+  actTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#E8EEFF',
+    marginBottom: 2,
+  },
+  actTheme: {
+    fontSize: 10,
+    color: '#96a5bf',
+    marginBottom: 4,
+  },
+  actProgress: {
+    fontSize: 10,
+    color: '#c2d2f4',
+    marginTop: 4,
+  },
+  actUnlockHint: {
+    fontSize: 10,
+    color: '#8dd0ff',
+    marginTop: 3,
+  },
+
+  // ── Strategic Advisor ────────────────────────────────────
+  advisorSection: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#4A6A3A',
+    backgroundColor: '#0F1F0F',
+    padding: 10,
+    gap: 8,
+  },
+  advisorTitle: {
+    fontSize: 12,
+    color: '#C8F0B8',
+    fontWeight: '700',
+  },
+  advisorEmpty: {
+    fontSize: 11,
+    color: '#8CB88A',
+    fontStyle: 'italic',
+  },
+  advisorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#2A4528',
+    backgroundColor: '#152415',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    gap: 10,
+  },
+  advisorCardPrimary: {
+    borderColor: '#5A9E48',
+    backgroundColor: '#1A3518',
+  },
+  advisorCardText: {
+    flex: 1,
+    gap: 2,
+  },
+  advisorCardTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#D0ECC4',
+  },
+  advisorCardTitlePrimary: {
+    color: '#A8F090',
+  },
+  advisorCardDetail: {
+    fontSize: 10,
+    color: '#8CB88A',
+  },
+  advisorCardArrow: {
+    fontSize: 14,
+    color: '#5A9E48',
+    fontWeight: '700',
+  },
+
+  // ── Active Objectives ────────────────────────────────────
+  objectivesSection: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#5A5030',
+    backgroundColor: '#1A1508',
+    padding: 10,
+    gap: 8,
+  },
+  objectivesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  objectivesTitle: {
+    fontSize: 12,
+    color: '#F0E0A0',
+    fontWeight: '700',
+  },
+  objectivesViewAll: {
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#6A6030',
+    backgroundColor: '#2A2510',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  objectivesViewAllText: {
+    fontSize: 10,
+    color: '#E8D888',
+    fontWeight: '700',
+  },
+  objectivesStats: {
+    gap: 4,
+  },
+  objectivesStat: {
+    fontSize: 11,
+    color: '#C8B870',
+  },
+  claimAllBtn: {
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#8A7A30',
+    backgroundColor: '#3A3010',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-start',
+  },
+  claimAllBtnText: {
+    fontSize: 11,
+    color: '#F0E0A0',
+    fontWeight: '700',
   },
 
   // ── Near Unlock ──────────────────────────────────────────
@@ -116,128 +252,59 @@ export const styles = StyleSheet.create({
     color: '#7FC39F',
   },
 
-  // ── War Panels ───────────────────────────────────────────
-  warPanel: {
+  // ── Prestige Progress ────────────────────────────────────
+  prestigeSection: {
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#31506A',
-    backgroundColor: '#101C2A',
-    overflow: 'hidden',
-  },
-  warPanelHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    backgroundColor: '#162839',
-  },
-  warPanelTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  warPanelAlertDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 999,
-    backgroundColor: '#FF5E5E',
-    shadowColor: '#FF5E5E',
-    shadowOpacity: 0.35,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 2,
-  },
-  warPanelTitle: {
-    fontSize: 12,
-    color: '#D6ECFF',
-    fontWeight: '700',
-  },
-  warPanelChevron: {
-    fontSize: 16,
-    color: '#99C4E1',
-    fontWeight: '700',
-  },
-  warPanelBody: {
+    borderColor: '#4A3570',
+    backgroundColor: '#150F22',
     padding: 10,
-    gap: 6,
-  },
-  warPanelStat: {
-    fontSize: 11,
-    color: '#B3CADB',
-  },
-  warPanelActionRow: {
-    flexDirection: 'row',
     gap: 8,
-    marginTop: 2,
   },
-  warPanelActionBtn: {
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#5D88AD',
-    backgroundColor: '#21364A',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    alignSelf: 'flex-start',
-  },
-  warPanelActionBtnDisabled: {
-    opacity: 0.5,
-  },
-  warPanelActionText: {
-    fontSize: 10,
-    color: '#D9ECFB',
+  prestigeSectionTitle: {
+    fontSize: 12,
+    color: '#D8B8FF',
     fontWeight: '700',
   },
-
-  // ── Act ──────────────────────────────────────────────────
-  actTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#E8EEFF',
-    marginBottom: 2,
+  prestigeTrack: {
+    gap: 0,
   },
-  actTheme: {
-    fontSize: 10,
-    color: '#96a5bf',
-    marginBottom: 8,
-  },
-  actProgress: {
-    fontSize: 10,
-    color: '#c2d2f4',
-    marginTop: 6,
-  },
-  actUnlockHint: {
-    fontSize: 10,
-    color: '#8dd0ff',
-    marginTop: 3,
-  },
-
-  // ── Prestige Milestones ──────────────────────────────────
   prestigeMilestoneRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
     paddingVertical: 5,
     borderTopWidth: 1,
-    borderTopColor: '#1A2E42',
+    borderTopColor: '#251A38',
   },
   prestigeMilestoneCheck: {
     fontSize: 12,
-    color: '#6080A0',
+    color: '#6050A0',
     minWidth: 18,
     paddingTop: 2,
   },
   prestigeMilestoneDone: {
     color: '#7DFF9A',
   },
+  prestigeMilestoneContent: {
+    flex: 1,
+  },
   prestigeMilestoneLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#D0E8FF',
+    color: '#D0C8FF',
+  },
+  prestigeMilestoneLabelDone: {
+    color: '#A8E8B8',
   },
   prestigeMilestoneBonus: {
     fontSize: 10,
-    color: '#8AAFCC',
+    color: '#8A7ACC',
+  },
+  prestigeNextHint: {
+    fontSize: 10,
+    color: '#9A80CC',
+    fontStyle: 'italic',
   },
 
   // ── Shared ───────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, Pressable, Text, StatusBar, useWindowDimensions } from 'react-native';
 import { THEME, TYPOGRAPHY, SPACING, Z_INDEX, RADIUS } from '../theme';
 import { debugLog } from '../telemetry';
@@ -19,7 +19,9 @@ interface GameHeaderProps {
   dps: number;
   power: number;
   mailUnreadCount: number;
+  canRebirthNow: boolean;
   onActionPress: (action: 'stats' | 'shop' | 'settings' | 'events' | 'mail') => void;
+  onRebirthPress: () => void;
 }
 
 export default function GameHeader({
@@ -37,26 +39,27 @@ export default function GameHeader({
   dps,
   power,
   mailUnreadCount,
+  canRebirthNow,
   onActionPress,
+  onRebirthPress,
 }: GameHeaderProps) {
   const [showStatTip, setShowStatTip] = useState(false);
   const { width } = useWindowDimensions();
   const twoRowResources = width <= 980;
 
- const formatNumber = (num: number): string => {
+  const formatNumber = (num: number): string => {
     if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
     if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
     if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
     return num.toString();
   };
 
-  const syncMeta = (() => {
+  const syncMeta = useMemo(() => {
     if (onlineSyncState === 'synced') {
+      // eslint-disable-next-line react-hooks/purity -- intentional: sync age display needs current time
       const ageSec = onlineSyncAt ? Math.max(0, Math.floor((Date.now() - onlineSyncAt) / 1000)) : 0;
       return {
-        label: ageSec <= 10
-          ? t('header.cloudSyncedNow')
-          : t('header.cloudSyncedAgo', { seconds: ageSec }),
+        label: ageSec <= 10 ? t('header.cloudSyncedNow') : t('header.cloudSyncedAgo', { seconds: ageSec }),
         color: '#7CE58D',
       };
     }
@@ -64,7 +67,7 @@ export default function GameHeader({
     if (onlineSyncState === 'conflict') return { label: t('header.cloudConflict'), color: '#FFB86B' };
     if (onlineSyncState === 'error') return { label: t('header.cloudSyncError'), color: '#FF7C7C' };
     return { label: t('header.localSaveOnly'), color: '#A8B0C3' };
-  })();
+  }, [onlineSyncState, onlineSyncAt]);
 
   return (
     <View style={styles.root}>
@@ -81,7 +84,9 @@ export default function GameHeader({
           </Text>
         </View>
         <Text style={styles.playerClass}>{playerClass}</Text>
-        <Text style={styles.playerExpStatus} numberOfLines={1}>{playerExpStatus}</Text>
+        <Text style={styles.playerExpStatus} numberOfLines={1}>
+          {playerExpStatus}
+        </Text>
         <Text style={[styles.syncStatus, { color: syncMeta.color }]} numberOfLines={1}>
           {syncMeta.label}
         </Text>
@@ -92,25 +97,50 @@ export default function GameHeader({
         {twoRowResources ? (
           <>
             <View style={styles.resourceRow}>
-              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.goldA11y', { amount: formatNumber(gold) })}>
+              <Pressable
+                style={styles.resourceChip}
+                onPress={() => {}}
+                accessibilityRole="text"
+                accessibilityLabel={t('header.goldA11y', { amount: formatNumber(gold) })}
+              >
                 <Text style={styles.resourceIcon}>💰</Text>
                 <Text style={styles.resourceValue}>{formatNumber(gold)}</Text>
               </Pressable>
-              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.diamondsA11y', { amount: formatNumber(diamonds) })}>
+              <Pressable
+                style={styles.resourceChip}
+                onPress={() => {}}
+                accessibilityRole="text"
+                accessibilityLabel={t('header.diamondsA11y', { amount: formatNumber(diamonds) })}
+              >
                 <Text style={styles.resourceIcon}>💎</Text>
                 <Text style={styles.resourceValue}>{formatNumber(diamonds)}</Text>
               </Pressable>
-              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.bossTearsA11y', { amount: formatNumber(bossTearsOrdered) })}>
+              <Pressable
+                style={styles.resourceChip}
+                onPress={() => {}}
+                accessibilityRole="text"
+                accessibilityLabel={t('header.bossTearsA11y', { amount: formatNumber(bossTearsOrdered) })}
+              >
                 <Text style={styles.resourceIcon}>💧</Text>
                 <Text style={styles.resourceValue}>{formatNumber(bossTearsOrdered)}</Text>
               </Pressable>
             </View>
             <View style={styles.resourceRow}>
-              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.heroShardsA11y', { amount: formatNumber(heroShards) })}>
+              <Pressable
+                style={styles.resourceChip}
+                onPress={() => {}}
+                accessibilityRole="text"
+                accessibilityLabel={t('header.heroShardsA11y', { amount: formatNumber(heroShards) })}
+              >
                 <Text style={styles.resourceIcon}>💠</Text>
                 <Text style={styles.resourceValue}>{formatNumber(heroShards)}</Text>
               </Pressable>
-              <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.essenceA11y', { amount: formatNumber(essence) })}>
+              <Pressable
+                style={styles.resourceChip}
+                onPress={() => {}}
+                accessibilityRole="text"
+                accessibilityLabel={t('header.essenceA11y', { amount: formatNumber(essence) })}
+              >
                 <Text style={styles.resourceIcon}>✨</Text>
                 <Text style={styles.resourceValue}>{formatNumber(essence)}</Text>
               </Pressable>
@@ -118,23 +148,48 @@ export default function GameHeader({
           </>
         ) : (
           <>
-            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.goldA11y', { amount: formatNumber(gold) })}>
+            <Pressable
+              style={styles.resourceChip}
+              onPress={() => {}}
+              accessibilityRole="text"
+              accessibilityLabel={t('header.goldA11y', { amount: formatNumber(gold) })}
+            >
               <Text style={styles.resourceIcon}>💰</Text>
               <Text style={styles.resourceValue}>{formatNumber(gold)}</Text>
             </Pressable>
-            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.diamondsA11y', { amount: formatNumber(diamonds) })}>
+            <Pressable
+              style={styles.resourceChip}
+              onPress={() => {}}
+              accessibilityRole="text"
+              accessibilityLabel={t('header.diamondsA11y', { amount: formatNumber(diamonds) })}
+            >
               <Text style={styles.resourceIcon}>💎</Text>
               <Text style={styles.resourceValue}>{formatNumber(diamonds)}</Text>
             </Pressable>
-            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.bossTearsA11y', { amount: formatNumber(bossTearsOrdered) })}>
+            <Pressable
+              style={styles.resourceChip}
+              onPress={() => {}}
+              accessibilityRole="text"
+              accessibilityLabel={t('header.bossTearsA11y', { amount: formatNumber(bossTearsOrdered) })}
+            >
               <Text style={styles.resourceIcon}>💧</Text>
               <Text style={styles.resourceValue}>{formatNumber(bossTearsOrdered)}</Text>
             </Pressable>
-            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.heroShardsA11y', { amount: formatNumber(heroShards) })}>
+            <Pressable
+              style={styles.resourceChip}
+              onPress={() => {}}
+              accessibilityRole="text"
+              accessibilityLabel={t('header.heroShardsA11y', { amount: formatNumber(heroShards) })}
+            >
               <Text style={styles.resourceIcon}>💠</Text>
               <Text style={styles.resourceValue}>{formatNumber(heroShards)}</Text>
             </Pressable>
-            <Pressable style={styles.resourceChip} onPress={() => {}} accessibilityRole="text" accessibilityLabel={t('header.essenceA11y', { amount: formatNumber(essence) })}>
+            <Pressable
+              style={styles.resourceChip}
+              onPress={() => {}}
+              accessibilityRole="text"
+              accessibilityLabel={t('header.essenceA11y', { amount: formatNumber(essence) })}
+            >
               <Text style={styles.resourceIcon}>✨</Text>
               <Text style={styles.resourceValue}>{formatNumber(essence)}</Text>
             </Pressable>
@@ -144,6 +199,18 @@ export default function GameHeader({
 
       {/* Right: Key Stats + Actions */}
       <View style={styles.right}>
+        {canRebirthNow && (
+          <Pressable
+            style={[styles.actionButton, styles.rebirthButton]}
+            onPress={onRebirthPress}
+            accessibilityRole="button"
+            accessibilityLabel="Rebirth ready, tap to ascend"
+          >
+            <Text style={styles.actionIcon}>♾️</Text>
+            <View style={styles.rebirthPulse} />
+          </Pressable>
+        )}
+
         <Pressable
           style={styles.actionButton}
           onPress={() => {
@@ -397,5 +464,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     color: THEME.text.primary,
+  },
+
+  rebirthButton: {
+    borderWidth: 1,
+    borderColor: '#C084FC',
+    backgroundColor: '#2D1854',
+    borderRadius: 6,
+  },
+  rebirthPulse: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#C084FC',
   },
 });

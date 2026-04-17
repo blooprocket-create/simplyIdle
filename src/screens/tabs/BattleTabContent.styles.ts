@@ -6,6 +6,40 @@ export const styles = StyleSheet.create({
     gap: 12,
   },
 
+  // ── Rebirth Banner ───────────────────────────────────────
+  rebirthBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#C084FC',
+    backgroundColor: '#2D1854',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  rebirthBannerIcon: {
+    fontSize: 22,
+  },
+  rebirthBannerTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  rebirthBannerTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#E0B0FF',
+  },
+  rebirthBannerSub: {
+    fontSize: 10,
+    color: '#B89ADB',
+  },
+  rebirthBannerCta: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#C084FC',
+  },
+
   // ── Shared ───────────────────────────────────────────────
   sectionTitle: {
     fontSize: 14,

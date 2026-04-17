@@ -868,6 +868,15 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
             detail: `Maximum ${MAX_FORMATION_ROLE_HEROES} heroes in ${role.toUpperCase()} line.`,
           });
         }
+        const activeBaseIds = new Set(active.map(uid => state.heroRoster.find(h => h.uid === uid)?.id).filter(Boolean));
+        if (activeBaseIds.has(hero.id)) {
+          return queueReward(state, {
+            id: `duplicate_hero_${Date.now()}`,
+            kind: 'system',
+            title: 'Duplicate Hero',
+            detail: `${hero.name} is already on your team (different rarity). Only one copy per hero allowed.`,
+          });
+        }
         newTeam = [...active, action.uid];
       }
       const newMaxHp = ctx.getTeamMaxHp({ ...state, activeTeamHeroIds: newTeam });

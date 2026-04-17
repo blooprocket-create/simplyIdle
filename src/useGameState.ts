@@ -1158,6 +1158,7 @@ function normalizeTeamSelectionByRules(
   const cap = getUnlockedTeamSlotCap(state);
   const accepted: string[] = [];
   const seen = new Set<string>();
+  const seenBaseIds = new Set<string>();
   const roleCounts: Record<HeroFormationRole, number> = { front: 0, mid: 0, back: 0 };
 
   for (const uid of heroIds) {
@@ -1165,12 +1166,14 @@ function normalizeTeamSelectionByRules(
     if (seen.has(uid)) continue;
     const hero = state.heroRoster.find(h => h.uid === uid);
     if (!hero) continue;
+    if (seenBaseIds.has(hero.id)) continue;
 
     const role = state.heroFormationByUid[uid] ?? defaultFormationForClass(hero.heroClass);
     if (roleCounts[role] >= MAX_FORMATION_ROLE_HEROES) continue;
 
     accepted.push(uid);
     seen.add(uid);
+    seenBaseIds.add(hero.id);
     roleCounts[role] += 1;
   }
 
