@@ -3169,8 +3169,9 @@ export interface SparkExchangeOption {
   id: string;
   label: string;
   sparkCost: number;
-  kind: 'free_summon' | 'targeted_hero';
+  kind: 'free_summon' | 'targeted_hero' | 'guaranteed_transcendent';
   minRarity?: Rarity;
+  minTier?: number;
 }
 
 export const SPARK_EXCHANGE_OPTIONS: SparkExchangeOption[] = [
@@ -3185,6 +3186,14 @@ export const SPARK_EXCHANGE_OPTIONS: SparkExchangeOption[] = [
     minRarity: 'legendary',
   },
   { id: 'spark_mythic', label: 'Choose a Mythic+ Hero', sparkCost: 5000, kind: 'targeted_hero', minRarity: 'mythic' },
+  {
+    id: 'spark_transcendent_t4t5',
+    label: 'Guaranteed Tier 4/5 Transcendent Hero',
+    sparkCost: 75000,
+    kind: 'guaranteed_transcendent',
+    minRarity: 'transcendent',
+    minTier: 4,
+  },
 ];
 
 // ── Gacha V2: Banner Rate-Up (across all Legendary+ pulls) ───────────────

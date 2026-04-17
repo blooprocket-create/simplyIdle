@@ -1175,6 +1175,32 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
           title: 'Spark Exchange',
           detail: `${hero.emoji} ${hero.name} (${rarity}) acquired!`,
         });
+      } else if (option.kind === 'guaranteed_transcendent') {
+        const minTier = option.minTier ?? 4;
+        const eligible = HERO_POOL.filter(h => h.tier >= minTier && h.tier <= 5);
+        const template = eligible[Math.floor(Math.random() * eligible.length)];
+        const rarity = clampRarityToTier('transcendent' as Rarity, template.tier);
+        const rarityMult = rarityConfig(rarity).boostMultiplier;
+        const uid = `${template.id}_${Date.now()}_spark_${Math.floor(Math.random() * 10000)}`;
+        const hero: HeroUnit = {
+          ...template,
+          uid,
+          rarity,
+          level: 1,
+          rank: 1,
+          teamBoost: roundTo4(template.baseTeamBoost * rarityMult),
+        };
+        nextState = {
+          ...nextState,
+          heroRoster: [hero, ...nextState.heroRoster],
+        };
+        nextState = syncUniqueWeaponAssignmentForHero(nextState, hero.id);
+        nextState = queueReward(nextState, {
+          id: `spark_exchange_hero_${Date.now()}`,
+          kind: 'system',
+          title: 'Spark Exchange',
+          detail: `${hero.emoji} ${hero.name} (${rarity}) — Transcendent Tier ${template.tier} acquired!`,
+        });
       }
 
       return nextState;
