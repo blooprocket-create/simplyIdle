@@ -320,6 +320,42 @@ function decodeFirestorePayload(payload: Record<string, unknown>): Record<string
   return decoded && typeof decoded === 'object' && !Array.isArray(decoded) ? (decoded as Record<string, unknown>) : {};
 }
 
+/**
+ * Encode a value for native Firestore storage.
+ * Firestore doesn't support nested arrays, so we wrap them with a marker object.
+ */
+function encodeFirestoreValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    const hasNestedArray = value.some(item => Array.isArray(item));
+    if (hasNestedArray) {
+      return { [NESTED_ARRAY_MARKER]: value.map(encodeFirestoreValue) };
+    }
+    return value.map(encodeFirestoreValue);
+  }
+  if (value && typeof value === 'object' && !(value instanceof Date)) {
+    const encoded: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      encoded[k] = encodeFirestoreValue(v);
+    }
+    return encoded;
+  }
+  return value;
+}
+
+/** Encode a chunk payload's values so they can be stored as native Firestore fields. */
+function encodeChunkForFirestore(chunk: Record<string, unknown>): Record<string, unknown> {
+  const encoded: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(chunk)) {
+    encoded[key] = encodeFirestoreValue(value);
+  }
+  return encoded;
+}
+
+/** Decode a native Firestore chunk doc back into a plain JS object. */
+function decodeChunkFromFirestore(data: Record<string, unknown>): Record<string, unknown> {
+  return decodeFirestorePayload(data);
+}
+
 export function isOnlineSaveAvailable(): boolean {
   if (!isFirebaseConfigured()) return false;
   if (!getFirebaseFirestore()) return false;
@@ -381,11 +417,15 @@ async function loadChunksForSlot(
     if (chunkSnap.exists()) {
       const chunkData = chunkSnap.data();
       if (typeof chunkData.payloadJson === 'string') {
+        // Legacy: chunk stored as JSON string
         try {
           chunks[chunkName] = JSON.parse(chunkData.payloadJson) as Record<string, unknown>;
         } catch {
           // Corrupted chunk — skip it, sanitizeSaveData will fill defaults
         }
+      } else {
+        // Native Firestore fields — decode nested array markers
+        chunks[chunkName] = decodeChunkFromFirestore(chunkData);
       }
     }
     onProgress?.(loaded, total, chunkName);
@@ -443,10 +483,10 @@ export async function writeOnlineSave<TPayload extends Record<string, unknown>>(
         chunkKeys: chunkKeyList,
       });
 
-      // Write each chunk as a subcollection doc
+      // Write each chunk as native Firestore fields
       for (const [chunkName, chunkPayload] of chunkEntries) {
         const chunkRef = doc(db, 'users', uid, 'saveSlots', safeSlot, 'chunks', chunkName);
-        tx.set(chunkRef, { payloadJson: JSON.stringify(chunkPayload) });
+        tx.set(chunkRef, encodeChunkForFirestore(chunkPayload));
       }
 
       return { ok: true, revision: nextRevision } as OnlineSaveWriteResult<TPayload>;
@@ -541,7 +581,7 @@ export async function writeOnlineSaveForUid<TPayload extends Record<string, unkn
     });
     for (const [chunkName, chunkPayload] of chunkEntries) {
       const chunkRef = doc(db, 'users', uid, 'saveSlots', saveSlotId, 'chunks', chunkName);
-      batch.set(chunkRef, { payloadJson: JSON.stringify(chunkPayload) });
+      batch.set(chunkRef, encodeChunkForFirestore(chunkPayload));
     }
     await batch.commit();
 
