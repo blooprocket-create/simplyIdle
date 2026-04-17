@@ -110,6 +110,17 @@ export const FACILITY_MAX_LEVEL = 999;
 const BURST_COST = 15;
 const BURST_BOSS_CHARGE_GAIN = 3;
 const EQUIPMENT_RARITY_SET = new Set<string>(['common', 'rare', 'epic', 'legendary', 'mythic', 'transcendent']);
+const EQUIPMENT_RARITY_RANK: Record<string, number> = {
+  common: 0,
+  rare: 1,
+  epic: 2,
+  legendary: 3,
+  mythic: 4,
+  transcendent: 5,
+};
+const GEAR_INVENTORY_CAP = 250;
+const GEAR_INVENTORY_CAP_VIP5 = 500;
+const GEAR_CAP_VIP_THRESHOLD = 5;
 const BURST_STRIKE_DPS_MULT = 1.8;
 const PREMIUM_COOLANT_COSTS = {
   coolant_mk1: 8,
@@ -497,6 +508,7 @@ export interface GameState {
   equipmentInventory: Record<string, EquipmentInstance>;
   equippedItems: Record<EquipmentSlot, string | null>;
   autoDismantleRarityFloor: EquipmentRarity;
+  autoDismantleEnabled: boolean;
   usableItemCounts: Record<string, number>;
   autoUsePotionEnabled: boolean;
   autoUseCoolantEnabled: boolean;
@@ -678,6 +690,7 @@ export const DEFAULT_STATE: GameState = {
   inventoryItemIds: [],
   equipmentInventory: {},
   autoDismantleRarityFloor: 'common' as EquipmentRarity,
+  autoDismantleEnabled: false,
   equippedItems: {
     weapon: null,
     armor: null,
@@ -1546,6 +1559,45 @@ function maybeAutoRecycleBackground(state: GameState): GameState {
       kind: 'shard',
       title: 'Auto Recycle (Background)',
       detail: `+${shardReward} shards from ${toRecycle.length} heroes`,
+    },
+  );
+}
+
+function getGearInventoryCap(state: GameState): number {
+  return (state.vipLevel ?? 0) >= GEAR_CAP_VIP_THRESHOLD ? GEAR_INVENTORY_CAP_VIP5 : GEAR_INVENTORY_CAP;
+}
+
+function maybeAutoDismantleTick(state: GameState): GameState {
+  if (!state.autoDismantleEnabled) return state;
+  const floorRank = EQUIPMENT_RARITY_RANK[state.autoDismantleRarityFloor ?? 'common'] ?? 0;
+  const equippedIds = new Set(Object.values(state.equippedItems).filter((id): id is string => !!id));
+  const candidates = state.inventoryItemIds
+    .filter(itemId => !equippedIds.has(itemId))
+    .map(itemId => ({ itemId, item: state.equipmentInventory[itemId] }))
+    .filter(
+      (entry): entry is { itemId: string; item: EquipmentInstance } =>
+        !!entry.item &&
+        entry.item.source !== 'hero_unique' &&
+        (EQUIPMENT_RARITY_RANK[entry.item.rarity] ?? 0) <= floorRank,
+    );
+  if (candidates.length === 0) return state;
+
+  const dismantleIds = new Set(candidates.map(entry => entry.itemId));
+  const gain = candidates.reduce((sum, entry) => sum + getEquipmentScrapGain(entry.item), 0);
+  const nextEquipmentInventory = { ...state.equipmentInventory };
+  for (const itemId of dismantleIds) delete nextEquipmentInventory[itemId];
+  return queueReward(
+    {
+      ...state,
+      inventoryItemIds: state.inventoryItemIds.filter(id => !dismantleIds.has(id)),
+      equipmentInventory: nextEquipmentInventory,
+      equipmentScrap: state.equipmentScrap + gain,
+    },
+    {
+      id: `auto_dismantle_tick_${Date.now()}`,
+      kind: 'item',
+      title: 'Auto Dismantle',
+      detail: `+${gain} scrap from ${candidates.length} items`,
     },
   );
 }
@@ -3137,6 +3189,7 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     autoDismantleRarityFloor: (EQUIPMENT_RARITY_SET.has(payload.autoDismantleRarityFloor)
       ? payload.autoDismantleRarityFloor
       : 'common') as EquipmentRarity,
+    autoDismantleEnabled: clampBoolean(payload.autoDismantleEnabled, false),
     usableItemCounts,
     autoUsePotionEnabled: clampBoolean(payload.autoUsePotionEnabled, false),
     autoUseCoolantEnabled: clampBoolean(payload.autoUseCoolantEnabled, false),
@@ -3578,10 +3631,11 @@ function killMonster(state: GameState): GameState {
   }
 
   // Chance to drop class-compatible equipment on kill.
+  const gearCap = getGearInventoryCap(newState);
   const mythicUnlocked = hasUnlock(newState, 'mythic_equipment');
   const transcendentUnlocked = isPostgameSummonUnlocked(newState);
   const dropChance = Math.min(0.4, 0.1 + state.wave * 0.003 + (isBoss ? 0.12 : 0));
-  if (newState.playerClass && Math.random() <= dropChance) {
+  if (newState.playerClass && Math.random() <= dropChance && newState.inventoryItemIds.length < gearCap) {
     const droppedRarity = rollEquipmentRarityByTier(Math.random(), mythicUnlocked, transcendentUnlocked);
     const pool = EQUIPMENT_CATALOG.filter(
       item => item.allowedClasses.includes(newState.playerClass as PlayerClass) && item.rarity === droppedRarity,
@@ -3884,7 +3938,8 @@ function advanceCombatStep(state: GameState, elapsedMs: number): GameState {
   const withPotions = maybeAutoUsePotion({ ...working, monsterHp: hp, teamHp, lastActiveAt: Date.now() });
   const withCoolant = maybeAutoUseCoolant(withPotions);
   const withRecycle = maybeAutoRecycleBackground(withCoolant);
-  const withSummon = maybeAutoSummonTick(withRecycle);
+  const withDismantle = maybeAutoDismantleTick(withRecycle);
+  const withSummon = maybeAutoSummonTick(withDismantle);
   if (withSummon.autoBurstEnabled && withSummon.burstCharge >= BURST_COST) {
     return applyBurst(withSummon, 4 * withSummon.combatTempo);
   }
@@ -4422,6 +4477,7 @@ function reducer(state: GameState, action: Action): GameState {
           autoDismantleRarityFloor: EQUIPMENT_RARITY_SET.has(p.autoDismantleRarityFloor)
             ? p.autoDismantleRarityFloor
             : 'common',
+          autoDismantleEnabled: !!p.autoDismantleEnabled,
           usableItemCounts: p.usableItemCounts,
           autoUsePotionEnabled: p.autoUsePotionEnabled,
           autoUseCoolantEnabled: p.autoUseCoolantEnabled,
@@ -4693,6 +4749,8 @@ export function serialize(state: GameState): SaveData {
     inventoryItemIds: state.inventoryItemIds,
     equipmentInventory: state.equipmentInventory,
     equippedItems: state.equippedItems,
+    autoDismantleRarityFloor: state.autoDismantleRarityFloor,
+    autoDismantleEnabled: state.autoDismantleEnabled,
     usableItemCounts: state.usableItemCounts,
     autoUsePotionEnabled: state.autoUsePotionEnabled,
     autoUseCoolantEnabled: state.autoUseCoolantEnabled,
@@ -5251,6 +5309,10 @@ export function useGameState(saveSlot: string = 'default') {
   const setAutoDismantleRarityFloor = useCallback((rarity: EquipmentRarity) => {
     dispatch({ type: 'SET_AUTO_DISMANTLE_RARITY_FLOOR', rarity });
   }, []);
+  const setAutoDismantleEnabled = useCallback((enabled: boolean) => {
+    dispatch({ type: 'SET_AUTO_DISMANTLE_ENABLED', enabled });
+  }, []);
+  const gearInventoryCap = useMemo(() => getGearInventoryCap(state), [state.vipLevel]);
   const spendEssenceUpgrade = useCallback((path: 'damage' | 'economy' | 'survival') => {
     dispatch({ type: 'SPEND_ESSENCE_UPGRADE', path });
   }, []);
@@ -5468,6 +5530,8 @@ export function useGameState(saveSlot: string = 'default') {
     buyPremiumCoolant,
     autoDismantleEquipment,
     setAutoDismantleRarityFloor,
+    setAutoDismantleEnabled,
+    gearInventoryCap,
     spendEssenceUpgrade,
     claimWeeklyTrack,
     claimMission,

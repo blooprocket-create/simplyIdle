@@ -29,6 +29,7 @@ export type SettingsAction =
   | { type: 'SET_AUTO_TEMPO_ENABLED'; enabled: boolean }
   | { type: 'SET_AUTO_TEMPO_TARGET'; target: AutoTempoTarget }
   | { type: 'SET_AUTO_SUMMON_RESERVE_GOLD'; reserveGold: number }
+  | { type: 'SET_AUTO_DISMANTLE_ENABLED'; enabled: boolean }
   | { type: 'SET_AUTO_DISMANTLE_RARITY_FLOOR'; rarity: EquipmentRarity };
 
 export const SETTINGS_ACTION_TYPES = new Set<string>([
@@ -47,6 +48,7 @@ export const SETTINGS_ACTION_TYPES = new Set<string>([
   'SET_AUTO_TEMPO_ENABLED',
   'SET_AUTO_TEMPO_TARGET',
   'SET_AUTO_SUMMON_RESERVE_GOLD',
+  'SET_AUTO_DISMANTLE_ENABLED',
   'SET_AUTO_DISMANTLE_RARITY_FLOOR',
 ]);
 
@@ -172,6 +174,10 @@ export function settingsReducer(state: GameState, action: SettingsAction, ctx: S
 
     case 'SET_AUTO_SUMMON_RESERVE_GOLD': {
       return { ...state, autoSummonReserveGold: Math.max(0, action.reserveGold) };
+    }
+
+    case 'SET_AUTO_DISMANTLE_ENABLED': {
+      return { ...state, autoDismantleEnabled: action.enabled };
     }
 
     case 'SET_AUTO_DISMANTLE_RARITY_FLOOR': {

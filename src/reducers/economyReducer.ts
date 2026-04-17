@@ -616,6 +616,8 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
       if (!state.playerClass) return state;
       const cost = getEquipmentCraftCost(action.slot);
       if (state.equipmentScrap < cost.scrap || state.gold < cost.gold) return state;
+      const craftCap = (state.vipLevel ?? 0) >= 5 ? 500 : 250;
+      if (state.inventoryItemIds.length >= craftCap) return state;
 
       const classSlotItems = EQUIPMENT_CATALOG.filter(
         item => item.allowedClasses.includes(state.playerClass as PlayerClass) && item.slot === action.slot,

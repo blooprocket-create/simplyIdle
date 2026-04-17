@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import {
@@ -23,6 +23,8 @@ const GEAR_RARITY_POINTS: Record<string, number> = {
   transcendent: 680,
 };
 
+const GEAR_INVENTORY_PAGE_SIZE = 30;
+
 function itemGearScore(item: { rarity: string; bonus: Record<string, number | null | undefined> }): number {
   const statValue = Object.values(item.bonus).reduce<number>((s, v) => s + (v ?? 0), 0);
   return (GEAR_RARITY_POINTS[item.rarity] ?? 0) + statValue * 12;
@@ -44,6 +46,8 @@ export interface EquipmentTabContentProps {
   optimizeEquipment: () => void;
   autoDismantleEquipment: () => void;
   setAutoDismantleRarityFloor: (rarity: EquipmentRarity) => void;
+  setAutoDismantleEnabled: (enabled: boolean) => void;
+  gearInventoryCap: number;
   craftEquipment: (slot: EquipmentSlot) => void;
   equipItem: (itemId: string) => void;
   toggleHeroUniqueWeapon: (heroUid: string) => void;
@@ -71,6 +75,8 @@ export const EquipmentTabContent = React.memo<EquipmentTabContentProps>(
     optimizeEquipment,
     autoDismantleEquipment,
     setAutoDismantleRarityFloor,
+    setAutoDismantleEnabled,
+    gearInventoryCap,
     craftEquipment,
     equipItem,
     toggleHeroUniqueWeapon,
@@ -80,6 +86,7 @@ export const EquipmentTabContent = React.memo<EquipmentTabContentProps>(
     convertScrapToShards,
     renderSubTabBar,
   }) => {
+    const [visibleCount, setVisibleCount] = useState(GEAR_INVENTORY_PAGE_SIZE);
     const rarityRank = useMemo(() => {
       const rankMap: Record<string, number> = {};
       RARITIES.forEach((rarity, index) => {
@@ -155,9 +162,20 @@ export const EquipmentTabContent = React.memo<EquipmentTabContentProps>(
               })),
             )}
             <Text style={styles.equipInventoryCount}>
-              Total: {state.inventoryItemIds.length} items • Shards:{' '}
+              Total: {state.inventoryItemIds.length}/{gearInventoryCap} items • Shards:{' '}
               <Text style={{ color: '#FFB347' }}>{state.heroShards}</Text>
             </Text>
+            {state.inventoryItemIds.length >= gearInventoryCap && (
+              <Text style={{ color: '#FF6B6B', fontSize: 12, fontWeight: '600', marginTop: 2 }}>
+                ⚠ Inventory full! New drops are blocked. Dismantle or enable auto-dismantle.
+              </Text>
+            )}
+            {state.inventoryItemIds.length >= gearInventoryCap * 0.9 &&
+              state.inventoryItemIds.length < gearInventoryCap && (
+                <Text style={{ color: '#FFB347', fontSize: 11, marginTop: 2 }}>
+                  Inventory nearly full — consider dismantling low-tier gear.
+                </Text>
+              )}
             <Text style={styles.scrapLabel}>🔩 Scrap: {fmt(state.equipmentScrap)}</Text>
             <Text style={styles.uniqueArmorySummary}>
               🗃️ Unique Armory: {forgedUniqueCount} forged • {equippedUniqueCount} equipped • Stored separately from
@@ -215,33 +233,67 @@ export const EquipmentTabContent = React.memo<EquipmentTabContentProps>(
                 <Text style={styles.equipOptimizeHint}>
                   Auto dismantle scraps unequipped items at or below the selected rarity.
                 </Text>
+                <Pressable
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    marginTop: 6,
+                    paddingVertical: 4,
+                    paddingHorizontal: 8,
+                    borderRadius: 6,
+                    borderWidth: 1,
+                    borderColor: state.autoDismantleEnabled ? '#4CAF50' : '#555',
+                    backgroundColor: state.autoDismantleEnabled ? '#4CAF5022' : 'transparent',
+                  }}
+                  onPress={() => setAutoDismantleEnabled(!state.autoDismantleEnabled)}
+                  accessibilityRole="switch"
+                  accessibilityLabel="Toggle automatic gear dismantle"
+                >
+                  <Text
+                    style={{ color: state.autoDismantleEnabled ? '#4CAF50' : '#888', fontSize: 12, fontWeight: '600' }}
+                  >
+                    {state.autoDismantleEnabled ? '✓ Auto Dismantle ON' : '○ Auto Dismantle OFF'}
+                  </Text>
+                </Pressable>
+                <Text style={styles.equipOptimizeHint}>
+                  When enabled, gear at or below the dismantle floor is scrapped automatically each combat tick.
+                </Text>
               </View>
             )}
             {equipmentSubTab === 'craft' && (
-              <View style={styles.craftRow}>
-                {(['weapon', 'armor', 'accessory'] as EquipmentSlot[]).map(slot => {
-                  const cost = getEquipmentCraftCost(slot);
-                  const canCraft = state.equipmentScrap >= cost.scrap && state.gold >= cost.gold;
-                  return (
-                    <Pressable
-                      key={slot}
-                      style={[styles.craftBtn, !canCraft && styles.craftBtnDisabled]}
-                      disabled={!canCraft}
-                      onPress={() => craftEquipment(slot)}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('equipment.craftA11y', {
-                        slot,
-                        suffix: !canCraft ? ', insufficient resources' : '',
-                      })}
-                    >
-                      <Text style={styles.craftBtnText}>{slot.toUpperCase()}</Text>
-                      <Text style={styles.craftCostText}>
-                        {cost.scrap}🔩 • {fmt(cost.gold)}g
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+              <>
+                {state.inventoryItemIds.length >= gearInventoryCap && (
+                  <Text style={{ color: '#FF6B6B', fontSize: 12, marginBottom: 6, textAlign: 'center' }}>
+                    Inventory full ({gearInventoryCap}/{gearInventoryCap}). Dismantle items to craft more.
+                  </Text>
+                )}
+                <View style={styles.craftRow}>
+                  {(['weapon', 'armor', 'accessory'] as EquipmentSlot[]).map(slot => {
+                    const cost = getEquipmentCraftCost(slot);
+                    const atCap = state.inventoryItemIds.length >= gearInventoryCap;
+                    const canCraft = state.equipmentScrap >= cost.scrap && state.gold >= cost.gold && !atCap;
+                    return (
+                      <Pressable
+                        key={slot}
+                        style={[styles.craftBtn, !canCraft && styles.craftBtnDisabled]}
+                        disabled={!canCraft}
+                        onPress={() => craftEquipment(slot)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('equipment.craftA11y', {
+                          slot,
+                          suffix: !canCraft ? ', insufficient resources' : '',
+                        })}
+                      >
+                        <Text style={styles.craftBtnText}>{slot.toUpperCase()}</Text>
+                        <Text style={styles.craftCostText}>
+                          {cost.scrap}🔩 • {fmt(cost.gold)}g
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </>
             )}
             {equipmentSubTab === 'armory' && (
               <>
@@ -337,108 +389,129 @@ export const EquipmentTabContent = React.memo<EquipmentTabContentProps>(
             {equipmentSubTab === 'inventory' && state.inventoryItemIds.length === 0 ? (
               <Text style={styles.emptyMsg}>No equipment yet! Kill monsters to find better gear.</Text>
             ) : equipmentSubTab === 'inventory' ? (
-              state.inventoryItemIds.map(itemId => {
-                const item = getEquipmentItem(itemId);
-                if (!item) return null;
-                const isEquipped = Object.values(state.equippedItems).includes(itemId);
-                const rarity = equipmentRarityConfig(item.rarity);
-                const upgradePlan = getUpgradePlan(item.id);
-                return (
-                  <View key={itemId} style={[styles.invEquipCard, isEquipped && styles.invEquipCardEquipped]}>
-                    <View style={[styles.invEquipRarity, { backgroundColor: rarity.color }]} />
-                    <View style={styles.invEquipContent}>
-                      <View style={styles.invEquipHeader}>
-                        <Text style={styles.invEquipName}>
-                          {item.emoji} {item.name}
-                        </Text>
-                        <Text style={[styles.invEquipRarity2, { color: rarity.color }]}>{item.rarity}</Text>
-                      </View>
-                      <Text style={styles.invEquipSlot}>
-                        {item.slot.toUpperCase()} • iLv {item.itemLevel ?? 1} • GS {fmt(itemGearScore(item))}
-                      </Text>
-                      <Text style={styles.invEquipBonus}>
-                        {Object.entries(item.bonus)
-                          .filter(([_, v]) => v)
-                          .map(
-                            ([k, v]) =>
-                              `+${v} ${k === 'strength' ? 'STR' : k === 'vitality' ? 'VIT' : k === 'agility' ? 'AGI' : k === 'intelligence' ? 'INT' : 'SPR'}`,
-                          )
-                          .join(' • ')}
-                      </Text>
-                      {isEquipped && <Text style={styles.invEquipActive}>✓ Equipped</Text>}
-                      <View style={styles.equipActionRow}>
-                        {!isEquipped && (
-                          <>
-                            <Pressable style={styles.equipNowBtn} onPress={() => equipItem(item.id)}>
-                              <Text style={styles.equipNowBtnText}>Equip</Text>
-                            </Pressable>
-                            <Pressable
-                              style={styles.compareBtn}
-                              onPress={() => setCompareItemId(compareItemId === item.id ? null : item.id)}
-                            >
-                              <Text style={styles.compareBtnText}>vs</Text>
-                            </Pressable>
-                          </>
-                        )}
-                        <Pressable
-                          style={[styles.upgradeGearBtn, !upgradePlan.canUpgrade && styles.upgradeGearBtnDisabled]}
-                          disabled={!upgradePlan.canUpgrade}
-                          onPress={() => upgradeEquipmentRarity(item.id)}
-                        >
-                          <Text style={styles.upgradeGearBtnText}>
-                            {upgradePlan.targetRarity
-                              ? `Upgrade → ${upgradePlan.targetRarity.toUpperCase()} (${upgradePlan.scrapCost}🔩 ${upgradePlan.essenceCost}✨ ${fmt(upgradePlan.goldCost)}💰)`
-                              : 'Upgrade Unavailable'}
+              <>
+                {state.inventoryItemIds.slice(0, visibleCount).map(itemId => {
+                  const item = getEquipmentItem(itemId);
+                  if (!item) return null;
+                  const isEquipped = Object.values(state.equippedItems).includes(itemId);
+                  const rarity = equipmentRarityConfig(item.rarity);
+                  const upgradePlan = getUpgradePlan(item.id);
+                  return (
+                    <View key={itemId} style={[styles.invEquipCard, isEquipped && styles.invEquipCardEquipped]}>
+                      <View style={[styles.invEquipRarity, { backgroundColor: rarity.color }]} />
+                      <View style={styles.invEquipContent}>
+                        <View style={styles.invEquipHeader}>
+                          <Text style={styles.invEquipName}>
+                            {item.emoji} {item.name}
                           </Text>
-                        </Pressable>
-                      </View>
-                      {!isEquipped &&
-                        compareItemId === item.id &&
-                        (() => {
-                          const curId = state.equippedItems[item.slot as EquipmentSlot];
-                          const curItem = curId ? getEquipmentItem(curId) : null;
-                          const allStats = ['strength', 'vitality', 'agility', 'intelligence', 'spirit'] as const;
-                          return (
-                            <View style={styles.comparePanel}>
-                              <Text style={styles.comparePanelTitle}>
-                                vs Current: {curItem ? `${curItem.name} (${curItem.rarity})` : 'Empty slot'}
-                              </Text>
-                              <View style={styles.compareStatRow}>
-                                {allStats.map(stat => {
-                                  const nv = item.bonus[stat] ?? 0;
-                                  const cv = curItem?.bonus[stat] ?? 0;
-                                  const diff = nv - cv;
-                                  if (nv === 0 && cv === 0) return null;
-                                  return (
-                                    <Text
-                                      key={stat}
-                                      style={[
-                                        styles.compareStat,
-                                        diff > 0
-                                          ? styles.compareStatUp
-                                          : diff < 0
-                                            ? styles.compareStatDown
-                                            : styles.compareStatNeutral,
-                                      ]}
-                                    >
-                                      {stat.slice(0, 3).toUpperCase()}: {diff >= 0 ? '+' : ''}
-                                      {diff}
-                                    </Text>
-                                  );
-                                })}
+                          <Text style={[styles.invEquipRarity2, { color: rarity.color }]}>{item.rarity}</Text>
+                        </View>
+                        <Text style={styles.invEquipSlot}>
+                          {item.slot.toUpperCase()} • iLv {item.itemLevel ?? 1} • GS {fmt(itemGearScore(item))}
+                        </Text>
+                        <Text style={styles.invEquipBonus}>
+                          {Object.entries(item.bonus)
+                            .filter(([_, v]) => v)
+                            .map(
+                              ([k, v]) =>
+                                `+${v} ${k === 'strength' ? 'STR' : k === 'vitality' ? 'VIT' : k === 'agility' ? 'AGI' : k === 'intelligence' ? 'INT' : 'SPR'}`,
+                            )
+                            .join(' • ')}
+                        </Text>
+                        {isEquipped && <Text style={styles.invEquipActive}>✓ Equipped</Text>}
+                        <View style={styles.equipActionRow}>
+                          {!isEquipped && (
+                            <>
+                              <Pressable style={styles.equipNowBtn} onPress={() => equipItem(item.id)}>
+                                <Text style={styles.equipNowBtnText}>Equip</Text>
+                              </Pressable>
+                              <Pressable
+                                style={styles.compareBtn}
+                                onPress={() => setCompareItemId(compareItemId === item.id ? null : item.id)}
+                              >
+                                <Text style={styles.compareBtnText}>vs</Text>
+                              </Pressable>
+                            </>
+                          )}
+                          <Pressable
+                            style={[styles.upgradeGearBtn, !upgradePlan.canUpgrade && styles.upgradeGearBtnDisabled]}
+                            disabled={!upgradePlan.canUpgrade}
+                            onPress={() => upgradeEquipmentRarity(item.id)}
+                          >
+                            <Text style={styles.upgradeGearBtnText}>
+                              {upgradePlan.targetRarity
+                                ? `Upgrade → ${upgradePlan.targetRarity.toUpperCase()} (${upgradePlan.scrapCost}🔩 ${upgradePlan.essenceCost}✨ ${fmt(upgradePlan.goldCost)}💰)`
+                                : 'Upgrade Unavailable'}
+                            </Text>
+                          </Pressable>
+                        </View>
+                        {!isEquipped &&
+                          compareItemId === item.id &&
+                          (() => {
+                            const curId = state.equippedItems[item.slot as EquipmentSlot];
+                            const curItem = curId ? getEquipmentItem(curId) : null;
+                            const allStats = ['strength', 'vitality', 'agility', 'intelligence', 'spirit'] as const;
+                            return (
+                              <View style={styles.comparePanel}>
+                                <Text style={styles.comparePanelTitle}>
+                                  vs Current: {curItem ? `${curItem.name} (${curItem.rarity})` : 'Empty slot'}
+                                </Text>
+                                <View style={styles.compareStatRow}>
+                                  {allStats.map(stat => {
+                                    const nv = item.bonus[stat] ?? 0;
+                                    const cv = curItem?.bonus[stat] ?? 0;
+                                    const diff = nv - cv;
+                                    if (nv === 0 && cv === 0) return null;
+                                    return (
+                                      <Text
+                                        key={stat}
+                                        style={[
+                                          styles.compareStat,
+                                          diff > 0
+                                            ? styles.compareStatUp
+                                            : diff < 0
+                                              ? styles.compareStatDown
+                                              : styles.compareStatNeutral,
+                                        ]}
+                                      >
+                                        {stat.slice(0, 3).toUpperCase()}: {diff >= 0 ? '+' : ''}
+                                        {diff}
+                                      </Text>
+                                    );
+                                  })}
+                                </View>
                               </View>
-                            </View>
-                          );
-                        })()}
-                      {!isEquipped && (
-                        <Pressable style={styles.dismantleBtn} onPress={() => dismantleEquipment(item.id)}>
-                          <Text style={styles.dismantleBtnText}>Dismantle</Text>
-                        </Pressable>
-                      )}
+                            );
+                          })()}
+                        {!isEquipped && (
+                          <Pressable style={styles.dismantleBtn} onPress={() => dismantleEquipment(item.id)}>
+                            <Text style={styles.dismantleBtnText}>Dismantle</Text>
+                          </Pressable>
+                        )}
+                      </View>
                     </View>
-                  </View>
-                );
-              })
+                  );
+                })}
+                {state.inventoryItemIds.length > visibleCount && (
+                  <Pressable
+                    style={{
+                      alignSelf: 'center',
+                      paddingVertical: 10,
+                      paddingHorizontal: 24,
+                      marginVertical: 8,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      borderColor: '#666',
+                      backgroundColor: '#1a1a2e',
+                    }}
+                    onPress={() => setVisibleCount(prev => prev + GEAR_INVENTORY_PAGE_SIZE)}
+                  >
+                    <Text style={{ color: '#ccc', fontSize: 13 }}>
+                      Show More ({state.inventoryItemIds.length - visibleCount} remaining)
+                    </Text>
+                  </Pressable>
+                )}
+              </>
             ) : equipmentSubTab === 'forge' ? (
               <>
                 <View style={styles.shardForgeCard}>
