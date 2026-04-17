@@ -15,7 +15,6 @@ import {
   Alert,
   Animated,
   Easing,
-  ActivityIndicator,
   useWindowDimensions,
   AppState,
 } from 'react-native';
@@ -136,6 +135,43 @@ import {
 import { deleteOnlineSave, loadOnlineSave } from '../services/onlineSave';
 import { getFirebaseAuth } from '../services/firebase';
 import { t } from '../i18n';
+
+/** Smoothly animated progress bar for save-slot hydration (single async op). */
+function HydrationProgressBar() {
+  const [anim] = useState(() => new Animated.Value(0));
+  const [displayPct, setDisplayPct] = useState(0);
+  const [widthPct] = useState(() => anim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }));
+
+  useEffect(() => {
+    const listener = anim.addListener(({ value }) => setDisplayPct(Math.round(value)));
+    Animated.timing(anim, {
+      toValue: 85,
+      duration: 2400,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: false,
+    }).start();
+    return () => anim.removeListener(listener);
+  }, [anim]);
+
+  return (
+    <>
+      <View
+        style={{
+          width: '60%',
+          maxWidth: 280,
+          height: 10,
+          borderRadius: 5,
+          backgroundColor: '#2A2A4A',
+          overflow: 'hidden',
+          marginVertical: 16,
+        }}
+      >
+        <Animated.View style={{ height: '100%', borderRadius: 5, backgroundColor: '#C77DFF', width: widthPct }} />
+      </View>
+      <Text style={{ color: '#C77DFF', fontSize: 13, fontWeight: '600', marginBottom: 8 }}>{displayPct}%</Text>
+    </>
+  );
+}
 
 export type Tab = 'warroom' | 'battle' | 'heroes' | 'stats' | 'achievements' | 'equipment' | 'operations' | 'social';
 type HeroesSubTab = 'summon' | 'roster' | 'batch' | 'spark';
@@ -404,14 +440,20 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     selectedCharacterClass ? getCharacterSaveSlot(accountName, selectedCharacterClass) : '__character_slot_preview__',
   );
 
-  const { lastUsedCharacterClass, slotSummaries, setSlotSummaries, slotListLoading, clearLastUsedClass } =
-    useCharacterSlots({
-      accountName,
-      selectedCharacterClass,
-      setSelectedCharacterClass,
-      hydrated,
-      state,
-    });
+  const {
+    lastUsedCharacterClass,
+    slotSummaries,
+    setSlotSummaries,
+    slotListLoading,
+    slotLoadProgress,
+    clearLastUsedClass,
+  } = useCharacterSlots({
+    accountName,
+    selectedCharacterClass,
+    setSelectedCharacterClass,
+    hydrated,
+    state,
+  });
 
   const [tab, setTab] = useState<Tab>('warroom');
 
@@ -1830,8 +1872,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       <SafeAreaView style={styles.safe}>
         <StatusBar barStyle="light-content" backgroundColor="#0A0A18" />
         <View style={styles.characterLoadingWrap}>
-          <ActivityIndicator size="large" color="#C77DFF" style={{ marginBottom: 18 }} />
           <Text style={styles.createTitle}>Loading Characters...</Text>
+          <View style={{ width: '60%', maxWidth: 280, marginVertical: 16 }}>
+            <ProgressBar percent={slotLoadProgress} color="#C77DFF" height={10} borderRadius={5} />
+          </View>
+          <Text style={{ color: '#C77DFF', fontSize: 13, fontWeight: '600', marginBottom: 8 }}>
+            {Math.round(slotLoadProgress)}%
+          </Text>
           <Text style={styles.createSubtitle}>Checking your class slots for this account.</Text>
         </View>
       </SafeAreaView>
@@ -1912,8 +1959,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       <SafeAreaView style={styles.safe}>
         <StatusBar barStyle="light-content" backgroundColor="#0A0A18" />
         <View style={styles.characterLoadingWrap}>
-          <ActivityIndicator size="large" color="#C77DFF" style={{ marginBottom: 18 }} />
           <Text style={styles.createTitle}>Loading {selectedClassConfig?.name ?? 'Character'}...</Text>
+          <HydrationProgressBar />
           <Text style={styles.createSubtitle}>Preparing your save slot.</Text>
         </View>
       </SafeAreaView>
