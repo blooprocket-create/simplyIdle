@@ -1720,8 +1720,6 @@ function maybeAutoSummonTick(state: GameState): GameState {
   if (state.autoSummonMode === 'x10') {
     const x10 = tryX10();
     if (x10) return x10;
-    const single = trySingle();
-    if (single) return single;
     return state;
   }
 
