@@ -505,6 +505,9 @@ export async function joinGuild(input: {
     if (input.playerPeakProgress < minPeakProgress)
       throw new Error(`Peak progress ${minPeakProgress}+ required to join.`);
 
+    const isPublic = guild.isPublic !== false;
+    if (!isPublic) throw new Error('This guild is private. You need an invite to join.');
+
     tx.set(memberRef, {
       displayName: input.displayName.trim().slice(0, 24) || 'Member',
       rank: 'member',
