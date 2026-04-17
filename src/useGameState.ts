@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useReducer, useState } from 'react';
+import { useEffect, useRef, useCallback, useReducer, useState, useMemo } from 'react';
 import {
   SKILLS,
   ACHIEVEMENTS,
