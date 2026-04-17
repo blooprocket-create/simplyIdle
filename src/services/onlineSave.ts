@@ -324,13 +324,15 @@ function decodeFirestorePayload(payload: Record<string, unknown>): Record<string
  * Encode a value for native Firestore storage.
  * Firestore doesn't support nested arrays, so we wrap them with a marker object.
  */
-function encodeFirestoreValue(value: unknown): unknown {
+function encodeFirestoreValue(value: unknown, insideArray = false): unknown {
   if (Array.isArray(value)) {
-    const hasNestedArray = value.some(item => Array.isArray(item));
-    if (hasNestedArray) {
-      return { [NESTED_ARRAY_MARKER]: value.map(encodeFirestoreValue) };
+    const encoded = value.map(item => encodeFirestoreValue(item, true));
+    // Any array that is itself inside another array must be wrapped with a marker
+    // because Firestore does not allow nested arrays at any depth.
+    if (insideArray) {
+      return { [NESTED_ARRAY_MARKER]: encoded };
     }
-    return value.map(encodeFirestoreValue);
+    return encoded;
   }
   if (value && typeof value === 'object' && !(value instanceof Date)) {
     const encoded: Record<string, unknown> = {};
