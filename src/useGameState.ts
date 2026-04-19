@@ -4016,6 +4016,105 @@ function getOfflineStepElapsedMs(state: GameState, remainingMs: number): number 
   return Math.min(remainingMs, roundedMs, OFFLINE_SIM_MAX_SLICE_MS);
 }
 
+/**
+ * Fast-path: batch-process multiple monster kills when combat is in a stable
+ * farming state (no active buffs/cooldowns that need per-tick processing).
+ * Returns null when conditions don't allow batching.
+ */
+function tryBatchOfflineKills(state: GameState, remainingMs: number): { state: GameState; consumedMs: number } | null {
+  // Require clean combat state — no active buffs/cooldowns needing tick decay
+  if (state.damageBuffMs > 0 || state.damageReductionBuffMs > 0) return null;
+  if (state.combatHeat > 0) return null;
+  if (state.autoSummonCooldownMs > 0) return null;
+  for (const cd of Object.values(state.heroActiveCdMs)) {
+    if (cd > 0) return null;
+  }
+
+  const withTempo = applyAutoTempo(state);
+  const combatTempo = Math.max(1, withTempo.combatTempo);
+  const weekly = getCurrentWeeklyEvent(withTempo);
+  let currentDps = getDps(withTempo);
+  if (currentDps <= 0) return null;
+
+  const affix = getMonsterAffixModifiers(withTempo.wave);
+  const ttk = safeDivide(
+    withTempo.monsterHp * 1000 * affix.hpMult * weekly.enemyHpMultiplier,
+    currentDps * combatTempo,
+    Infinity,
+  );
+  // Only batch when kills are fast (under max slice)
+  if (!Number.isFinite(ttk) || ttk > OFFLINE_SIM_MAX_SLICE_MS) return null;
+
+  // Check team survival over one kill cycle
+  const enemyDmg = getMonsterDamage(withTempo.wave) * affix.dmgMult * weekly.enemyDamageMultiplier;
+  const defense = getTeamDefense(withTempo);
+  const damageReduction = Math.min(0.8, defense / (defense + 100));
+  const passive = withTempo.playerClass ? getClassPassive(withTempo.playerClass) : null;
+  const passiveIncomingMult = hasUnlock(withTempo, 'class_passive') && passive ? passive.incomingDamageMultiplier : 1;
+  const heroPassive = getHeroPassiveMultipliers(withTempo);
+  const formation = getFormationMultipliers(withTempo);
+  const synergy = getTeamSynergy(withTempo);
+  const incomingDmgPerMs =
+    enemyDmg *
+    (1 - damageReduction) *
+    passiveIncomingMult *
+    heroPassive.incomingDmgMult *
+    formation.incomingMult *
+    synergy.incomingMult *
+    (combatTempo / 1000);
+  // Team must survive comfortably (heals to full each kill)
+  if (incomingDmgPerMs * ttk >= withTempo.teamHp * 0.8) return null;
+
+  const BATCH_LIMIT = 500;
+  const DPS_RECHECK_INTERVAL = 50;
+  let working = withTempo;
+  let consumedMs = 0;
+
+  for (let i = 0; i < BATCH_LIMIT && consumedMs < remainingMs; i++) {
+    // Periodically revalidate — hero levels change DPS, wave changes difficulty
+    if (i > 0 && i % DPS_RECHECK_INTERVAL === 0) {
+      currentDps = getDps(applyAutoTempo(working));
+      if (currentDps <= 0) break;
+      const newAffix = getMonsterAffixModifiers(working.wave);
+      const newTtk = safeDivide(
+        working.monsterHp * 1000 * newAffix.hpMult * weekly.enemyHpMultiplier,
+        currentDps * combatTempo,
+        Infinity,
+      );
+      if (!Number.isFinite(newTtk) || newTtk > OFFLINE_SIM_MAX_SLICE_MS) break;
+      const newEnemyDmg = getMonsterDamage(working.wave) * newAffix.dmgMult * weekly.enemyDamageMultiplier;
+      const newDefense = getTeamDefense(working);
+      const newDmgRed = Math.min(0.8, newDefense / (newDefense + 100));
+      const newIncoming =
+        newEnemyDmg *
+        (1 - newDmgRed) *
+        passiveIncomingMult *
+        heroPassive.incomingDmgMult *
+        formation.incomingMult *
+        synergy.incomingMult *
+        (combatTempo / 1000);
+      if (newIncoming * newTtk >= working.teamHp * 0.8) break;
+    }
+
+    // TTK for this specific wave
+    const waveAffix = getMonsterAffixModifiers(working.wave);
+    const waveTtk = safeDivide(
+      working.monsterHp * 1000 * waveAffix.hpMult * weekly.enemyHpMultiplier,
+      currentDps * combatTempo,
+      Infinity,
+    );
+    if (!Number.isFinite(waveTtk) || consumedMs + waveTtk > remainingMs) break;
+
+    working = killMonster(working);
+    consumedMs += waveTtk;
+  }
+
+  if (consumedMs <= 0) return null;
+  // Check achievements once for the whole batch instead of per-kill
+  working = withAchievement(working);
+  return { state: working, consumedMs };
+}
+
 function simulateOfflineProgress(
   state: GameState,
   elapsedMs: number,
@@ -4030,6 +4129,20 @@ function simulateOfflineProgress(
   const preservedCombatLog = state.combatLog;
 
   while (remainingMs > 0 && working.characterCreated && iterations < OFFLINE_SIM_MAX_ITERATIONS) {
+    // Fast path: batch kills when in stable farming state
+    const batch = tryBatchOfflineKills(working, remainingMs);
+    if (batch !== null) {
+      working = {
+        ...batch.state,
+        rewardQueue: preservedRewardQueue,
+        combatLog: preservedCombatLog,
+      };
+      remainingMs -= batch.consumedMs;
+      iterations += 1;
+      continue;
+    }
+
+    // Slow path: per-tick simulation
     const stepElapsedMs = getOfflineStepElapsedMs(working, remainingMs);
     const advanced = advanceCombatStep(working, stepElapsedMs);
     working = {
