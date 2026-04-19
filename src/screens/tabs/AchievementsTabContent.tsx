@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, Pressable, Image, Modal } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
 import { GameState, Stats } from '../../useGameState';
 import {
   ACHIEVEMENTS,
@@ -9,6 +10,7 @@ import {
   getHeroUniqueWeaponName,
 } from '../../gameConfig';
 import { getHeroPortraitSource } from '../../heroPortraits';
+import { getHeroAnimationSource } from '../../heroAnimations';
 import { ACH_BONUS_PER_UNLOCK_PCT } from '../GameScreen';
 import { styles } from './AchievementsTabContent.styles';
 
@@ -518,6 +520,7 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
             <View style={styles.portraitModalContent}>
               {portraitModalHero &&
                 (() => {
+                  const animSource = getHeroAnimationSource(portraitModalHero.id);
                   const source = getHeroPortraitSource(portraitModalHero.id);
                   const tierLabel =
                     portraitModalHero.tier >= 5
@@ -531,7 +534,16 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                             : '⚔️ Common';
                   return (
                     <>
-                      {source ? (
+                      {animSource ? (
+                        <Video
+                          source={animSource}
+                          style={styles.portraitModalImage}
+                          resizeMode={ResizeMode.CONTAIN}
+                          shouldPlay
+                          isLooping
+                          isMuted
+                        />
+                      ) : source ? (
                         <Image source={source} style={styles.portraitModalImage} resizeMode="contain" />
                       ) : (
                         <Text style={styles.portraitModalEmoji}>{portraitModalHero.emoji}</Text>
