@@ -73,7 +73,7 @@ export const styles = StyleSheet.create({
   summonRevealPortrait: {
     width: 64,
     height: 64,
-    borderRadius: 18,
+    borderRadius: 6,
     marginTop: 4,
   },
   summonRevealName: {
@@ -150,7 +150,7 @@ export const styles = StyleSheet.create({
   cinematicSummonResultPortrait: {
     width: 46,
     height: 46,
-    borderRadius: 12,
+    borderRadius: 4,
   },
   cinematicSummonResultName: {
     marginTop: 4,
@@ -2372,7 +2372,7 @@ export const styles = StyleSheet.create({
   heroPortraitFrame: {
     width: 38,
     height: 38,
-    borderRadius: 19,
+    borderRadius: 4,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2382,7 +2382,7 @@ export const styles = StyleSheet.create({
   heroPortraitFrameMobile: {
     width: 58,
     height: 58,
-    borderRadius: 29,
+    borderRadius: 6,
     backgroundColor: '#0B1522',
     shadowColor: '#4FA8FF',
     shadowOffset: { width: 0, height: 0 },
@@ -4814,7 +4814,7 @@ export const styles = StyleSheet.create({
   codexHeroPortrait: {
     width: 28,
     height: 28,
-    borderRadius: 14,
+    borderRadius: 3,
   },
   codexTitle: {
     fontSize: 12,

@@ -391,7 +391,7 @@ export const styles = StyleSheet.create({
   heroPortraitFrame: {
     width: 38,
     height: 38,
-    borderRadius: 19,
+    borderRadius: 4,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
@@ -401,7 +401,7 @@ export const styles = StyleSheet.create({
   heroPortraitFrameMobile: {
     width: 58,
     height: 58,
-    borderRadius: 29,
+    borderRadius: 6,
     backgroundColor: '#0B1522',
     shadowColor: '#4FA8FF',
     shadowOffset: { width: 0, height: 0 },

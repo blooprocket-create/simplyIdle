@@ -352,7 +352,7 @@ export const styles = StyleSheet.create({
   codexHeroPortrait: {
     width: 28,
     height: 28,
-    borderRadius: 14,
+    borderRadius: 3,
   },
   codexTitle: {
     fontSize: 12,
