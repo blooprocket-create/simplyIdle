@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, Text, Pressable, Image, Modal } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
+import { View, Text, Pressable, Image, Modal, Platform } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import {
   ACHIEVEMENTS,
@@ -10,7 +9,7 @@ import {
   getHeroUniqueWeaponName,
 } from '../../gameConfig';
 import { getHeroPortraitSource } from '../../heroPortraits';
-import { getHeroAnimationSource } from '../../heroAnimations';
+import { getHeroAnimationUri } from '../../heroAnimations';
 import { ACH_BONUS_PER_UNLOCK_PCT } from '../GameScreen';
 import { styles } from './AchievementsTabContent.styles';
 
@@ -517,10 +516,10 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
         {/* Hero Portrait Viewer Modal */}
         <Modal visible={!!portraitModalHero} transparent animationType="fade" onRequestClose={closePortraitModal}>
           <Pressable style={styles.portraitModalOverlay} onPress={closePortraitModal}>
-            <View style={styles.portraitModalContent}>
+            <Pressable style={styles.portraitModalContent} onPress={e => e.stopPropagation()}>
               {portraitModalHero &&
                 (() => {
-                  const animSource = getHeroAnimationSource(portraitModalHero.id);
+                  const animUri = getHeroAnimationUri(portraitModalHero.id);
                   const source = getHeroPortraitSource(portraitModalHero.id);
                   const tierLabel =
                     portraitModalHero.tier >= 5
@@ -534,15 +533,15 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                             : '⚔️ Common';
                   return (
                     <>
-                      {animSource ? (
-                        <Video
-                          source={animSource}
-                          style={styles.portraitModalImage}
-                          resizeMode={ResizeMode.CONTAIN}
-                          shouldPlay
-                          isLooping
-                          isMuted
-                        />
+                      {animUri && Platform.OS === 'web' ? (
+                        React.createElement('video', {
+                          src: animUri,
+                          autoPlay: true,
+                          loop: true,
+                          muted: true,
+                          playsInline: true,
+                          style: { width: 240, height: 240, borderRadius: 8, objectFit: 'cover' },
+                        })
                       ) : source ? (
                         <Image source={source} style={styles.portraitModalImage} resizeMode="contain" />
                       ) : (
@@ -562,7 +561,7 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
               <Pressable style={styles.portraitModalCloseBtn} onPress={closePortraitModal}>
                 <Text style={styles.portraitModalCloseBtnText}>Close</Text>
               </Pressable>
-            </View>
+            </Pressable>
           </Pressable>
         </Modal>
       </>
