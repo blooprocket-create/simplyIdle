@@ -397,4 +397,72 @@ export const styles = StyleSheet.create({
     color: '#98b2c8',
     marginBottom: 8,
   },
+
+  // ── Hero Portrait Viewer Modal ───────────────────────────
+  portraitModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  portraitModalContent: {
+    backgroundColor: '#111A26',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2A4A6B',
+    padding: 20,
+    alignItems: 'center',
+    maxWidth: 320,
+    width: '85%',
+  },
+  portraitModalImage: {
+    width: 240,
+    height: 240,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  portraitModalEmoji: {
+    fontSize: 80,
+    marginBottom: 16,
+  },
+  portraitModalName: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#F6F8FF',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  portraitModalTier: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFD700',
+    marginBottom: 2,
+  },
+  portraitModalClass: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#7A9BB5',
+    marginBottom: 10,
+    textTransform: 'capitalize',
+  },
+  portraitModalBackstory: {
+    fontSize: 12,
+    color: '#A0C0DD',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  portraitModalCloseBtn: {
+    backgroundColor: '#1C2E42',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 32,
+    borderWidth: 1,
+    borderColor: '#385A66',
+  },
+  portraitModalCloseBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#A0C0DD',
+  },
 });
