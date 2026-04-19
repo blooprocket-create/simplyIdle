@@ -400,8 +400,9 @@ export function GuildSection({
 
   const activityFeed = useMemo(() => {
     const items: Array<{ label: string; detail: string; timestamp: number }> = [];
+    const now = Date.now();
 
-    if (guildBoss) {
+    if (guildBoss && guildBoss.status !== 'expired' && guildBoss.expiresAt > now) {
       items.push({
         label: `Boss ${guildBoss.status === 'active' ? 'Active' : guildBoss.status === 'defeated' ? 'Defeated' : 'Expired'}`,
         detail: `${guildBoss.name} • Tier ${guildBoss.tier} • Raiders ${guildBoss.participantUids.length}`,
@@ -409,7 +410,7 @@ export function GuildSection({
       });
     }
 
-    for (const event of guildEvents.slice(0, 4)) {
+    for (const event of guildEvents.filter(e => e.status !== 'expired' && e.endsAt > now).slice(0, 4)) {
       items.push({
         label: `${event.type === 'war' ? 'Warfront' : 'Expedition'} ${event.status}`,
         detail:
@@ -1049,8 +1050,10 @@ export function GuildSection({
       {myGuild && guildSubTab === 'boss' && (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Guild Boss</Text>
-          {!guildBoss && <Text style={styles.metaText}>No active boss right now.</Text>}
-          {guildBoss && (
+          {(!guildBoss || guildBoss.status === 'expired' || guildBoss.expiresAt <= nowMs) && (
+            <Text style={styles.metaText}>No active boss right now.</Text>
+          )}
+          {guildBoss && guildBoss.status !== 'expired' && guildBoss.expiresAt > nowMs && (
             <>
               <Text style={styles.metaText}>
                 {guildBoss.name} • Tier {guildBoss.tier}
@@ -1243,131 +1246,139 @@ export function GuildSection({
               </View>
             </View>
           )}
-          {guildEvents.length === 0 && <Text style={styles.metaText}>No guild events yet.</Text>}
-          {guildEvents.map(event => {
-            const isWar = event.type === 'war';
-            const total = Number(event.details[isWar ? 'totalDamage' : 'totalKills'] ?? 0);
-            const target = Number(event.details[isWar ? 'targetDamage' : 'targetKills'] ?? 1);
-            const pct = Math.min(100, Math.floor((total / Math.max(1, target)) * 100));
-            const lifecycleLabel = getEventLifecycleLabel(event, pct, nowMs);
-            const contributors = eventContribByEventId[event.eventId] ?? [];
-            const contributorsLoaded = eventContribByEventId[event.eventId] !== undefined;
-            const myContributionRow = contributors.find(row => row.uid === me.uid) ?? null;
-            const localContribution = eventLastContributionById[event.eventId] ?? null;
-            const persistedCooldownUntil = (myContributionRow?.lastContributedAt ?? 0) + EVENT_CONTRIBUTION_COOLDOWN_MS;
-            const localCooldownUntil = eventCooldownUntilById[event.eventId] ?? 0;
-            const eventCooldownRemainingMs = Math.max(0, Math.max(persistedCooldownUntil, localCooldownUntil) - nowMs);
-            const canContribute =
-              !guildBusy && contributorsLoaded && event.status === 'active' && eventCooldownRemainingMs <= 0;
-            const topContributors = contributors.slice(0, 3);
-            return (
-              <View key={event.eventId} style={styles.friendRow}>
-                <View style={styles.friendMeta}>
-                  <Text style={styles.friendName}>
-                    {isWar ? 'Warfront Assault' : 'Expedition'} • {event.status}
-                  </Text>
-                  <Text style={styles.metaText}>Lifecycle: {lifecycleLabel}</Text>
-                  <Text style={styles.metaText}>
-                    Progress: {total.toLocaleString()} / {target.toLocaleString()} ({pct}%)
-                  </Text>
-                  <SocialProgressBar
-                    styles={styles}
-                    progress={pct / 100}
-                    label={`${pct}% completion`}
-                    tint={pct >= 100 ? '#67E6B6' : '#7EC8FF'}
-                  />
-                  <Text style={styles.metaText}>Ends: {new Date(event.endsAt).toLocaleString()}</Text>
-                  {myContributionRow && (
-                    <Text style={styles.metaText}>
-                      Your total contribution: {formatCompactNumber(myContributionRow.totalContributed)}
+          {guildEvents.filter(e => e.status !== 'expired' && e.endsAt > nowMs).length === 0 && (
+            <Text style={styles.metaText}>No guild events yet.</Text>
+          )}
+          {guildEvents
+            .filter(e => e.status !== 'expired' && e.endsAt > nowMs)
+            .map(event => {
+              const isWar = event.type === 'war';
+              const total = Number(event.details[isWar ? 'totalDamage' : 'totalKills'] ?? 0);
+              const target = Number(event.details[isWar ? 'targetDamage' : 'targetKills'] ?? 1);
+              const pct = Math.min(100, Math.floor((total / Math.max(1, target)) * 100));
+              const lifecycleLabel = getEventLifecycleLabel(event, pct, nowMs);
+              const contributors = eventContribByEventId[event.eventId] ?? [];
+              const contributorsLoaded = eventContribByEventId[event.eventId] !== undefined;
+              const myContributionRow = contributors.find(row => row.uid === me.uid) ?? null;
+              const localContribution = eventLastContributionById[event.eventId] ?? null;
+              const persistedCooldownUntil =
+                (myContributionRow?.lastContributedAt ?? 0) + EVENT_CONTRIBUTION_COOLDOWN_MS;
+              const localCooldownUntil = eventCooldownUntilById[event.eventId] ?? 0;
+              const eventCooldownRemainingMs = Math.max(
+                0,
+                Math.max(persistedCooldownUntil, localCooldownUntil) - nowMs,
+              );
+              const canContribute =
+                !guildBusy && contributorsLoaded && event.status === 'active' && eventCooldownRemainingMs <= 0;
+              const topContributors = contributors.slice(0, 3);
+              return (
+                <View key={event.eventId} style={styles.friendRow}>
+                  <View style={styles.friendMeta}>
+                    <Text style={styles.friendName}>
+                      {isWar ? 'Warfront Assault' : 'Expedition'} • {event.status}
                     </Text>
-                  )}
-                  {localContribution && (
+                    <Text style={styles.metaText}>Lifecycle: {lifecycleLabel}</Text>
                     <Text style={styles.metaText}>
-                      Last contribution: +{formatCompactNumber(localContribution.amount)} at{' '}
-                      {new Date(localContribution.at).toLocaleTimeString()}
+                      Progress: {total.toLocaleString()} / {target.toLocaleString()} ({pct}%)
                     </Text>
-                  )}
-                  {topContributors.length > 0 && (
-                    <Text style={styles.metaText}>
-                      Top contributors:{' '}
-                      {topContributors
-                        .map((row, idx) => {
-                          const memberName =
-                            guildMembers.find(member => member.uid === row.uid)?.displayName ?? row.uid.slice(0, 8);
-                          return `#${idx + 1} ${memberName} ${formatCompactNumber(row.totalContributed)}`;
-                        })
-                        .join(' • ')}
-                    </Text>
-                  )}
-                  {!contributorsLoaded && event.status === 'active' && (
-                    <Text style={styles.metaText}>Syncing your cooldown status...</Text>
-                  )}
-                  {eventCooldownRemainingMs > 0 && (
-                    <Text style={styles.metaText}>
-                      Your cooldown: {formatCooldownMinutesSeconds(eventCooldownRemainingMs)}
-                    </Text>
-                  )}
-                </View>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.smallBtn,
-                    !canContribute && styles.sendBtnDisabled,
-                    pressed && canContribute && styles.smallBtnPressed,
-                  ]}
-                  disabled={!canContribute}
-                  onPress={async () => {
-                    if (!me.uid) return;
-                    setGuildBusy(true);
-                    setError(null);
-                    const contributionAmount = isWar
-                      ? Math.max(1, Math.floor(me.level * 10_000_000)) * 30
-                      : Math.max(1, Math.floor(me.level * 12));
-                    try {
-                      await contributeToGuildEvent({
-                        uid: me.uid,
-                        eventId: event.eventId,
-                        dps: isWar ? Math.max(1, Math.floor(me.level * 10_000_000)) : undefined,
-                        kills: isWar ? undefined : Math.max(1, Math.floor(me.level * 12)),
-                      });
-                      setEventCooldownUntilById(prev => ({
-                        ...prev,
-                        [event.eventId]: Date.now() + EVENT_CONTRIBUTION_COOLDOWN_MS,
-                      }));
-                      setEventLastContributionById(prev => ({
-                        ...prev,
-                        [event.eventId]: {
-                          amount: contributionAmount,
-                          at: Date.now(),
-                        },
-                      }));
-                      await refreshGuildData();
-                    } catch (err) {
-                      const msg = err instanceof Error ? err.message : 'Contribution failed.';
-                      const secondsLeft = parseCooldownSeconds(msg);
-                      if (secondsLeft) {
+                    <SocialProgressBar
+                      styles={styles}
+                      progress={pct / 100}
+                      label={`${pct}% completion`}
+                      tint={pct >= 100 ? '#67E6B6' : '#7EC8FF'}
+                    />
+                    <Text style={styles.metaText}>Ends: {new Date(event.endsAt).toLocaleString()}</Text>
+                    {myContributionRow && (
+                      <Text style={styles.metaText}>
+                        Your total contribution: {formatCompactNumber(myContributionRow.totalContributed)}
+                      </Text>
+                    )}
+                    {localContribution && (
+                      <Text style={styles.metaText}>
+                        Last contribution: +{formatCompactNumber(localContribution.amount)} at{' '}
+                        {new Date(localContribution.at).toLocaleTimeString()}
+                      </Text>
+                    )}
+                    {topContributors.length > 0 && (
+                      <Text style={styles.metaText}>
+                        Top contributors:{' '}
+                        {topContributors
+                          .map((row, idx) => {
+                            const memberName =
+                              guildMembers.find(member => member.uid === row.uid)?.displayName ?? row.uid.slice(0, 8);
+                            return `#${idx + 1} ${memberName} ${formatCompactNumber(row.totalContributed)}`;
+                          })
+                          .join(' • ')}
+                      </Text>
+                    )}
+                    {!contributorsLoaded && event.status === 'active' && (
+                      <Text style={styles.metaText}>Syncing your cooldown status...</Text>
+                    )}
+                    {eventCooldownRemainingMs > 0 && (
+                      <Text style={styles.metaText}>
+                        Your cooldown: {formatCooldownMinutesSeconds(eventCooldownRemainingMs)}
+                      </Text>
+                    )}
+                  </View>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.smallBtn,
+                      !canContribute && styles.sendBtnDisabled,
+                      pressed && canContribute && styles.smallBtnPressed,
+                    ]}
+                    disabled={!canContribute}
+                    onPress={async () => {
+                      if (!me.uid) return;
+                      setGuildBusy(true);
+                      setError(null);
+                      const contributionAmount = isWar
+                        ? Math.max(1, Math.floor(me.level * 10_000_000)) * 30
+                        : Math.max(1, Math.floor(me.level * 12));
+                      try {
+                        await contributeToGuildEvent({
+                          uid: me.uid,
+                          eventId: event.eventId,
+                          dps: isWar ? Math.max(1, Math.floor(me.level * 10_000_000)) : undefined,
+                          kills: isWar ? undefined : Math.max(1, Math.floor(me.level * 12)),
+                        });
                         setEventCooldownUntilById(prev => ({
                           ...prev,
-                          [event.eventId]: Date.now() + secondsLeft * 1000,
+                          [event.eventId]: Date.now() + EVENT_CONTRIBUTION_COOLDOWN_MS,
                         }));
+                        setEventLastContributionById(prev => ({
+                          ...prev,
+                          [event.eventId]: {
+                            amount: contributionAmount,
+                            at: Date.now(),
+                          },
+                        }));
+                        await refreshGuildData();
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : 'Contribution failed.';
+                        const secondsLeft = parseCooldownSeconds(msg);
+                        if (secondsLeft) {
+                          setEventCooldownUntilById(prev => ({
+                            ...prev,
+                            [event.eventId]: Date.now() + secondsLeft * 1000,
+                          }));
+                        }
+                        setError(msg);
+                      } finally {
+                        setGuildBusy(false);
                       }
-                      setError(msg);
-                    } finally {
-                      setGuildBusy(false);
-                    }
-                  }}
-                >
-                  <Text style={styles.smallBtnText}>
-                    {!contributorsLoaded && event.status === 'active'
-                      ? 'Syncing...'
-                      : eventCooldownRemainingMs > 0
-                        ? `Contribute ${formatCooldownMinutesSeconds(eventCooldownRemainingMs)}`
-                        : 'Contribute'}
-                  </Text>
-                </Pressable>
-              </View>
-            );
-          })}
+                    }}
+                  >
+                    <Text style={styles.smallBtnText}>
+                      {!contributorsLoaded && event.status === 'active'
+                        ? 'Syncing...'
+                        : eventCooldownRemainingMs > 0
+                          ? `Contribute ${formatCooldownMinutesSeconds(eventCooldownRemainingMs)}`
+                          : 'Contribute'}
+                    </Text>
+                  </Pressable>
+                </View>
+              );
+            })}
         </View>
       )}
 
