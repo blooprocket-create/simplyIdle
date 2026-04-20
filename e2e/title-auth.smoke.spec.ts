@@ -22,7 +22,7 @@ test.describe('Title to Auth smoke', () => {
       await page.getByPlaceholder('your_username').last().fill('smoke_runner_01');
       await expect(page.getByText('Public Username')).toBeVisible();
     } else {
-      await expect(page.getByText('Online features are temporarily unavailable. Please try again later.')).toBeVisible();
+      await expect(page.getByText('Online features are temporarily unavailable. Please try again later.').first()).toBeVisible();
     }
 
     await expect(page.getByText('Open a New Ledger')).toBeVisible();
