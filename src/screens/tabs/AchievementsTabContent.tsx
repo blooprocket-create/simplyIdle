@@ -74,8 +74,12 @@ function getHeroTierLabel(tier: number): string {
   return 'Common';
 }
 
-function getRarityAccent(rarity: CodexHero['rarity']): string {
-  return theme.rarity[rarity] ?? theme.accent.primary;
+function getTierAccent(tier: CodexHero['tier']): string {
+  if (tier >= 5) return theme.rarity.transcendent;
+  if (tier >= 4) return theme.rarity.mythic;
+  if (tier >= 3) return theme.rarity.legendary;
+  if (tier >= 2) return theme.rarity.epic;
+  return theme.rarity.rare;
 }
 
 export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
@@ -100,11 +104,17 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
     renderSubTabBar,
   }) => {
     const { width: viewportWidth } = useWindowDimensions();
+    const codexVipClaimedHeroIds = Array.isArray(state.codexVipClaimedHeroIds) ? state.codexVipClaimedHeroIds : [];
+    const codexVipClaimedUniqueIds = Array.isArray(state.codexVipClaimedUniqueIds)
+      ? state.codexVipClaimedUniqueIds
+      : [];
+    const heroUniqueGearByHeroId = state.heroUniqueGearByHeroId ?? {};
+    const safeStoryEntries = Array.isArray(storyEntries) ? storyEntries : [];
     const unlockedHeroIds = useMemo(() => new Set(state.heroRoster.map(hero => hero.id)), [state.heroRoster]);
     const codexHeroes = useMemo(() => HERO_POOL.filter(hero => unlockedHeroIds.has(hero.id)), [unlockedHeroIds]);
     const codexUniqueEntries = useMemo(() => {
       const entries = HERO_POOL.map(hero => {
-        const uniqueProgress = state.heroUniqueGearByHeroId[hero.id];
+        const uniqueProgress = heroUniqueGearByHeroId[hero.id];
         const uniqueRank = uniqueProgress?.rank ?? 0;
         if (uniqueRank <= 0) return null;
         return { hero, uniqueRank };
@@ -115,14 +125,14 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
           return a.hero.name.localeCompare(b.hero.name);
         });
       return entries;
-    }, [state.heroUniqueGearByHeroId]);
+    }, [heroUniqueGearByHeroId]);
     const claimableCodexHeroVipCount = useMemo(
-      () => codexHeroes.filter(hero => !state.codexVipClaimedHeroIds.includes(hero.id)).length,
-      [codexHeroes, state.codexVipClaimedHeroIds],
+      () => codexHeroes.filter(hero => !codexVipClaimedHeroIds.includes(hero.id)).length,
+      [codexHeroes, codexVipClaimedHeroIds],
     );
     const claimableCodexUniqueVipCount = useMemo(
-      () => codexUniqueEntries.filter(({ hero }) => !state.codexVipClaimedUniqueIds.includes(hero.id)).length,
-      [codexUniqueEntries, state.codexVipClaimedUniqueIds],
+      () => codexUniqueEntries.filter(({ hero }) => !codexVipClaimedUniqueIds.includes(hero.id)).length,
+      [codexUniqueEntries, codexVipClaimedUniqueIds],
     );
     const codexNotificationCount = claimableCodexHeroVipCount + claimableCodexUniqueVipCount;
     const [codexFactionFilter, setCodexFactionFilter] = useState<CodexFactionFilter>('all');
@@ -155,13 +165,13 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
       return codexUniqueEntries.find(entry => entry.hero.id === selectedRelicHeroId) ?? codexUniqueEntries[0];
     }, [codexUniqueEntries, selectedRelicHeroId]);
     const storySpotlightEntry = useMemo(() => {
-      if (storyEntries.length === 0) return null;
+      if (safeStoryEntries.length === 0) return null;
       return (
-        storyEntries.find(entry => entry.id === selectedStoryId) ??
-        storyEntries.find(entry => entry.unlocked) ??
-        storyEntries[0]
+        safeStoryEntries.find(entry => entry.id === selectedStoryId) ??
+        safeStoryEntries.find(entry => entry.unlocked) ??
+        safeStoryEntries[0]
       );
-    }, [selectedStoryId, storyEntries]);
+    }, [safeStoryEntries, selectedStoryId]);
     const codexFrontCounts = useMemo(() => {
       const counts: Record<CodexFactionFilter, number> = {
         all: 0,
@@ -445,7 +455,9 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                   </View>
                   <View style={styles.codexOverviewCard}>
                     <Text style={styles.codexOverviewEyebrow}>War Chronicle</Text>
-                    <Text style={styles.codexOverviewValue}>{storyEntries.filter(entry => entry.unlocked).length}</Text>
+                    <Text style={styles.codexOverviewValue}>
+                      {safeStoryEntries.filter(entry => entry.unlocked).length}
+                    </Text>
                     <Text style={styles.codexOverviewBody}>Unlocked campaign chapters</Text>
                   </View>
                 </View>
@@ -512,16 +524,13 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                             style={[
                               styles.codexTierBadge,
                               {
-                                borderColor: getRarityAccent(archiveSpotlightHero.rarity),
-                                backgroundColor: `${getRarityAccent(archiveSpotlightHero.rarity)}22`,
+                                borderColor: getTierAccent(archiveSpotlightHero.tier),
+                                backgroundColor: `${getTierAccent(archiveSpotlightHero.tier)}22`,
                               },
                             ]}
                           >
                             <Text
-                              style={[
-                                styles.codexTierBadgeText,
-                                { color: getRarityAccent(archiveSpotlightHero.rarity) },
-                              ]}
+                              style={[styles.codexTierBadgeText, { color: getTierAccent(archiveSpotlightHero.tier) }]}
                             >
                               Tier {archiveSpotlightHero.tier} {getHeroTierLabel(archiveSpotlightHero.tier)}
                             </Text>
@@ -529,7 +538,7 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                         </View>
                         <View style={styles.codexMetaRow}>
                           <Text style={styles.codexMetaChip}>{formatHeroClass(archiveSpotlightHero.heroClass)}</Text>
-                          <Text style={styles.codexMetaChip}>{archiveSpotlightHero.rarity.toUpperCase()}</Text>
+                          <Text style={styles.codexMetaChip}>TIER {archiveSpotlightHero.tier}</Text>
                           <Text style={styles.codexMetaChip}>
                             {getHeroUniqueEffectFamilyLabel(archiveSpotlightHero.id)}
                           </Text>
@@ -541,7 +550,7 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                         </Text>
                         <View style={styles.codexSpotlightActionRow}>
                           {unlockedHeroIds.has(archiveSpotlightHero.id) &&
-                          !state.codexVipClaimedHeroIds.includes(archiveSpotlightHero.id) ? (
+                          !codexVipClaimedHeroIds.includes(archiveSpotlightHero.id) ? (
                             <Pressable
                               style={styles.codexActionPrimary}
                               onPress={() => {
@@ -561,7 +570,7 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                           ) : null}
                           <Text style={styles.codexActionHint}>
                             {unlockedHeroIds.has(archiveSpotlightHero.id)
-                              ? state.codexVipClaimedHeroIds.includes(archiveSpotlightHero.id)
+                              ? codexVipClaimedHeroIds.includes(archiveSpotlightHero.id)
                                 ? 'Archive reward claimed'
                                 : 'First reveal claims VIP points'
                               : 'Currently classified'}
@@ -576,7 +585,7 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                   <View style={styles.codexGalleryGrid}>
                     {filteredArchiveHeroes.map(hero => {
                       const unlocked = unlockedHeroIds.has(hero.id);
-                      const claimed = state.codexVipClaimedHeroIds.includes(hero.id);
+                      const claimed = codexVipClaimedHeroIds.includes(hero.id);
                       return (
                         <Pressable
                           key={hero.id}
@@ -588,9 +597,7 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                           ]}
                           onPress={() => setSelectedCodexHeroId(hero.id)}
                         >
-                          <View
-                            style={[styles.codexGalleryPortraitWrap, { borderColor: getRarityAccent(hero.rarity) }]}
-                          >
+                          <View style={[styles.codexGalleryPortraitWrap, { borderColor: getTierAccent(hero.tier) }]}>
                             {unlocked ? (
                               renderCodexHeroIcon(hero.id, hero.emoji, 'md')
                             ) : (
@@ -647,14 +654,14 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                         <Pressable
                           style={styles.codexActionSecondary}
                           onPress={() => {
-                            if (!state.codexVipClaimedUniqueIds.includes(relicSpotlightEntry.hero.id)) {
+                            if (!codexVipClaimedUniqueIds.includes(relicSpotlightEntry.hero.id)) {
                               claimCodexUniqueVip(relicSpotlightEntry.hero.id);
                             }
                             setPortraitModalHero(relicSpotlightEntry.hero);
                           }}
                         >
                           <Text style={styles.codexActionSecondaryText}>
-                            {state.codexVipClaimedUniqueIds.includes(relicSpotlightEntry.hero.id)
+                            {codexVipClaimedUniqueIds.includes(relicSpotlightEntry.hero.id)
                               ? 'Inspect Relic'
                               : 'Archive Relic +10 VIP'}
                           </Text>
@@ -665,7 +672,7 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                       </Text>
                       <View style={styles.codexMetaRow}>
                         <Text style={styles.codexMetaChip}>{formatHeroClass(relicSpotlightEntry.hero.heroClass)}</Text>
-                        <Text style={styles.codexMetaChip}>{relicSpotlightEntry.hero.rarity.toUpperCase()}</Text>
+                        <Text style={styles.codexMetaChip}>TIER {relicSpotlightEntry.hero.tier}</Text>
                         <Text style={styles.codexMetaChip}>Rank {relicSpotlightEntry.uniqueRank}</Text>
                       </View>
                     </View>
@@ -676,7 +683,7 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                   {codexUniqueEntries.length > 0 && (
                     <View style={styles.codexRelicGrid}>
                       {codexUniqueEntries.map(({ hero, uniqueRank }) => {
-                        const claimed = state.codexVipClaimedUniqueIds.includes(hero.id);
+                        const claimed = codexVipClaimedUniqueIds.includes(hero.id);
                         return (
                           <Pressable
                             key={`unique_${hero.id}`}
@@ -688,7 +695,7 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                             onPress={() => setSelectedRelicHeroId(hero.id)}
                           >
                             <View style={styles.codexRelicCardHeader}>
-                              <View style={[styles.codexRelicIconWrap, { borderColor: getRarityAccent(hero.rarity) }]}>
+                              <View style={[styles.codexRelicIconWrap, { borderColor: getTierAccent(hero.tier) }]}>
                                 {renderCodexHeroIcon(hero.id, hero.emoji)}
                                 {!claimed && <View style={styles.codexClaimDot} />}
                               </View>
@@ -720,14 +727,14 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                     </View>
                     <View style={styles.codexSectionBadge}>
                       <Text style={styles.codexSectionBadgeValue}>
-                        {storyEntries.filter(entry => entry.unlocked).length}
+                        {safeStoryEntries.filter(entry => entry.unlocked).length}
                       </Text>
                       <Text style={styles.codexSectionBadgeLabel}>Open chapters</Text>
                     </View>
                   </View>
 
                   <View style={styles.storyNodeRow}>
-                    {storyEntries.map(entry => (
+                    {safeStoryEntries.map(entry => (
                       <Pressable
                         key={entry.id}
                         style={[
