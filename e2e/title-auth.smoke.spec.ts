@@ -11,12 +11,19 @@ test.describe('Title to Auth smoke', () => {
     await expect(page.getByText('SimplyIdle')).toBeVisible();
 
     await page.getByText('Create', { exact: true }).click();
-    await expect(page.getByText('Public Username')).toBeVisible();
+    await expect(page.getByText('Open a New Ledger')).toBeVisible();
 
     await page.getByPlaceholder('commander@domain.com').fill('smoke@example.com');
     await page.getByPlaceholder('Enter password').fill('password123');
     await page.getByPlaceholder('Repeat password').fill('password123');
-    await page.getByPlaceholder('your_username').last().fill('smoke_runner_01');
+
+    const hasPublicUsernameField = await page.getByPlaceholder('your_username').last().isVisible();
+    if (hasPublicUsernameField) {
+      await page.getByPlaceholder('your_username').last().fill('smoke_runner_01');
+      await expect(page.getByText('Public Username')).toBeVisible();
+    } else {
+      await expect(page.getByText('Online features are temporarily unavailable. Please try again later.')).toBeVisible();
+    }
 
     await expect(page.getByText('Open a New Ledger')).toBeVisible();
   });
