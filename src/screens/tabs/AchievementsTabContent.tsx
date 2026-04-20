@@ -1,16 +1,19 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, Text, Pressable, Image, Modal, Platform } from 'react-native';
+import { View, Text, Pressable, Image, Modal, Platform, useWindowDimensions } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import {
   ACHIEVEMENTS,
   HERO_POOL,
   WEEKLY_TRACK_MILESTONES,
   getHeroBackstory,
+  getHeroUniqueEffectFamilyLabel,
+  getHeroUniqueSkillDescription,
   getHeroUniqueWeaponName,
 } from '../../gameConfig';
 import { getHeroPortraitSource } from '../../heroPortraits';
 import { getHeroAnimationUri } from '../../heroAnimations';
 import { ACH_BONUS_PER_UNLOCK_PCT } from '../gameScreenShared';
+import { theme } from '../../theme/colors';
 import { styles } from './AchievementsTabContent.styles';
 
 export interface AchievementsTabContentProps {
@@ -34,6 +37,47 @@ export interface AchievementsTabContentProps {
   renderSubTabBar: (tabs: any[]) => React.ReactNode;
 }
 
+type CodexHero = (typeof HERO_POOL)[number];
+type CodexFactionFilter = 'all' | 'vanguard' | 'ranger' | 'arcanum' | 'aegis';
+
+function getCodexFaction(hero: CodexHero): Exclude<CodexFactionFilter, 'all'> {
+  if (hero.heroClass === 'warrior' || hero.heroClass === 'berserker') return 'vanguard';
+  if (hero.heroClass === 'archer') return 'ranger';
+  if (hero.heroClass === 'mage') return 'arcanum';
+  return 'aegis';
+}
+
+function getCodexFactionLabel(filter: CodexFactionFilter): string {
+  switch (filter) {
+    case 'vanguard':
+      return 'Vanguard';
+    case 'ranger':
+      return 'Ranger Wings';
+    case 'arcanum':
+      return 'Arcanum';
+    case 'aegis':
+      return 'Aegis Orders';
+    default:
+      return 'All Fronts';
+  }
+}
+
+function formatHeroClass(heroClass: CodexHero['heroClass']): string {
+  return heroClass.charAt(0).toUpperCase() + heroClass.slice(1);
+}
+
+function getHeroTierLabel(tier: number): string {
+  if (tier >= 5) return 'Transcendent';
+  if (tier >= 4) return 'Godlike';
+  if (tier >= 3) return 'Legendary';
+  if (tier >= 2) return 'Veteran';
+  return 'Common';
+}
+
+function getRarityAccent(rarity: CodexHero['rarity']): string {
+  return theme.rarity[rarity] ?? theme.accent.primary;
+}
+
 export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
   ({
     tab,
@@ -55,6 +99,7 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
     claimAllRewards,
     renderSubTabBar,
   }) => {
+    const { width: viewportWidth } = useWindowDimensions();
     const unlockedHeroIds = useMemo(() => new Set(state.heroRoster.map(hero => hero.id)), [state.heroRoster]);
     const codexHeroes = useMemo(() => HERO_POOL.filter(hero => unlockedHeroIds.has(hero.id)), [unlockedHeroIds]);
     const codexUniqueEntries = useMemo(() => {
@@ -80,14 +125,71 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
       [codexUniqueEntries, state.codexVipClaimedUniqueIds],
     );
     const codexNotificationCount = claimableCodexHeroVipCount + claimableCodexUniqueVipCount;
+    const [codexFactionFilter, setCodexFactionFilter] = useState<CodexFactionFilter>('all');
+    const [selectedCodexHeroId, setSelectedCodexHeroId] = useState<string | null>(null);
+    const [selectedRelicHeroId, setSelectedRelicHeroId] = useState<string | null>(null);
+    const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
     const [portraitModalHero, setPortraitModalHero] = useState<(typeof HERO_POOL)[number] | null>(null);
     const closePortraitModal = useCallback(() => setPortraitModalHero(null), []);
-    const renderCodexHeroIcon = (heroId: string, emoji: string) => {
-      const portraitSource = getHeroPortraitSource(heroId);
-      if (portraitSource) {
-        return <Image source={portraitSource} style={styles.codexHeroPortrait} resizeMode="cover" />;
+    const codexColumns = viewportWidth < 420 ? 2 : viewportWidth < 840 ? 3 : 4;
+    const relicColumns = viewportWidth < 560 ? 1 : viewportWidth < 960 ? 2 : 3;
+    const filteredArchiveHeroes = useMemo(
+      () =>
+        HERO_POOL.filter(hero => codexFactionFilter === 'all' || getCodexFaction(hero) === codexFactionFilter).sort(
+          (a, b) => {
+            const aUnlocked = unlockedHeroIds.has(a.id) ? 1 : 0;
+            const bUnlocked = unlockedHeroIds.has(b.id) ? 1 : 0;
+            if (aUnlocked !== bUnlocked) return bUnlocked - aUnlocked;
+            if (a.tier !== b.tier) return b.tier - a.tier;
+            return a.name.localeCompare(b.name);
+          },
+        ),
+      [codexFactionFilter, unlockedHeroIds],
+    );
+    const archiveSpotlightHero = useMemo(() => {
+      if (filteredArchiveHeroes.length === 0) return null;
+      return filteredArchiveHeroes.find(hero => hero.id === selectedCodexHeroId) ?? filteredArchiveHeroes[0];
+    }, [filteredArchiveHeroes, selectedCodexHeroId]);
+    const relicSpotlightEntry = useMemo(() => {
+      if (codexUniqueEntries.length === 0) return null;
+      return codexUniqueEntries.find(entry => entry.hero.id === selectedRelicHeroId) ?? codexUniqueEntries[0];
+    }, [codexUniqueEntries, selectedRelicHeroId]);
+    const storySpotlightEntry = useMemo(() => {
+      if (storyEntries.length === 0) return null;
+      return (
+        storyEntries.find(entry => entry.id === selectedStoryId) ??
+        storyEntries.find(entry => entry.unlocked) ??
+        storyEntries[0]
+      );
+    }, [selectedStoryId, storyEntries]);
+    const codexFrontCounts = useMemo(() => {
+      const counts: Record<CodexFactionFilter, number> = {
+        all: 0,
+        vanguard: 0,
+        ranger: 0,
+        arcanum: 0,
+        aegis: 0,
+      };
+      for (const hero of codexHeroes) {
+        counts.all += 1;
+        counts[getCodexFaction(hero)] += 1;
       }
-      return <Text style={styles.toggleBtnText}>{emoji}</Text>;
+      return counts;
+    }, [codexHeroes]);
+    const renderCodexHeroIcon = (heroId: string, emoji: string, size: 'sm' | 'md' | 'lg' = 'sm') => {
+      const portraitSource = getHeroPortraitSource(heroId);
+      const portraitStyle =
+        size === 'lg'
+          ? styles.codexHeroPortraitLarge
+          : size === 'md'
+            ? styles.codexHeroPortraitMedium
+            : styles.codexHeroPortrait;
+      const emojiStyle =
+        size === 'lg' ? styles.codexHeroEmojiLarge : size === 'md' ? styles.codexHeroEmojiMedium : styles.toggleBtnText;
+      if (portraitSource) {
+        return <Image source={portraitSource} style={portraitStyle} resizeMode="cover" />;
+      }
+      return <Text style={emojiStyle}>{emoji}</Text>;
     };
 
     return (
@@ -325,199 +427,454 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
               <View>
                 <Text style={styles.sectionTitle}>📖 Legacy Codex</Text>
                 <Text style={styles.sectionHelperText}>
-                  Long-term milestones that define your legend. Each grants a permanent title.
+                  Build your war archive. Heroes, relics, and chapters should feel discovered, not merely listed.
                 </Text>
 
-                <View style={styles.collectionCard}>
-                  <Text style={styles.collectionCardTitle}>👥 Hero Codex</Text>
-                  <Text style={styles.collectionStat}>
-                    Discovered heroes: {codexHeroes.length}/{HERO_POOL.length}
-                  </Text>
-                  <Text style={styles.collectionHint}>
-                    Tap a discovered hero icon to view it. First view claims +10 VIP points.
-                  </Text>
-                  {codexHeroes.length === 0 ? (
-                    <Text style={styles.collectionStat}>Summon heroes to unlock their backstories.</Text>
-                  ) : (
-                    codexHeroes.map(hero => {
-                      const claimed = state.codexVipClaimedHeroIds.includes(hero.id);
-                      return (
-                        <View key={hero.id} style={[styles.codexEntry, claimed && styles.codexEntryDone]}>
-                          <Pressable
-                            style={[styles.toggleBtn, styles.codexHeroIconBtn, claimed && { opacity: 0.55 }]}
-                            onPress={() => {
-                              if (!claimed) claimCodexHeroVip(hero.id);
-                              setPortraitModalHero(hero);
-                            }}
-                          >
-                            {renderCodexHeroIcon(hero.id, hero.emoji)}
-                            {!claimed && <View style={styles.codexClaimDot} />}
-                          </Pressable>
-                          <View style={styles.codexEntryLeft}>
-                            <Text style={[styles.codexTitle, claimed && styles.codexTitleDone]}>
-                              {claimed ? '✅' : '📜'} {hero.name}
-                            </Text>
-                            <Text style={styles.codexDesc}>{getHeroBackstory(hero.id)}</Text>
-                            <Text style={styles.codexReward}>
-                              {claimed ? 'VIP claimed (+10)' : 'First view: +10 VIP points'}
-                            </Text>
-                          </View>
-                        </View>
-                      );
-                    })
-                  )}
+                <View style={styles.codexOverviewRow}>
+                  <View style={[styles.codexOverviewCard, styles.codexOverviewCardPrimary]}>
+                    <Text style={styles.codexOverviewEyebrow}>Hero Archive</Text>
+                    <Text style={styles.codexOverviewValue}>
+                      {codexHeroes.length}/{HERO_POOL.length}
+                    </Text>
+                    <Text style={styles.codexOverviewBody}>Discovered across all fronts</Text>
+                  </View>
+                  <View style={styles.codexOverviewCard}>
+                    <Text style={styles.codexOverviewEyebrow}>Relic Armory</Text>
+                    <Text style={styles.codexOverviewValue}>{codexUniqueEntries.length}</Text>
+                    <Text style={styles.codexOverviewBody}>Forged signature relics</Text>
+                  </View>
+                  <View style={styles.codexOverviewCard}>
+                    <Text style={styles.codexOverviewEyebrow}>War Chronicle</Text>
+                    <Text style={styles.codexOverviewValue}>{storyEntries.filter(entry => entry.unlocked).length}</Text>
+                    <Text style={styles.codexOverviewBody}>Unlocked campaign chapters</Text>
+                  </View>
                 </View>
 
-                <View style={styles.collectionCard}>
-                  <Text style={styles.collectionCardTitle}>🗡️ Unique Gear Codex</Text>
-                  <Text style={styles.collectionStat}>
-                    Discovered uniques: {codexUniqueEntries.length}/{HERO_POOL.length}
-                  </Text>
-                  <Text style={styles.collectionHint}>
-                    Tap a discovered unique icon to view it. First view claims +10 VIP points.
-                  </Text>
-                  {codexUniqueEntries.length === 0 ? (
-                    <Text style={styles.collectionStat}>Find unique weapon drops to archive them here.</Text>
-                  ) : (
-                    codexUniqueEntries.map(({ hero, uniqueRank }) => {
-                      const claimed = state.codexVipClaimedUniqueIds.includes(hero.id);
-                      return (
-                        <View key={`unique_${hero.id}`} style={[styles.codexEntry, claimed && styles.codexEntryDone]}>
-                          <Pressable
-                            style={[styles.toggleBtn, styles.codexHeroIconBtn, claimed && { opacity: 0.55 }]}
-                            onPress={() => {
-                              if (!claimed) claimCodexUniqueVip(hero.id);
-                              setPortraitModalHero(hero);
-                            }}
-                          >
-                            {renderCodexHeroIcon(hero.id, hero.emoji)}
-                            {!claimed && <View style={styles.codexClaimDot} />}
-                          </Pressable>
-                          <View style={styles.codexEntryLeft}>
-                            <Text style={[styles.codexTitle, claimed && styles.codexTitleDone]}>
-                              {claimed ? '✅' : '🗡️'} {getHeroUniqueWeaponName(hero.id)}
-                            </Text>
-                            <Text style={styles.codexDesc}>
-                              {hero.name} • Rank {uniqueRank}/10
-                            </Text>
-                            <Text style={styles.codexReward}>
-                              {claimed ? 'VIP claimed (+10)' : 'First view: +10 VIP points'}
-                            </Text>
-                          </View>
-                        </View>
-                      );
-                    })
-                  )}
-                </View>
-
-                <View style={styles.storyCardWrap}>
-                  <Text style={styles.storyCardTitle}>🧭 War Chronicle</Text>
-                  <Text style={styles.storyCardSubtitle}>
-                    Unlocked chapters: {storyEntries.filter(entry => entry.unlocked).length}/{storyEntries.length}
-                  </Text>
-                  {storyEntries.map(entry => (
-                    <View key={entry.id} style={[styles.storyBeatCard, entry.unlocked && styles.storyBeatCardUnlocked]}>
-                      <Text style={[styles.storyBeatChapter, entry.unlocked && styles.storyBeatChapterUnlocked]}>
-                        {entry.unlocked ? '✅' : '🔒'} {entry.chapter} - {entry.title}
-                      </Text>
-                      <Text style={styles.storyBeatBody}>
-                        {entry.unlocked ? entry.body : 'Classified until campaign requirements are met.'}
-                      </Text>
-                      <Text style={styles.storyBeatReq}>
-                        Req: Wave {entry.unlockWave}
-                        {entry.unlockPrestige != null ? ` • Rebirth ${entry.unlockPrestige}+` : ''}
+                <View style={styles.codexSectionShell}>
+                  <View style={styles.codexSectionHeaderRow}>
+                    <View style={styles.codexSectionHeaderCopy}>
+                      <Text style={styles.codexSectionKicker}>Archive Wing</Text>
+                      <Text style={styles.codexSectionTitle}>Hero Archive</Text>
+                      <Text style={styles.codexSectionDescription}>
+                        Review your commanders by front, class, and rarity. Classified files stay on the wall until you
+                        summon them.
                       </Text>
                     </View>
-                  ))}
-                  {nextStoryEntry && (
-                    <Text style={styles.storyNextHint}>
-                      Next chapter unlock: Wave {nextStoryEntry.unlockWave}
-                      {nextStoryEntry.unlockPrestige != null ? ` and Rebirth ${nextStoryEntry.unlockPrestige}+` : ''}
-                    </Text>
-                  )}
-                </View>
-                {[
-                  {
-                    id: 'codex_wave100',
-                    title: 'Warlord',
-                    desc: 'Reach Wave 100',
-                    done: state.wave >= 100,
-                    reward: 'Title: Warlord',
-                  },
-                  {
-                    id: 'codex_wave500',
-                    title: 'Conqueror',
-                    desc: 'Reach Wave 500',
-                    done: state.wave >= 500,
-                    reward: 'Title: Conqueror',
-                  },
-                  {
-                    id: 'codex_wave1000',
-                    title: 'Legend',
-                    desc: 'Reach Wave 1000',
-                    done: state.wave >= 1000,
-                    reward: 'Title: Legend',
-                  },
-                  {
-                    id: 'codex_rebirth1',
-                    title: 'Reborn',
-                    desc: 'Complete 1 Rebirth',
-                    done: (state.prestigeCount ?? 0) >= 1,
-                    reward: 'Title: Reborn',
-                  },
-                  {
-                    id: 'codex_rebirth10',
-                    title: 'Eternal',
-                    desc: 'Complete 10 Rebirths',
-                    done: (state.prestigeCount ?? 0) >= 10,
-                    reward: 'Title: Eternal',
-                  },
-                  {
-                    id: 'codex_rebirth25',
-                    title: 'Immortal',
-                    desc: 'Complete 25 Rebirths',
-                    done: (state.prestigeCount ?? 0) >= 25,
-                    reward: 'Title: Immortal',
-                  },
-                  {
-                    id: 'codex_heroes25',
-                    title: 'Commander',
-                    desc: 'Summon 25 heroes',
-                    done: state.heroRoster.length >= 25,
-                    reward: 'Title: Commander',
-                  },
-                  {
-                    id: 'codex_ach10',
-                    title: 'Achiever',
-                    desc: 'Unlock 10 achievements',
-                    done: state.achievements.size >= 10,
-                    reward: 'Title: Achiever',
-                  },
-                  {
-                    id: 'codex_allunlocks',
-                    title: 'Sovereign',
-                    desc: 'Collect all permanent unlocks',
-                    done: state.permanentUnlocks.length >= 3,
-                    reward: 'Title: Sovereign',
-                  },
-                  {
-                    id: 'codex_streak30',
-                    title: 'Devoted',
-                    desc: 'Maintain a 30-day login streak',
-                    done: (state.dailyLoginStreak ?? 0) >= 30,
-                    reward: 'Title: Devoted',
-                  },
-                ].map(entry => (
-                  <View key={entry.id} style={[styles.codexEntry, entry.done && styles.codexEntryDone]}>
-                    <View style={styles.codexEntryLeft}>
-                      <Text style={[styles.codexTitle, entry.done && styles.codexTitleDone]}>
-                        {entry.done ? '✅' : '🔒'} {entry.title}
-                      </Text>
-                      <Text style={styles.codexDesc}>{entry.desc}</Text>
-                      <Text style={styles.codexReward}>{entry.reward}</Text>
+                    <View style={styles.codexSectionBadge}>
+                      <Text style={styles.codexSectionBadgeValue}>{codexFrontCounts.all}</Text>
+                      <Text style={styles.codexSectionBadgeLabel}>Known dossiers</Text>
                     </View>
                   </View>
-                ))}
+
+                  <View style={styles.codexFilterRow}>
+                    {(['all', 'vanguard', 'ranger', 'arcanum', 'aegis'] as const).map(filter => (
+                      <Pressable
+                        key={filter}
+                        style={[styles.codexFilterChip, codexFactionFilter === filter && styles.codexFilterChipActive]}
+                        onPress={() => setCodexFactionFilter(filter)}
+                      >
+                        <Text
+                          style={[
+                            styles.codexFilterChipText,
+                            codexFactionFilter === filter && styles.codexFilterChipTextActive,
+                          ]}
+                        >
+                          {getCodexFactionLabel(filter)} {filter !== 'all' ? `(${codexFrontCounts[filter]})` : ''}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+
+                  {archiveSpotlightHero ? (
+                    <View style={styles.codexSpotlightCard}>
+                      <View style={styles.codexSpotlightMedia}>
+                        {unlockedHeroIds.has(archiveSpotlightHero.id) ? (
+                          renderCodexHeroIcon(archiveSpotlightHero.id, archiveSpotlightHero.emoji, 'lg')
+                        ) : (
+                          <View style={styles.codexClassifiedPortrait}>
+                            <Text style={styles.codexClassifiedPortraitText}>?</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.codexSpotlightBody}>
+                        <View style={styles.codexSpotlightHeader}>
+                          <View style={styles.codexSpotlightTitleWrap}>
+                            <Text style={styles.codexSpotlightEyebrow}>
+                              {getCodexFactionLabel(getCodexFaction(archiveSpotlightHero))}
+                            </Text>
+                            <Text style={styles.codexSpotlightTitle}>
+                              {unlockedHeroIds.has(archiveSpotlightHero.id)
+                                ? archiveSpotlightHero.name
+                                : 'Classified Operative'}
+                            </Text>
+                          </View>
+                          <View
+                            style={[
+                              styles.codexTierBadge,
+                              {
+                                borderColor: getRarityAccent(archiveSpotlightHero.rarity),
+                                backgroundColor: `${getRarityAccent(archiveSpotlightHero.rarity)}22`,
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.codexTierBadgeText,
+                                { color: getRarityAccent(archiveSpotlightHero.rarity) },
+                              ]}
+                            >
+                              Tier {archiveSpotlightHero.tier} {getHeroTierLabel(archiveSpotlightHero.tier)}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.codexMetaRow}>
+                          <Text style={styles.codexMetaChip}>{formatHeroClass(archiveSpotlightHero.heroClass)}</Text>
+                          <Text style={styles.codexMetaChip}>{archiveSpotlightHero.rarity.toUpperCase()}</Text>
+                          <Text style={styles.codexMetaChip}>
+                            {getHeroUniqueEffectFamilyLabel(archiveSpotlightHero.id)}
+                          </Text>
+                        </View>
+                        <Text style={styles.codexSpotlightDescription}>
+                          {unlockedHeroIds.has(archiveSpotlightHero.id)
+                            ? getHeroBackstory(archiveSpotlightHero.id)
+                            : 'Signal fragments detected. Summon this operative to unseal their dossier, doctrine, and battlefield history.'}
+                        </Text>
+                        <View style={styles.codexSpotlightActionRow}>
+                          {unlockedHeroIds.has(archiveSpotlightHero.id) &&
+                          !state.codexVipClaimedHeroIds.includes(archiveSpotlightHero.id) ? (
+                            <Pressable
+                              style={styles.codexActionPrimary}
+                              onPress={() => {
+                                claimCodexHeroVip(archiveSpotlightHero.id);
+                                setPortraitModalHero(archiveSpotlightHero);
+                              }}
+                            >
+                              <Text style={styles.codexActionPrimaryText}>Reveal Dossier +10 VIP</Text>
+                            </Pressable>
+                          ) : unlockedHeroIds.has(archiveSpotlightHero.id) ? (
+                            <Pressable
+                              style={styles.codexActionPrimary}
+                              onPress={() => setPortraitModalHero(archiveSpotlightHero)}
+                            >
+                              <Text style={styles.codexActionPrimaryText}>Inspect Full Dossier</Text>
+                            </Pressable>
+                          ) : null}
+                          <Text style={styles.codexActionHint}>
+                            {unlockedHeroIds.has(archiveSpotlightHero.id)
+                              ? state.codexVipClaimedHeroIds.includes(archiveSpotlightHero.id)
+                                ? 'Archive reward claimed'
+                                : 'First reveal claims VIP points'
+                              : 'Currently classified'}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  ) : (
+                    <Text style={styles.collectionStat}>Summon heroes to begin filling the archive wall.</Text>
+                  )}
+
+                  <View style={styles.codexGalleryGrid}>
+                    {filteredArchiveHeroes.map(hero => {
+                      const unlocked = unlockedHeroIds.has(hero.id);
+                      const claimed = state.codexVipClaimedHeroIds.includes(hero.id);
+                      return (
+                        <Pressable
+                          key={hero.id}
+                          style={[
+                            styles.codexGalleryCard,
+                            { width: `${100 / codexColumns - 2}%` },
+                            unlocked && styles.codexGalleryCardUnlocked,
+                            selectedCodexHeroId === hero.id && styles.codexGalleryCardSelected,
+                          ]}
+                          onPress={() => setSelectedCodexHeroId(hero.id)}
+                        >
+                          <View
+                            style={[styles.codexGalleryPortraitWrap, { borderColor: getRarityAccent(hero.rarity) }]}
+                          >
+                            {unlocked ? (
+                              renderCodexHeroIcon(hero.id, hero.emoji, 'md')
+                            ) : (
+                              <View style={styles.codexGalleryLockedPortrait}>
+                                <Text style={styles.codexGalleryLockedPortraitText}>CLASSIFIED</Text>
+                              </View>
+                            )}
+                            {unlocked && !claimed && <View style={styles.codexClaimDot} />}
+                          </View>
+                          <Text style={styles.codexGalleryName} numberOfLines={1}>
+                            {unlocked ? hero.name : 'Unknown'}
+                          </Text>
+                          <Text style={styles.codexGalleryMeta} numberOfLines={1}>
+                            {unlocked
+                              ? `${formatHeroClass(hero.heroClass)} • T${hero.tier}`
+                              : `${getCodexFactionLabel(getCodexFaction(hero))} file`}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <View style={styles.codexSectionShell}>
+                  <View style={styles.codexSectionHeaderRow}>
+                    <View style={styles.codexSectionHeaderCopy}>
+                      <Text style={styles.codexSectionKicker}>Armory Vault</Text>
+                      <Text style={styles.codexSectionTitle}>Relic Armory</Text>
+                      <Text style={styles.codexSectionDescription}>
+                        Signature weapons should read like artifacts of doctrine and conquest, not one more line item in
+                        storage.
+                      </Text>
+                    </View>
+                    <View style={styles.codexSectionBadge}>
+                      <Text style={styles.codexSectionBadgeValue}>{claimableCodexUniqueVipCount}</Text>
+                      <Text style={styles.codexSectionBadgeLabel}>Unclaimed reveals</Text>
+                    </View>
+                  </View>
+
+                  {relicSpotlightEntry ? (
+                    <View style={styles.codexRelicSpotlightCard}>
+                      <View style={styles.codexRelicSpotlightHeader}>
+                        <View>
+                          <Text style={styles.codexSpotlightEyebrow}>
+                            {getHeroUniqueEffectFamilyLabel(relicSpotlightEntry.hero.id)}
+                          </Text>
+                          <Text style={styles.codexSpotlightTitle}>
+                            {getHeroUniqueWeaponName(relicSpotlightEntry.hero.id)}
+                          </Text>
+                          <Text style={styles.codexRelicHeroLine}>
+                            Bound to {relicSpotlightEntry.hero.name} • Rank {relicSpotlightEntry.uniqueRank}/10
+                          </Text>
+                        </View>
+                        <Pressable
+                          style={styles.codexActionSecondary}
+                          onPress={() => {
+                            if (!state.codexVipClaimedUniqueIds.includes(relicSpotlightEntry.hero.id)) {
+                              claimCodexUniqueVip(relicSpotlightEntry.hero.id);
+                            }
+                            setPortraitModalHero(relicSpotlightEntry.hero);
+                          }}
+                        >
+                          <Text style={styles.codexActionSecondaryText}>
+                            {state.codexVipClaimedUniqueIds.includes(relicSpotlightEntry.hero.id)
+                              ? 'Inspect Relic'
+                              : 'Archive Relic +10 VIP'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                      <Text style={styles.codexSpotlightDescription}>
+                        {getHeroUniqueSkillDescription(relicSpotlightEntry.hero.id, relicSpotlightEntry.uniqueRank)}
+                      </Text>
+                      <View style={styles.codexMetaRow}>
+                        <Text style={styles.codexMetaChip}>{formatHeroClass(relicSpotlightEntry.hero.heroClass)}</Text>
+                        <Text style={styles.codexMetaChip}>{relicSpotlightEntry.hero.rarity.toUpperCase()}</Text>
+                        <Text style={styles.codexMetaChip}>Rank {relicSpotlightEntry.uniqueRank}</Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <Text style={styles.collectionStat}>Forge a unique weapon to begin stocking the armory vault.</Text>
+                  )}
+
+                  {codexUniqueEntries.length > 0 && (
+                    <View style={styles.codexRelicGrid}>
+                      {codexUniqueEntries.map(({ hero, uniqueRank }) => {
+                        const claimed = state.codexVipClaimedUniqueIds.includes(hero.id);
+                        return (
+                          <Pressable
+                            key={`unique_${hero.id}`}
+                            style={[
+                              styles.codexRelicCard,
+                              { width: `${100 / relicColumns - 2}%` },
+                              selectedRelicHeroId === hero.id && styles.codexGalleryCardSelected,
+                            ]}
+                            onPress={() => setSelectedRelicHeroId(hero.id)}
+                          >
+                            <View style={styles.codexRelicCardHeader}>
+                              <View style={[styles.codexRelicIconWrap, { borderColor: getRarityAccent(hero.rarity) }]}>
+                                {renderCodexHeroIcon(hero.id, hero.emoji)}
+                                {!claimed && <View style={styles.codexClaimDot} />}
+                              </View>
+                              <View style={styles.codexRelicRankPill}>
+                                <Text style={styles.codexRelicRankText}>R{uniqueRank}</Text>
+                              </View>
+                            </View>
+                            <Text style={styles.codexRelicCardTitle} numberOfLines={2}>
+                              {getHeroUniqueWeaponName(hero.id)}
+                            </Text>
+                            <Text style={styles.codexRelicCardMeta} numberOfLines={1}>
+                              {hero.name} • {getHeroUniqueEffectFamilyLabel(hero.id)}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.codexSectionShell}>
+                  <View style={styles.codexSectionHeaderRow}>
+                    <View style={styles.codexSectionHeaderCopy}>
+                      <Text style={styles.codexSectionKicker}>Campaign Record</Text>
+                      <Text style={styles.codexSectionTitle}>War Chronicle</Text>
+                      <Text style={styles.codexSectionDescription}>
+                        Chapters should feel unlocked along a campaign route, with the next frontier clearly visible.
+                      </Text>
+                    </View>
+                    <View style={styles.codexSectionBadge}>
+                      <Text style={styles.codexSectionBadgeValue}>
+                        {storyEntries.filter(entry => entry.unlocked).length}
+                      </Text>
+                      <Text style={styles.codexSectionBadgeLabel}>Open chapters</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.storyNodeRow}>
+                    {storyEntries.map(entry => (
+                      <Pressable
+                        key={entry.id}
+                        style={[
+                          styles.storyNode,
+                          entry.unlocked && styles.storyNodeUnlocked,
+                          storySpotlightEntry?.id === entry.id && styles.storyNodeSelected,
+                        ]}
+                        onPress={() => setSelectedStoryId(entry.id)}
+                      >
+                        <Text style={styles.storyNodeChapter}>{entry.chapter}</Text>
+                        <Text style={styles.storyNodeTitle} numberOfLines={2}>
+                          {entry.title}
+                        </Text>
+                        <Text style={styles.storyNodeState}>{entry.unlocked ? 'Unlocked' : 'Classified'}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+
+                  {storySpotlightEntry && (
+                    <View style={styles.storyCardWrap}>
+                      <Text style={styles.storyCardTitle}>
+                        {storySpotlightEntry.unlocked ? '🧭' : '🔒'} {storySpotlightEntry.chapter} -{' '}
+                        {storySpotlightEntry.title}
+                      </Text>
+                      <Text style={styles.storyCardSubtitle}>
+                        {storySpotlightEntry.unlocked
+                          ? 'Campaign intelligence recovered'
+                          : 'This chapter remains sealed by campaign progression'}
+                      </Text>
+                      <Text style={styles.storyBeatBody}>
+                        {storySpotlightEntry.unlocked
+                          ? storySpotlightEntry.body
+                          : 'Classified until campaign requirements are met.'}
+                      </Text>
+                      <Text style={styles.storyBeatReq}>
+                        Req: Wave {storySpotlightEntry.unlockWave}
+                        {storySpotlightEntry.unlockPrestige != null
+                          ? ` • Rebirth ${storySpotlightEntry.unlockPrestige}+`
+                          : ''}
+                      </Text>
+                      {nextStoryEntry && (
+                        <Text style={styles.storyNextHint}>
+                          Next frontier opens at Wave {nextStoryEntry.unlockWave}
+                          {nextStoryEntry.unlockPrestige != null
+                            ? ` and Rebirth ${nextStoryEntry.unlockPrestige}+`
+                            : ''}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.codexSectionShell}>
+                  <View style={styles.codexSectionHeaderRow}>
+                    <View style={styles.codexSectionHeaderCopy}>
+                      <Text style={styles.codexSectionKicker}>Legacy Titles</Text>
+                      <Text style={styles.codexSectionTitle}>Mastery Ladder</Text>
+                      <Text style={styles.codexSectionDescription}>
+                        Your long-war titles should read like rising command prestige, not a loose pile of milestone
+                        rows.
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.masteryTitleGrid}>
+                    {[
+                      {
+                        id: 'codex_wave100',
+                        title: 'Warlord',
+                        desc: 'Reach Wave 100',
+                        done: state.wave >= 100,
+                        reward: 'Title: Warlord',
+                      },
+                      {
+                        id: 'codex_wave500',
+                        title: 'Conqueror',
+                        desc: 'Reach Wave 500',
+                        done: state.wave >= 500,
+                        reward: 'Title: Conqueror',
+                      },
+                      {
+                        id: 'codex_wave1000',
+                        title: 'Legend',
+                        desc: 'Reach Wave 1000',
+                        done: state.wave >= 1000,
+                        reward: 'Title: Legend',
+                      },
+                      {
+                        id: 'codex_rebirth1',
+                        title: 'Reborn',
+                        desc: 'Complete 1 Rebirth',
+                        done: (state.prestigeCount ?? 0) >= 1,
+                        reward: 'Title: Reborn',
+                      },
+                      {
+                        id: 'codex_rebirth10',
+                        title: 'Eternal',
+                        desc: 'Complete 10 Rebirths',
+                        done: (state.prestigeCount ?? 0) >= 10,
+                        reward: 'Title: Eternal',
+                      },
+                      {
+                        id: 'codex_rebirth25',
+                        title: 'Immortal',
+                        desc: 'Complete 25 Rebirths',
+                        done: (state.prestigeCount ?? 0) >= 25,
+                        reward: 'Title: Immortal',
+                      },
+                      {
+                        id: 'codex_heroes25',
+                        title: 'Commander',
+                        desc: 'Summon 25 heroes',
+                        done: state.heroRoster.length >= 25,
+                        reward: 'Title: Commander',
+                      },
+                      {
+                        id: 'codex_ach10',
+                        title: 'Achiever',
+                        desc: 'Unlock 10 achievements',
+                        done: state.achievements.size >= 10,
+                        reward: 'Title: Achiever',
+                      },
+                      {
+                        id: 'codex_allunlocks',
+                        title: 'Sovereign',
+                        desc: 'Collect all permanent unlocks',
+                        done: state.permanentUnlocks.length >= 3,
+                        reward: 'Title: Sovereign',
+                      },
+                      {
+                        id: 'codex_streak30',
+                        title: 'Devoted',
+                        desc: 'Maintain a 30-day login streak',
+                        done: (state.dailyLoginStreak ?? 0) >= 30,
+                        reward: 'Title: Devoted',
+                      },
+                    ].map(entry => (
+                      <View key={entry.id} style={[styles.masteryTitleCard, entry.done && styles.masteryTitleCardDone]}>
+                        <Text style={styles.masteryTitleState}>{entry.done ? 'TITLE SECURED' : 'PENDING'}</Text>
+                        <Text style={[styles.masteryTitleName, entry.done && styles.masteryTitleNameDone]}>
+                          {entry.title}
+                        </Text>
+                        <Text style={styles.masteryTitleDesc}>{entry.desc}</Text>
+                        <Text style={styles.masteryTitleReward}>{entry.reward}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
               </View>
             )}
           </View>
@@ -562,9 +919,16 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                         Tier {portraitModalHero.tier} — {tierLabel}
                       </Text>
                       <Text style={styles.portraitModalClass}>
-                        {portraitModalHero.heroClass.charAt(0).toUpperCase() + portraitModalHero.heroClass.slice(1)}
+                        {formatHeroClass(portraitModalHero.heroClass)} •{' '}
+                        {getHeroUniqueEffectFamilyLabel(portraitModalHero.id)}
                       </Text>
                       <Text style={styles.portraitModalBackstory}>{getHeroBackstory(portraitModalHero.id)}</Text>
+                      <Text style={styles.portraitModalWeaponName}>
+                        {getHeroUniqueWeaponName(portraitModalHero.id)}
+                      </Text>
+                      <Text style={styles.portraitModalWeaponSkill}>
+                        {getHeroUniqueSkillDescription(portraitModalHero.id, 1)}
+                      </Text>
                     </>
                   );
                 })()}
