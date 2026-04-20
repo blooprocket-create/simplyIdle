@@ -1,5 +1,5 @@
-import React, { type CSSProperties } from 'react';
-import { ResizeMode, Video } from 'expo-av';
+import React, { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
+import { Audio, ResizeMode, Video, type AVPlaybackStatus } from 'expo-av';
 import { Modal, View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import { getStoryCutsceneUri } from '../storyCutscenes';
 
@@ -23,9 +23,72 @@ export default function StoryBeatCutscene({
   body,
   onContinue,
 }: StoryBeatCutsceneProps) {
-  if (!visible) return null;
-
+  const webVideoRef = useRef<HTMLVideoElement | null>(null);
+  const completionHandledRef = useRef(false);
+  const [playbackBlockedBeatId, setPlaybackBlockedBeatId] = useState<string | null>(null);
   const videoUri = beatId ? getStoryCutsceneUri(beatId) : null;
+  const playbackBlocked = playbackBlockedBeatId === beatId;
+
+  const handlePlaybackComplete = useCallback(() => {
+    if (completionHandledRef.current) return;
+    completionHandledRef.current = true;
+    onContinue();
+  }, [onContinue]);
+
+  const startWebPlayback = useCallback(async () => {
+    const video = webVideoRef.current;
+    if (!video) return;
+
+    video.currentTime = 0;
+    video.loop = false;
+    video.muted = false;
+    video.volume = 1;
+
+    try {
+      await video.play();
+      setPlaybackBlockedBeatId(null);
+    } catch {
+      setPlaybackBlockedBeatId(beatId);
+    }
+  }, [beatId]);
+
+  const handleNativePlaybackStatus = useCallback(
+    (status: AVPlaybackStatus) => {
+      if (!status.isLoaded) return;
+      if (status.didJustFinish) {
+        handlePlaybackComplete();
+      }
+    },
+    [handlePlaybackComplete],
+  );
+
+  useEffect(() => {
+    completionHandledRef.current = false;
+  }, [beatId, visible]);
+
+  useEffect(() => {
+    if (!visible || !videoUri) return;
+
+    void Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: true,
+    }).catch(() => {
+      // Non-critical; continue playback even if audio mode configuration fails.
+    });
+
+    if (Platform.OS !== 'web') return;
+
+    const video = webVideoRef.current;
+
+    return () => {
+      if (!video) return;
+      video.pause();
+      video.currentTime = 0;
+    };
+  }, [startWebPlayback, videoUri, visible]);
+
+  if (!visible) return null;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onContinue}>
@@ -34,24 +97,32 @@ export default function StoryBeatCutscene({
           <View style={styles.mediaViewport}>
             {videoUri ? (
               Platform.OS === 'web' ? (
-                React.createElement('video', {
-                  key: videoUri,
-                  src: videoUri,
-                  autoPlay: true,
-                  loop: true,
-                  muted: true,
-                  playsInline: true,
-                  style: styles.webVideo as CSSProperties,
-                })
+                <video
+                  key={videoUri}
+                  ref={webVideoRef}
+                  src={videoUri}
+                  autoPlay
+                  loop={false}
+                  muted={false}
+                  preload="auto"
+                  playsInline
+                  onEnded={handlePlaybackComplete}
+                  onCanPlay={() => {
+                    void startWebPlayback();
+                  }}
+                  style={styles.webVideo as CSSProperties}
+                />
               ) : (
                 <Video
                   key={videoUri}
                   source={{ uri: videoUri }}
                   style={styles.media}
                   shouldPlay
-                  isLooping
-                  isMuted
+                  isLooping={false}
+                  isMuted={false}
+                  volume={1}
                   resizeMode={ResizeMode.COVER}
+                  onPlaybackStatusUpdate={handleNativePlaybackStatus}
                 />
               )
             ) : (
@@ -75,16 +146,22 @@ export default function StoryBeatCutscene({
 
             <View style={styles.footerRow}>
               <Text style={styles.footerHint}>
-                {videoUri ? 'Continue when you are ready to enter the field.' : 'No cutscene file found for this beat.'}
+                {playbackBlocked
+                  ? 'Autoplay with sound was blocked. Start the cutscene once and it will close on its own when finished.'
+                  : videoUri
+                    ? 'This cutscene will close automatically when playback finishes.'
+                    : 'No cutscene file found for this beat.'}
               </Text>
-              <Pressable
-                style={styles.cta}
-                onPress={onContinue}
-                accessibilityRole="button"
-                accessibilityLabel="Continue"
-              >
-                <Text style={styles.ctaText}>Continue</Text>
-              </Pressable>
+              {(playbackBlocked || !videoUri) && (
+                <Pressable
+                  style={styles.cta}
+                  onPress={playbackBlocked ? () => void startWebPlayback() : onContinue}
+                  accessibilityRole="button"
+                  accessibilityLabel={playbackBlocked ? 'Play cutscene' : 'Continue'}
+                >
+                  <Text style={styles.ctaText}>{playbackBlocked ? 'Play Cutscene' : 'Continue'}</Text>
+                </Pressable>
+              )}
             </View>
           </View>
         </View>
