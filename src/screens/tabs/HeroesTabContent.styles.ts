@@ -331,7 +331,6 @@ export const styles = StyleSheet.create({
   // ── Hero Card ────────────────────────────────────────────
   heroCard: {
     position: 'relative',
-    isolation: 'isolate',
     flexDirection: 'row',
     backgroundColor: theme.bg.card,
     borderRadius: 6,
