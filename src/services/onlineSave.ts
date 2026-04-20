@@ -213,6 +213,10 @@ export type OnlineSaveLoadResult<TPayload extends Record<string, unknown>> =
   | { ok: true; data: OnlineSaveEnvelope<TPayload> | null }
   | { ok: false; errorCode: OnlineSaveErrorCode };
 
+export interface OnlineSaveLoadOptions {
+  includeChunks?: string[];
+}
+
 function sanitizeSaveSlot(saveSlot: string): string {
   const sanitized =
     saveSlot
@@ -382,6 +386,7 @@ export function isOnlineSaveAvailable(): boolean {
 export async function loadOnlineSave<TPayload extends Record<string, unknown>>(
   saveSlot: string,
   onProgress?: LoadProgressCallback,
+  options?: OnlineSaveLoadOptions,
 ): Promise<OnlineSaveLoadResult<TPayload>> {
   const db = getFirebaseFirestore();
   const uid = getCurrentUid();
@@ -399,7 +404,11 @@ export async function loadOnlineSave<TPayload extends Record<string, unknown>>(
     if (Array.isArray(raw.chunkKeys) && raw.chunkKeys.length > 0) {
       const envelope = toEnvelope<TPayload>(raw);
       if (!envelope) return { ok: true, data: null };
-      const payload = await loadChunksForSlot(db, ['users', uid, 'saveSlots', safeSlot], raw.chunkKeys, onProgress);
+      const selectedChunkKeys =
+        options?.includeChunks && options.includeChunks.length > 0
+          ? raw.chunkKeys.filter(chunkName => options.includeChunks!.includes(chunkName))
+          : raw.chunkKeys;
+      const payload = await loadChunksForSlot(db, ['users', uid, 'saveSlots', safeSlot], selectedChunkKeys, onProgress);
       envelope.payload = payload as TPayload;
       return { ok: true, data: envelope };
     }
@@ -417,20 +426,31 @@ export async function loadOnlineSave<TPayload extends Record<string, unknown>>(
  * Fires onProgress after each chunk resolves so callers can drive a progress bar.
  */
 async function loadChunksForSlot(
-  db: ReturnType<typeof getFirebaseFirestore>,
+  db: NonNullable<ReturnType<typeof getFirebaseFirestore>>,
   slotPath: string[],
   chunkKeys: string[],
   onProgress?: LoadProgressCallback,
 ): Promise<Record<string, unknown>> {
+  if (chunkKeys.length === 0) {
+    onProgress?.(1, 1, 'payload');
+    return {};
+  }
+
   const total = chunkKeys.length;
   let loaded = 0;
   const chunks: Record<string, Record<string, unknown>> = {};
 
-  // Load chunks in parallel for speed, report progress as each resolves
-  const promises = chunkKeys.map(async chunkName => {
-    const chunkRef = doc(db!, ...slotPath, 'chunks', chunkName);
-    const chunkSnap = await getDoc(chunkRef);
-    loaded++;
+  // Fetch chunk docs in parallel, then parse serially to avoid main-thread spikes
+  const chunkDocs = await Promise.all(
+    chunkKeys.map(async chunkName => {
+      const chunkPath = [...slotPath, 'chunks', chunkName] as [string, ...string[]];
+      const chunkRef = doc(db, ...chunkPath);
+      const chunkSnap = await getDoc(chunkRef);
+      return { chunkName, chunkSnap };
+    }),
+  );
+
+  for (const { chunkName, chunkSnap } of chunkDocs) {
     if (chunkSnap.exists()) {
       const chunkData = chunkSnap.data();
       if (typeof chunkData.payloadJson === 'string') {
@@ -445,10 +465,13 @@ async function loadChunksForSlot(
         chunks[chunkName] = decodeChunkFromFirestore(chunkData);
       }
     }
+    loaded++;
     onProgress?.(loaded, total, chunkName);
-  });
+    if (loaded < total) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+  }
 
-  await Promise.all(promises);
   return mergeChunks(chunks);
 }
 

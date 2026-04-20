@@ -72,6 +72,8 @@ export type RosterAction =
   | { type: 'AUTO_RECYCLE_HEROES' }
   | { type: 'TOGGLE_HERO_UNIQUE_WEAPON'; heroUid: string }
   | { type: 'RANK_UP_HERO'; uid: string }
+  | { type: 'RANK_UP_HERO_TO_MAX'; uid: string }
+  | { type: 'RANK_UP_HERO_TO_MAX_AND_REBIRTH'; uid: string }
   | { type: 'LEVEL_UP_HERO_GOLD'; uid: string }
   | { type: 'REBIRTH_HERO'; uid: string }
   | { type: 'BATCH_LEVEL_HEROES'; heroIds: string[]; addLevels: number | 'max' }
@@ -93,6 +95,8 @@ export const ROSTER_ACTION_TYPES = new Set<string>([
   'AUTO_RECYCLE_HEROES',
   'TOGGLE_HERO_UNIQUE_WEAPON',
   'RANK_UP_HERO',
+  'RANK_UP_HERO_TO_MAX',
+  'RANK_UP_HERO_TO_MAX_AND_REBIRTH',
   'LEVEL_UP_HERO_GOLD',
   'REBIRTH_HERO',
   'BATCH_LEVEL_HEROES',
@@ -161,6 +165,16 @@ function queueCombatLog(state: GameState, line: string): GameState {
 
 function isPostgameSummonUnlocked(state: Pick<GameState, 'highestWaveReached' | 'prestigeCount'>): boolean {
   return state.highestWaveReached >= 150 && state.prestigeCount >= 1;
+}
+
+function getRankUpCostToTarget(rarity: Rarity, currentRank: number, targetRank: number): number {
+  const safeCurrent = Math.max(1, Math.min(10, Math.floor(currentRank)));
+  const safeTarget = Math.max(safeCurrent, Math.min(10, Math.floor(targetRank)));
+  let total = 0;
+  for (let rank = safeCurrent + 1; rank <= safeTarget; rank += 1) {
+    total += getRankUpShardCost(rarity, rank);
+  }
+  return total;
 }
 
 function rollRarityWithPity(
@@ -1039,6 +1053,55 @@ export function rosterReducer(state: GameState, action: RosterAction, ctx: Roste
         heroRoster: newRoster,
         heroShards: state.heroShards - nextRankCost,
       };
+    }
+
+    case 'RANK_UP_HERO_TO_MAX': {
+      const hero = state.heroRoster.find(h => h.uid === action.uid);
+      if (!hero || hero.rank >= 10) return state;
+
+      const rankUpCostToMax = getRankUpCostToTarget(hero.rarity, hero.rank, 10);
+      if (!Number.isFinite(rankUpCostToMax) || state.heroShards < rankUpCostToMax) return state;
+
+      const updatedHero = { ...hero, rank: 10 };
+      return {
+        ...state,
+        heroRoster: state.heroRoster.map(h => (h.uid === action.uid ? updatedHero : h)),
+        heroShards: state.heroShards - rankUpCostToMax,
+      };
+    }
+
+    case 'RANK_UP_HERO_TO_MAX_AND_REBIRTH': {
+      const hero = state.heroRoster.find(h => h.uid === action.uid);
+      if (!hero || hero.level < HERO_LEVEL_CAP) return state;
+
+      const rankUpCostToMax = getRankUpCostToTarget(hero.rarity, hero.rank, 10);
+      const rankedHero = hero.rank >= 10 ? hero : { ...hero, rank: 10 };
+      const rebirthPlan = getHeroRebirthPlan(rankedHero);
+      const totalShardCost = rankUpCostToMax + rebirthPlan.shardCost;
+
+      if (state.heroShards < totalShardCost || state.essence < rebirthPlan.essenceCost) return state;
+
+      const rebornHero = normalizeHero({
+        ...rankedHero,
+        level: 1,
+        rank: 1,
+        rebirthStatMult: rebirthPlan.nextStatMultiplier,
+      });
+
+      return queueReward(
+        {
+          ...state,
+          heroShards: state.heroShards - totalShardCost,
+          essence: state.essence - rebirthPlan.essenceCost,
+          heroRoster: state.heroRoster.map(h => (h.uid === action.uid ? rebornHero : h)),
+        },
+        {
+          id: `hero_rank10_rebirth_${hero.uid}_${Date.now()}`,
+          kind: 'system',
+          title: `${hero.name} Ascended`,
+          detail: `-${rankUpCostToMax} shards to rank 10 • -${rebirthPlan.shardCost} shards • -${rebirthPlan.essenceCost} essence • +${rebirthPlan.statGainPct}% hero stat gain`,
+        },
+      );
     }
 
     case 'LEVEL_UP_HERO_GOLD': {

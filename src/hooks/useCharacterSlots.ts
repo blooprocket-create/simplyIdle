@@ -67,6 +67,8 @@ async function saveLastCharacterSlot(uid: string, playerClass: PlayerClass | nul
   }
 }
 
+const SLOT_SUMMARY_CHUNKS = ['identity', 'economy', 'combat', 'progression'] as const;
+
 export function useCharacterSlots({
   accountName,
   selectedCharacterClass,
@@ -89,7 +91,11 @@ export function useCharacterSlots({
       const total = CLASSES.length;
       const summaries = await Promise.all(
         CLASSES.map(async cls => {
-          const slotResult = await loadOnlineSave<Record<string, unknown>>(getCharacterSaveSlot(accountName, cls.id));
+          const slotResult = await loadOnlineSave<Record<string, unknown>>(
+            getCharacterSaveSlot(accountName, cls.id),
+            undefined,
+            { includeChunks: [...SLOT_SUMMARY_CHUNKS] },
+          );
           loaded++;
           if (!cancelled) setSlotLoadProgress(Math.round((loaded / total) * 80));
           const parsed = slotResult.ok && slotResult.data ? slotResult.data.payload : null;

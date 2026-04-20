@@ -81,12 +81,27 @@ export interface HeroesTabContentProps {
   toggleEquipHero: (heroId: string) => void;
   toggleHeroUniqueWeapon: (heroUid: string) => void;
   rankUpHero: (heroId: string) => void;
+  rankUpHeroToMax: (heroId: string) => void;
+  rankUpHeroToMaxAndRebirth: (heroId: string) => void;
   rebirthHero: (heroId: string) => void;
   levelUpHeroGold: (heroId: string) => void;
   unlockTeamSlot: () => void;
   batchLevelHeroes: (heroIds: string[], mode: number | 'max') => void;
   setRecycleConfirmUid: (uid: string) => void;
   renderSubTabBar: (tabs: any[]) => React.ReactNode;
+}
+
+function getRankUpCostToMax(
+  rarity: Rarity,
+  currentRank: number,
+  getRankUpShardCost: (rarity: Rarity, rank: number) => number,
+): number {
+  if (currentRank >= 10) return 0;
+  let total = 0;
+  for (let rank = currentRank + 1; rank <= 10; rank += 1) {
+    total += getRankUpShardCost(rarity, rank);
+  }
+  return total;
 }
 
 export const HeroesTabContent = React.memo<HeroesTabContentProps>(
@@ -130,6 +145,8 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
     toggleEquipHero,
     toggleHeroUniqueWeapon,
     rankUpHero,
+    rankUpHeroToMax,
+    rankUpHeroToMaxAndRebirth,
     rebirthHero,
     levelUpHeroGold,
     unlockTeamSlot,
@@ -519,7 +536,14 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                       const heroRebirthShardCost = heroRebirthPlan.shardCost;
                       const heroRebirthEssenceCost = heroRebirthPlan.essenceCost;
                       const nextRankCost = hero.rank < 10 ? getRankUpShardCost(hero.rarity, hero.rank + 1) : null;
+                      const rankUpCostToMax = getRankUpCostToMax(hero.rarity, hero.rank, getRankUpShardCost);
                       const canRankUp = !!nextRankCost && state.heroShards >= nextRankCost;
+                      const canRankUpToMax = hero.rank < 10 && state.heroShards >= rankUpCostToMax;
+                      const canRankUpToMaxAndRebirth =
+                        hero.rank < 10 &&
+                        hero.level >= HERO_LEVEL_CAP &&
+                        state.heroShards >= rankUpCostToMax + heroRebirthShardCost &&
+                        state.essence >= heroRebirthEssenceCost;
                       const canHeroRebirth =
                         hero.rank >= 10 &&
                         hero.level >= HERO_LEVEL_CAP &&
@@ -717,15 +741,49 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                                 {nextRankCost && (
                                   <View style={styles.rankUpSection}>
                                     <Text style={styles.rankUpLabel}>Rank Up Cost: {nextRankCost} 💠</Text>
-                                    <Pressable
-                                      style={[styles.rankUpBtn, !canRankUp && styles.rankUpBtnDisabled]}
-                                      disabled={!canRankUp}
-                                      onPress={() => rankUpHero(hero.uid)}
-                                    >
-                                      <Text style={styles.rankUpBtnText}>
-                                        {canRankUp ? 'Rank Up' : `Need ${nextRankCost - state.heroShards} more`}
-                                      </Text>
-                                    </Pressable>
+                                    {canRankUpToMax ? (
+                                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                                        <Pressable
+                                          style={[
+                                            styles.rankUpBtn,
+                                            !canRankUp && styles.rankUpBtnDisabled,
+                                            { flex: 1 },
+                                          ]}
+                                          disabled={!canRankUp}
+                                          onPress={() => rankUpHero(hero.uid)}
+                                        >
+                                          <Text style={styles.rankUpBtnText}>
+                                            {canRankUp ? 'Rank Up' : `Need ${nextRankCost - state.heroShards} more`}
+                                          </Text>
+                                        </Pressable>
+                                        <Pressable
+                                          style={[styles.rankUpBtn, { flex: 1 }]}
+                                          onPress={() => {
+                                            if (canRankUpToMaxAndRebirth) {
+                                              rankUpHeroToMaxAndRebirth(hero.uid);
+                                            } else {
+                                              rankUpHeroToMax(hero.uid);
+                                            }
+                                          }}
+                                        >
+                                          <Text style={styles.rankUpBtnText}>
+                                            {canRankUpToMaxAndRebirth
+                                              ? `Rank 10 + Rebirth (${rankUpCostToMax + heroRebirthShardCost}💠 + ${heroRebirthEssenceCost}✨)`
+                                              : `Rank to 10 (${rankUpCostToMax}💠)`}
+                                          </Text>
+                                        </Pressable>
+                                      </View>
+                                    ) : (
+                                      <Pressable
+                                        style={[styles.rankUpBtn, !canRankUp && styles.rankUpBtnDisabled]}
+                                        disabled={!canRankUp}
+                                        onPress={() => rankUpHero(hero.uid)}
+                                      >
+                                        <Text style={styles.rankUpBtnText}>
+                                          {canRankUp ? 'Rank Up' : `Need ${nextRankCost - state.heroShards} more`}
+                                        </Text>
+                                      </Pressable>
+                                    )}
                                   </View>
                                 )}
                                 {hero.rank === 10 && <Text style={styles.maxRankMsg}>✓ Max Rank!</Text>}

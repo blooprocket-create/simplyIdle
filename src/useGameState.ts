@@ -4223,6 +4223,8 @@ type Action =
   | { type: 'SET_AUTO_RECYCLE_ENABLED'; enabled: boolean }
   | { type: 'TOGGLE_HERO_UNIQUE_WEAPON'; heroUid: string }
   | { type: 'RANK_UP_HERO'; uid: string }
+  | { type: 'RANK_UP_HERO_TO_MAX'; uid: string }
+  | { type: 'RANK_UP_HERO_TO_MAX_AND_REBIRTH'; uid: string }
   | { type: 'CONVERT_SCRAP_TO_ESSENCE'; count?: number }
   | { type: 'CONVERT_SCRAP_TO_SHARDS'; count?: number }
   | { type: 'SPEND_REBIRTH_CORE'; path: 'damage' | 'economy' | 'survival' }
@@ -4468,7 +4470,8 @@ function reducer(state: GameState, action: Action): GameState {
     // UPGRADE_FACILITY, START_EXPEDITION, REFRESH_EXPEDITION_CONTRACTS,
     // COMPLETE_EXPEDITION handled by economyReducer
 
-    // TOGGLE_HERO_UNIQUE_WEAPON, RANK_UP_HERO, LEVEL_UP_HERO_GOLD,
+    // TOGGLE_HERO_UNIQUE_WEAPON, RANK_UP_HERO, RANK_UP_HERO_TO_MAX,
+    // RANK_UP_HERO_TO_MAX_AND_REBIRTH, LEVEL_UP_HERO_GOLD,
     // REBIRTH_HERO handled by rosterReducer
 
     // CONVERT_SCRAP_TO_ESSENCE, CONVERT_SCRAP_TO_SHARDS handled by economyReducer
@@ -5129,48 +5132,40 @@ export function useGameState(saveSlot: string = 'default') {
         revision: remote.revision,
       });
 
-      let payloadWithCloudMail = remote.payload as Partial<SaveData>;
+      const payload = remote.payload as Partial<SaveData>;
       setLoadProgress(88);
-      const uid = getFirebaseAuth()?.currentUser?.uid;
-      if (uid) {
-        try {
-          const cloudMails = await fetchCloudMail(uid);
-          if (cloudMails.length > 0) {
-            const existingMailbox = Array.isArray((payloadWithCloudMail as { mailbox?: MailMessage[] }).mailbox)
-              ? ((payloadWithCloudMail as { mailbox?: MailMessage[] }).mailbox ?? [])
-              : [];
-            const seenIds = new Set(existingMailbox.map(mail => mail.id));
-            const newMails: MailMessage[] = cloudMails
-              .filter(mail => !seenIds.has(mail.id))
-              .map(mail => ({
-                id: mail.id,
-                subject: mail.subject,
-                message: mail.message,
-                from: mail.from,
-                sentAt: mail.sentAt,
-                attachments: mail.attachments,
-                claimedAttachments: emptyAttachments(),
-              }));
-            if (newMails.length > 0) {
-              payloadWithCloudMail = {
-                ...payloadWithCloudMail,
-                mailbox: [...newMails, ...existingMailbox].slice(0, 100),
-              };
-            }
-
-            await Promise.all(cloudMails.map(mail => claimCloudMail(uid, mail.id).catch(() => {})));
-          }
-        } catch {
-          // Non-fatal. The real-time cloud mail listener in GameScreen will still surface messages.
-        }
-      }
-
       setLoadProgress(95);
-      dispatch({ type: 'LOAD', payload: payloadWithCloudMail });
-      const elapsed = Date.now() - (payloadWithCloudMail.lastActiveAt ?? Date.now());
+      dispatch({ type: 'LOAD', payload });
+      const elapsed = Date.now() - (payload.lastActiveAt ?? Date.now());
       dispatch({ type: 'APPLY_OFFLINE_PROGRESS', elapsedMs: elapsed });
       dispatch({ type: 'APPLY_DAILY_LOGIN', nowMs: Date.now() });
       dispatch({ type: 'APPLY_WEEKLY_ROLLOVER', nowMs: Date.now() });
+
+      const uid = getFirebaseAuth()?.currentUser?.uid;
+      if (uid) {
+        void (async () => {
+          try {
+            const cloudMails = await fetchCloudMail(uid);
+            if (cloudMails.length === 0) return;
+
+            const mails: MailMessage[] = cloudMails.map(mail => ({
+              id: mail.id,
+              subject: mail.subject,
+              message: mail.message,
+              from: mail.from,
+              sentAt: mail.sentAt,
+              attachments: mail.attachments,
+              claimedAttachments: emptyAttachments(),
+            }));
+            dispatch({ type: 'APPEND_MAIL_MESSAGES', mails });
+
+            await Promise.allSettled(cloudMails.map(mail => claimCloudMail(uid, mail.id)));
+          } catch {
+            // Non-fatal. The real-time cloud mail listener in GameScreen will still surface messages.
+          }
+        })();
+      }
+
       setLoadProgress(100);
     })().finally(() => {
       if (!cancelled) setHydrated(true);
@@ -5368,6 +5363,11 @@ export function useGameState(saveSlot: string = 'default') {
     dispatch({ type: 'TOGGLE_HERO_UNIQUE_WEAPON', heroUid });
   }, []);
   const rankUpHero = useCallback((uid: string) => dispatch({ type: 'RANK_UP_HERO', uid }), []);
+  const rankUpHeroToMax = useCallback((uid: string) => dispatch({ type: 'RANK_UP_HERO_TO_MAX', uid }), []);
+  const rankUpHeroToMaxAndRebirth = useCallback(
+    (uid: string) => dispatch({ type: 'RANK_UP_HERO_TO_MAX_AND_REBIRTH', uid }),
+    [],
+  );
   const levelUpHeroGold = useCallback((uid: string) => dispatch({ type: 'LEVEL_UP_HERO_GOLD', uid }), []);
   const convertScrapToEssence = useCallback(
     (count?: number) => dispatch({ type: 'CONVERT_SCRAP_TO_ESSENCE', count }),
@@ -5637,6 +5637,8 @@ export function useGameState(saveSlot: string = 'default') {
     setAutoRecycleEnabled,
     toggleHeroUniqueWeapon,
     rankUpHero,
+    rankUpHeroToMax,
+    rankUpHeroToMaxAndRebirth,
     levelUpHeroGold,
     convertScrapToEssence,
     convertScrapToShards,
