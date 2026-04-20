@@ -8,6 +8,7 @@ import {
   Image,
   Modal,
   StyleSheet as RNStyleSheet,
+  Platform,
 } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import {
@@ -27,6 +28,7 @@ import {
   SUMMON_MILESTONES,
 } from '../../gameConfig';
 import { getHeroPortraitSource } from '../../heroPortraits';
+import { getHeroAnimationUri } from '../../heroAnimations';
 import { fmt } from '../../utils';
 import { styles } from './HeroesTabContent.styles';
 
@@ -572,7 +574,26 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                             { width: rosterCardWidth, marginBottom: 0 },
                           ]}
                         >
-                          {getHeroPortraitSource(hero.id) ? (
+                          {hero.tier >= 5 && Platform.OS === 'web' && getHeroAnimationUri(hero.id) ? (
+                            React.createElement('video', {
+                              src: getHeroAnimationUri(hero.id),
+                              autoPlay: true,
+                              loop: true,
+                              muted: true,
+                              playsInline: true,
+                              style: {
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                opacity: 0.38,
+                              } as any,
+                            })
+                          ) : getHeroPortraitSource(hero.id) ? (
                             <Image
                               source={getHeroPortraitSource(hero.id)}
                               style={styles.heroCardBackdropImage}
