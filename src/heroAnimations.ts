@@ -4,7 +4,10 @@ import { Asset } from 'expo-asset';
 const HERO_ANIMATION_MODULES: Record<string, number | string> = {
   // Tier 5
   h61: require('../IMG/HeroAnimate/TitanWorldrender.mp4'),
+  h62: require('../IMG/HeroAnimate/LeviathanDepths.mp4'),
+  h63: require('../IMG/HeroAnimate/PhoenixEternal.mp4'),
   h64: require('../IMG/HeroAnimate/CelestialArchitect.mp4'),
+  h65: require('../IMG/HeroAnimate/DharmaEternalCycle.mp4'),
 };
 
 /**
