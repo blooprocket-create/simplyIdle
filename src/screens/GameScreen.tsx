@@ -932,6 +932,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   useEffect(() => {
     setGamePaused(!!storyCutscene || !!storyBeatModal);
   }, [setGamePaused, storyCutscene, storyBeatModal]);
+  const hasStorySequenceOpen = !!storyCutscene || !!storyBeatModal;
 
   useModalOpenTelemetry({
     activeModal,
@@ -1983,14 +1984,16 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#0A0A18" />
-      <TutorialOverlay
-        step={tutorialStep}
-        onDismissWelcome={() => {
-          markHintSeen('tutorial_welcome_seen');
-          setTab('battle');
-        }}
-        onFinishTutorial={() => markHintSeen('tutorial_complete')}
-      />
+      {!hasStorySequenceOpen && (
+        <TutorialOverlay
+          step={tutorialStep}
+          onDismissWelcome={() => {
+            markHintSeen('tutorial_welcome_seen');
+            setTab('battle');
+          }}
+          onFinishTutorial={() => markHintSeen('tutorial_complete')}
+        />
+      )}
       <View pointerEvents="none" style={styles.sceneDecor}>
         <View style={styles.sceneOrbA} />
         <View style={styles.sceneOrbB} />
@@ -2198,7 +2201,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         </Modal>
       )}
 
-      <TutorialBanner step={tutorialStep} />
+      {!hasStorySequenceOpen && <TutorialBanner step={tutorialStep} />}
 
       {tutorialStep === 'done' && activeHint && (
         <View style={styles.hintBanner}>
