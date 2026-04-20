@@ -590,6 +590,7 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                                 width: '100%',
                                 height: '100%',
                                 objectFit: 'cover',
+                                objectPosition: 'center center',
                                 opacity: 0.38,
                               } as any,
                             })

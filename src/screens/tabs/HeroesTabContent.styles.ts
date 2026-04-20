@@ -338,6 +338,7 @@ export const styles = StyleSheet.create({
     borderColor: '#2A2A4A',
     marginBottom: 8,
     overflow: 'hidden',
+    minHeight: 160,
   },
   heroCardBackdropImage: {
     ...StyleSheet.absoluteFillObject,
@@ -370,6 +371,7 @@ export const styles = StyleSheet.create({
     shadowOpacity: 0.34,
     shadowRadius: 18,
     elevation: 8,
+    minHeight: 180,
   },
   heroCardMobileActive: {
     borderColor: '#69D59A',
@@ -387,11 +389,13 @@ export const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 10,
     zIndex: 2,
+    minHeight: 120,
   },
   heroCardBodyMobile: {
     paddingHorizontal: 12,
     paddingVertical: 12,
     gap: 10,
+    minHeight: 140,
   },
   heroCardTopRow: {
     flexDirection: 'row',
