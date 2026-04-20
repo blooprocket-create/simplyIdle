@@ -27,6 +27,13 @@ interface EngineTabProps {
 
 export default function EngineTab(props: EngineTabProps) {
   const [statFocus, setStatFocus] = useState<string | null>(null);
+  const statButtons: Array<{ label: string; key: StatKey }> = [
+    { label: 'STR', key: 'strength' },
+    { label: 'VIT', key: 'vitality' },
+    { label: 'AGI', key: 'agility' },
+    { label: 'INT', key: 'intelligence' },
+    { label: 'SPR', key: 'spirit' },
+  ];
 
   return (
     <MobileScrollContainer>
@@ -54,17 +61,17 @@ export default function EngineTab(props: EngineTabProps) {
         <View style={styles.statGrid}>
           <Text style={styles.gridTitle}>Allocate Stats</Text>
           <View style={styles.statButtons}>
-            {['STR', 'VIT', 'AGI', 'INT', 'SPR'].map(stat => (
+            {statButtons.map(stat => (
               <Pressable
-                key={stat}
-                style={[styles.statBtn, statFocus === stat && styles.statBtnFocused]}
+                key={stat.key}
+                style={[styles.statBtn, statFocus === stat.label && styles.statBtnFocused]}
                 onPress={() => {
-                  props.onAllocateStat(stat.toLowerCase());
-                  setStatFocus(stat);
+                  props.onAllocateStat(stat.key);
+                  setStatFocus(stat.label);
                   setTimeout(() => setStatFocus(null), 300);
                 }}
               >
-                <Text style={styles.statBtnText}>{stat}</Text>
+                <Text style={styles.statBtnText}>{stat.label}</Text>
               </Pressable>
             ))}
           </View>

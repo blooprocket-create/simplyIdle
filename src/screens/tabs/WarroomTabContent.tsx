@@ -26,7 +26,7 @@ interface NearUnlockAchievement {
     value: number;
     target: number;
   } | null;
-  remaining?: number;
+  remaining?: number | null;
 }
 
 interface WarroomAct {
