@@ -14,12 +14,9 @@ import { getHeroPortraitSource } from '../../heroPortraits';
 import { getHeroAnimationUri } from '../../heroAnimations';
 import { ACH_BONUS_PER_UNLOCK_PCT } from '../gameScreenShared';
 import { theme } from '../../theme/colors';
+import MobileCard from '../../components/MobileCard';
+import SectionHeader from '../../components/SectionHeader';
 import { styles } from './AchievementsTabContent.styles';
-import achievementsAtmosphereNoise from '../../../assets/ui/achievements/atmosphere-noise.png';
-import achievementsCommandDeckBanner from '../../../assets/ui/achievements/command-deck-banner.png';
-import achievementsMissionOverlay from '../../../assets/ui/achievements/mission-tile-overlay.png';
-import achievementsRecordsPlaque from '../../../assets/ui/achievements/records-plaque.png';
-import achievementsCollectionPanel from '../../../assets/ui/achievements/collection-vault-panel.png';
 
 export interface AchievementsTabContentProps {
   tab: string;
