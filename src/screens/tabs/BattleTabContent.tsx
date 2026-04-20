@@ -1,17 +1,7 @@
 import React from 'react';
 import { Alert, Platform, View, Text, Pressable } from 'react-native';
 import { GameState, Stats, getUsableItemDescription } from '../../useGameState';
-import {
-  PlayerClass,
-  getActForWave,
-  getMonsterAffixes,
-  getMonsterDamage,
-  getMonsterExp,
-  getMonsterForWave,
-  getMonsterGold,
-  rarityConfig,
-} from '../../gameConfig';
-import { fmt } from '../../utils';
+import { PlayerClass, rarityConfig } from '../../gameConfig';
 import { styles } from './BattleTabContent.styles';
 
 export interface BattleTabContentProps {
@@ -59,13 +49,6 @@ export const BattleTabContent = React.memo<BattleTabContentProps>(
     setRebirthOpen,
   }) => {
     const hasTempo4Access = (state.vipLevel ?? 0) >= 1;
-    const monster = getMonsterForWave(state.wave);
-    const currentAct = getActForWave(state.wave);
-    const isBoss = state.wave % 10 === 0;
-    const monsterAffixes = getMonsterAffixes(state.wave);
-    const monsterHpPct = Math.max(0, Math.min(100, (state.monsterHp / Math.max(1, state.monsterMaxHp)) * 100));
-    const teamHpPct = Math.max(0, Math.min(100, (state.teamHp / Math.max(1, state.teamMaxHp)) * 100));
-    const threatDps = Math.ceil(getMonsterDamage(state.wave));
 
     const confirmUseAll = (item: any, count: number) => {
       if (count <= 0) return;
@@ -111,103 +94,6 @@ export const BattleTabContent = React.memo<BattleTabContentProps>(
               </Pressable>
             )}
             <Text style={styles.sectionTitle}>⚔️ Battle Overview</Text>
-
-            <View style={styles.frontlineCard}>
-              <View style={styles.frontlineHeader}>
-                <View>
-                  <Text style={styles.frontlineEyebrow}>Frontline Command</Text>
-                  <Text style={styles.frontlineTitle}>
-                    {currentAct.emoji} {currentAct.name} • Wave {state.wave}
-                  </Text>
-                </View>
-                <View style={[styles.frontlineThreatBadge, isBoss && styles.frontlineThreatBadgeBoss]}>
-                  <Text style={styles.frontlineThreatBadgeText}>{isBoss ? 'BOSS ENGAGED' : 'SKIRMISH'}</Text>
-                </View>
-              </View>
-
-              <View style={styles.frontlineMonsterRow}>
-                <Text style={styles.frontlineMonsterEmoji}>{monster.emoji}</Text>
-                <View style={styles.frontlineMonsterMeta}>
-                  <Text style={styles.frontlineMonsterName}>{monster.name}</Text>
-                  <Text style={styles.frontlineMonsterSub}>
-                    Enemy Pressure {fmt(threatDps)} DPS •{' '}
-                    {isBoss ? 'Boss rewards boosted' : 'Advance to next boss at W'}
-                    {Math.ceil(state.wave / 10) * 10}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.frontlineMeterBlock}>
-                <View style={styles.frontlineMeterLabelRow}>
-                  <Text style={styles.frontlineMeterLabel}>Monster Integrity</Text>
-                  <Text style={styles.frontlineMeterValue}>
-                    {Math.ceil(state.monsterHp)}/{Math.ceil(state.monsterMaxHp)}
-                  </Text>
-                </View>
-                <View style={styles.hpBarBg}>
-                  <View
-                    style={[
-                      styles.hpBarFill,
-                      {
-                        width: `${monsterHpPct}%`,
-                        backgroundColor: monsterHpPct > 50 ? '#66D17A' : monsterHpPct > 20 ? '#F5C062' : '#FF7C7C',
-                      },
-                    ]}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.frontlineMeterBlock}>
-                <View style={styles.frontlineMeterLabelRow}>
-                  <Text style={styles.frontlineMeterLabel}>Team Stability</Text>
-                  <Text style={styles.frontlineMeterValue}>
-                    {Math.ceil(state.teamHp)}/{Math.ceil(state.teamMaxHp)}
-                  </Text>
-                </View>
-                <View style={styles.hpBarBg}>
-                  <View
-                    style={[
-                      styles.hpBarFill,
-                      {
-                        width: `${teamHpPct}%`,
-                        backgroundColor: teamHpPct > 50 ? '#58CDA1' : teamHpPct > 20 ? '#E5B560' : '#FF7C7C',
-                      },
-                    ]}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.frontlineIntelRow}>
-                <View style={styles.frontlineIntelChip}>
-                  <Text style={styles.frontlineIntelChipLabel}>Reward</Text>
-                  <Text style={styles.frontlineIntelChipValue}>💰 {fmt(getMonsterGold(state.wave))}</Text>
-                </View>
-                <View style={styles.frontlineIntelChip}>
-                  <Text style={styles.frontlineIntelChipLabel}>Reward</Text>
-                  <Text style={styles.frontlineIntelChipValue}>⭐ {fmt(getMonsterExp(state.wave))} EXP</Text>
-                </View>
-                <View style={styles.frontlineIntelChip}>
-                  <Text style={styles.frontlineIntelChipLabel}>Burst Gauge</Text>
-                  <Text style={styles.frontlineIntelChipValue}>
-                    {state.burstCharge}/{burstCost}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.frontlineAffixRow}>
-                {monsterAffixes.slice(0, 4).map(affix => (
-                  <View key={affix.id} style={[styles.frontlineAffixChip, { borderColor: affix.color }]}>
-                    <Text style={[styles.frontlineAffixChipText, { color: affix.color }]}>{affix.name}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {stats.synergies.length > 0 && (
-                <Text style={styles.frontlineSynergyText}>
-                  Active Synergies: {stats.synergies.map(s => s.name).join(' • ')}
-                </Text>
-              )}
-            </View>
 
             <View style={styles.battleTempoCard}>
               <View style={styles.battleTempoHeader}>
