@@ -3,7 +3,6 @@ import {
   SKILLS,
   ACHIEVEMENTS,
   REBIRTH_BONUS,
-  getRebirthWaveRequirement,
   PlayerClass,
   StatKey,
   StatBlock,
@@ -50,26 +49,19 @@ import {
   rollEquipmentRarityByTier,
   rollRarity,
   rarityConfig,
-  getHighestAvailableSummonRarity,
   getSummonRarityPool,
-  getRankUpShardCost,
   getRankStatMultiplier,
   calculateShardReward,
-  getHeroRebirthPlan,
   getHeroBackstory,
   getHeroUniqueCombatModifiers,
   getHeroUniqueSkillDescription,
   getHeroUniqueWeaponName,
   getHeroUniqueSkillParams,
   unlockLabel,
-  pickHeroForRarity,
   SPARK_TOKEN_BY_RARITY,
   SOFT_PITY_START,
   SOFT_PITY_BOOST_PER_PULL,
   getHeroStatProfile,
-  DIAMOND_SUMMON_COST,
-  VIP_SUMMON_DISCOUNT_LEVEL,
-  VIP_SUMMON_DISCOUNT,
 } from './gameConfig';
 import { safeDivide, roundTo4, safeMultiplier, fmt } from './utils';
 import { debugLog, trackEvent, trackGameplayAction } from './telemetry';
@@ -86,7 +78,6 @@ import { economyReducer, ECONOMY_ACTION_TYPES } from './reducers/economyReducer'
 import type { EconomyAction } from './reducers/economyReducer';
 import { settingsReducer, SETTINGS_ACTION_TYPES } from './reducers/settingsReducer';
 import type { SettingsAction } from './reducers/settingsReducer';
-import { getFirebaseAuth } from './services/firebase';
 
 const TICK_MS = 100;
 const SAVE_INTERVAL_MS = 5000;
@@ -126,15 +117,6 @@ const GEAR_INVENTORY_CAP = 250;
 const GEAR_INVENTORY_CAP_VIP5 = 500;
 const GEAR_CAP_VIP_THRESHOLD = 5;
 const BURST_STRIKE_DPS_MULT = 1.8;
-const PREMIUM_COOLANT_COSTS = {
-  coolant_mk1: 8,
-  coolant_mk2: 18,
-} as const;
-const GOLD_SHOP_COSTS: Record<GoldShopOfferId, number> = {
-  exp_cache: 2200,
-  potion_bundle: 3600,
-  armory_crate: 9500,
-};
 const DIAMOND_SHOP_COSTS: Record<DiamondShopOfferId, number> = {
   coolant_i_pack: 18,
   coolant_ii_pack: 42,
@@ -148,18 +130,6 @@ const DOLLAR_SHOP_PACKS: Record<DollarShopOfferId, { usdCents: number; diamonds:
   usd_9999: { usdCents: 9999, diamonds: 13000 },
 };
 export const ENABLE_SIMULATED_DOLLAR_PURCHASES = false;
-const VIP_MILESTONE_REWARDS: Record<number, { diamonds: number; gold: number; shards: number; essence: number }> = {
-  1: { diamonds: 50, gold: 1200, shards: 50, essence: 0 },
-  2: { diamonds: 100, gold: 2800, shards: 90, essence: 1 },
-  3: { diamonds: 180, gold: 5200, shards: 140, essence: 1 },
-  4: { diamonds: 300, gold: 9200, shards: 220, essence: 2 },
-  5: { diamonds: 500, gold: 16000, shards: 340, essence: 3 },
-  6: { diamonds: 800, gold: 30000, shards: 500, essence: 4 },
-  7: { diamonds: 1250, gold: 52000, shards: 760, essence: 6 },
-  8: { diamonds: 2000, gold: 90000, shards: 1100, essence: 9 },
-  9: { diamonds: 3200, gold: 145000, shards: 1550, essence: 13 },
-  10: { diamonds: 5000, gold: 220000, shards: 2200, essence: 20 },
-};
 const VIP_LEVEL_THRESHOLDS = [0, 50, 150, 350, 700, 1500, 3000, 6500, 15000, 35000, 100000] as const;
 const VIP_DAMAGE_PER_LEVEL = 0.03;
 const VIP_GOLD_PER_LEVEL = 0.025;
@@ -316,13 +286,6 @@ export const EXPEDITION_CONTRACT_REFRESH_MS = 8 * 60 * 60 * 1000;
 export const EXPEDITION_CONTRACT_REFRESH_GOLD_COST = 100_000;
 export const MINI_OPS_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 
-/** Returns true if the cooldown has NOT elapsed. Handles future timestamps (clock skew) by treating them as "just now". */
-function isMiniOpOnCooldown(lastUsedMs: number | null, nowMs: number): boolean {
-  if (lastUsedMs == null) return false;
-  // Clamp: if lastUsedMs is in the future (clock skew), treat as just now → on cooldown
-  const clamped = Math.min(lastUsedMs, nowMs);
-  return nowMs - clamped < MINI_OPS_COOLDOWN_MS;
-}
 const EXPEDITION_TYPES: ExpeditionType[] = ['artifact', 'merchant', 'ruins', 'vault', 'abyss'];
 const EXPEDITION_RARITIES: ExpeditionRarity[] = ['common', 'rare', 'epic', 'legendary', 'godly'];
 
@@ -4715,7 +4678,7 @@ export interface SaveData {
   } | null;
 
   guildhallFacilities?: Record<'training' | 'treasury' | 'forge' | 'tactics', { level: number }>;
-  expeditionQueue?: Array<any>;
+  expeditionQueue?: GameState['expeditionQueue'];
   lastExpeditionDay?: Record<ExpeditionType, number | null>;
   expeditionContractOffers?: Record<ExpeditionType, ExpeditionRarity>;
   expeditionContractsRefreshedAt?: number;
@@ -5186,7 +5149,7 @@ export function useGameState(saveSlot: string = 'default') {
     if (state.lastDailyLoginDay !== today) {
       dispatch({ type: 'APPLY_DAILY_LOGIN', nowMs: Date.now() });
     }
-  }, [state.characterCreated, state.lastDailyLoginDay]);
+  }, [dispatch, state.characterCreated, state.lastDailyLoginDay]);
 
   useEffect(() => {
     if (!state.characterCreated) return;
@@ -5194,7 +5157,7 @@ export function useGameState(saveSlot: string = 'default') {
     if (state.weeklyEventWeek !== week) {
       dispatch({ type: 'APPLY_WEEKLY_ROLLOVER', nowMs: Date.now() });
     }
-  }, [state.characterCreated, state.weeklyEventWeek]);
+  }, [dispatch, state.characterCreated, state.weeklyEventWeek]);
 
   useEffect(() => {
     if (!hydrated || !state.characterCreated) return;
@@ -5301,184 +5264,271 @@ export function useGameState(saveSlot: string = 'default') {
     }
   }, [state.totalSummons, state.highestWaveReached, state.prestigeCount, state.wave]);
 
-  const createCharacter = useCallback((name: string, playerClass: PlayerClass) => {
-    dispatch({ type: 'CREATE_CHARACTER', name, playerClass });
-  }, []);
+  const createCharacter = useCallback(
+    (name: string, playerClass: PlayerClass) => {
+      dispatch({ type: 'CREATE_CHARACTER', name, playerClass });
+    },
+    [dispatch],
+  );
 
-  const buySkill = useCallback((id: string) => dispatch({ type: 'BUY_SKILL', id }), []);
-  const allocateStat = useCallback((stat: StatKey) => dispatch({ type: 'ALLOCATE_STAT', stat }), []);
-  const allocateStatMax = useCallback((stat: StatKey) => dispatch({ type: 'ALLOCATE_STAT_MAX', stat }), []);
+  const buySkill = useCallback((id: string) => dispatch({ type: 'BUY_SKILL', id }), [dispatch]);
+  const allocateStat = useCallback((stat: StatKey) => dispatch({ type: 'ALLOCATE_STAT', stat }), [dispatch]);
+  const allocateStatMax = useCallback((stat: StatKey) => dispatch({ type: 'ALLOCATE_STAT_MAX', stat }), [dispatch]);
   const allocateStatN = useCallback(
     (stat: StatKey, amount: number) => dispatch({ type: 'ALLOCATE_STAT_N', stat, amount }),
-    [],
+    [dispatch],
   );
-  const burst = useCallback((hits: number) => dispatch({ type: 'BURST', hits }), []);
-  const equipItem = useCallback((itemId: string) => dispatch({ type: 'EQUIP_ITEM', itemId }), []);
-  const summonHero = useCallback((payWithDiamonds?: boolean) => dispatch({ type: 'SUMMON_HERO', payWithDiamonds }), []);
+  const burst = useCallback((hits: number) => dispatch({ type: 'BURST', hits }), [dispatch]);
+  const equipItem = useCallback((itemId: string) => dispatch({ type: 'EQUIP_ITEM', itemId }), [dispatch]);
+  const summonHero = useCallback(
+    (payWithDiamonds?: boolean) => dispatch({ type: 'SUMMON_HERO', payWithDiamonds }),
+    [dispatch],
+  );
   const summonHeroX10Cinematic = useCallback(
     (featuredHeroId?: string, payWithDiamonds?: boolean) =>
       dispatch({ type: 'SUMMON_HERO_X10_CINEMATIC', featuredHeroId, payWithDiamonds }),
-    [],
+    [dispatch],
   );
   const sparkExchange = useCallback(
     (optionId: string, targetHeroId?: string) => dispatch({ type: 'SPARK_EXCHANGE', optionId, targetHeroId }),
-    [],
+    [dispatch],
   );
-  const autoEquipBestHeroes = useCallback(() => dispatch({ type: 'AUTO_EQUIP_BEST_HEROES' }), []);
-  const saveTeamLoadout = useCallback((slot: number) => dispatch({ type: 'SAVE_TEAM_LOADOUT', slot }), []);
-  const loadTeamLoadout = useCallback((slot: number) => dispatch({ type: 'LOAD_TEAM_LOADOUT', slot }), []);
-  const unlockTeamSlot = useCallback(() => dispatch({ type: 'UNLOCK_TEAM_SLOT' }), []);
-  const toggleEquipHero = useCallback((uid: string) => dispatch({ type: 'TOGGLE_EQUIP_HERO', uid }), []);
-  const setActiveTeam = useCallback((heroIds: string[]) => dispatch({ type: 'SET_ACTIVE_TEAM', heroIds }), []);
-  const setHeroFormation = useCallback((uid: string, role: HeroFormationRole) => {
-    dispatch({ type: 'SET_HERO_FORMATION', uid, role });
-  }, []);
-  const playDiceRoll = useCallback((forcedRoll?: number) => dispatch({ type: 'PLAY_DICE_ROLL', forcedRoll }), []);
-  const playReconSweep = useCallback((forcedOutcome?: 'intel_gold' | 'intel_shards' | 'intel_buff' | 'ambush') => {
-    dispatch({ type: 'PLAY_RECON_SWEEP', forcedOutcome });
-  }, []);
-  const playLockpickCache = useCallback((forcedSuccess?: boolean) => {
-    dispatch({ type: 'PLAY_LOCKPICK_CACHE', forcedSuccess });
-  }, []);
-  const playTargetPractice = useCallback((forcedScore?: number) => {
-    dispatch({ type: 'PLAY_TARGET_PRACTICE', forcedScore });
-  }, []);
-  const startMiniBountyDraft = useCallback((draftType: MiniBountyDraftType) => {
-    dispatch({ type: 'START_MINI_BOUNTY_DRAFT', draftType });
-  }, []);
+  const autoEquipBestHeroes = useCallback(() => dispatch({ type: 'AUTO_EQUIP_BEST_HEROES' }), [dispatch]);
+  const saveTeamLoadout = useCallback((slot: number) => dispatch({ type: 'SAVE_TEAM_LOADOUT', slot }), [dispatch]);
+  const loadTeamLoadout = useCallback((slot: number) => dispatch({ type: 'LOAD_TEAM_LOADOUT', slot }), [dispatch]);
+  const unlockTeamSlot = useCallback(() => dispatch({ type: 'UNLOCK_TEAM_SLOT' }), [dispatch]);
+  const toggleEquipHero = useCallback((uid: string) => dispatch({ type: 'TOGGLE_EQUIP_HERO', uid }), [dispatch]);
+  const setActiveTeam = useCallback((heroIds: string[]) => dispatch({ type: 'SET_ACTIVE_TEAM', heroIds }), [dispatch]);
+  const setHeroFormation = useCallback(
+    (uid: string, role: HeroFormationRole) => {
+      dispatch({ type: 'SET_HERO_FORMATION', uid, role });
+    },
+    [dispatch],
+  );
+  const playDiceRoll = useCallback(
+    (forcedRoll?: number) => dispatch({ type: 'PLAY_DICE_ROLL', forcedRoll }),
+    [dispatch],
+  );
+  const playReconSweep = useCallback(
+    (forcedOutcome?: 'intel_gold' | 'intel_shards' | 'intel_buff' | 'ambush') => {
+      dispatch({ type: 'PLAY_RECON_SWEEP', forcedOutcome });
+    },
+    [dispatch],
+  );
+  const playLockpickCache = useCallback(
+    (forcedSuccess?: boolean) => {
+      dispatch({ type: 'PLAY_LOCKPICK_CACHE', forcedSuccess });
+    },
+    [dispatch],
+  );
+  const playTargetPractice = useCallback(
+    (forcedScore?: number) => {
+      dispatch({ type: 'PLAY_TARGET_PRACTICE', forcedScore });
+    },
+    [dispatch],
+  );
+  const startMiniBountyDraft = useCallback(
+    (draftType: MiniBountyDraftType) => {
+      dispatch({ type: 'START_MINI_BOUNTY_DRAFT', draftType });
+    },
+    [dispatch],
+  );
   const claimMiniBountyDraft = useCallback(() => {
     dispatch({ type: 'CLAIM_MINI_BOUNTY_DRAFT' });
-  }, []);
-  const runRiftDungeon = useCallback((useRaidTicket = false) => {
-    dispatch({ type: 'RUN_RIFT_DUNGEON', useRaidTicket });
-  }, []);
-  const runTreasuryRaid = useCallback((useRaidTicket = false) => {
-    dispatch({ type: 'RUN_TREASURY_RAID', useRaidTicket });
-  }, []);
-  const recycleHero = useCallback((uid: string) => dispatch({ type: 'RECYCLE_HERO', uid }), []);
-  const autoRecycleHeroes = useCallback(() => dispatch({ type: 'AUTO_RECYCLE_HEROES' }), []);
-  const setAutoRecycleMaxRarity = useCallback((rarity: Rarity) => {
-    dispatch({ type: 'SET_AUTO_RECYCLE_MAX_RARITY', rarity });
-  }, []);
-  const setAutoRecycleEnabled = useCallback((enabled: boolean) => {
-    dispatch({ type: 'SET_AUTO_RECYCLE_ENABLED', enabled });
-  }, []);
-  const toggleHeroUniqueWeapon = useCallback((heroUid: string) => {
-    dispatch({ type: 'TOGGLE_HERO_UNIQUE_WEAPON', heroUid });
-  }, []);
-  const rankUpHero = useCallback((uid: string) => dispatch({ type: 'RANK_UP_HERO', uid }), []);
-  const rankUpHeroToMax = useCallback((uid: string) => dispatch({ type: 'RANK_UP_HERO_TO_MAX', uid }), []);
+  }, [dispatch]);
+  const runRiftDungeon = useCallback(
+    (useRaidTicket = false) => {
+      dispatch({ type: 'RUN_RIFT_DUNGEON', useRaidTicket });
+    },
+    [dispatch],
+  );
+  const runTreasuryRaid = useCallback(
+    (useRaidTicket = false) => {
+      dispatch({ type: 'RUN_TREASURY_RAID', useRaidTicket });
+    },
+    [dispatch],
+  );
+  const recycleHero = useCallback((uid: string) => dispatch({ type: 'RECYCLE_HERO', uid }), [dispatch]);
+  const autoRecycleHeroes = useCallback(() => dispatch({ type: 'AUTO_RECYCLE_HEROES' }), [dispatch]);
+  const setAutoRecycleMaxRarity = useCallback(
+    (rarity: Rarity) => {
+      dispatch({ type: 'SET_AUTO_RECYCLE_MAX_RARITY', rarity });
+    },
+    [dispatch],
+  );
+  const setAutoRecycleEnabled = useCallback(
+    (enabled: boolean) => {
+      dispatch({ type: 'SET_AUTO_RECYCLE_ENABLED', enabled });
+    },
+    [dispatch],
+  );
+  const toggleHeroUniqueWeapon = useCallback(
+    (heroUid: string) => {
+      dispatch({ type: 'TOGGLE_HERO_UNIQUE_WEAPON', heroUid });
+    },
+    [dispatch],
+  );
+  const rankUpHero = useCallback((uid: string) => dispatch({ type: 'RANK_UP_HERO', uid }), [dispatch]);
+  const rankUpHeroToMax = useCallback((uid: string) => dispatch({ type: 'RANK_UP_HERO_TO_MAX', uid }), [dispatch]);
   const rankUpHeroToMaxAndRebirth = useCallback(
     (uid: string) => dispatch({ type: 'RANK_UP_HERO_TO_MAX_AND_REBIRTH', uid }),
-    [],
+    [dispatch],
   );
-  const levelUpHeroGold = useCallback((uid: string) => dispatch({ type: 'LEVEL_UP_HERO_GOLD', uid }), []);
+  const levelUpHeroGold = useCallback((uid: string) => dispatch({ type: 'LEVEL_UP_HERO_GOLD', uid }), [dispatch]);
   const convertScrapToEssence = useCallback(
     (count?: number) => dispatch({ type: 'CONVERT_SCRAP_TO_ESSENCE', count }),
-    [],
+    [dispatch],
   );
   const convertScrapToShards = useCallback(
     (count?: number) => dispatch({ type: 'CONVERT_SCRAP_TO_SHARDS', count }),
-    [],
+    [dispatch],
   );
-  const spendRebirthCore = useCallback((path: 'damage' | 'economy' | 'survival') => {
-    dispatch({ type: 'SPEND_REBIRTH_CORE', path });
-  }, []);
+  const spendRebirthCore = useCallback(
+    (path: 'damage' | 'economy' | 'survival') => {
+      dispatch({ type: 'SPEND_REBIRTH_CORE', path });
+    },
+    [dispatch],
+  );
   const applyUsableItem = useCallback(
     (itemId: string, amount: number | 'all' = 1) => dispatch({ type: 'USE_USABLE_ITEM', itemId, amount }),
-    [],
+    [dispatch],
   );
-  const dismantleEquipment = useCallback((itemId: string) => dispatch({ type: 'DISMANTLE_EQUIPMENT', itemId }), []);
-  const craftEquipment = useCallback((slot: EquipmentSlot) => dispatch({ type: 'CRAFT_EQUIPMENT', slot }), []);
+  const dismantleEquipment = useCallback(
+    (itemId: string) => dispatch({ type: 'DISMANTLE_EQUIPMENT', itemId }),
+    [dispatch],
+  );
+  const craftEquipment = useCallback((slot: EquipmentSlot) => dispatch({ type: 'CRAFT_EQUIPMENT', slot }), [dispatch]);
   const upgradeEquipmentRarity = useCallback(
     (itemId: string) => dispatch({ type: 'UPGRADE_EQUIPMENT_RARITY', itemId }),
-    [],
+    [dispatch],
   );
-  const setAutoUsePotion = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_USE_POTION', enabled }), []);
-  const setAutoUseCoolant = useCallback((enabled: boolean) => dispatch({ type: 'SET_AUTO_USE_COOLANT', enabled }), []);
+  const setAutoUsePotion = useCallback(
+    (enabled: boolean) => dispatch({ type: 'SET_AUTO_USE_POTION', enabled }),
+    [dispatch],
+  );
+  const setAutoUseCoolant = useCallback(
+    (enabled: boolean) => dispatch({ type: 'SET_AUTO_USE_COOLANT', enabled }),
+    [dispatch],
+  );
   const setAutoUsePotionThreshold = useCallback(
     (thresholdPct: number) => dispatch({ type: 'SET_AUTO_USE_POTION_THRESHOLD', thresholdPct }),
-    [],
+    [dispatch],
   );
   const setAutoSummonEnabled = useCallback(
     (enabled: boolean) => dispatch({ type: 'SET_AUTO_SUMMON_ENABLED', enabled }),
-    [],
+    [dispatch],
   );
   const setAutoSummonMode = useCallback(
     (mode: 'single' | 'x10') => dispatch({ type: 'SET_AUTO_SUMMON_MODE', mode }),
-    [],
+    [dispatch],
   );
   const setAutoBurstEnabled = useCallback(
     (enabled: boolean) => dispatch({ type: 'SET_AUTO_BURST_ENABLED', enabled }),
-    [],
+    [dispatch],
   );
-  const setCombatTempo = useCallback((tempo: CombatTempo) => dispatch({ type: 'SET_COMBAT_TEMPO', tempo }), []);
-  const rebirthHero = useCallback((uid: string) => dispatch({ type: 'REBIRTH_HERO', uid }), []);
+  const setCombatTempo = useCallback((tempo: CombatTempo) => dispatch({ type: 'SET_COMBAT_TEMPO', tempo }), [dispatch]);
+  const rebirthHero = useCallback((uid: string) => dispatch({ type: 'REBIRTH_HERO', uid }), [dispatch]);
   const setAutoTempoEnabled = useCallback(
     (enabled: boolean) => dispatch({ type: 'SET_AUTO_TEMPO_ENABLED', enabled }),
-    [],
+    [dispatch],
   );
   const setAutoTempoTarget = useCallback(
     (target: AutoTempoTarget) => dispatch({ type: 'SET_AUTO_TEMPO_TARGET', target }),
-    [],
+    [dispatch],
   );
-  const setAutoSummonReserveGold = useCallback((reserveGold: number) => {
-    dispatch({ type: 'SET_AUTO_SUMMON_RESERVE_GOLD', reserveGold });
-  }, []);
+  const setAutoSummonReserveGold = useCallback(
+    (reserveGold: number) => {
+      dispatch({ type: 'SET_AUTO_SUMMON_RESERVE_GOLD', reserveGold });
+    },
+    [dispatch],
+  );
   const buyGoldShopItem = useCallback(
     (offerId: GoldShopOfferId) => dispatch({ type: 'BUY_GOLD_SHOP_ITEM', offerId }),
-    [],
+    [dispatch],
   );
   const buyDiamondShopItem = useCallback(
     (offerId: DiamondShopOfferId) => dispatch({ type: 'BUY_DIAMOND_SHOP_ITEM', offerId }),
-    [],
+    [dispatch],
   );
   const simulateDollarPurchase = useCallback(
     (offerId: DollarShopOfferId) => dispatch({ type: 'SIMULATE_DOLLAR_PURCHASE', offerId }),
-    [],
+    [dispatch],
   );
-  const claimVipReward = useCallback((level: number) => dispatch({ type: 'CLAIM_VIP_REWARD', level }), []);
-  const buyPremiumCoolant = useCallback((itemId: 'coolant_mk1' | 'coolant_mk2', amount: number = 1) => {
-    dispatch({ type: 'BUY_PREMIUM_COOLANT', itemId, amount });
-  }, []);
-  const autoDismantleEquipment = useCallback(() => dispatch({ type: 'AUTO_DISMANTLE_EQUIPMENT' }), []);
-  const setAutoDismantleRarityFloor = useCallback((rarity: EquipmentRarity) => {
-    dispatch({ type: 'SET_AUTO_DISMANTLE_RARITY_FLOOR', rarity });
-  }, []);
-  const setAutoDismantleEnabled = useCallback((enabled: boolean) => {
-    dispatch({ type: 'SET_AUTO_DISMANTLE_ENABLED', enabled });
-  }, []);
-  const gearInventoryCap = useMemo(() => getGearInventoryCap(state), [state.vipLevel]);
-  const spendEssenceUpgrade = useCallback((path: 'damage' | 'economy' | 'survival') => {
-    dispatch({ type: 'SPEND_ESSENCE_UPGRADE', path });
-  }, []);
-  const claimWeeklyTrack = useCallback((milestone: number) => {
-    dispatch({ type: 'CLAIM_WEEKLY_TRACK', milestone });
-  }, []);
-  const claimMission = useCallback((missionId: string) => {
-    dispatch({ type: 'CLAIM_MISSION', missionId });
-  }, []);
-  const claimCodexHeroVip = useCallback((heroId: string) => {
-    dispatch({ type: 'CLAIM_CODEX_HERO_VIP', heroId });
-  }, []);
-  const claimCodexUniqueVip = useCallback((heroId: string) => {
-    dispatch({ type: 'CLAIM_CODEX_UNIQUE_VIP', heroId });
-  }, []);
-  const markHintSeen = useCallback((hintId: string) => {
-    dispatch({ type: 'MARK_HINT_SEEN', hintId });
-  }, []);
-  const appendMailboxMessages = useCallback((mails: MailMessage[]) => {
-    dispatch({ type: 'APPEND_MAIL_MESSAGES', mails });
-  }, []);
-  const claimMailAttachment = useCallback((mailId: string, attachment: MailAttachmentKey) => {
-    dispatch({ type: 'CLAIM_MAIL_ATTACHMENT', mailId, attachment });
-  }, []);
+  const claimVipReward = useCallback((level: number) => dispatch({ type: 'CLAIM_VIP_REWARD', level }), [dispatch]);
+  const buyPremiumCoolant = useCallback(
+    (itemId: 'coolant_mk1' | 'coolant_mk2', amount: number = 1) => {
+      dispatch({ type: 'BUY_PREMIUM_COOLANT', itemId, amount });
+    },
+    [dispatch],
+  );
+  const autoDismantleEquipment = useCallback(() => dispatch({ type: 'AUTO_DISMANTLE_EQUIPMENT' }), [dispatch]);
+  const setAutoDismantleRarityFloor = useCallback(
+    (rarity: EquipmentRarity) => {
+      dispatch({ type: 'SET_AUTO_DISMANTLE_RARITY_FLOOR', rarity });
+    },
+    [dispatch],
+  );
+  const setAutoDismantleEnabled = useCallback(
+    (enabled: boolean) => {
+      dispatch({ type: 'SET_AUTO_DISMANTLE_ENABLED', enabled });
+    },
+    [dispatch],
+  );
+  const gearInventoryCap = useMemo(() => getGearInventoryCap(state), [state]);
+  const spendEssenceUpgrade = useCallback(
+    (path: 'damage' | 'economy' | 'survival') => {
+      dispatch({ type: 'SPEND_ESSENCE_UPGRADE', path });
+    },
+    [dispatch],
+  );
+  const claimWeeklyTrack = useCallback(
+    (milestone: number) => {
+      dispatch({ type: 'CLAIM_WEEKLY_TRACK', milestone });
+    },
+    [dispatch],
+  );
+  const claimMission = useCallback(
+    (missionId: string) => {
+      dispatch({ type: 'CLAIM_MISSION', missionId });
+    },
+    [dispatch],
+  );
+  const claimCodexHeroVip = useCallback(
+    (heroId: string) => {
+      dispatch({ type: 'CLAIM_CODEX_HERO_VIP', heroId });
+    },
+    [dispatch],
+  );
+  const claimCodexUniqueVip = useCallback(
+    (heroId: string) => {
+      dispatch({ type: 'CLAIM_CODEX_UNIQUE_VIP', heroId });
+    },
+    [dispatch],
+  );
+  const markHintSeen = useCallback(
+    (hintId: string) => {
+      dispatch({ type: 'MARK_HINT_SEEN', hintId });
+    },
+    [dispatch],
+  );
+  const appendMailboxMessages = useCallback(
+    (mails: MailMessage[]) => {
+      dispatch({ type: 'APPEND_MAIL_MESSAGES', mails });
+    },
+    [dispatch],
+  );
+  const claimMailAttachment = useCallback(
+    (mailId: string, attachment: MailAttachmentKey) => {
+      dispatch({ type: 'CLAIM_MAIL_ATTACHMENT', mailId, attachment });
+    },
+    [dispatch],
+  );
   const claimAllMailAttachments = useCallback(() => {
     dispatch({ type: 'CLAIM_ALL_MAIL_ATTACHMENTS' });
-  }, []);
-  const rebirth = useCallback(() => dispatch({ type: 'REBIRTH' }), []);
-  const clearAchievement = useCallback(() => dispatch({ type: 'CLEAR_ACHIEVEMENT' }), []);
-  const clearRewardPopup = useCallback(() => dispatch({ type: 'CLEAR_REWARD_POPUP' }), []);
+  }, [dispatch]);
+  const rebirth = useCallback(() => dispatch({ type: 'REBIRTH' }), [dispatch]);
+  const clearAchievement = useCallback(() => dispatch({ type: 'CLEAR_ACHIEVEMENT' }), [dispatch]);
+  const clearRewardPopup = useCallback(() => dispatch({ type: 'CLEAR_REWARD_POPUP' }), [dispatch]);
 
   const getEssenceCost = useCallback(
     (path: 'damage' | 'economy' | 'survival') => {
@@ -5551,13 +5601,19 @@ export function useGameState(saveSlot: string = 'default') {
     [state],
   );
 
-  const batchLevelHeroes = useCallback((heroIds: string[], addLevels: number | 'max') => {
-    dispatch({ type: 'BATCH_LEVEL_HEROES', heroIds, addLevels });
-  }, []);
+  const batchLevelHeroes = useCallback(
+    (heroIds: string[], addLevels: number | 'max') => {
+      dispatch({ type: 'BATCH_LEVEL_HEROES', heroIds, addLevels });
+    },
+    [dispatch],
+  );
 
-  const upgradeFacility = useCallback((facilityId: 'training' | 'treasury' | 'forge' | 'tactics') => {
-    dispatch({ type: 'UPGRADE_FACILITY', facilityId });
-  }, []);
+  const upgradeFacility = useCallback(
+    (facilityId: 'training' | 'treasury' | 'forge' | 'tactics') => {
+      dispatch({ type: 'UPGRADE_FACILITY', facilityId });
+    },
+    [dispatch],
+  );
 
   const startExpedition = useCallback(
     (
@@ -5566,20 +5622,26 @@ export function useGameState(saveSlot: string = 'default') {
     ) => {
       dispatch({ type: 'START_EXPEDITION', expeditionType, offeredRarity });
     },
-    [],
+    [dispatch],
   );
 
   const refreshExpeditionContracts = useCallback(() => {
     dispatch({ type: 'REFRESH_EXPEDITION_CONTRACTS' });
-  }, []);
+  }, [dispatch]);
 
-  const completeExpedition = useCallback((expeditionId: string) => {
-    dispatch({ type: 'COMPLETE_EXPEDITION', expeditionId });
-  }, []);
+  const completeExpedition = useCallback(
+    (expeditionId: string) => {
+      dispatch({ type: 'COMPLETE_EXPEDITION', expeditionId });
+    },
+    [dispatch],
+  );
 
-  const applyOfflineProgress = useCallback((elapsedMs: number) => {
-    dispatch({ type: 'APPLY_OFFLINE_PROGRESS', elapsedMs });
-  }, []);
+  const applyOfflineProgress = useCallback(
+    (elapsedMs: number) => {
+      dispatch({ type: 'APPLY_OFFLINE_PROGRESS', elapsedMs });
+    },
+    [dispatch],
+  );
 
   const setLastActiveAt = useCallback(
     (timestampMs: number, persistNow = false) => {
@@ -5593,7 +5655,7 @@ export function useGameState(saveSlot: string = 'default') {
       });
       void persistSnapshot(true, snapshot);
     },
-    [persistSnapshot],
+    [dispatch, persistSnapshot],
   );
 
   const stats = computeStats(state);

@@ -63,7 +63,6 @@ import {
   calculateShardReward,
   getRankUpShardCost,
   getUsableItem,
-  Rarity,
   expForLevel,
   BREAKPOINTS,
   DIAMOND_SUMMON_COST,
@@ -78,16 +77,6 @@ import BottomNavigation, { BottomTabType } from '../components/BottomNavigation'
 import GameHeader from '../components/GameHeader';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ProgressBar } from '../components/ProgressBar';
-import type {
-  BattleTabContentProps,
-  WarroomTabContentProps,
-  HeroesTabContentProps,
-  StatsTabContentProps,
-  EquipmentTabContentProps,
-  AchievementsTabContentProps,
-  OperationsTabContentProps,
-  SocialTabContentProps,
-} from './tabs';
 import { EXPEDITION_RARITY_META, EXPEDITION_TYPES } from './gameScreenShared';
 import type { Tab } from './gameScreenShared';
 
@@ -135,7 +124,6 @@ import {
   reserveCharacterName,
 } from '../services/characterNameRegistry';
 import { deleteOnlineSave, loadOnlineSave } from '../services/onlineSave';
-import { getFirebaseAuth } from '../services/firebase';
 import { t } from '../i18n';
 
 /** Smoothly animated progress bar for save-slot hydration, driven by real load progress. */
@@ -466,15 +454,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     publicUsername,
     appendMailboxMessages,
   });
-  const {
-    isAdmin,
-    adminCheckPending,
-    devCommandInput,
-    setDevCommandInput,
-    devCommandOutput,
-    collectCharacterSnapshots,
-    runDevCommand,
-  } = useDevConsole({ accountName, publicUsername, selectedCharacterClass, state, appendMailboxMessages });
+  const { isAdmin, devCommandInput, setDevCommandInput, devCommandOutput, collectCharacterSnapshots, runDevCommand } =
+    useDevConsole({ accountName, publicUsername, selectedCharacterClass, state, appendMailboxMessages });
   const [compareItemId, setCompareItemId] = useState<string | null>(null);
   const [hoveredTopChipId, setHoveredTopChipId] = useState<'dps' | 'power' | 'gear' | null>(null);
   const [activeAffixTooltipId, setActiveAffixTooltipId] = useState<string | null>(null);
@@ -509,7 +490,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     shards: number;
     essence: number;
   } | null>(null);
-  const [riftIsSimulating, setRiftIsSimulating] = useState(false);
+  const [riftIsSimulating] = useState(false);
 
   const [reconChoices, setReconChoices] = useState<ReconSweepOutcome[]>([]);
   const [reconPickedIndex, setReconPickedIndex] = useState<number | null>(null);
@@ -541,35 +522,35 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const [riftCurrentBonuses, setRiftCurrentBonuses] = useState<RiftBuffChoice[]>([]);
   const [riftWavePredictions, setRiftWavePredictions] = useState<number[]>([]);
 
+  const handleAppStateChange = useCallback(
+    (nextState: typeof AppState.currentState) => {
+      if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
+        if (backgroundTimeRef.current && hydrated && state.characterCreated) {
+          const elapsed = Date.now() - backgroundTimeRef.current;
+          if (elapsed > 5000) {
+            applyOfflineProgress(elapsed);
+          }
+        }
+        backgroundTimeRef.current = null;
+      } else if (nextState.match(/inactive|background/)) {
+        if (!backgroundTimeRef.current) {
+          backgroundTimeRef.current = Date.now();
+          if (hydrated && state.characterCreated) {
+            setLastActiveAt(backgroundTimeRef.current, true);
+          }
+        }
+      }
+      appStateRef.current = nextState;
+    },
+    [applyOfflineProgress, hydrated, setLastActiveAt, state.characterCreated],
+  );
+
   // Handle app state changes: track time when app goes to background
   // and apply offline progression when it returns to foreground
   useEffect(() => {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription.remove();
-  }, [applyOfflineProgress, hydrated, setLastActiveAt, state.characterCreated]);
-
-  const handleAppStateChange = (nextState: typeof AppState.currentState) => {
-    if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
-      // App has come to foreground
-      if (backgroundTimeRef.current && hydrated && state.characterCreated) {
-        const elapsed = Date.now() - backgroundTimeRef.current;
-        if (elapsed > 5000) {
-          // Apply offline progression if away for > 5 seconds
-          applyOfflineProgress(elapsed);
-        }
-      }
-      backgroundTimeRef.current = null;
-    } else if (nextState.match(/inactive|background/)) {
-      // App going to background or becoming inactive
-      if (!backgroundTimeRef.current) {
-        backgroundTimeRef.current = Date.now();
-        if (hydrated && state.characterCreated) {
-          setLastActiveAt(backgroundTimeRef.current, true);
-        }
-      }
-    }
-    appStateRef.current = nextState;
-  };
+  }, [handleAppStateChange]);
 
   useEffect(() => {
     if (!selectedCharacterClass) return;
@@ -824,13 +805,16 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const nextGuidance = guidanceList[0];
   const extraGuidanceCount = Math.max(0, guidanceList.length - 1);
   const equipmentInventory = state.equipmentInventory;
-  const getOwnedEquipmentItem = (id: string | null) => (id ? (equipmentInventory[id] ?? null) : null);
+  const getOwnedEquipmentItem = useCallback(
+    (id: string | null) => (id ? (equipmentInventory[id] ?? null) : null),
+    [equipmentInventory],
+  );
   const equippedItemsForScore = useMemo(
     () =>
       Object.values(state.equippedItems)
         .map(id => getOwnedEquipmentItem(id))
         .filter(Boolean),
-    [state.equippedItems, state.equipmentInventory],
+    [state.equippedItems, getOwnedEquipmentItem],
   );
   const gearScore = useMemo(() => {
     return equippedItemsForScore.reduce((sum, item) => {
@@ -933,14 +917,13 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const currentVipMilestoneClaimed = vipClaimedLevels.includes(currentVipMilestone.level);
   const currentVipMilestoneCanClaim = !currentVipMilestoneClaimed && vipLevel >= currentVipMilestone.level;
 
-  const { isOfflineRewardPopup, idleChestReward, setIdleChestReward, storyBeatModal, setStoryBeatModal } =
-    useGameOverlays({
-      storyEntries,
-      rewardPopup,
-      activeModal,
-      setActiveModal: modal => setActiveModal(modal as ActiveModal),
-      clearRewardPopup,
-    });
+  const { idleChestReward, setIdleChestReward, storyBeatModal, setStoryBeatModal } = useGameOverlays({
+    storyEntries,
+    rewardPopup,
+    activeModal,
+    setActiveModal: modal => setActiveModal(modal as ActiveModal),
+    clearRewardPopup,
+  });
 
   useModalOpenTelemetry({
     activeModal,
@@ -1400,8 +1383,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setTargetPracticeScore(null);
   };
 
+  const isTargetPracticeGameOpen = activeModal === 'targetPracticeGame';
   useEffect(() => {
-    if (activeModal !== 'targetPracticeGame' || targetPracticeScore != null) return;
+    if (!isTargetPracticeGameOpen || targetPracticeScore != null) return;
     const timer = setInterval(() => {
       setTargetPracticeMeter(prev => {
         const nextPosition = prev.position + prev.direction * 3;
@@ -1416,7 +1400,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     }, 45);
 
     return () => clearInterval(timer);
-  }, [activeModal === 'targetPracticeGame', targetPracticeScore]);
+  }, [isTargetPracticeGameOpen, targetPracticeScore]);
 
   const chooseRiftBuff = (choice: RiftBuffChoice) => {
     if (riftDungeonResult || riftIsSimulating) return;

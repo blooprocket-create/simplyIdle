@@ -13,6 +13,42 @@ export interface GuidanceItem {
   tab: Tab;
 }
 
+interface NearUnlockAchievement {
+  ach: {
+    id: string;
+    emoji: string;
+    name: string;
+    description: string;
+  };
+  ratio: number;
+  progress?: {
+    label: string;
+    value: number;
+    target: number;
+  };
+  remaining?: number;
+}
+
+interface WarroomAct {
+  id: number;
+  name: string;
+  emoji: string;
+  theme: string;
+  bossWave: number;
+}
+
+interface MissionCardSummary {
+  claimed: boolean;
+  progress: {
+    done: boolean;
+  };
+}
+
+interface WeeklyEventSummary {
+  emoji: string;
+  name: string;
+}
+
 export interface WarroomTabContentProps {
   tab: string;
   state: GameState;
@@ -22,15 +58,15 @@ export interface WarroomTabContentProps {
   isBossImminent: boolean;
   teamPowerIndex: number;
   powerTier: string;
-  nearUnlockAchievements: any[];
-  currentAct: any;
+  nearUnlockAchievements: NearUnlockAchievement[];
+  currentAct: WarroomAct;
   actProgressPct: number;
-  nextBossUnlock: any;
+  nextBossUnlock: PermanentUnlockId | null;
   unlockLabel: (unlock: PermanentUnlockId) => string;
-  missionCards: any[];
-  weeklyEvent: any;
+  missionCards: MissionCardSummary[];
+  weeklyEvent: WeeklyEventSummary;
   hasClaimableRewards: boolean;
-  claimableWeeklyMilestones: any[];
+  claimableWeeklyMilestones: number[];
   claimableMissionIds: any[];
   prestige1Done: boolean;
   prestige5Done: boolean;

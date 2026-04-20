@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, type CSSProperties } from 'react';
 import {
   View,
   Text,
@@ -43,6 +43,48 @@ interface FeaturedSummonBannerView {
   highestRarity: string;
 }
 
+interface HeroSummonTimelineEntry {
+  id: string;
+  rarity: Rarity;
+}
+
+interface HeroRarityView {
+  color: string;
+}
+
+interface HeroClassView {
+  emoji: string;
+  name: string;
+}
+
+interface HeroPassiveTraitView {
+  name: string;
+  description: string;
+}
+
+interface HeroActiveArchetypeView {
+  name: string;
+}
+
+interface TeamSlotUnlockView {
+  targetSlots: number;
+  requiredWave: number;
+  goldCost: number;
+  shardCost: number;
+  waveMet: boolean;
+  goldMet: boolean;
+  shardMet: boolean;
+  canUnlock: boolean;
+}
+
+interface HeroesSubTabItem {
+  id: string;
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  notificationCount?: number;
+}
+
 export interface HeroesTabContentProps {
   tab: string;
   state: GameState;
@@ -59,16 +101,16 @@ export interface HeroesTabContentProps {
   hasGachaNotification: boolean;
   paidX10: number;
   diamondPerSummon: number;
-  summonTimeline: any[];
-  rarityConfig: (rarity: Rarity) => any;
+  summonTimeline: HeroSummonTimelineEntry[];
+  rarityConfig: (rarity: Rarity) => HeroRarityView;
   expandedHeroes: Set<string>;
   setExpandedHeroes: (set: Set<string>) => void;
   activeTeamSet: Set<string>;
   teamSlotCap: number;
-  nextTeamSlotUnlock: any;
-  getClassConfig: (heroClass: PlayerClass) => any;
-  getHeroPassiveTraitInfo: (trait: HeroPassiveTraitId) => any;
-  getHeroActiveArchetypeInfo: (archetype: HeroActiveSkillArchetypeId) => any;
+  nextTeamSlotUnlock: TeamSlotUnlockView | null;
+  getClassConfig: (heroClass: PlayerClass) => HeroClassView;
+  getHeroPassiveTraitInfo: (trait: HeroPassiveTraitId) => HeroPassiveTraitView;
+  getHeroActiveArchetypeInfo: (archetype: HeroActiveSkillArchetypeId) => HeroActiveArchetypeView;
   calculateShardReward: (rarity: Rarity, level: number) => number;
   getRankUpShardCost: (rarity: Rarity, rank: number) => number;
   getHeroGoldLevelCost: (level: number) => number;
@@ -88,7 +130,7 @@ export interface HeroesTabContentProps {
   unlockTeamSlot: () => void;
   batchLevelHeroes: (heroIds: string[], mode: number | 'max') => void;
   setRecycleConfirmUid: (uid: string) => void;
-  renderSubTabBar: (tabs: any[]) => React.ReactNode;
+  renderSubTabBar: (tabs: HeroesSubTabItem[]) => React.ReactNode;
 }
 
 function getRankUpCostToMax(
@@ -116,7 +158,7 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
     batchLevelSelected,
     setBatchLevelSelected,
     canGachaX10,
-    canGachaOnce,
+    canGachaOnce: _canGachaOnce,
     pityRemaining,
     hasGachaNotification,
     paidX10: _paidX10,
@@ -185,7 +227,7 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
         if (a.level !== b.level) return b.level - a.level;
         return a.name.localeCompare(b.name);
       });
-    }, [activeTeamSet, rarityRank, state.heroRoster]);
+    }, [activeTeamSet, state.heroRoster]);
 
     const sortedBatchHeroes = useMemo(() => {
       return state.heroRoster
@@ -202,7 +244,7 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
           if (a.level !== b.level) return b.level - a.level;
           return a.name.localeCompare(b.name);
         });
-    }, [activeTeamSet, rarityRank, state.heroRoster]);
+    }, [activeTeamSet, state.heroRoster]);
 
     const uniqueBearerByHeroId = useMemo(() => {
       const bearerByHeroId: Record<string, string> = {};
@@ -595,7 +637,7 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                                 objectFit: 'cover',
                                 objectPosition: 'center center',
                                 opacity: 0.38,
-                              } as any,
+                              } as CSSProperties,
                             })
                           ) : heroPortraitSource ? (
                             <View style={styles.heroCardBackdropImageContainer}>

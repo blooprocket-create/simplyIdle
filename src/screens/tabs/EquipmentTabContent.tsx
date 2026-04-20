@@ -25,6 +25,47 @@ const GEAR_RARITY_POINTS: Record<string, number> = {
 
 const GEAR_INVENTORY_PAGE_SIZE = 30;
 
+interface EquipmentRarityView {
+  color: string;
+}
+
+interface EquipmentCraftCost {
+  scrap: number;
+  gold: number;
+}
+
+interface EquipmentUpgradePlan {
+  canUpgrade: boolean;
+  targetItemId: string | null;
+  targetRarity: string | null;
+  scrapCost: number;
+  essenceCost: number;
+  goldCost: number;
+}
+
+interface EquipmentViewItem {
+  id: string;
+  name: string;
+  emoji: string;
+  rarity: string;
+  slot: EquipmentSlot;
+  itemLevel?: number;
+  bonus: Record<string, number | null | undefined>;
+}
+
+interface ShardForgeCosts {
+  essenceRefineScrapCost: number;
+  shardRefineScrapCost: number;
+}
+
+interface EquipmentSubTabItem {
+  id: string;
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  notificationCount?: number;
+}
+
 function itemGearScore(item: { rarity: string; bonus: Record<string, number | null | undefined> }): number {
   const statValue = Object.values(item.bonus).reduce<number>((s, v) => s + (v ?? 0), 0);
   return (GEAR_RARITY_POINTS[item.rarity] ?? 0) + statValue * 12;
@@ -38,11 +79,11 @@ export interface EquipmentTabContentProps {
   setEquipmentSubTab: (tab: 'inventory' | 'craft' | 'forge' | 'armory') => void;
   compareItemId: string | null;
   setCompareItemId: (id: string | null) => void;
-  shardForgeCosts: any;
-  getEquipmentCraftCost: (slot: EquipmentSlot) => any;
-  getEquipmentItem: (itemId: string) => any;
-  getUpgradePlan: (itemId: string) => any;
-  equipmentRarityConfig: (rarity: EquipmentRarity) => any;
+  shardForgeCosts: ShardForgeCosts;
+  getEquipmentCraftCost: (slot: EquipmentSlot) => EquipmentCraftCost;
+  getEquipmentItem: (itemId: string) => EquipmentViewItem | null;
+  getUpgradePlan: (itemId: string) => EquipmentUpgradePlan;
+  equipmentRarityConfig: (rarity: EquipmentRarity) => EquipmentRarityView;
   optimizeEquipment: () => void;
   autoDismantleEquipment: () => void;
   setAutoDismantleRarityFloor: (rarity: EquipmentRarity) => void;
@@ -55,7 +96,7 @@ export interface EquipmentTabContentProps {
   dismantleEquipment: (itemId: string) => void;
   convertScrapToEssence: (count?: number) => void;
   convertScrapToShards: (count?: number) => void;
-  renderSubTabBar: (tabs: any[]) => React.ReactNode;
+  renderSubTabBar: (tabs: EquipmentSubTabItem[]) => React.ReactNode;
 }
 
 export const EquipmentTabContent = React.memo<EquipmentTabContentProps>(

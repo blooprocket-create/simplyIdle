@@ -20,6 +20,20 @@ import type { ExpeditionType, ExpeditionRarity } from '../gameScreenShared';
 import { fmt } from '../../utils';
 import { styles } from './OperationsTabContent.styles';
 
+interface DiceRollResult {
+  roll: number;
+  diamonds: number;
+  shards: number;
+}
+
+interface OperationsSubTabItem {
+  id: string;
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  notificationCount?: number;
+}
+
 export interface OperationsTabContentProps {
   tab: string;
   state: GameState;
@@ -50,7 +64,7 @@ export interface OperationsTabContentProps {
   canRunTreasuryEntry: boolean;
   canRaidTreasury: boolean;
   openTreasuryRaid: (useRaidTicket?: boolean) => void;
-  setDiceRollResult: (result: any) => void;
+  setDiceRollResult: (result: DiceRollResult | null) => void;
   setDiceIsRolling: (rolling: boolean) => void;
   setDiceRollModalOpen: (open: boolean) => void;
   openReconSweepGame: () => void;
@@ -63,7 +77,7 @@ export interface OperationsTabContentProps {
   startExpedition: (type: ExpeditionType, rarity: ExpeditionRarity) => void;
   completeExpedition: (expeditionId: string) => void;
   refreshExpeditionContracts: () => void;
-  renderSubTabBar: (tabs: any[]) => React.ReactNode;
+  renderSubTabBar: (tabs: OperationsSubTabItem[]) => React.ReactNode;
 }
 
 export const OperationsTabContent = React.memo<OperationsTabContentProps>(

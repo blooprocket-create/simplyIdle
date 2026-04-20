@@ -4452,16 +4452,6 @@ export interface MissionBoardGoal {
   rewardDiamonds?: number;
 }
 
-/**
- * Reward scaling formula by horizon tier.
- * Base gold scales with target difficulty; shards and diamonds follow tier brackets.
- */
-const HORIZON_REWARD_SCALE = {
-  short: { goldPerDifficulty: 60, shardBase: 80, diamondBase: 2 },
-  medium: { goldPerDifficulty: 40, shardBase: 200, diamondBase: 5 },
-  long: { goldPerDifficulty: 30, shardBase: 500, diamondBase: 12 },
-} as const;
-
 export const MISSION_BOARD_GOALS: MissionBoardGoal[] = [
   // ── Short-term missions (can complete in a single run) ──────────────
   {

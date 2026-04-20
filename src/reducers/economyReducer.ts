@@ -109,7 +109,7 @@ export interface EconomyContext {
   getVipGoldMultiplier: (state: GameState) => number;
   getVipExpMultiplier: (state: GameState) => number;
   maybeAutoRefreshExpeditionContracts: (state: GameState, nowMs: number) => GameState;
-  rollExpeditionContractOffers: () => Record<string, string>;
+  rollExpeditionContractOffers: () => Record<ExpeditionType, ExpeditionRarity>;
   getScrapToEssenceCost: (state: GameState) => number;
   getScrapToShardCost: () => number;
   getMaxHeatForLevel: (level: number) => number;
@@ -780,7 +780,7 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
           ...refreshedState.expeditionQueue,
           {
             id: expeditionId,
-            type: action.expeditionType as any,
+            type: action.expeditionType,
             rarity,
             startTime: Date.now(),
             durationMs: config.durationMs,
@@ -797,7 +797,7 @@ export function economyReducer(state: GameState, action: EconomyAction, ctx: Eco
       return {
         ...refreshedState,
         gold: refreshedState.gold - EXPEDITION_CONTRACT_REFRESH_GOLD_COST,
-        expeditionContractOffers: ctx.rollExpeditionContractOffers() as any,
+        expeditionContractOffers: ctx.rollExpeditionContractOffers(),
         expeditionContractsRefreshedAt: Date.now(),
       };
     }
