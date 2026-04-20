@@ -333,7 +333,9 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                   <Text style={styles.collectionStat}>
                     Discovered heroes: {codexHeroes.length}/{HERO_POOL.length}
                   </Text>
-                  <Text style={styles.collectionHint}>Tap a discovered hero icon to claim +10 VIP points once.</Text>
+                  <Text style={styles.collectionHint}>
+                    Tap a discovered hero icon to view it. First view claims +10 VIP points.
+                  </Text>
                   {codexHeroes.length === 0 ? (
                     <Text style={styles.collectionStat}>Summon heroes to unlock their backstories.</Text>
                   ) : (
@@ -343,7 +345,10 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                         <View key={hero.id} style={[styles.codexEntry, claimed && styles.codexEntryDone]}>
                           <Pressable
                             style={[styles.toggleBtn, styles.codexHeroIconBtn, claimed && { opacity: 0.55 }]}
-                            onPress={() => (claimed ? setPortraitModalHero(hero) : claimCodexHeroVip(hero.id))}
+                            onPress={() => {
+                              if (!claimed) claimCodexHeroVip(hero.id);
+                              setPortraitModalHero(hero);
+                            }}
                           >
                             {renderCodexHeroIcon(hero.id, hero.emoji)}
                             {!claimed && <View style={styles.codexClaimDot} />}
@@ -354,7 +359,7 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                             </Text>
                             <Text style={styles.codexDesc}>{getHeroBackstory(hero.id)}</Text>
                             <Text style={styles.codexReward}>
-                              {claimed ? 'VIP claimed (+10)' : 'Tap icon: +10 VIP points'}
+                              {claimed ? 'VIP claimed (+10)' : 'First view: +10 VIP points'}
                             </Text>
                           </View>
                         </View>
@@ -368,7 +373,9 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                   <Text style={styles.collectionStat}>
                     Discovered uniques: {codexUniqueEntries.length}/{HERO_POOL.length}
                   </Text>
-                  <Text style={styles.collectionHint}>Tap a discovered unique icon to claim +10 VIP points once.</Text>
+                  <Text style={styles.collectionHint}>
+                    Tap a discovered unique icon to view it. First view claims +10 VIP points.
+                  </Text>
                   {codexUniqueEntries.length === 0 ? (
                     <Text style={styles.collectionStat}>Find unique weapon drops to archive them here.</Text>
                   ) : (
@@ -378,7 +385,10 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                         <View key={`unique_${hero.id}`} style={[styles.codexEntry, claimed && styles.codexEntryDone]}>
                           <Pressable
                             style={[styles.toggleBtn, styles.codexHeroIconBtn, claimed && { opacity: 0.55 }]}
-                            onPress={() => (claimed ? setPortraitModalHero(hero) : claimCodexUniqueVip(hero.id))}
+                            onPress={() => {
+                              if (!claimed) claimCodexUniqueVip(hero.id);
+                              setPortraitModalHero(hero);
+                            }}
                           >
                             {renderCodexHeroIcon(hero.id, hero.emoji)}
                             {!claimed && <View style={styles.codexClaimDot} />}
@@ -391,7 +401,7 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                               {hero.name} • Rank {uniqueRank}/10
                             </Text>
                             <Text style={styles.codexReward}>
-                              {claimed ? 'VIP claimed (+10)' : 'Tap icon: +10 VIP points'}
+                              {claimed ? 'VIP claimed (+10)' : 'First view: +10 VIP points'}
                             </Text>
                           </View>
                         </View>
