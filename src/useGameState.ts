@@ -96,7 +96,11 @@ const OFFLINE_PROGRESS_CAP_MS = 8 * 60 * 60 * 1000;
 const OFFLINE_SIM_MAX_SLICE_MS = 1000;
 const OFFLINE_SIM_MAX_ITERATIONS = 300000;
 const PITY_THRESHOLD = 30;
-const SAFE_INTEGER_CAP = Number.MAX_SAFE_INTEGER;
+// Use MAX_VALUE instead of MAX_SAFE_INTEGER so gold and other currencies are not
+// artificially capped at ~9.01 Qa. JS IEEE-754 doubles can hold values up to
+// ~1.8e308; precision is approximate above MAX_SAFE_INTEGER, but that is
+// acceptable for an idle game with large-number mechanics.
+const SAFE_INTEGER_CAP = Number.MAX_VALUE;
 const MAX_SAVE_WAVE = 1_000_000;
 const MAX_SAVE_PLAYER_LEVEL = 1_000_000;
 const MAX_SAVE_COLLECTION = 500;
@@ -339,20 +343,18 @@ const FACILITY_POST_5_GROWTH_RATE: Record<FacilityId, number> = {
 
 export function getFacilityUpgradeCost(facilityId: FacilityId, currentLevel: number): number {
   const safeLevel = Math.max(0, Math.floor(currentLevel));
-  if (safeLevel >= FACILITY_MAX_LEVEL) return Number.MAX_SAFE_INTEGER;
+  if (safeLevel >= FACILITY_MAX_LEVEL) return Infinity;
   const openingCurve = FACILITY_INITIAL_UPGRADE_COSTS[facilityId];
   if (safeLevel < openingCurve.length) return openingCurve[safeLevel];
 
-  let cost = openingCurve[openingCurve.length - 1];
+  // Use a closed-form exponential formula instead of an iterative loop to avoid
+  // premature overflow. JS doubles (IEEE-754) represent values up to ~1.8e308,
+  // so costs stay finite well past the FACILITY_MAX_LEVEL of 999.
   const growth = FACILITY_POST_5_GROWTH_RATE[facilityId];
-  for (let level = openingCurve.length - 1; level < safeLevel; level++) {
-    cost = Math.ceil(cost * growth);
-    if (!Number.isFinite(cost) || cost > Number.MAX_SAFE_INTEGER) {
-      return Number.MAX_SAFE_INTEGER;
-    }
-  }
+  const stepsAboveBase = safeLevel - (openingCurve.length - 1);
+  const cost = openingCurve[openingCurve.length - 1] * Math.pow(growth, stepsAboveBase);
 
-  return cost;
+  return Number.isFinite(cost) ? cost : Infinity;
 }
 
 export interface Stats {

@@ -359,7 +359,7 @@ function getScaledUsableHeatReduction(
 
 function getFacilityUpgradeCostLocal(facilityId: FacilityId, currentLevel: number): number {
   const safeLevel = Math.max(0, Math.floor(currentLevel));
-  if (safeLevel >= FACILITY_MAX_LEVEL) return Number.MAX_SAFE_INTEGER;
+  if (safeLevel >= FACILITY_MAX_LEVEL) return Infinity;
   const FACILITY_INITIAL_UPGRADE_COSTS: Record<FacilityId, number[]> = {
     training: [5000, 12000, 30000, 75000, 150000, 300000],
     treasury: [4000, 10000, 25000, 60000, 120000, 250000],
@@ -368,13 +368,10 @@ function getFacilityUpgradeCostLocal(facilityId: FacilityId, currentLevel: numbe
   };
   const openingCurve = FACILITY_INITIAL_UPGRADE_COSTS[facilityId];
   if (safeLevel < openingCurve.length) return openingCurve[safeLevel];
-  let cost = openingCurve[openingCurve.length - 1];
-  const growth = 2;
-  for (let level = openingCurve.length - 1; level < safeLevel; level++) {
-    cost = Math.ceil(cost * growth);
-    if (!Number.isFinite(cost) || cost > Number.MAX_SAFE_INTEGER) return Number.MAX_SAFE_INTEGER;
-  }
-  return cost;
+  // Closed-form exponential to avoid iterative overflow below MAX_SAFE_INTEGER.
+  const stepsAboveBase = safeLevel - (openingCurve.length - 1);
+  const cost = openingCurve[openingCurve.length - 1] * Math.pow(2, stepsAboveBase);
+  return Number.isFinite(cost) ? cost : Infinity;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────

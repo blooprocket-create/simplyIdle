@@ -37,8 +37,8 @@ describe('fmt', () => {
 
   it('handles NaN and Infinity', () => {
     expect(fmt(NaN)).toBe('0');
-    expect(fmt(Infinity)).toBe('0');
-    expect(fmt(-Infinity)).toBe('0');
+    expect(fmt(Infinity)).toBe('∞');   // Infinity renders as ∞
+    expect(fmt(-Infinity)).toBe('0'); // -Infinity is still treated as invalid
   });
 
   it('handles negative numbers', () => {
@@ -89,7 +89,9 @@ describe('safeMultiplier', () => {
   });
 
   it('caps at limit', () => {
-    expect(safeMultiplier(1e15)).toBe(1e12);
+    // Default cap is now Number.MAX_VALUE so 1e15 passes through uncapped.
+    expect(safeMultiplier(1e15)).toBe(1e15);
+    // Explicit cap argument still works.
     expect(safeMultiplier(500, 100)).toBe(100);
   });
 
