@@ -36,6 +36,67 @@ export const styles = StyleSheet.create({
     color: '#A6C8D4',
     lineHeight: 15,
   },
+  achievementOverviewGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  achievementOverviewCard: {
+    flex: 1,
+    minWidth: 108,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#325262',
+    backgroundColor: '#10202A',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  achievementOverviewLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#8FB7C5',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  achievementOverviewValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#E6F5FF',
+    marginBottom: 2,
+  },
+  achievementOverviewHint: {
+    fontSize: 10,
+    color: '#98BCCC',
+  },
+  achievementQuickGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
+  },
+  achievementQuickCard: {
+    flexGrow: 1,
+    minWidth: 150,
+    backgroundColor: '#151A2A',
+    borderWidth: 1,
+    borderColor: '#374069',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+  },
+  achievementQuickTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#E8E8FF',
+    marginBottom: 3,
+  },
+  achievementQuickBody: {
+    fontSize: 10,
+    color: '#A9B2DA',
+    lineHeight: 15,
+  },
 
   // ── Claim All ────────────────────────────────────────────
   claimAllRow: {
@@ -130,6 +191,35 @@ export const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
   },
+  missionGroupCard: {
+    backgroundColor: '#151327',
+    borderWidth: 1,
+    borderColor: '#342C58',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
+  },
+  missionGroupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  missionGroupTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#F1E9FF',
+  },
+  missionGroupMeta: {
+    fontSize: 10,
+    color: '#A6B7E9',
+    fontWeight: '700',
+  },
+  missionGroupFlavor: {
+    fontSize: 10,
+    color: '#A49DCB',
+    marginBottom: 4,
+  },
   missionRow: {
     flexDirection: 'row',
     gap: 8,
@@ -221,6 +311,32 @@ export const styles = StyleSheet.create({
   achBonusLineUnlocked: {
     color: '#79D89F',
   },
+  recordsFilterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
+  },
+  recordsFilterChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#335168',
+    backgroundColor: '#101D2A',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  recordsFilterChipActive: {
+    borderColor: '#6FC7A2',
+    backgroundColor: '#193229',
+  },
+  recordsFilterChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#A0BED3',
+  },
+  recordsFilterChipTextActive: {
+    color: '#E8FFF3',
+  },
 
   // ── Collection ───────────────────────────────────────────
   collectionCard: {
@@ -253,6 +369,66 @@ export const styles = StyleSheet.create({
     color: '#AA8855',
     marginTop: 3,
     fontStyle: 'italic',
+  },
+  collectionProgressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  collectionProgressLabel: {
+    fontSize: 10,
+    color: '#9BB6CC',
+    fontWeight: '700',
+  },
+  collectionProgressValue: {
+    fontSize: 10,
+    color: '#D9EDFF',
+    fontWeight: '700',
+  },
+  collectionProgressBarBg: {
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: '#1A3042',
+    overflow: 'hidden',
+  },
+  collectionProgressBarFill: {
+    height: '100%',
+    backgroundColor: '#63D7A1',
+    borderRadius: 999,
+  },
+  collectionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  collectionCardCompact: {
+    flex: 1,
+    minWidth: 112,
+    backgroundColor: '#111E2C',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2A4260',
+    padding: 10,
+  },
+  unlockChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  unlockChip: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#D2F8E1',
+    backgroundColor: '#1D3B2E',
+    borderWidth: 1,
+    borderColor: '#3E7A5E',
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+    overflow: 'hidden',
   },
 
   // ── Story ────────────────────────────────────────────────

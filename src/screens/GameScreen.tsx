@@ -180,7 +180,7 @@ function HydrationProgressBar({ progress }: { progress: number }) {
 
 type HeroesSubTab = 'summon' | 'roster' | 'batch' | 'spark';
 type EquipmentSubTab = 'inventory' | 'armory' | 'craft' | 'forge';
-type AchievementsSubTab = 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex';
+type AchievementsSubTab = 'overview' | 'missions' | 'achievements' | 'collection' | 'codex';
 type OperationsSubTab = 'facilities' | 'expeditions' | 'miniops' | 'dungeonops';
 type ShopTab = 'diamond' | 'gold' | 'dollar';
 type ActiveModal =
@@ -3186,10 +3186,10 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     debugLog('ui', 'Navigate to weekly achievements from events');
                     setActiveModal(null);
                     onTabChange('achievements');
-                    setAchievementsSubTab('weekly');
+                    setAchievementsSubTab('missions');
                   }}
                 >
-                  <Text style={styles.eventsActionBtnText}>View Weekly Track</Text>
+                  <Text style={styles.eventsActionBtnText}>View Mission Board</Text>
                 </Pressable>
               </View>
 

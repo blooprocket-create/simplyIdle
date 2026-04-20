@@ -21,7 +21,7 @@ export interface AchievementsTabContentProps {
   state: GameState;
   stats: Stats;
   achievementsSubTab: string;
-  setAchievementsSubTab: (tab: 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex') => void;
+  setAchievementsSubTab: (tab: 'overview' | 'missions' | 'achievements' | 'collection' | 'codex') => void;
   missionCards: any[];
   claimableWeeklyMilestones: any[];
   claimableMissionIds: any[];
@@ -39,6 +39,19 @@ export interface AchievementsTabContentProps {
 
 type CodexHero = (typeof HERO_POOL)[number];
 type CodexFactionFilter = 'all' | 'vanguard' | 'ranger' | 'arcanum' | 'aegis';
+type RecordsFilter = 'all' | 'unlocked' | 'locked' | 'hidden';
+
+function getMissionHorizonLabel(horizon: 'short' | 'medium' | 'long'): string {
+  if (horizon === 'short') return 'Daily';
+  if (horizon === 'medium') return 'Weekly';
+  return 'Lifetime';
+}
+
+function getMissionHorizonFlavor(horizon: 'short' | 'medium' | 'long'): string {
+  if (horizon === 'short') return 'Fast tactical objectives for today.';
+  if (horizon === 'medium') return 'Extended campaign tasks for this week.';
+  return 'Long-haul legacy milestones that define your account.';
+}
 
 function getCodexFaction(hero: CodexHero): Exclude<CodexFactionFilter, 'all'> {
   if (hero.heroClass === 'warrior' || hero.heroClass === 'berserker') return 'vanguard';
@@ -187,6 +200,60 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
       }
       return counts;
     }, [codexHeroes]);
+    const [recordsFilter, setRecordsFilter] = useState<RecordsFilter>('all');
+    const achievementRows = useMemo(
+      () =>
+        ACHIEVEMENTS.map(ach => {
+          const unlocked = state.achievements.has(ach.id);
+          const hiddenLocked = !!ach.hidden && !unlocked;
+          return { ach, unlocked, hiddenLocked };
+        }),
+      [state.achievements],
+    );
+    const unlockedAchievements = useMemo(() => achievementRows.filter(row => row.unlocked), [achievementRows]);
+    const hiddenLockedAchievements = useMemo(() => achievementRows.filter(row => row.hiddenLocked), [achievementRows]);
+    const openLockedAchievements = useMemo(
+      () => achievementRows.filter(row => !row.unlocked && !row.hiddenLocked),
+      [achievementRows],
+    );
+    const filteredAchievementRows = useMemo(() => {
+      if (recordsFilter === 'unlocked') return unlockedAchievements;
+      if (recordsFilter === 'hidden') return hiddenLockedAchievements;
+      if (recordsFilter === 'locked') return openLockedAchievements;
+      return achievementRows;
+    }, [achievementRows, hiddenLockedAchievements, openLockedAchievements, recordsFilter, unlockedAchievements]);
+    const missionGroups = useMemo(() => {
+      const grouped: Record<'short' | 'medium' | 'long', typeof missionCards> = {
+        short: [],
+        medium: [],
+        long: [],
+      };
+      for (const missionCard of missionCards) {
+        grouped[missionCard.mission.horizon].push(missionCard);
+      }
+      return grouped;
+    }, [missionCards]);
+    const missionCompletionCounts = useMemo(() => {
+      let done = 0;
+      for (const card of missionCards) {
+        if (card.claimed) done += 1;
+      }
+      return {
+        done,
+        total: missionCards.length,
+      };
+    }, [missionCards]);
+    const collectionProgress = useMemo(() => {
+      const heroCompletionPct = Math.min(100, (state.heroRoster.length / Math.max(1, HERO_POOL.length)) * 100);
+      const unlockCompletionPct = Math.min(100, (state.permanentUnlocks.length / 3) * 100);
+      const rebirthCompletionPct = Math.min(100, ((state.prestigeCount ?? 0) / 10) * 100);
+      return {
+        heroCompletionPct,
+        unlockCompletionPct,
+        rebirthCompletionPct,
+      };
+    }, [state.heroRoster.length, state.permanentUnlocks.length, state.prestigeCount]);
+    const overviewClaimableCount = claimableWeeklyMilestones.length + claimableMissionIds.length;
     const renderCodexHeroIcon = (heroId: string, emoji: string, size: 'sm' | 'md' | 'lg' = 'sm') => {
       const portraitSource = getHeroPortraitSource(heroId);
       const portraitStyle =
@@ -208,36 +275,30 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
         {tab === 'achievements' && (
           <View style={styles.achievementsTab}>
             {renderSubTabBar(
-              (['overview', 'weekly', 'missions', 'achievements', 'collection', 'codex'] as const).map(st => ({
+              (['overview', 'missions', 'achievements', 'collection', 'codex'] as const).map(st => ({
                 id: st,
                 label:
                   st === 'overview'
                     ? 'Overview'
-                    : st === 'weekly'
-                      ? 'Weekly'
-                      : st === 'missions'
-                        ? 'Missions'
-                        : st === 'achievements'
-                          ? 'Records'
-                          : st === 'collection'
-                            ? 'Collection'
-                            : 'Codex',
+                    : st === 'missions'
+                      ? 'Missions'
+                      : st === 'achievements'
+                        ? 'Records'
+                        : st === 'collection'
+                          ? 'Collection'
+                          : 'Codex',
                 active: achievementsSubTab === st,
                 onPress: () => setAchievementsSubTab(st),
                 notificationCount:
-                  st === 'weekly'
-                    ? claimableWeeklyMilestones.length
-                    : st === 'missions'
-                      ? claimableMissionIds.length
-                      : st === 'codex'
-                        ? codexNotificationCount
-                        : 0,
+                  st === 'missions'
+                    ? claimableWeeklyMilestones.length + claimableMissionIds.length
+                    : st === 'codex'
+                      ? codexNotificationCount
+                      : 0,
               })),
             )}
 
-            {(achievementsSubTab === 'overview' ||
-              achievementsSubTab === 'weekly' ||
-              achievementsSubTab === 'missions') && (
+            {(achievementsSubTab === 'overview' || achievementsSubTab === 'missions') && (
               <View style={styles.achievementBonusCard}>
                 <View style={styles.achievementBonusHeader}>
                   <Text style={styles.achievementBonusTitle}>Legacy Bonus Engine</Text>
@@ -248,21 +309,11 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                   multipliers.
                 </Text>
                 <Text style={styles.achievementBonusDesc}>
-                  Unlocked: {state.achievements.size}/{ACHIEVEMENTS.length}
-                </Text>
-                <Text style={styles.achievementBonusDesc}>
-                  Current multiplier: x{(1 + stats.achievementBonusPercent).toFixed(2)} applied after most
-                  build/class/rebirth modifiers.
-                </Text>
-                <Text style={styles.achievementBonusDesc}>
-                  Affects now: DPS x{(1 + stats.achievementBonusPercent).toFixed(2)} • Gold x
-                  {(1 + stats.achievementBonusPercent).toFixed(2)} • EXP x
+                  Unlocked: {state.achievements.size}/{ACHIEVEMENTS.length} • Current multiplier: x
                   {(1 + stats.achievementBonusPercent).toFixed(2)}
                 </Text>
                 <View style={styles.claimAllRow}>
-                  <Text style={styles.claimAllInfo}>
-                    Claimable: {claimableWeeklyMilestones.length + claimableMissionIds.length}
-                  </Text>
+                  <Text style={styles.claimAllInfo}>Ready to claim: {overviewClaimableCount}</Text>
                   <Pressable
                     style={[styles.claimAllBtn, !hasClaimableRewards && styles.claimAllBtnDisabled]}
                     disabled={!hasClaimableRewards}
@@ -271,164 +322,247 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                     <Text style={styles.claimAllBtnText}>Claim All Rewards</Text>
                   </Pressable>
                 </View>
+                <View style={styles.achievementOverviewGrid}>
+                  <View style={styles.achievementOverviewCard}>
+                    <Text style={styles.achievementOverviewLabel}>Records Secured</Text>
+                    <Text style={styles.achievementOverviewValue}>{unlockedAchievements.length}</Text>
+                    <Text style={styles.achievementOverviewHint}>
+                      {ACHIEVEMENTS.length - unlockedAchievements.length} remaining
+                    </Text>
+                  </View>
+                  <View style={styles.achievementOverviewCard}>
+                    <Text style={styles.achievementOverviewLabel}>Mission Board</Text>
+                    <Text style={styles.achievementOverviewValue}>{missionCompletionCounts.done}</Text>
+                    <Text style={styles.achievementOverviewHint}>of {missionCompletionCounts.total} claimed</Text>
+                  </View>
+                  <View style={styles.achievementOverviewCard}>
+                    <Text style={styles.achievementOverviewLabel}>Collection Depth</Text>
+                    <Text style={styles.achievementOverviewValue}>
+                      {Math.floor(collectionProgress.heroCompletionPct)}%
+                    </Text>
+                    <Text style={styles.achievementOverviewHint}>hero archive discovered</Text>
+                  </View>
+                </View>
               </View>
             )}
 
-            {(achievementsSubTab === 'overview' || achievementsSubTab === 'weekly') && (
-              <View style={styles.weeklyEventCard}>
-                <Text style={styles.weeklyEventTitle}>
-                  {weeklyEvent.emoji} Weekly Event: {weeklyEvent.name}
-                </Text>
-                <Text style={styles.weeklyEventDesc}>{weeklyEvent.description}</Text>
-                <Text style={styles.weeklyProgressLabel}>Weekly Kills: {state.weeklyKills}</Text>
-                {WEEKLY_TRACK_MILESTONES.map(ms => {
-                  const done = state.weeklyKills >= ms;
-                  const claimed = state.weeklyTrackClaimed.includes(ms);
-                  return (
-                    <View key={ms} style={styles.weeklyTrackRow}>
-                      <Text style={styles.weeklyTrackText}>Milestone {ms}</Text>
-                      <Pressable
-                        style={[styles.weeklyClaimBtn, (!done || claimed) && styles.weeklyClaimBtnDisabled]}
-                        disabled={!done || claimed}
-                        onPress={() => claimWeeklyTrack(ms)}
-                      >
-                        <Text style={styles.weeklyClaimBtnText}>{claimed ? 'Claimed' : done ? 'Claim' : 'Locked'}</Text>
-                      </Pressable>
-                    </View>
-                  );
-                })}
+            {achievementsSubTab === 'overview' && (
+              <View style={styles.achievementQuickGrid}>
+                <Pressable style={styles.achievementQuickCard} onPress={() => setAchievementsSubTab('missions')}>
+                  <Text style={styles.achievementQuickTitle}>Mission Board</Text>
+                  <Text style={styles.achievementQuickBody}>Claim {overviewClaimableCount} available rewards now.</Text>
+                </Pressable>
+                <Pressable style={styles.achievementQuickCard} onPress={() => setAchievementsSubTab('achievements')}>
+                  <Text style={styles.achievementQuickTitle}>Records Hall</Text>
+                  <Text style={styles.achievementQuickBody}>Hidden leads: {hiddenLockedAchievements.length}</Text>
+                </Pressable>
+                <Pressable style={styles.achievementQuickCard} onPress={() => setAchievementsSubTab('collection')}>
+                  <Text style={styles.achievementQuickTitle}>Collection Matrix</Text>
+                  <Text style={styles.achievementQuickBody}>Unlocks cataloged: {state.permanentUnlocks.length}</Text>
+                </Pressable>
               </View>
             )}
 
             {(achievementsSubTab === 'overview' || achievementsSubTab === 'missions') && (
               <View style={styles.missionBoardCard}>
                 <Text style={styles.sectionTitle}>🎯 Mission Board</Text>
-                {missionCards.map(({ mission, progress, claimed }) => (
-                  <View key={mission.id} style={styles.missionRow}>
-                    <View style={styles.missionInfo}>
-                      <Text style={styles.missionTitle}>
-                        {mission.title} ({mission.horizon})
-                      </Text>
-                      <Text style={styles.missionDesc}>{mission.description}</Text>
-                      <Text style={styles.missionProgress}>
-                        {Math.min(progress.value, mission.target)}/{mission.target}
+                <Text style={styles.sectionHelperText}>
+                  Weekly progression now lives here with daily, weekly, and lifetime categories.
+                </Text>
+
+                <View style={styles.weeklyEventCard}>
+                  <Text style={styles.weeklyEventTitle}>
+                    {weeklyEvent.emoji} Weekly Directive: {weeklyEvent.name}
+                  </Text>
+                  <Text style={styles.weeklyEventDesc}>{weeklyEvent.description}</Text>
+                  <Text style={styles.weeklyProgressLabel}>Weekly Kills: {state.weeklyKills}</Text>
+                  {WEEKLY_TRACK_MILESTONES.map(ms => {
+                    const done = state.weeklyKills >= ms;
+                    const claimed = state.weeklyTrackClaimed.includes(ms);
+                    return (
+                      <View key={ms} style={styles.weeklyTrackRow}>
+                        <Text style={styles.weeklyTrackText}>Milestone {ms}</Text>
+                        <Pressable
+                          style={[styles.weeklyClaimBtn, (!done || claimed) && styles.weeklyClaimBtnDisabled]}
+                          disabled={!done || claimed}
+                          onPress={() => claimWeeklyTrack(ms)}
+                        >
+                          <Text style={styles.weeklyClaimBtnText}>
+                            {claimed ? 'Claimed' : done ? 'Claim' : 'Locked'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                {(['short', 'medium', 'long'] as const).map(horizon => (
+                  <View key={horizon} style={styles.missionGroupCard}>
+                    <View style={styles.missionGroupHeader}>
+                      <Text style={styles.missionGroupTitle}>{getMissionHorizonLabel(horizon)} Orders</Text>
+                      <Text style={styles.missionGroupMeta}>
+                        {missionGroups[horizon].filter(card => card.claimed).length}/{missionGroups[horizon].length}
                       </Text>
                     </View>
-                    <Pressable
-                      style={[styles.missionClaimBtn, (!progress.done || claimed) && styles.missionClaimBtnDisabled]}
-                      disabled={!progress.done || claimed}
-                      onPress={() => claimMission(mission.id)}
-                    >
-                      <Text style={styles.missionClaimBtnText}>
-                        {claimed ? 'Claimed' : progress.done ? 'Claim' : 'Locked'}
-                      </Text>
-                    </Pressable>
+                    <Text style={styles.missionGroupFlavor}>{getMissionHorizonFlavor(horizon)}</Text>
+                    {missionGroups[horizon].map(({ mission, progress, claimed }) => (
+                      <View key={mission.id} style={styles.missionRow}>
+                        <View style={styles.missionInfo}>
+                          <Text style={styles.missionTitle}>{mission.title}</Text>
+                          <Text style={styles.missionDesc}>{mission.description}</Text>
+                          <Text style={styles.missionProgress}>
+                            {Math.min(progress.value, mission.target)}/{mission.target}
+                          </Text>
+                        </View>
+                        <Pressable
+                          style={[
+                            styles.missionClaimBtn,
+                            (!progress.done || claimed) && styles.missionClaimBtnDisabled,
+                          ]}
+                          disabled={!progress.done || claimed}
+                          onPress={() => claimMission(mission.id)}
+                        >
+                          <Text style={styles.missionClaimBtnText}>
+                            {claimed ? 'Claimed' : progress.done ? 'Claim' : 'Locked'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ))}
                   </View>
                 ))}
               </View>
             )}
 
-            {(achievementsSubTab === 'overview' || achievementsSubTab === 'achievements') && (
-              <Text style={styles.sectionTitle}>🏆 Achievements</Text>
-            )}
-            {(achievementsSubTab === 'overview' || achievementsSubTab === 'achievements') &&
-              ACHIEVEMENTS.map(ach => {
-                const unlocked = state.achievements.has(ach.id);
-                const isHiddenLocked = !!ach.hidden && !unlocked;
-                return (
+            {achievementsSubTab === 'achievements' && (
+              <View>
+                <Text style={styles.sectionTitle}>🏆 Records Hall</Text>
+                <Text style={styles.sectionHelperText}>Filter by state to avoid scrolling a full wall of records.</Text>
+                <View style={styles.recordsFilterRow}>
+                  {(
+                    [
+                      { id: 'all', label: `All (${achievementRows.length})` },
+                      { id: 'unlocked', label: `Unlocked (${unlockedAchievements.length})` },
+                      { id: 'locked', label: `Open (${openLockedAchievements.length})` },
+                      { id: 'hidden', label: `Hidden (${hiddenLockedAchievements.length})` },
+                    ] as const
+                  ).map(option => (
+                    <Pressable
+                      key={option.id}
+                      style={[styles.recordsFilterChip, recordsFilter === option.id && styles.recordsFilterChipActive]}
+                      onPress={() => setRecordsFilter(option.id)}
+                    >
+                      <Text
+                        style={[
+                          styles.recordsFilterChipText,
+                          recordsFilter === option.id && styles.recordsFilterChipTextActive,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                {filteredAchievementRows.map(({ ach, unlocked, hiddenLocked }) => (
                   <View key={ach.id} style={[styles.achCard, unlocked && styles.achCardUnlocked]}>
-                    <Text style={styles.achEmoji}>{isHiddenLocked ? '❔' : ach.emoji}</Text>
+                    <Text style={styles.achEmoji}>{hiddenLocked ? '❔' : ach.emoji}</Text>
                     <View style={styles.achCardInfo}>
                       <Text style={[styles.achName, unlocked && styles.achNameUnlocked]}>
-                        {isHiddenLocked ? 'Hidden Achievement' : ach.name}
+                        {hiddenLocked ? 'Hidden Record' : ach.name}
                       </Text>
                       <Text style={styles.achDesc}>
-                        {isHiddenLocked ? 'Unlock this by discovering an obscure milestone.' : ach.description}
+                        {hiddenLocked ? 'Unseal this by discovering an obscure milestone.' : ach.description}
                       </Text>
                       <Text style={[styles.achBonusLine, unlocked && styles.achBonusLineUnlocked]}>
-                        {isHiddenLocked
-                          ? `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/gold/EXP when revealed`
+                        {hiddenLocked
+                          ? `+${ACH_BONUS_PER_UNLOCK_PCT}% final DPS/gold/EXP when revealed`
                           : unlocked
-                            ? `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/gold/EXP applied`
-                            : `+${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS/gold/EXP on unlock`}
+                            ? `+${ACH_BONUS_PER_UNLOCK_PCT}% final DPS/gold/EXP active`
+                            : `+${ACH_BONUS_PER_UNLOCK_PCT}% final DPS/gold/EXP on unlock`}
                       </Text>
                     </View>
                   </View>
-                );
-              })}
+                ))}
+              </View>
+            )}
 
             {achievementsSubTab === 'collection' && (
               <View>
-                <Text style={styles.sectionTitle}>📚 Collection Log</Text>
+                <Text style={styles.sectionTitle}>📚 Collection Matrix</Text>
                 <Text style={styles.sectionHelperText}>
-                  Track everything you've collected. Completion grants bonus power.
+                  Collection now tracks category completion and milestone power thresholds.
                 </Text>
 
                 <View style={styles.collectionCard}>
-                  <Text style={styles.collectionCardTitle}>👥 Heroes</Text>
-                  <Text style={styles.collectionStat}>{state.heroRoster.length} heroes summoned</Text>
-                  {(['common', 'rare', 'epic', 'legendary', 'mythic'] as const).map(r => {
-                    const count = state.heroRoster.filter(h => h.rarity === r).length;
-                    return count > 0 ? (
-                      <Text key={r} style={styles.collectionStat}>
-                        {' '}
-                        • {r}: {count}
-                      </Text>
-                    ) : null;
-                  })}
-                  {state.heroRoster.length >= 10 && (
-                    <Text style={styles.collectionBonus}>✅ Bonus: +5% final team DPS multiplier</Text>
-                  )}
-                  {state.heroRoster.length >= 25 && (
-                    <Text style={styles.collectionBonus}>✅ Bonus: +10% hero team-boost contribution</Text>
-                  )}
+                  <Text style={styles.collectionCardTitle}>Archive Completion</Text>
+                  <View style={styles.collectionProgressRow}>
+                    <Text style={styles.collectionProgressLabel}>Heroes</Text>
+                    <Text style={styles.collectionProgressValue}>
+                      {state.heroRoster.length}/{HERO_POOL.length}
+                    </Text>
+                  </View>
+                  <View style={styles.collectionProgressBarBg}>
+                    <View
+                      style={[styles.collectionProgressBarFill, { width: `${collectionProgress.heroCompletionPct}%` }]}
+                    />
+                  </View>
+                  <View style={styles.collectionProgressRow}>
+                    <Text style={styles.collectionProgressLabel}>Permanent Unlocks</Text>
+                    <Text style={styles.collectionProgressValue}>{state.permanentUnlocks.length}/3</Text>
+                  </View>
+                  <View style={styles.collectionProgressBarBg}>
+                    <View
+                      style={[
+                        styles.collectionProgressBarFill,
+                        { width: `${collectionProgress.unlockCompletionPct}%` },
+                      ]}
+                    />
+                  </View>
+                  <View style={styles.collectionProgressRow}>
+                    <Text style={styles.collectionProgressLabel}>Rebirth Legacy</Text>
+                    <Text style={styles.collectionProgressValue}>{state.prestigeCount ?? 0}/10</Text>
+                  </View>
+                  <View style={styles.collectionProgressBarBg}>
+                    <View
+                      style={[
+                        styles.collectionProgressBarFill,
+                        { width: `${collectionProgress.rebirthCompletionPct}%` },
+                      ]}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.collectionGrid}>
+                  <View style={styles.collectionCardCompact}>
+                    <Text style={styles.collectionCardTitle}>Heroes</Text>
+                    <Text style={styles.collectionStat}>{state.heroRoster.length} summoned</Text>
+                    <Text style={styles.collectionHint}>Boss waves cleared: {Math.floor(state.wave / 10)}</Text>
+                  </View>
+                  <View style={styles.collectionCardCompact}>
+                    <Text style={styles.collectionCardTitle}>Equipment</Text>
+                    <Text style={styles.collectionStat}>{state.inventoryItemIds.length} total items</Text>
+                    <Text style={styles.collectionHint}>
+                      {Object.values(state.equippedItems).filter(Boolean).length} / 3 slots equipped
+                    </Text>
+                  </View>
+                  <View style={styles.collectionCardCompact}>
+                    <Text style={styles.collectionCardTitle}>Rebirth</Text>
+                    <Text style={styles.collectionStat}>Ascensions: {state.prestigeCount ?? 0}</Text>
+                    <Text style={styles.collectionHint}>Rebirth Cores: {state.rebirthCores}</Text>
+                  </View>
                 </View>
 
                 <View style={styles.collectionCard}>
-                  <Text style={styles.collectionCardTitle}>🎒 Equipment</Text>
-                  <Text style={styles.collectionStat}>{state.inventoryItemIds.length} items held</Text>
-                  <Text style={styles.collectionStat}>
-                    {Object.values(state.equippedItems).filter(Boolean).length} / 3 slots filled
-                  </Text>
-                  {state.permanentUnlocks.includes('mythic_equipment') && (
-                    <Text style={styles.collectionBonus}>✅ Mythic Tier Unlocked</Text>
-                  )}
-                  {!state.permanentUnlocks.includes('mythic_equipment') && (
-                    <Text style={styles.collectionHint}>🔒 Defeat Act 3 Boss to unlock Mythic</Text>
-                  )}
-                </View>
-
-                <View style={styles.collectionCard}>
-                  <Text style={styles.collectionCardTitle}>👑 Bosses Defeated</Text>
-                  <Text style={styles.collectionStat}>Highest wave: {state.wave}</Text>
-                  <Text style={styles.collectionStat}>Boss waves cleared: {Math.floor(state.wave / 10)}</Text>
-                  {Math.floor(state.wave / 10) >= 5 && (
-                    <Text style={styles.collectionBonus}>✅ Boss Veteran: +5% final gold multiplier</Text>
-                  )}
-                </View>
-
-                <View style={styles.collectionCard}>
-                  <Text style={styles.collectionCardTitle}>🔓 Unlocks & Relics</Text>
+                  <Text style={styles.collectionCardTitle}>Permanent Unlock Registry</Text>
                   {state.permanentUnlocks.length === 0 ? (
-                    <Text style={styles.collectionStat}>No unlocks yet. Defeat bosses to progress.</Text>
+                    <Text style={styles.collectionStat}>No permanent unlocks cataloged yet.</Text>
                   ) : (
-                    state.permanentUnlocks.map(u => (
-                      <Text key={u} style={styles.collectionBonus}>
-                        ✅ {u.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                      </Text>
-                    ))
-                  )}
-                </View>
-
-                <View style={styles.collectionCard}>
-                  <Text style={styles.collectionCardTitle}>♾️ Rebirths</Text>
-                  <Text style={styles.collectionStat}>Times ascended: {state.prestigeCount ?? 0}</Text>
-                  <Text style={styles.collectionStat}>Rebirth Cores: {state.rebirthCores}</Text>
-                  {(state.prestigeCount ?? 0) >= 1 && (
-                    <Text style={styles.collectionBonus}>✅ First Rebirth: Unlocked Core Tree</Text>
-                  )}
-                  {(state.prestigeCount ?? 0) >= 5 && (
-                    <Text style={styles.collectionBonus}>✅ Veteran: +5% rebirth core branch effectiveness</Text>
+                    <View style={styles.unlockChipRow}>
+                      {state.permanentUnlocks.map(unlockId => (
+                        <Text key={unlockId} style={styles.unlockChip}>
+                          {unlockId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                        </Text>
+                      ))}
+                    </View>
                   )}
                 </View>
               </View>
