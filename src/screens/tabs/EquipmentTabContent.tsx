@@ -47,7 +47,7 @@ interface EquipmentViewItem {
   id: string;
   name: string;
   emoji: string;
-  rarity: string;
+  rarity: EquipmentRarity;
   slot: EquipmentSlot;
   itemLevel?: number;
   bonus: Record<string, number | null | undefined>;

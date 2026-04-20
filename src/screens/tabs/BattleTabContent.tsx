@@ -1,7 +1,7 @@
 import React from 'react';
 import { Alert, Platform, View, Text, Pressable } from 'react-native';
 import { GameState, Stats, getUsableItemDescription } from '../../useGameState';
-import { PlayerClass, rarityConfig } from '../../gameConfig';
+import { PlayerClass, rarityConfig, type UsableItem } from '../../gameConfig';
 import { styles } from './BattleTabContent.styles';
 
 interface BattleClassConfig {
@@ -9,15 +9,10 @@ interface BattleClassConfig {
   name: string;
 }
 
-interface BattleUsableItem {
-  id: string;
-  name: string;
-  emoji: string;
-  effect: string;
-}
+type BattleUsableItem = UsableItem;
 
 interface BattleUsableInventoryEntry {
-  item: BattleUsableItem | null;
+  item: BattleUsableItem | undefined;
   count: number;
 }
 

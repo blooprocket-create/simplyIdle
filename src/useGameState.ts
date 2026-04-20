@@ -78,6 +78,7 @@ import { economyReducer, ECONOMY_ACTION_TYPES } from './reducers/economyReducer'
 import type { EconomyAction } from './reducers/economyReducer';
 import { settingsReducer, SETTINGS_ACTION_TYPES } from './reducers/settingsReducer';
 import type { SettingsAction } from './reducers/settingsReducer';
+import { getFirebaseAuth } from './services/firebase';
 
 const TICK_MS = 100;
 const SAVE_INTERVAL_MS = 5000;
@@ -4685,7 +4686,7 @@ export interface SaveData {
   } | null;
 
   guildhallFacilities?: Record<'training' | 'treasury' | 'forge' | 'tactics', { level: number }>;
-  expeditionQueue?: GameState['expeditionQueue'];
+  expeditionQueue?: Array<unknown>;
   lastExpeditionDay?: Record<ExpeditionType, number | null>;
   expeditionContractOffers?: Record<ExpeditionType, ExpeditionRarity>;
   expeditionContractsRefreshedAt?: number;

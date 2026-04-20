@@ -25,7 +25,7 @@ interface NearUnlockAchievement {
     label: string;
     value: number;
     target: number;
-  };
+  } | null;
   remaining?: number;
 }
 

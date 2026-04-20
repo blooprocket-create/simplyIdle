@@ -64,6 +64,7 @@ interface HeroPassiveTraitView {
 
 interface HeroActiveArchetypeView {
   name: string;
+  description: string;
 }
 
 interface TeamSlotUnlockView {

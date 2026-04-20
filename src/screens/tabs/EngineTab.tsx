@@ -5,6 +5,7 @@ import MobileCard from '../../components/MobileCard';
 import SectionHeader from '../../components/SectionHeader';
 import MobileScrollContainer from '../../components/MobileScrollContainer';
 import { fmt } from '../../utils';
+import type { StatKey } from '../../gameConfig';
 
 interface EngineTabProps {
   playerLevel: number;
@@ -17,7 +18,7 @@ interface EngineTabProps {
     name: string;
     timeLeft: string;
   }>;
-  onAllocateStat: (stat: string) => void;
+  onAllocateStat: (stat: StatKey) => void;
   onAllocateMaxStats: () => void;
   onOpenEquipment: () => void;
   onOpenFacilities: () => void;
@@ -29,11 +30,7 @@ export default function EngineTab(props: EngineTabProps) {
 
   return (
     <MobileScrollContainer>
-      <SectionHeader
-        icon="⚙️"
-        title="Growth Engine"
-        subtitle="Stats, gear, and infrastructure"
-      />
+      <SectionHeader icon="⚙️" title="Growth Engine" subtitle="Stats, gear, and infrastructure" />
 
       {/* Level and XP */}
       <MobileCard
@@ -60,10 +57,7 @@ export default function EngineTab(props: EngineTabProps) {
             {['STR', 'VIT', 'AGI', 'INT', 'SPR'].map(stat => (
               <Pressable
                 key={stat}
-                style={[
-                  styles.statBtn,
-                  statFocus === stat && styles.statBtnFocused,
-                ]}
+                style={[styles.statBtn, statFocus === stat && styles.statBtnFocused]}
                 onPress={() => {
                   props.onAllocateStat(stat.toLowerCase());
                   setStatFocus(stat);
@@ -74,10 +68,7 @@ export default function EngineTab(props: EngineTabProps) {
               </Pressable>
             ))}
           </View>
-          <Pressable
-            style={styles.allocateMaxBtn}
-            onPress={props.onAllocateMaxStats}
-          >
+          <Pressable style={styles.allocateMaxBtn} onPress={props.onAllocateMaxStats}>
             <Text style={styles.allocateMaxBtnText}>Allocate All ({props.unspentStats})</Text>
           </Pressable>
         </View>
@@ -124,12 +115,13 @@ export default function EngineTab(props: EngineTabProps) {
         title="Expeditions"
         sections={[
           {
-            items: props.expeditions.length === 0
-              ? [{ label: 'Status', value: 'No expeditions active' }]
-              : props.expeditions.map(exp => ({
-                label: exp.name,
-                value: exp.timeLeft,
-              })),
+            items:
+              props.expeditions.length === 0
+                ? [{ label: 'Status', value: 'No expeditions active' }]
+                : props.expeditions.map(exp => ({
+                    label: exp.name,
+                    value: exp.timeLeft,
+                  })),
           },
         ]}
         action={{
