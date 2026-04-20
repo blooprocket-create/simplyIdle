@@ -6,7 +6,7 @@ title: Equipment Database
 
 Status: Live
 
-Last reviewed: 2026-04-12
+Last reviewed: 2026-04-20
 
 Total equipment items: 75
 
