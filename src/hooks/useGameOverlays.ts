@@ -51,10 +51,25 @@ export function useGameOverlays({
   }, [storyEntries]);
 
   const prevBeatIndexRef = useRef<number | null>(null);
+  const initialPrologueShownRef = useRef(false);
 
   useEffect(() => {
     if (prevBeatIndexRef.current === null) {
-      // First run — seed without showing the modal
+      // First run — seed baseline index.
+      // Exception: show the testing prologue beat when it is already unlocked.
+      const initialEntry = highestUnlockedIndex >= 0 ? storyEntries[highestUnlockedIndex] : null;
+      if (initialEntry && initialEntry.id === 'prologue_ash' && !initialPrologueShownRef.current) {
+        queueMicrotask(() => {
+          setStoryBeatModal({
+            chapter: initialEntry.chapter,
+            title: initialEntry.title,
+            body: initialEntry.body,
+            wave: initialEntry.unlockWave,
+          });
+        });
+        initialPrologueShownRef.current = true;
+      }
+
       prevBeatIndexRef.current = highestUnlockedIndex;
       return;
     }
@@ -62,12 +77,13 @@ export function useGameOverlays({
     if (highestUnlockedIndex > prevBeatIndexRef.current) {
       const entry = storyEntries[highestUnlockedIndex];
       if (entry) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setStoryBeatModal({
-          chapter: entry.chapter,
-          title: entry.title,
-          body: entry.body,
-          wave: entry.unlockWave,
+        queueMicrotask(() => {
+          setStoryBeatModal({
+            chapter: entry.chapter,
+            title: entry.title,
+            body: entry.body,
+            wave: entry.unlockWave,
+          });
         });
       }
     }
