@@ -3189,9 +3189,10 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     inventoryItemIds: cleanedInventoryItemIds,
     equipmentInventory: cleanedEquipmentInventory,
     equippedItems: cleanedEquippedItems,
-    autoDismantleRarityFloor: (EQUIPMENT_RARITY_SET.has(payload.autoDismantleRarityFloor)
-      ? payload.autoDismantleRarityFloor
-      : 'common') as EquipmentRarity,
+    autoDismantleRarityFloor:
+      typeof payload.autoDismantleRarityFloor === 'string' && EQUIPMENT_RARITY_SET.has(payload.autoDismantleRarityFloor)
+        ? (payload.autoDismantleRarityFloor as EquipmentRarity)
+        : 'common',
     autoDismantleEnabled: clampBoolean(payload.autoDismantleEnabled, false),
     usableItemCounts,
     autoUsePotionEnabled: clampBoolean(payload.autoUsePotionEnabled, false),
@@ -4243,6 +4244,7 @@ type Action =
   | { type: 'BUY_PREMIUM_COOLANT'; itemId: 'coolant_mk1' | 'coolant_mk2'; amount?: number }
   | { type: 'USE_USABLE_ITEM'; itemId: string; amount?: number | 'all' }
   | { type: 'AUTO_DISMANTLE_EQUIPMENT' }
+  | { type: 'SET_AUTO_DISMANTLE_ENABLED'; enabled: boolean }
   | { type: 'SET_AUTO_DISMANTLE_RARITY_FLOOR'; rarity: EquipmentRarity }
   | { type: 'DISMANTLE_EQUIPMENT'; itemId: string }
   | { type: 'CRAFT_EQUIPMENT'; slot: EquipmentSlot }
@@ -4744,6 +4746,8 @@ export interface SaveData {
   inventoryItemIds: string[];
   equipmentInventory?: Record<string, EquipmentInstance>;
   equippedItems: Record<EquipmentSlot, string | null>;
+  autoDismantleRarityFloor?: EquipmentRarity;
+  autoDismantleEnabled?: boolean;
   usableItemCounts: Record<string, number>;
   autoUsePotionEnabled: boolean;
   autoUseCoolantEnabled?: boolean;

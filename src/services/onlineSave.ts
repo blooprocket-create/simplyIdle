@@ -427,7 +427,7 @@ export async function loadOnlineSave<TPayload extends Record<string, unknown>>(
  */
 async function loadChunksForSlot(
   db: NonNullable<ReturnType<typeof getFirebaseFirestore>>,
-  slotPath: string[],
+  slotPath: [string, ...string[]],
   chunkKeys: string[],
   onProgress?: LoadProgressCallback,
 ): Promise<Record<string, unknown>> {
@@ -443,7 +443,7 @@ async function loadChunksForSlot(
   // Fetch chunk docs in parallel, then parse serially to avoid main-thread spikes
   const chunkDocs = await Promise.all(
     chunkKeys.map(async chunkName => {
-      const chunkPath = [...slotPath, 'chunks', chunkName] as [string, ...string[]];
+      const chunkPath: [string, ...string[]] = [...slotPath, 'chunks', chunkName];
       const chunkRef = doc(db, ...chunkPath);
       const chunkSnap = await getDoc(chunkRef);
       return { chunkName, chunkSnap };

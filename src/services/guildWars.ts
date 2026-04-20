@@ -545,6 +545,7 @@ export async function fetchWarHistory(uid: string): Promise<WarHistoryEntry[]> {
 function parseChallenge(id: string, data: Record<string, unknown>): WarChallenge {
   return {
     challengeId: id,
+    challengerUid: typeof data.challengerUid === 'string' ? data.challengerUid : '',
     challengerGuildId: typeof data.challengerGuildId === 'string' ? data.challengerGuildId : '',
     challengerName: typeof data.challengerName === 'string' ? data.challengerName : 'Guild',
     challengerTag: typeof data.challengerTag === 'string' ? data.challengerTag : '???',

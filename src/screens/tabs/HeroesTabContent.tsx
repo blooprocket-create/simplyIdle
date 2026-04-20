@@ -562,6 +562,9 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                         uniqueRank > 0
                           ? `Forged for ${hero.name}: ${getHeroBackstory(hero.id)}`
                           : `Unforged concept: ${getHeroBackstory(hero.id)}`;
+                      const heroAnimationUri =
+                        hero.tier >= 5 && Platform.OS === 'web' ? getHeroAnimationUri(hero.id) : null;
+                      const heroPortraitSource = getHeroPortraitSource(hero.id);
 
                       return (
                         <View
@@ -574,9 +577,9 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                             { width: rosterCardWidth, marginBottom: 0 },
                           ]}
                         >
-                          {hero.tier >= 5 && Platform.OS === 'web' && getHeroAnimationUri(hero.id) ? (
+                          {heroAnimationUri ? (
                             React.createElement('video', {
-                              src: getHeroAnimationUri(hero.id),
+                              src: heroAnimationUri,
                               autoPlay: true,
                               loop: true,
                               muted: true,
@@ -594,10 +597,10 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                                 opacity: 0.38,
                               } as any,
                             })
-                          ) : getHeroPortraitSource(hero.id) ? (
+                          ) : heroPortraitSource ? (
                             <View style={styles.heroCardBackdropImageContainer}>
                               <Image
-                                source={getHeroPortraitSource(hero.id)}
+                                source={heroPortraitSource}
                                 style={styles.heroCardBackdropImage}
                                 resizeMode="cover"
                               />

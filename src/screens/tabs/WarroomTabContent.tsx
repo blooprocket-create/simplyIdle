@@ -39,7 +39,7 @@ export interface WarroomTabContentProps {
   prestige50Done: boolean;
   guidanceList: GuidanceItem[];
   onTabChange: (tab: Tab) => void;
-  setAchievementsSubTab: (tab: 'overview' | 'weekly' | 'missions' | 'achievements' | 'collection' | 'codex') => void;
+  setAchievementsSubTab: (tab: 'overview' | 'missions' | 'achievements' | 'collection' | 'codex') => void;
   claimAllRewards: () => void;
 }
 
