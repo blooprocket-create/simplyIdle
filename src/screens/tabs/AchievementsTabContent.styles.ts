@@ -525,6 +525,39 @@ export const styles = StyleSheet.create({
     lineHeight: 17,
     marginBottom: 10,
   },
+  codexRelicInlineCard: {
+    backgroundColor: '#0F1B28',
+    borderWidth: 1,
+    borderColor: '#2A4560',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
+  },
+  codexRelicInlineLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#8DB2D8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  codexRelicInlineName: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#F0F6FF',
+    marginBottom: 2,
+  },
+  codexRelicInlineMeta: {
+    fontSize: 10,
+    color: '#9BB6CD',
+    lineHeight: 15,
+    marginBottom: 4,
+  },
+  codexRelicInlineDesc: {
+    fontSize: 10,
+    color: '#B2C8DB',
+    lineHeight: 15,
+  },
   codexSpotlightActionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -616,6 +649,12 @@ export const styles = StyleSheet.create({
     fontSize: 10,
     color: '#8EA6BC',
     lineHeight: 14,
+  },
+  codexGalleryRelicState: {
+    marginTop: 4,
+    fontSize: 10,
+    color: '#A8C2D9',
+    fontWeight: '700',
   },
   codexRelicSpotlightCard: {
     backgroundColor: '#101B29',

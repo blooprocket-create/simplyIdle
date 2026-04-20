@@ -137,12 +137,10 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
     const codexNotificationCount = claimableCodexHeroVipCount + claimableCodexUniqueVipCount;
     const [codexFactionFilter, setCodexFactionFilter] = useState<CodexFactionFilter>('all');
     const [selectedCodexHeroId, setSelectedCodexHeroId] = useState<string | null>(null);
-    const [selectedRelicHeroId, setSelectedRelicHeroId] = useState<string | null>(null);
     const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
     const [portraitModalHero, setPortraitModalHero] = useState<(typeof HERO_POOL)[number] | null>(null);
     const closePortraitModal = useCallback(() => setPortraitModalHero(null), []);
     const codexColumns = viewportWidth < 420 ? 2 : viewportWidth < 840 ? 3 : 4;
-    const relicColumns = viewportWidth < 560 ? 1 : viewportWidth < 960 ? 2 : 3;
     const filteredArchiveHeroes = useMemo(
       () =>
         HERO_POOL.filter(hero => codexFactionFilter === 'all' || getCodexFaction(hero) === codexFactionFilter).sort(
@@ -160,10 +158,13 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
       if (filteredArchiveHeroes.length === 0) return null;
       return filteredArchiveHeroes.find(hero => hero.id === selectedCodexHeroId) ?? filteredArchiveHeroes[0];
     }, [filteredArchiveHeroes, selectedCodexHeroId]);
-    const relicSpotlightEntry = useMemo(() => {
-      if (codexUniqueEntries.length === 0) return null;
-      return codexUniqueEntries.find(entry => entry.hero.id === selectedRelicHeroId) ?? codexUniqueEntries[0];
-    }, [codexUniqueEntries, selectedRelicHeroId]);
+    const codexUniqueRankByHeroId = useMemo(() => {
+      const ranks: Record<string, number> = {};
+      for (const entry of codexUniqueEntries) {
+        ranks[entry.hero.id] = entry.uniqueRank;
+      }
+      return ranks;
+    }, [codexUniqueEntries]);
     const storySpotlightEntry = useMemo(() => {
       if (safeStoryEntries.length === 0) return null;
       return (
@@ -449,9 +450,9 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                     <Text style={styles.codexOverviewBody}>Discovered across all fronts</Text>
                   </View>
                   <View style={styles.codexOverviewCard}>
-                    <Text style={styles.codexOverviewEyebrow}>Relic Armory</Text>
+                    <Text style={styles.codexOverviewEyebrow}>Hero Relics</Text>
                     <Text style={styles.codexOverviewValue}>{codexUniqueEntries.length}</Text>
-                    <Text style={styles.codexOverviewBody}>Forged signature relics</Text>
+                    <Text style={styles.codexOverviewBody}>Forged and linked to hero dossiers</Text>
                   </View>
                   <View style={styles.codexOverviewCard}>
                     <Text style={styles.codexOverviewEyebrow}>War Chronicle</Text>
@@ -548,6 +549,32 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                             ? getHeroBackstory(archiveSpotlightHero.id)
                             : 'Signal fragments detected. Summon this operative to unseal their dossier, doctrine, and battlefield history.'}
                         </Text>
+                        {unlockedHeroIds.has(archiveSpotlightHero.id) && (
+                          <View style={styles.codexRelicInlineCard}>
+                            <Text style={styles.codexRelicInlineLabel}>Bound Relic</Text>
+                            {codexUniqueRankByHeroId[archiveSpotlightHero.id] ? (
+                              <>
+                                <Text style={styles.codexRelicInlineName}>
+                                  {getHeroUniqueWeaponName(archiveSpotlightHero.id)}
+                                </Text>
+                                <Text style={styles.codexRelicInlineMeta}>
+                                  Rank {codexUniqueRankByHeroId[archiveSpotlightHero.id]}/10 •{' '}
+                                  {getHeroUniqueEffectFamilyLabel(archiveSpotlightHero.id)}
+                                </Text>
+                                <Text style={styles.codexRelicInlineDesc}>
+                                  {getHeroUniqueSkillDescription(
+                                    archiveSpotlightHero.id,
+                                    codexUniqueRankByHeroId[archiveSpotlightHero.id],
+                                  )}
+                                </Text>
+                              </>
+                            ) : (
+                              <Text style={styles.codexRelicInlineMeta}>
+                                Not forged yet. Secure this hero's signature relic to unlock doctrine bonuses.
+                              </Text>
+                            )}
+                          </View>
+                        )}
                         <View style={styles.codexSpotlightActionRow}>
                           {unlockedHeroIds.has(archiveSpotlightHero.id) &&
                           !codexVipClaimedHeroIds.includes(archiveSpotlightHero.id) ? (
@@ -568,6 +595,18 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                               <Text style={styles.codexActionPrimaryText}>Inspect Full Dossier</Text>
                             </Pressable>
                           ) : null}
+                          {unlockedHeroIds.has(archiveSpotlightHero.id) &&
+                          codexUniqueRankByHeroId[archiveSpotlightHero.id] > 0 &&
+                          !codexVipClaimedUniqueIds.includes(archiveSpotlightHero.id) ? (
+                            <Pressable
+                              style={styles.codexActionSecondary}
+                              onPress={() => {
+                                claimCodexUniqueVip(archiveSpotlightHero.id);
+                              }}
+                            >
+                              <Text style={styles.codexActionSecondaryText}>Archive Relic +10 VIP</Text>
+                            </Pressable>
+                          ) : null}
                           <Text style={styles.codexActionHint}>
                             {unlockedHeroIds.has(archiveSpotlightHero.id)
                               ? codexVipClaimedHeroIds.includes(archiveSpotlightHero.id)
@@ -575,6 +614,14 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                                 : 'First reveal claims VIP points'
                               : 'Currently classified'}
                           </Text>
+                          {unlockedHeroIds.has(archiveSpotlightHero.id) &&
+                            codexUniqueRankByHeroId[archiveSpotlightHero.id] > 0 && (
+                              <Text style={styles.codexActionHint}>
+                                {codexVipClaimedUniqueIds.includes(archiveSpotlightHero.id)
+                                  ? 'Relic archive reward claimed'
+                                  : 'Relic archive reward available'}
+                              </Text>
+                            )}
                         </View>
                       </View>
                     </View>
@@ -615,105 +662,17 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                               ? `${formatHeroClass(hero.heroClass)} • T${hero.tier}`
                               : `${getCodexFactionLabel(getCodexFaction(hero))} file`}
                           </Text>
+                          {unlocked ? (
+                            <Text style={styles.codexGalleryRelicState} numberOfLines={1}>
+                              {codexUniqueRankByHeroId[hero.id]
+                                ? `Relic Rank ${codexUniqueRankByHeroId[hero.id]}`
+                                : 'Relic not forged'}
+                            </Text>
+                          ) : null}
                         </Pressable>
                       );
                     })}
                   </View>
-                </View>
-
-                <View style={styles.codexSectionShell}>
-                  <View style={styles.codexSectionHeaderRow}>
-                    <View style={styles.codexSectionHeaderCopy}>
-                      <Text style={styles.codexSectionKicker}>Armory Vault</Text>
-                      <Text style={styles.codexSectionTitle}>Relic Armory</Text>
-                      <Text style={styles.codexSectionDescription}>
-                        Signature weapons should read like artifacts of doctrine and conquest, not one more line item in
-                        storage.
-                      </Text>
-                    </View>
-                    <View style={styles.codexSectionBadge}>
-                      <Text style={styles.codexSectionBadgeValue}>{claimableCodexUniqueVipCount}</Text>
-                      <Text style={styles.codexSectionBadgeLabel}>Unclaimed reveals</Text>
-                    </View>
-                  </View>
-
-                  {relicSpotlightEntry ? (
-                    <View style={styles.codexRelicSpotlightCard}>
-                      <View style={styles.codexRelicSpotlightHeader}>
-                        <View>
-                          <Text style={styles.codexSpotlightEyebrow}>
-                            {getHeroUniqueEffectFamilyLabel(relicSpotlightEntry.hero.id)}
-                          </Text>
-                          <Text style={styles.codexSpotlightTitle}>
-                            {getHeroUniqueWeaponName(relicSpotlightEntry.hero.id)}
-                          </Text>
-                          <Text style={styles.codexRelicHeroLine}>
-                            Bound to {relicSpotlightEntry.hero.name} • Rank {relicSpotlightEntry.uniqueRank}/10
-                          </Text>
-                        </View>
-                        <Pressable
-                          style={styles.codexActionSecondary}
-                          onPress={() => {
-                            if (!codexVipClaimedUniqueIds.includes(relicSpotlightEntry.hero.id)) {
-                              claimCodexUniqueVip(relicSpotlightEntry.hero.id);
-                            }
-                            setPortraitModalHero(relicSpotlightEntry.hero);
-                          }}
-                        >
-                          <Text style={styles.codexActionSecondaryText}>
-                            {codexVipClaimedUniqueIds.includes(relicSpotlightEntry.hero.id)
-                              ? 'Inspect Relic'
-                              : 'Archive Relic +10 VIP'}
-                          </Text>
-                        </Pressable>
-                      </View>
-                      <Text style={styles.codexSpotlightDescription}>
-                        {getHeroUniqueSkillDescription(relicSpotlightEntry.hero.id, relicSpotlightEntry.uniqueRank)}
-                      </Text>
-                      <View style={styles.codexMetaRow}>
-                        <Text style={styles.codexMetaChip}>{formatHeroClass(relicSpotlightEntry.hero.heroClass)}</Text>
-                        <Text style={styles.codexMetaChip}>TIER {relicSpotlightEntry.hero.tier}</Text>
-                        <Text style={styles.codexMetaChip}>Rank {relicSpotlightEntry.uniqueRank}</Text>
-                      </View>
-                    </View>
-                  ) : (
-                    <Text style={styles.collectionStat}>Forge a unique weapon to begin stocking the armory vault.</Text>
-                  )}
-
-                  {codexUniqueEntries.length > 0 && (
-                    <View style={styles.codexRelicGrid}>
-                      {codexUniqueEntries.map(({ hero, uniqueRank }) => {
-                        const claimed = codexVipClaimedUniqueIds.includes(hero.id);
-                        return (
-                          <Pressable
-                            key={`unique_${hero.id}`}
-                            style={[
-                              styles.codexRelicCard,
-                              { width: `${100 / relicColumns - 2}%` },
-                              selectedRelicHeroId === hero.id && styles.codexGalleryCardSelected,
-                            ]}
-                            onPress={() => setSelectedRelicHeroId(hero.id)}
-                          >
-                            <View style={styles.codexRelicCardHeader}>
-                              <View style={[styles.codexRelicIconWrap, { borderColor: getTierAccent(hero.tier) }]}>
-                                {renderCodexHeroIcon(hero.id, hero.emoji)}
-                                {!claimed && <View style={styles.codexClaimDot} />}
-                              </View>
-                              <View style={styles.codexRelicRankPill}>
-                                <Text style={styles.codexRelicRankText}>R{uniqueRank}</Text>
-                              </View>
-                            </View>
-                            <Text style={styles.codexRelicCardTitle} numberOfLines={2}>
-                              {getHeroUniqueWeaponName(hero.id)}
-                            </Text>
-                            <Text style={styles.codexRelicCardMeta} numberOfLines={1}>
-                              {hero.name} • {getHeroUniqueEffectFamilyLabel(hero.id)}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  )}
                 </View>
 
                 <View style={styles.codexSectionShell}>
