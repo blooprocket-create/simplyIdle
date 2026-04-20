@@ -53,6 +53,41 @@ function getMissionHorizonFlavor(horizon: 'short' | 'medium' | 'long'): string {
   return 'Long-haul legacy milestones that define your account.';
 }
 
+function getSubtabSceneMeta(subtab: string): { kicker: string; title: string; flavor: string } {
+  switch (subtab) {
+    case 'missions':
+      return {
+        kicker: 'Operations Desk',
+        title: 'Mission Command',
+        flavor: 'Directive lanes, rotating objectives, and live reward routing.',
+      };
+    case 'achievements':
+      return {
+        kicker: 'Honor Ledger',
+        title: 'Records Hall',
+        flavor: 'A ceremonial archive of milestones secured across the campaign.',
+      };
+    case 'collection':
+      return {
+        kicker: 'Archive Vault',
+        title: 'Collection Matrix',
+        flavor: 'Track roster depth, relic status, and long-war account progression.',
+      };
+    case 'codex':
+      return {
+        kicker: 'Intelligence Wing',
+        title: 'Legacy Codex',
+        flavor: 'Classified dossiers, relic doctrine, and chapter chronicle records.',
+      };
+    default:
+      return {
+        kicker: 'Command Deck',
+        title: 'Legacy Overview',
+        flavor: 'Your achievements wing at a glance, tuned for fast decisions.',
+      };
+  }
+}
+
 function getCodexFaction(hero: CodexHero): Exclude<CodexFactionFilter, 'all'> {
   if (hero.heroClass === 'warrior' || hero.heroClass === 'berserker') return 'vanguard';
   if (hero.heroClass === 'archer') return 'ranger';
@@ -254,6 +289,14 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
       };
     }, [state.heroRoster.length, state.permanentUnlocks.length, state.prestigeCount]);
     const overviewClaimableCount = claimableWeeklyMilestones.length + claimableMissionIds.length;
+    const sceneMeta = useMemo(() => getSubtabSceneMeta(achievementsSubTab), [achievementsSubTab]);
+    const showcaseHeroes = useMemo(() => {
+      const sorted = [...state.heroRoster].sort((a, b) => (b.level ?? 0) - (a.level ?? 0));
+      return sorted
+        .slice(0, 3)
+        .map(hero => HERO_POOL.find(template => template.id === hero.id))
+        .filter((hero): hero is CodexHero => !!hero);
+    }, [state.heroRoster]);
     const renderCodexHeroIcon = (heroId: string, emoji: string, size: 'sm' | 'md' | 'lg' = 'sm') => {
       const portraitSource = getHeroPortraitSource(heroId);
       const portraitStyle =
@@ -274,6 +317,12 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
       <>
         {tab === 'achievements' && (
           <View style={styles.achievementsTab}>
+            <View pointerEvents="none" style={styles.achievementsAtmosphere}>
+              <View style={styles.achievementsAtmosphereOrbPrimary} />
+              <View style={styles.achievementsAtmosphereOrbSecondary} />
+              <View style={styles.achievementsAtmosphereGrid} />
+            </View>
+
             {renderSubTabBar(
               (['overview', 'missions', 'achievements', 'collection', 'codex'] as const).map(st => ({
                 id: st,
@@ -297,6 +346,31 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                       : 0,
               })),
             )}
+
+            <View style={styles.sceneBannerCard}>
+              <View style={styles.sceneBannerHeaderRow}>
+                <View>
+                  <Text style={styles.sceneBannerKicker}>{sceneMeta.kicker}</Text>
+                  <Text style={styles.sceneBannerTitle}>{sceneMeta.title}</Text>
+                  <Text style={styles.sceneBannerFlavor}>{sceneMeta.flavor}</Text>
+                </View>
+                <View style={styles.sceneBannerBadge}>
+                  <Text style={styles.sceneBannerBadgeValue}>{overviewClaimableCount}</Text>
+                  <Text style={styles.sceneBannerBadgeLabel}>Ready</Text>
+                </View>
+              </View>
+              <View style={styles.scenePortraitStrip}>
+                {showcaseHeroes.length > 0 ? (
+                  showcaseHeroes.map(hero => (
+                    <View key={hero.id} style={styles.scenePortraitToken}>
+                      {renderCodexHeroIcon(hero.id, hero.emoji)}
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.scenePortraitEmpty}>Summon heroes to populate the command mural.</Text>
+                )}
+              </View>
+            </View>
 
             {(achievementsSubTab === 'overview' || achievementsSubTab === 'missions') && (
               <View style={styles.achievementBonusCard}>
@@ -407,12 +481,28 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                     <Text style={styles.missionGroupFlavor}>{getMissionHorizonFlavor(horizon)}</Text>
                     {missionGroups[horizon].map(({ mission, progress, claimed }) => (
                       <View key={mission.id} style={styles.missionRow}>
+                        <View style={[styles.missionStateRail, progress.done && styles.missionStateRailDone]} />
                         <View style={styles.missionInfo}>
-                          <Text style={styles.missionTitle}>{mission.title}</Text>
+                          <View style={styles.missionTitleRow}>
+                            <Text style={styles.missionTitle}>{mission.title}</Text>
+                            <Text style={styles.missionChip}>
+                              {claimed ? 'SECURED' : progress.done ? 'READY' : 'ACTIVE'}
+                            </Text>
+                          </View>
                           <Text style={styles.missionDesc}>{mission.description}</Text>
                           <Text style={styles.missionProgress}>
                             {Math.min(progress.value, mission.target)}/{mission.target}
                           </Text>
+                          <View style={styles.missionProgressBarBg}>
+                            <View
+                              style={[
+                                styles.missionProgressBarFill,
+                                {
+                                  width: `${Math.min(100, (Math.min(progress.value, mission.target) / Math.max(1, mission.target)) * 100)}%`,
+                                },
+                              ]}
+                            />
+                          </View>
                         </View>
                         <Pressable
                           style={[
@@ -464,11 +554,17 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                 </View>
                 {filteredAchievementRows.map(({ ach, unlocked, hiddenLocked }) => (
                   <View key={ach.id} style={[styles.achCard, unlocked && styles.achCardUnlocked]}>
+                    <View style={[styles.recordStateRail, unlocked && styles.recordStateRailUnlocked]} />
                     <Text style={styles.achEmoji}>{hiddenLocked ? '❔' : ach.emoji}</Text>
                     <View style={styles.achCardInfo}>
-                      <Text style={[styles.achName, unlocked && styles.achNameUnlocked]}>
-                        {hiddenLocked ? 'Hidden Record' : ach.name}
-                      </Text>
+                      <View style={styles.recordTitleRow}>
+                        <Text style={[styles.achName, unlocked && styles.achNameUnlocked]}>
+                          {hiddenLocked ? 'Hidden Record' : ach.name}
+                        </Text>
+                        <Text style={[styles.recordStateChip, unlocked && styles.recordStateChipUnlocked]}>
+                          {hiddenLocked ? 'CLASSIFIED' : unlocked ? 'SECURED' : 'PENDING'}
+                        </Text>
+                      </View>
                       <Text style={styles.achDesc}>
                         {hiddenLocked ? 'Unseal this by discovering an obscure milestone.' : ach.description}
                       </Text>
