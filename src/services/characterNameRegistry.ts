@@ -1,9 +1,7 @@
 import { doc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseFirestore, isFirebaseConfigured } from './firebase';
 
-export type CharacterNameReserveResult =
-  | { ok: true }
-  | { ok: false; error: 'taken' | 'unavailable' | 'unknown' };
+export type CharacterNameReserveResult = { ok: true } | { ok: false; error: 'taken' | 'unavailable' | 'unknown' };
 
 function normalizeCharacterName(name: string): string {
   // NFC normalize to collapse composed/decomposed Unicode variants,
@@ -11,7 +9,7 @@ function normalizeCharacterName(name: string): string {
   // Cyrillic/Greek/etc. homoglyphs (е→e, і→i, о→o).
   return name
     .normalize('NFC')
-    .replace(/[^\u0000-\u024F\s]/g, '')
+    .replace(/[^\u0020-\u024F\s]/g, '')
     .trim()
     .replace(/\s+/g, ' ')
     .toLowerCase();

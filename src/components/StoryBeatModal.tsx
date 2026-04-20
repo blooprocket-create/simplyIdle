@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal, Animated } from 'react-native';
 
 interface StoryBeatModalProps {
@@ -16,11 +16,11 @@ interface StoryBeatModalProps {
  * reveal animation when a new story beat unlocks.
  */
 export default function StoryBeatModal({ visible, chapter, title, body, wave, onDismiss }: StoryBeatModalProps) {
-  const fadeIn = useRef(new Animated.Value(0)).current;
-  const slideUp = useRef(new Animated.Value(40)).current;
-  const headerOpacity = useRef(new Animated.Value(0)).current;
-  const bodyOpacity = useRef(new Animated.Value(0)).current;
-  const ctaOpacity = useRef(new Animated.Value(0)).current;
+  const fadeIn = useMemo(() => new Animated.Value(0), []);
+  const slideUp = useMemo(() => new Animated.Value(40), []);
+  const headerOpacity = useMemo(() => new Animated.Value(0), []);
+  const bodyOpacity = useMemo(() => new Animated.Value(0), []);
+  const ctaOpacity = useMemo(() => new Animated.Value(0), []);
 
   useEffect(() => {
     if (!visible) {

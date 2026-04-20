@@ -9,13 +9,19 @@ import { debugLog } from '../telemetry';
  */
 export function useRenderTracker(label: string, warnThreshold = 60): void {
   const countRef = useRef(0);
-  const windowStartRef = useRef(Date.now());
-
-  if (typeof __DEV__ === 'undefined' || !__DEV__) return;
-
-  countRef.current += 1;
+  const windowStartRef = useRef(0);
+  const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
 
   useEffect(() => {
+    if (!isDev) return;
+    countRef.current += 1;
+  });
+
+  useEffect(() => {
+    if (!isDev) return;
+
+    windowStartRef.current = Date.now();
+
     const interval = setInterval(() => {
       const elapsed = (Date.now() - windowStartRef.current) / 1000;
       const rps = countRef.current / Math.max(elapsed, 1);
@@ -27,7 +33,7 @@ export function useRenderTracker(label: string, warnThreshold = 60): void {
     }, 10_000);
 
     return () => clearInterval(interval);
-  }, [label, warnThreshold]);
+  }, [isDev, label, warnThreshold]);
 }
 
 /**

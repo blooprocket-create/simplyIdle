@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated, useWindowDimensions } from 'react-native';
 import { t } from '../i18n';
 
@@ -9,21 +9,17 @@ interface TitleScreenProps {
 export default function TitleScreen({ onStart }: TitleScreenProps) {
   const { width } = useWindowDimensions();
   const isPhone = width < 600;
-  const loreLines = [
-    t('title.line1'),
-    t('title.line2'),
-    t('title.line3'),
-  ];
+  const loreLines = [t('title.line1'), t('title.line2'), t('title.line3')];
 
   // Fade-in animations
-  const titleOpacity = useRef(new Animated.Value(0)).current;
-  const subtitleOpacity = useRef(new Animated.Value(0)).current;
-  const loreOpacity = useRef(new Animated.Value(0)).current;
-  const ctaOpacity = useRef(new Animated.Value(0)).current;
-  const ctaPulse = useRef(new Animated.Value(1)).current;
+  const titleOpacity = useMemo(() => new Animated.Value(0), []);
+  const subtitleOpacity = useMemo(() => new Animated.Value(0), []);
+  const loreOpacity = useMemo(() => new Animated.Value(0), []);
+  const ctaOpacity = useMemo(() => new Animated.Value(0), []);
+  const ctaPulse = useMemo(() => new Animated.Value(1), []);
 
   const [loreIndex, setLoreIndex] = useState(0);
-  const loreLineOpacity = useRef(new Animated.Value(0)).current;
+  const loreLineOpacity = useMemo(() => new Animated.Value(0), []);
 
   useEffect(() => {
     Animated.sequence([
@@ -40,7 +36,7 @@ export default function TitleScreen({ onStart }: TitleScreenProps) {
         Animated.sequence([
           Animated.timing(ctaPulse, { toValue: 1.06, duration: 1200, useNativeDriver: true }),
           Animated.timing(ctaPulse, { toValue: 1, duration: 1200, useNativeDriver: true }),
-        ])
+        ]),
       ).start();
     }, 4000);
 
@@ -83,9 +79,7 @@ export default function TitleScreen({ onStart }: TitleScreenProps) {
 
         {/* Lore crawl */}
         <Animated.View style={[styles.loreContainer, { opacity: loreOpacity }]}>
-          <Animated.Text style={[styles.loreText, { opacity: loreLineOpacity }]}>
-            {loreLines[loreIndex]}
-          </Animated.Text>
+          <Animated.Text style={[styles.loreText, { opacity: loreLineOpacity }]}>{loreLines[loreIndex]}</Animated.Text>
         </Animated.View>
 
         {/* CTA */}
