@@ -11,6 +11,10 @@ export const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: -1,
   },
+  achievementsAtmosphereNoise: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.14,
+  },
   achievementsAtmosphereOrbPrimary: {
     position: 'absolute',
     top: -90,
@@ -35,91 +39,25 @@ export const styles = StyleSheet.create({
     borderColor: 'rgba(140, 176, 219, 0.06)',
     borderRadius: 14,
   },
-  sceneBannerCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#37506E',
-    backgroundColor: '#101A29',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginBottom: 10,
-  },
-  sceneBannerHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  sceneBannerKicker: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#93B4D8',
-    textTransform: 'uppercase',
-    letterSpacing: 0.7,
-    marginBottom: 2,
-  },
-  sceneBannerTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#ECF5FF',
-    marginBottom: 2,
-  },
-  sceneBannerFlavor: {
-    fontSize: 10,
-    color: '#A8BFD4',
-    lineHeight: 15,
-    maxWidth: 260,
-  },
-  sceneBannerBadge: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#4F7092',
-    backgroundColor: '#162B40',
-    minWidth: 64,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-  },
-  sceneBannerBadgeValue: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#D9ECFF',
-  },
-  sceneBannerBadgeLabel: {
-    fontSize: 9,
-    color: '#97B3CD',
-    textTransform: 'uppercase',
-  },
-  scenePortraitStrip: {
-    marginTop: 10,
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
-  scenePortraitToken: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#486684',
-    backgroundColor: '#0E1825',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  scenePortraitEmpty: {
-    fontSize: 10,
-    color: '#7E9CB8',
-  },
 
   // ── Bonus Card ───────────────────────────────────────────
   achievementBonusCard: {
+    position: 'relative',
+    overflow: 'hidden',
     backgroundColor: '#17232B',
     borderWidth: 1,
     borderColor: '#385A66',
     borderRadius: 8,
     padding: 10,
     marginBottom: 10,
+  },
+  achievementBonusArt: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.14,
+  },
+  achievementBonusScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(7, 13, 21, 0.5)',
   },
   achievementBonusHeader: {
     flexDirection: 'row',
@@ -290,12 +228,22 @@ export const styles = StyleSheet.create({
 
   // ── Mission Board ────────────────────────────────────────
   missionBoardCard: {
+    position: 'relative',
+    overflow: 'hidden',
     backgroundColor: '#1A182B',
     borderWidth: 1,
     borderColor: '#3A3161',
     borderRadius: 8,
     padding: 10,
     marginBottom: 10,
+  },
+  missionBoardArt: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.12,
+  },
+  missionBoardScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10, 8, 24, 0.56)',
   },
   missionGroupCard: {
     backgroundColor: '#151327',
@@ -415,6 +363,8 @@ export const styles = StyleSheet.create({
 
   // ── Achievement Cards ────────────────────────────────────
   achCard: {
+    position: 'relative',
+    overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
@@ -426,6 +376,14 @@ export const styles = StyleSheet.create({
     borderColor: '#2A4257',
     marginBottom: 8,
     opacity: 0.6,
+  },
+  recordPlaqueArt: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.13,
+  },
+  recordPlaqueScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(8, 12, 20, 0.54)',
   },
   recordStateRail: {
     width: 3,
@@ -521,12 +479,22 @@ export const styles = StyleSheet.create({
 
   // ── Collection ───────────────────────────────────────────
   collectionCard: {
+    position: 'relative',
+    overflow: 'hidden',
     backgroundColor: '#111E2C',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#2A4260',
     padding: 10,
     marginBottom: 8,
+  },
+  collectionVaultArt: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.12,
+  },
+  collectionVaultScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(7, 13, 21, 0.52)',
   },
   collectionCardTitle: {
     fontSize: 12,
@@ -586,6 +554,8 @@ export const styles = StyleSheet.create({
     marginBottom: 8,
   },
   collectionCardCompact: {
+    position: 'relative',
+    overflow: 'hidden',
     flex: 1,
     minWidth: 112,
     backgroundColor: '#111E2C',
@@ -593,6 +563,14 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2A4260',
     padding: 10,
+  },
+  collectionVaultArtCompact: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.1,
+  },
+  collectionVaultScrimCompact: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(8, 13, 22, 0.48)',
   },
   unlockChipRow: {
     flexDirection: 'row',
