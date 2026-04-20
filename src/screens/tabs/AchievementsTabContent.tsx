@@ -642,7 +642,12 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                             unlocked && styles.codexGalleryCardUnlocked,
                             selectedCodexHeroId === hero.id && styles.codexGalleryCardSelected,
                           ]}
-                          onPress={() => setSelectedCodexHeroId(hero.id)}
+                          onPress={() => {
+                            setSelectedCodexHeroId(hero.id);
+                            if (unlocked) {
+                              setPortraitModalHero(hero);
+                            }
+                          }}
                         >
                           <View style={[styles.codexGalleryPortraitWrap, { borderColor: getTierAccent(hero.tier) }]}>
                             {unlocked ? (
