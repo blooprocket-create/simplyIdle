@@ -595,11 +595,13 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                               } as any,
                             })
                           ) : getHeroPortraitSource(hero.id) ? (
-                            <Image
-                              source={getHeroPortraitSource(hero.id)}
-                              style={styles.heroCardBackdropImage}
-                              resizeMode="cover"
-                            />
+                            <View style={styles.heroCardBackdropImageContainer}>
+                              <Image
+                                source={getHeroPortraitSource(hero.id)}
+                                style={styles.heroCardBackdropImage}
+                                resizeMode="cover"
+                              />
+                            </View>
                           ) : (
                             <View style={styles.heroCardBackdropFallback}>
                               <Text style={styles.heroCardBackdropEmoji}>{hero.emoji}</Text>

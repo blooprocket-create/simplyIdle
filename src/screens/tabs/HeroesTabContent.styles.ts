@@ -341,8 +341,15 @@ export const styles = StyleSheet.create({
     minHeight: 160,
   },
   heroCardBackdropImage: {
-    ...StyleSheet.absoluteFillObject,
+    width: '110%',
+    height: '110%',
     opacity: 0.38,
+  },
+  heroCardBackdropImageContainer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   heroCardBackdropFallback: {
     ...StyleSheet.absoluteFillObject,
