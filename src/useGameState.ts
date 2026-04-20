@@ -921,10 +921,10 @@ function getPreferredUniqueBearer(state: Pick<GameState, 'heroRoster'>, heroTemp
 
 function syncUniqueWeaponAssignmentForHero(state: GameState, heroTemplateId: string): GameState {
   const progress = state.heroUniqueGearByHeroId[heroTemplateId];
-  if (!progress || progress.rank <= 0 || !progress.equippedByUid) return state;
+  if (!progress || progress.rank <= 0) return state;
 
   const preferredBearer = getPreferredUniqueBearer(state, heroTemplateId);
-  if (!preferredBearer || preferredBearer.uid === progress.equippedByUid) return state;
+  if (!preferredBearer) return state;
 
   return {
     ...state,
@@ -937,6 +937,8 @@ function syncUniqueWeaponAssignmentForHero(state: GameState, heroTemplateId: str
     },
   };
 }
+
+void syncUniqueWeaponAssignmentForHero;
 
 function getUniqueWeaponBearerUid(state: GameState, heroTemplateId: string): string | null {
   const progress = state.heroUniqueGearByHeroId[heroTemplateId];
@@ -1147,14 +1149,17 @@ function normalizeTeamSelectionByRules(
 
 function getTeamRoleCounts(state: Pick<GameState, 'heroRoster' | 'heroFormationByUid'>, heroIds: string[]) {
   const roleCounts: Record<HeroFormationRole, number> = { front: 0, mid: 0, back: 0 };
-  for (const uid of heroIds) {
+  heroIds.forEach(uid => {
     const hero = state.heroRoster.find(h => h.uid === uid);
-    if (!hero) continue;
-    const role = state.heroFormationByUid[uid] ?? defaultFormationForClass(hero.heroClass);
-    roleCounts[role] += 1;
-  }
+    if (hero) {
+      const role = state.heroFormationByUid[uid] ?? defaultFormationForClass(hero.heroClass);
+      roleCounts[role] += 1;
+    }
+  });
   return roleCounts;
 }
+
+void getTeamRoleCounts;
 
 function getFormationMultipliers(state: GameState): {
   dpsMult: number;
@@ -1413,6 +1418,8 @@ function claimAllMailAttachments(state: GameState): GameState {
   }
   return nextState;
 }
+
+void claimAllMailAttachments;
 
 function getHeroPassiveMultipliers(state: GameState): {
   dpsMult: number;
@@ -3476,16 +3483,16 @@ function toDayNumber(ts: number): number {
 }
 
 function getRiftDailyEntryCap(state: Pick<GameState, 'vipLevel'>): number {
-  if (state.vipLevel >= 4) return 5;
-  if (state.vipLevel >= 2) return 4;
-  return 3;
+  return state.vipLevel >= 4 ? 5 : state.vipLevel >= 2 ? 4 : 3;
 }
 
+void getRiftDailyEntryCap;
+
 function getTreasuryDailyEntryCap(state: Pick<GameState, 'vipLevel'>): number {
-  if (state.vipLevel >= 4) return 5;
-  if (state.vipLevel >= 2) return 4;
-  return 3;
+  return state.vipLevel >= 4 ? 5 : state.vipLevel >= 2 ? 4 : 3;
 }
+
+void getTreasuryDailyEntryCap;
 
 function killMonster(state: GameState): GameState {
   const weekly = getCurrentWeeklyEvent(state);

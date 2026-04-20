@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing } from 'react-native';
 import { Rarity } from '../gameConfig';
 
@@ -53,14 +53,17 @@ export function useSummonCinematic({
     cinematicTimersRef.current = [];
   };
 
-  const mapLatestTen = () =>
-    summonHistory.slice(0, 10).map(entry => ({
-      id: entry.id,
-      heroId: heroTemplateIdByName.get(entry.heroName) ?? null,
-      heroName: entry.heroName,
-      emoji: entry.heroEmoji,
-      rarity: entry.rarity,
-    }));
+  const mapLatestTen = useCallback(
+    () =>
+      summonHistory.slice(0, 10).map(entry => ({
+        id: entry.id,
+        heroId: heroTemplateIdByName.get(entry.heroName) ?? null,
+        heroName: entry.heroName,
+        emoji: entry.heroEmoji,
+        rarity: entry.rarity,
+      })),
+    [heroTemplateIdByName, summonHistory],
+  );
 
   useEffect(() => {
     if (!isCinematicModalOpen) return;
