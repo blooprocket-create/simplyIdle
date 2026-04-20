@@ -330,6 +330,8 @@ export const styles = StyleSheet.create({
 
   // ── Hero Card ────────────────────────────────────────────
   heroCard: {
+    position: 'relative',
+    isolation: 'isolate',
     flexDirection: 'row',
     backgroundColor: theme.bg.card,
     borderRadius: 6,
@@ -337,6 +339,24 @@ export const styles = StyleSheet.create({
     borderColor: '#2A2A4A',
     marginBottom: 8,
     overflow: 'hidden',
+  },
+  heroCardBackdropImage: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.38,
+  },
+  heroCardBackdropFallback: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#11111D',
+  },
+  heroCardBackdropEmoji: {
+    fontSize: 56,
+    opacity: 0.25,
+  },
+  heroCardBackdropScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(7, 10, 16, 0.58)',
   },
   heroCardActive: {
     borderColor: theme.status.positive,
@@ -361,11 +381,13 @@ export const styles = StyleSheet.create({
   heroCardRarityBar: {
     width: 4,
     borderRadius: 0,
+    zIndex: 2,
   },
   heroCardBody: {
     flex: 1,
     paddingVertical: 10,
     paddingHorizontal: 10,
+    zIndex: 2,
   },
   heroCardBodyMobile: {
     paddingHorizontal: 12,

@@ -76,8 +76,6 @@ export interface HeroesTabContentProps {
   featuredSummonBanner: FeaturedSummonBannerView;
   autoEquipBestHeroes: () => void;
   autoRecycleHeroes: () => void;
-  saveTeamLoadout: (slot: number) => void;
-  loadTeamLoadout: (slot: number) => void;
   toggleEquipHero: (heroId: string) => void;
   toggleHeroUniqueWeapon: (heroUid: string) => void;
   rankUpHero: (heroId: string) => void;
@@ -140,8 +138,6 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
     featuredSummonBanner,
     autoEquipBestHeroes,
     autoRecycleHeroes,
-    saveTeamLoadout,
-    loadTeamLoadout,
     toggleEquipHero,
     toggleHeroUniqueWeapon,
     rankUpHero,
@@ -154,21 +150,6 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
     setRecycleConfirmUid,
     renderSubTabBar,
   }) => {
-    const renderHeroPortrait = (heroId: string, emoji: string, isMobile: boolean) => {
-      const portraitSource = getHeroPortraitSource(heroId);
-      if (portraitSource) {
-        return (
-          <Image
-            source={portraitSource}
-            style={[styles.heroPortraitImage, isMobile && styles.heroPortraitImageMobile]}
-            resizeMode="cover"
-          />
-        );
-      }
-
-      return <Text style={[styles.heroEmoji, isMobile && styles.heroEmojiMobile]}>{emoji}</Text>;
-    };
-
     const [diamondConfirm, setDiamondConfirm] = useState<{
       type: 'single' | 'x10';
       cost: number;
@@ -506,25 +487,18 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                     <Text style={styles.heroSlotUnlockMeta}>All team slots unlocked.</Text>
                   )}
                 </View>
-                <View style={[styles.loadoutRow, isPhoneWidth && styles.loadoutRowMobile]}>
-                  {[0, 1, 2].map(slot => (
-                    <View key={slot} style={[styles.loadoutCell, isPhoneWidth && styles.loadoutCellMobile]}>
-                      <Text style={styles.loadoutLabel}>L{slot + 1}</Text>
-                      <View style={styles.loadoutBtnsWrap}>
-                        <Pressable style={styles.loadoutSaveBtn} onPress={() => saveTeamLoadout(slot)}>
-                          <Text style={styles.loadoutBtnText}>Save</Text>
-                        </Pressable>
-                        <Pressable style={styles.loadoutLoadBtn} onPress={() => loadTeamLoadout(slot)}>
-                          <Text style={styles.loadoutBtnText}>Load</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ))}
-                </View>
                 {state.heroRoster.length === 0 ? (
                   <Text style={styles.emptyMsg}>Summon your first hero!</Text>
                 ) : (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: rosterGap, alignItems: 'stretch' }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      gap: rosterGap,
+                      alignItems: 'stretch',
+                      justifyContent: 'center',
+                    }}
+                  >
                     {sortedRoster.map(hero => {
                       const inActiveTeam = activeTeamSet.has(hero.uid);
                       const cls = getClassConfig(hero.heroClass);
@@ -598,20 +572,23 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                             { width: rosterCardWidth, marginBottom: 0 },
                           ]}
                         >
+                          {getHeroPortraitSource(hero.id) ? (
+                            <Image
+                              source={getHeroPortraitSource(hero.id)}
+                              style={styles.heroCardBackdropImage}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View style={styles.heroCardBackdropFallback}>
+                              <Text style={styles.heroCardBackdropEmoji}>{hero.emoji}</Text>
+                            </View>
+                          )}
+                          <View style={styles.heroCardBackdropScrim} />
                           <View style={[styles.heroCardRarityBar, { backgroundColor: rarity.color }]} />
                           <View style={[styles.heroCardBody, isPhoneWidth && styles.heroCardBodyMobile]}>
                             {isPhoneWidth ? (
                               <>
                                 <View style={styles.heroCardHeaderMobile}>
-                                  <View
-                                    style={[
-                                      styles.heroPortraitFrame,
-                                      styles.heroPortraitFrameMobile,
-                                      { borderColor: rarity.color },
-                                    ]}
-                                  >
-                                    {renderHeroPortrait(hero.id, hero.emoji, true)}
-                                  </View>
                                   <View style={styles.heroCardInfoMobile}>
                                     <View style={styles.heroNameRowMobile}>
                                       <Text style={[styles.heroName, styles.heroNameMobile]} numberOfLines={1}>
@@ -687,9 +664,6 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
                             ) : (
                               <>
                                 <View style={styles.heroCardTopRow}>
-                                  <View style={[styles.heroPortraitFrame, { borderColor: rarity.color }]}>
-                                    {renderHeroPortrait(hero.id, hero.emoji, false)}
-                                  </View>
                                   <View style={styles.heroCardInfo}>
                                     <Text style={styles.heroName} numberOfLines={1}>
                                       {hero.name}
