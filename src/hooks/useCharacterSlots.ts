@@ -168,7 +168,7 @@ export function useCharacterSlots({
     return () => {
       cancelled = true;
     };
-  }, [accountName]);
+  }, [accountName, setSelectedCharacterClass]);
 
   useEffect(() => {
     if (!selectedCharacterClass) return;

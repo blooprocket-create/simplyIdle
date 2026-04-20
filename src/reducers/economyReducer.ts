@@ -9,10 +9,8 @@ import type { GameState, RewardPopup, EquipmentInstance, MailAttachments } from 
 import {
   SKILLS,
   type PlayerClass,
-  type StatBlock,
   type EquipmentSlot,
   type EquipmentItem,
-  type Rarity,
   type PermanentUnlockId,
   equipmentRarityConfig,
   EQUIPMENT_CATALOG,
@@ -20,7 +18,6 @@ import {
   getUsableItem,
   getMonsterGold,
   getMonsterExp,
-  expForLevel,
   calculateShardReward,
   getWeeklyEventByWeek,
   getEquipmentItem,
@@ -148,12 +145,6 @@ const DOLLAR_SHOP_PACKS: Record<DollarShopOfferId, { usdCents: number; diamonds:
   usd_4999: { usdCents: 4999, diamonds: 6000 },
   usd_9999: { usdCents: 9999, diamonds: 13000 },
 };
-
-const VIP_DAMAGE_PER_LEVEL = 0.03;
-const VIP_GOLD_PER_LEVEL = 0.025;
-const VIP_EXP_PER_LEVEL = 0.025;
-
-const EXPEDITION_TYPES: ExpeditionType[] = ['artifact', 'merchant', 'ruins', 'vault', 'abyss'];
 
 // ─── Helpers ───────────────────────────────────────────────────
 

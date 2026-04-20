@@ -181,6 +181,7 @@ export function useLeaderboard({ state, accountName, activeModal }: UseLeaderboa
     accountName,
     publicUsername,
     playerBoardScore,
+    state.playerName,
     state.level,
     state.vipLevel,
     state.highestWaveReached,

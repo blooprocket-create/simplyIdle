@@ -5141,7 +5141,7 @@ export function useGameState(saveSlot: string = 'default') {
     return () => {
       cancelled = true;
     };
-  }, [onlineSlotEligible, saveSlot]);
+  }, [dispatch, onlineSlotEligible, saveSlot]);
 
   useEffect(() => {
     if (!state.characterCreated) return;
@@ -5191,7 +5191,7 @@ export function useGameState(saveSlot: string = 'default') {
       }
     }, TICK_MS);
     return () => clearInterval(id);
-  }, [persistSnapshot]);
+  }, [dispatch, persistSnapshot]);
 
   useEffect(() => {
     if (!state.characterCreated || sessionStartedRef.current) return;

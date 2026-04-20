@@ -7,7 +7,7 @@ import WarfrontTab from './tabs/WarfrontTab';
 import RosterTab from './tabs/RosterTab';
 import EngineTab from './tabs/EngineTab';
 import ProgressTab from './tabs/ProgressTab';
-import { useGameState, getCharacterSaveSlot, getMaxHeatForLevel } from '../useGameState';
+import { useGameState, getCharacterSaveSlot } from '../useGameState';
 import { PlayerClass, getMonsterForWave, getRebirthWaveRequirement } from '../gameConfig';
 import { fmt } from '../utils';
 import { t } from '../i18n';

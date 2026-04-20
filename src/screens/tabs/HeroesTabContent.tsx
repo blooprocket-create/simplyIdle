@@ -227,7 +227,7 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
         if (a.level !== b.level) return b.level - a.level;
         return a.name.localeCompare(b.name);
       });
-    }, [activeTeamSet, state.heroRoster]);
+    }, [activeTeamSet, rarityRank, state.heroRoster]);
 
     const sortedBatchHeroes = useMemo(() => {
       return state.heroRoster
@@ -244,7 +244,7 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
           if (a.level !== b.level) return b.level - a.level;
           return a.name.localeCompare(b.name);
         });
-    }, [activeTeamSet, state.heroRoster]);
+    }, [activeTeamSet, rarityRank, state.heroRoster]);
 
     const uniqueBearerByHeroId = useMemo(() => {
       const bearerByHeroId: Record<string, string> = {};
@@ -256,7 +256,7 @@ export const HeroesTabContent = React.memo<HeroesTabContentProps>(
       }
 
       return bearerByHeroId;
-    }, [rarityRank, state.heroRoster, state.heroUniqueGearByHeroId]);
+    }, [state.heroRoster, state.heroUniqueGearByHeroId]);
 
     const rosterColumns = isSingleColumnRoster ? 1 : viewportWidth >= 1180 ? 4 : viewportWidth >= 860 ? 3 : 2;
     const rosterGap = isPhoneWidth ? 10 : 8;

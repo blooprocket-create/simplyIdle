@@ -116,7 +116,7 @@ export function useSummonCinematic({
       return;
     }
 
-    if (activeModal === 'cinematicSummon') return;
+    if (isCinematicModalOpen) return;
 
     const reveal: SummonReveal = {
       id: latest.id,
@@ -129,7 +129,7 @@ export function useSummonCinematic({
 
     const timer = setTimeout(() => setSummonReveal(null), 2000);
     return () => clearTimeout(timer);
-  }, [heroTemplateIdByName, isCinematicModalOpen, summonHistory]);
+  }, [heroTemplateIdByName, isCinematicModalOpen, mapLatestTen, summonHistory]);
 
   const triggerCinematicSummon = (_featuredHeroId?: string, payWithDiamonds?: boolean) => {
     if (!canGachaX10 || activeModal === 'cinematicSummon') return;

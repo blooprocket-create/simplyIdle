@@ -206,7 +206,7 @@ export function GuildSection({
     setIsPublicDraft(myGuild?.isPublic !== false);
     setIsEditingGuildSettings(false);
     setPendingInvites([]);
-  }, [myGuild?.guildId, me.uid]);
+  }, [me.uid, myGuild]);
 
   useEffect(() => {
     if (!myGuild) {
@@ -216,7 +216,7 @@ export function GuildSection({
     setDescriptionDraft(myGuild.description || '');
     setJoinLevelDraft(`${Math.max(1, myGuild.minPeakProgressToJoin || 1)}`);
     setIsPublicDraft(myGuild.isPublic !== false);
-  }, [myGuild?.description, myGuild?.guildId, myGuild?.isPublic, myGuild?.minPeakProgressToJoin]);
+  }, [myGuild]);
 
   useEffect(() => {
     if (!me.uid || !!myGuild) {

@@ -5,7 +5,7 @@
  * Extracted from the monolithic reducer in useGameState.ts.
  */
 
-import type { GameState, MailMessage, MailAttachments } from '../useGameState';
+import type { GameState, MailMessage } from '../useGameState';
 import type { Rarity, EquipmentRarity } from '../gameConfig';
 
 // ─── Types ─────────────────────────────────────────────────────

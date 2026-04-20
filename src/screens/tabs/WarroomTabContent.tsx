@@ -67,7 +67,7 @@ export interface WarroomTabContentProps {
   weeklyEvent: WeeklyEventSummary;
   hasClaimableRewards: boolean;
   claimableWeeklyMilestones: number[];
-  claimableMissionIds: any[];
+  claimableMissionIds: string[];
   prestige1Done: boolean;
   prestige5Done: boolean;
   prestige10Done: boolean;
