@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, NativeScrollEvent, NativeSyntheticEvent, Pressable, Text, View } from 'react-native';
 import { GlobalChatMessage } from '../../../services/chat';
 import { GuildChatMessage } from '../../../services/guild';
 import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
+import { socialStyles } from './social.styles';
+
+type SocialStyles = typeof socialStyles;
 
 type ChatChannel = 'global' | 'guild';
 
@@ -46,7 +49,7 @@ function formatDayLabel(ts: number): string {
 }
 
 interface ChatSectionProps {
-  styles: any;
+  styles: SocialStyles;
   onlineCount: number;
   mutedUntil: number | null;
   messages: GlobalChatMessage[];
@@ -184,7 +187,7 @@ export function ChatSection({
     });
   };
 
-  const handleScroll = (event: any) => {
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
     const distanceFromBottom = contentSize.height - (layoutMeasurement.height + contentOffset.y);
     const nearBottom = distanceFromBottom <= 40;

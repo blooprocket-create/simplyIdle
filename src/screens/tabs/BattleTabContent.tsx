@@ -4,6 +4,23 @@ import { GameState, Stats, getUsableItemDescription } from '../../useGameState';
 import { PlayerClass, rarityConfig } from '../../gameConfig';
 import { styles } from './BattleTabContent.styles';
 
+interface BattleClassConfig {
+  emoji: string;
+  name: string;
+}
+
+interface BattleUsableItem {
+  id: string;
+  name: string;
+  emoji: string;
+  effect: string;
+}
+
+interface BattleUsableInventoryEntry {
+  item: BattleUsableItem | null;
+  count: number;
+}
+
 export interface BattleTabContentProps {
   tab: string;
   state: GameState;
@@ -17,8 +34,8 @@ export interface BattleTabContentProps {
   teamSlotCap: number;
   canRebirthNow: boolean;
   rebirthWaveRequirement: number;
-  getClassConfig: (heroClass: PlayerClass) => any;
-  usableInventory: any[];
+  getClassConfig: (heroClass: PlayerClass) => BattleClassConfig;
+  usableInventory: BattleUsableInventoryEntry[];
   setCombatTempo: (tempo: 1 | 2 | 4) => void;
   burst: (hits: number) => void;
   buyPremiumCoolant: (itemId: 'coolant_mk1' | 'coolant_mk2', amount?: number) => void;
@@ -50,7 +67,7 @@ export const BattleTabContent = React.memo<BattleTabContentProps>(
   }) => {
     const hasTempo4Access = (state.vipLevel ?? 0) >= 1;
 
-    const confirmUseAll = (item: any, count: number) => {
+    const confirmUseAll = (item: BattleUsableItem, count: number) => {
       if (count <= 0) return;
 
       const needsWarning = item.effect === 'heal_team_percent' || item.effect === 'reduce_heat_flat';

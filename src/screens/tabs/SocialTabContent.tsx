@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Modal, NativeSyntheticEvent, NativeTouchEvent, Platform, Pressable, Text, View } from 'react-native';
 import { GlobalChatMessage } from '../../services/chat';
 import { fetchFriendRelationshipStatus, FriendRelationshipStatus, sendFriendRequest } from '../../services/friends';
-import { blockUser, unblockUser, reportUser, subscribeBlockList, ReportReason } from '../../services/blockReport';
+import { blockUser, unblockUser, reportUser, subscribeBlockList } from '../../services/blockReport';
 import { GiftPreference } from '../../gameConfig';
 import { trackEvent } from '../../telemetry';
 import { SOCIAL_FEATURE_FLAGS } from '../../socialFeatureFlags';

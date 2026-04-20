@@ -76,10 +76,6 @@ function clampAutoTempoTargetForVip(target: AutoTempoTarget, state: Pick<GameSta
   return target;
 }
 
-function emptyAttachments(): MailAttachments {
-  return { shards: 0, gold: 0, diamonds: 0, tears: 0, essence: 0 };
-}
-
 // ─── Reducer ───────────────────────────────────────────────────
 
 export function settingsReducer(state: GameState, action: SettingsAction, ctx: SettingsContext): GameState | null {

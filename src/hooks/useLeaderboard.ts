@@ -43,12 +43,13 @@ export function useLeaderboard({ state, accountName, activeModal }: UseLeaderboa
   const [liveLeaderboardError, setLiveLeaderboardError] = useState<string | null>(null);
 
   const seasonScore = state.seasonPoints;
+  const isEventsModalOpen = activeModal === 'events';
   const playerBoardScore =
-    seasonScore
-    + Math.floor(state.bestSeasonPoints * 0.35)
-    + state.wave * 12
-    + state.highestWaveReached * 9
-    + state.prestigeCount * 280;
+    seasonScore +
+    Math.floor(state.bestSeasonPoints * 0.35) +
+    state.wave * 12 +
+    state.highestWaveReached * 9 +
+    state.prestigeCount * 280;
 
   // Fetch public username on mount / account change
   useEffect(() => {
@@ -57,12 +58,14 @@ export function useLeaderboard({ state, accountName, activeModal }: UseLeaderboa
       const fresh = await refreshCurrentUserPublicUsername();
       if (!cancelled && fresh) setPublicUsername(fresh);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [accountName]);
 
   // Telemetry when events modal is open
   useEffect(() => {
-    if (activeModal !== 'events') return;
+    if (!isEventsModalOpen) return;
     void trackEvent('leaderboard_viewed', {
       rank: liveLeaderboardRank ?? 0,
       score: playerBoardScore,
@@ -71,7 +74,7 @@ export function useLeaderboard({ state, accountName, activeModal }: UseLeaderboa
       rank: liveLeaderboardRank ?? 0,
       score: playerBoardScore,
     });
-  }, [activeModal === 'events', liveLeaderboardRank, playerBoardScore]);
+  }, [isEventsModalOpen, liveLeaderboardRank, playerBoardScore]);
 
   // Periodic score submission (every 45 s)
   useEffect(() => {
@@ -106,13 +109,14 @@ export function useLeaderboard({ state, accountName, activeModal }: UseLeaderboa
     publicUsername,
     playerBoardScore,
     state.level,
+    state.vipLevel,
     state.highestWaveReached,
     state.prestigeCount,
   ]);
 
   // Fetch leaderboard when events modal opens
   useEffect(() => {
-    if (activeModal !== 'events' || !state.characterCreated) return;
+    if (!isEventsModalOpen || !state.characterCreated) return;
 
     let cancelled = false;
     setLiveLeaderboardLoading(true);
@@ -171,8 +175,17 @@ export function useLeaderboard({ state, accountName, activeModal }: UseLeaderboa
     return () => {
       cancelled = true;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeModal === 'events', state.characterCreated, accountName, publicUsername, playerBoardScore, state.highestWaveReached, state.prestigeCount]);
+  }, [
+    isEventsModalOpen,
+    state.characterCreated,
+    accountName,
+    publicUsername,
+    playerBoardScore,
+    state.level,
+    state.vipLevel,
+    state.highestWaveReached,
+    state.prestigeCount,
+  ]);
 
   return {
     publicUsername,

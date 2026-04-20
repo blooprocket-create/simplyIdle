@@ -40,7 +40,7 @@ export function useDpsPowerTooltip(
   hoveredTopChipId: string | null,
   state: GameState,
   stats: Stats,
-  affixTotals: AffixTotals,
+  _affixTotals: AffixTotals,
   gearScore: number,
   gearScoreRows: Array<{ name: string; rarityPoints: number; statPoints: number; total: number }>,
   teamPowerIndex: number,
@@ -95,18 +95,19 @@ export function useDpsPowerTooltip(
     }
 
     if (hoveredTopChipId === 'gear') {
-      const rows = gearScoreRows.length === 0
-        ? ['No equipped gear in the 3 slots.']
-        : gearScoreRows.map(row => `${row.name}: rarity ${fmt(row.rarityPoints)} + stats ${fmt(Math.floor(row.statPoints))} = ${fmt(Math.floor(row.total))}`);
+      const rows =
+        gearScoreRows.length === 0
+          ? ['No equipped gear in the 3 slots.']
+          : gearScoreRows.map(
+              row =>
+                `${row.name}: rarity ${fmt(row.rarityPoints)} + stats ${fmt(Math.floor(row.statPoints))} = ${fmt(Math.floor(row.total))}`,
+            );
       return {
         title: 'Gear Score Sources',
-        lines: [
-          'Per item: rarity points + (sum of item stats * 12)',
-          ...rows,
-        ],
+        lines: ['Per item: rarity points + (sum of item stats * 12)', ...rows],
       };
     }
 
     return null;
-  }, [hoveredTopChipId, state, stats, gearScore, gearScoreRows, teamPowerIndex, affixTotals]);
+  }, [hoveredTopChipId, state, stats, gearScore, gearScoreRows, teamPowerIndex]);
 }

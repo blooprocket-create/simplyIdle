@@ -60,7 +60,6 @@ export default function MobileGameScreen({ accountName, onLogout: _onLogout }: M
   const isBoss = (state.wave || 1) % 10 === 0;
   const burstCost = 20;
   const canBurst = (state.burstCharge || 0) >= burstCost;
-  const maxHeat = getMaxHeatForLevel(state.level || 1);
   const rebirthWaveRequirement = getRebirthWaveRequirement(state.prestigeCount || 0);
   const canRebirth = (state.highestWaveReached || 1) >= rebirthWaveRequirement;
   const rebirthWavesLeft = Math.max(0, rebirthWaveRequirement - (state.highestWaveReached || 1));
@@ -259,7 +258,7 @@ export default function MobileGameScreen({ accountName, onLogout: _onLogout }: M
             teamSlotCap={teamSlotCap}
             heroShards={state.heroShards || 0}
             heroes={
-              state.heroRoster?.map((hero: any) => ({
+              state.heroRoster?.map(hero => ({
                 uid: hero.uid,
                 name: hero.name,
                 emoji: hero.emoji,
@@ -311,7 +310,7 @@ export default function MobileGameScreen({ accountName, onLogout: _onLogout }: M
             essence={state.essence || 0}
             equipmentItemCount={state.inventoryItemIds?.length || 0}
             expeditions={[]}
-            onAllocateStat={(stat: string) => allocateStat(stat as any)}
+            onAllocateStat={allocateStat}
             onAllocateMaxStats={() => {}}
             onOpenEquipment={() => {}}
             onOpenFacilities={() => {}}

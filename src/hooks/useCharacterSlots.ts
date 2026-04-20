@@ -175,7 +175,7 @@ export function useCharacterSlots({
     setLastUsedCharacterClass(selectedCharacterClass);
     const uid = getFirebaseAuth()?.currentUser?.uid ?? '';
     if (uid) void saveLastCharacterSlot(uid, selectedCharacterClass);
-  }, [accountName, selectedCharacterClass]);
+  }, [accountName, selectedCharacterClass, setSelectedCharacterClass]);
 
   useEffect(() => {
     if (!selectedCharacterClass || !hydrated || !state.characterCreated) return;

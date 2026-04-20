@@ -3,9 +3,12 @@ import { Pressable, Text, View } from 'react-native';
 import { GiftPreference } from '../../../gameConfig';
 import { FriendListEntry, PendingFriendRequest } from '../../../services/friends';
 import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
+import { socialStyles } from './social.styles';
+
+type SocialStyles = typeof socialStyles;
 
 interface FriendsSectionProps {
-  styles: any;
+  styles: SocialStyles;
   myGiftPreference: GiftPreference;
   friendsBusy: boolean;
   isLoading: boolean;

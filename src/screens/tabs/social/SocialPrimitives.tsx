@@ -1,9 +1,12 @@
 import React from 'react';
 import { Pressable, Text, TextInput, TextInputProps, View } from 'react-native';
 import { THEME } from '../../../theme';
+import { socialStyles } from './social.styles';
+
+type SocialStyles = typeof socialStyles;
 
 interface SocialCardProps {
-  styles: any;
+  styles: SocialStyles;
   title?: string;
   subtitle?: string;
   children: React.ReactNode;
@@ -20,7 +23,7 @@ export function SocialCard({ styles, title, subtitle, children }: SocialCardProp
 }
 
 interface SocialInputProps extends TextInputProps {
-  styles: any;
+  styles: SocialStyles;
 }
 
 export function SocialInput({ styles, ...props }: SocialInputProps) {
@@ -34,7 +37,7 @@ export function SocialInput({ styles, ...props }: SocialInputProps) {
 }
 
 interface SocialPrimaryButtonProps {
-  styles: any;
+  styles: SocialStyles;
   label: string;
   onPress: () => void;
   disabled?: boolean;
@@ -57,7 +60,7 @@ export function SocialPrimaryButton({ styles, label, onPress, disabled }: Social
 }
 
 interface SocialProgressBarProps {
-  styles: any;
+  styles: SocialStyles;
   progress: number;
   label?: string;
   tint?: string;
@@ -82,7 +85,7 @@ export function SocialProgressBar({ styles, progress, label, tint }: SocialProgr
 }
 
 interface SocialAsyncStateProps {
-  styles: any;
+  styles: SocialStyles;
   isLoading?: boolean;
   isEmpty?: boolean;
   emptyTitle?: string;

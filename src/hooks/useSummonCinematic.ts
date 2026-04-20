@@ -46,6 +46,7 @@ export function useSummonCinematic({
 
   const cinematicPulse = useMemo(() => new Animated.Value(0), []);
   const cinematicRevealScale = useMemo(() => new Animated.Value(0.8), []);
+  const isCinematicModalOpen = activeModal === 'cinematicSummon';
 
   const clearCinematicTimers = () => {
     cinematicTimersRef.current.forEach(timer => clearTimeout(timer));
@@ -62,7 +63,7 @@ export function useSummonCinematic({
     }));
 
   useEffect(() => {
-    if (activeModal !== 'cinematicSummon') return;
+    if (!isCinematicModalOpen) return;
     cinematicPulse.setValue(0);
     Animated.loop(
       Animated.sequence([
@@ -80,7 +81,7 @@ export function useSummonCinematic({
         }),
       ]),
     ).start();
-  }, [cinematicPulse, activeModal === 'cinematicSummon']);
+  }, [cinematicPulse, isCinematicModalOpen]);
 
   useEffect(() => {
     if (cinematicSummonPhase !== 'reveal') return;
@@ -128,7 +129,7 @@ export function useSummonCinematic({
 
     const timer = setTimeout(() => setSummonReveal(null), 2000);
     return () => clearTimeout(timer);
-  }, [activeModal === 'cinematicSummon', heroTemplateIdByName, summonHistory]);
+  }, [heroTemplateIdByName, isCinematicModalOpen, summonHistory]);
 
   const triggerCinematicSummon = (_featuredHeroId?: string, payWithDiamonds?: boolean) => {
     if (!canGachaX10 || activeModal === 'cinematicSummon') return;

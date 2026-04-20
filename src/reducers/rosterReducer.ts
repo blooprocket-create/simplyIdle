@@ -13,12 +13,10 @@ import {
   rarityConfig,
   rollRarity,
   getSummonRarityPool,
-  getHighestAvailableSummonRarity,
   getRankUpShardCost,
   calculateShardReward,
   getHeroRebirthPlan,
   getHeroBackstory,
-  getHeroUniqueCombatModifiers,
   getHeroUniqueSkillDescription,
   getHeroUniqueWeaponName,
   pickHeroForRarity,
@@ -39,7 +37,6 @@ import {
   type HeroPassiveTraitId,
   type HeroActiveSkillArchetypeId,
   type EquipmentItem,
-  type EquipmentSlot,
 } from '../gameConfig';
 import { roundTo4 } from '../utils';
 

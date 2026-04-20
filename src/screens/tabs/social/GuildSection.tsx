@@ -30,6 +30,9 @@ import {
   GuildTreasuryState,
 } from '../../../services/guild';
 import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton, SocialProgressBar } from './SocialPrimitives';
+import { socialStyles } from './social.styles';
+
+type SocialStyles = typeof socialStyles;
 
 type GuildSubTab = 'home' | 'boss' | 'events' | 'treasury';
 
@@ -93,7 +96,7 @@ function getEventLifecycleLabel(event: GuildEventState, progressPct: number, now
 }
 
 interface GuildSectionProps {
-  styles: any;
+  styles: SocialStyles;
   me: {
     uid: string;
     name: string;
@@ -213,7 +216,7 @@ export function GuildSection({
     setDescriptionDraft(myGuild.description || '');
     setJoinLevelDraft(`${Math.max(1, myGuild.minPeakProgressToJoin || 1)}`);
     setIsPublicDraft(myGuild.isPublic !== false);
-  }, [myGuild?.description, myGuild?.guildId]);
+  }, [myGuild?.description, myGuild?.guildId, myGuild?.isPublic, myGuild?.minPeakProgressToJoin]);
 
   useEffect(() => {
     if (!me.uid || !!myGuild) {
@@ -331,7 +334,7 @@ export function GuildSection({
     return () => {
       cancelled = true;
     };
-  }, [guildSubTab, me.uid, myGuild, saveSlotId, treasuryEnabled]);
+  }, [guildSubTab, me.uid, myGuild, saveSlotId, setError, treasuryEnabled]);
 
   const myGuildMember = useMemo(
     () => guildMembers.find(member => member.uid === me.uid) ?? null,

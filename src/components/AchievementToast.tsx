@@ -1,12 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withDelay,
-  Easing,
-} from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, Easing } from 'react-native-reanimated';
 import { ACHIEVEMENTS } from '../gameConfig.ts';
 
 interface Props {
@@ -30,7 +24,7 @@ export default function AchievementToast({ achievementId, onDismiss }: Props) {
       setTimeout(onDismiss, 700);
     }, 3000);
     return () => clearTimeout(timer);
-  }, [achievementId]);
+  }, [achievementId, onDismiss, opacity, translateY]);
 
   const style = useAnimatedStyle(() => ({
     opacity: opacity.value,

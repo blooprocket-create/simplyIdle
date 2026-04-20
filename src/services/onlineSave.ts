@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, getDoc, getDocs, runTransaction, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, runTransaction, writeBatch } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseFirestore, isFirebaseConfigured } from './firebase';
 import { isCurrentUserAdmin, logAdminAction } from './adminAccess';
 
@@ -161,8 +161,6 @@ export const SAVE_CHUNKS: Record<string, string[]> = {
 };
 
 /** All chunk names in load order. */
-const CHUNK_KEYS = Object.keys(SAVE_CHUNKS);
-
 /** Set of all explicitly-mapped keys for fast lookup. */
 const MAPPED_KEYS = new Set(Object.values(SAVE_CHUNKS).flat());
 
@@ -404,10 +402,9 @@ export async function loadOnlineSave<TPayload extends Record<string, unknown>>(
     if (Array.isArray(raw.chunkKeys) && raw.chunkKeys.length > 0) {
       const envelope = toEnvelope<TPayload>(raw);
       if (!envelope) return { ok: true, data: null };
+      const includeChunks = options?.includeChunks ?? [];
       const selectedChunkKeys =
-        options?.includeChunks && options.includeChunks.length > 0
-          ? raw.chunkKeys.filter(chunkName => options.includeChunks!.includes(chunkName))
-          : raw.chunkKeys;
+        includeChunks.length > 0 ? raw.chunkKeys.filter(chunkName => includeChunks.includes(chunkName)) : raw.chunkKeys;
       const payload = await loadChunksForSlot(db, ['users', uid, 'saveSlots', safeSlot], selectedChunkKeys, onProgress);
       envelope.payload = payload as TPayload;
       return { ok: true, data: envelope };

@@ -6,11 +6,20 @@ import { STAT_LABELS } from '../gameScreenShared';
 import { fmt } from '../../utils';
 import { styles } from './StatsTabContent.styles';
 
+interface StatsClassConfig {
+  statDescriptions: Record<StatKey, string>;
+}
+
+interface StatsClassPassive {
+  name: string;
+  description: string;
+}
+
 export interface StatsTabContentProps {
   tab: string;
   state: GameState;
   stats: Stats;
-  classConfig: any;
+  classConfig: StatsClassConfig;
   classMasteryLevel: number;
   damageEssenceCost: number;
   economyEssenceCost: number;
@@ -18,7 +27,7 @@ export interface StatsTabContentProps {
   rebirthDamageCost: number;
   rebirthEconomyCost: number;
   rebirthSurvivalCost: number;
-  classPassive: any;
+  classPassive: StatsClassPassive;
   allocateStat: (stat: StatKey) => void;
   allocateStatN: (stat: StatKey, n: number) => void;
   allocateStatMax: (stat: StatKey) => void;

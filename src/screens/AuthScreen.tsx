@@ -28,7 +28,6 @@ import { getFirebaseAuth } from '../services/firebase';
 import {
   isPublicUsernameAvailable,
   loadPublicUsername,
-  normalizePublicUsername,
   PUBLIC_USERNAME_MAX,
   PUBLIC_USERNAME_MIN,
   reservePublicUsername,
