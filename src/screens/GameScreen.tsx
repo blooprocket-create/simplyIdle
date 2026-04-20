@@ -70,6 +70,7 @@ import {
   VIP_SUMMON_DISCOUNT,
 } from '../gameConfig';
 import { getHeroPortraitSource } from '../heroPortraits';
+import { hasStoryCutsceneVideo } from '../storyCutscenes';
 import { fmt } from '../utils';
 import StoryBeatCutscene from '../components/StoryBeatCutscene';
 import StoryBeatModal from '../components/StoryBeatModal';
@@ -901,6 +902,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         const prestigeReady = beat.unlockPrestige == null || state.prestigeCount >= beat.unlockPrestige;
         return {
           ...beat,
+          hasCutscene: hasStoryCutsceneVideo(beat.id),
           unlocked: waveReady && prestigeReady,
         };
       }),
@@ -2630,12 +2632,16 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
       <StoryBeatCutscene
         visible={!!storyCutscene}
+        beatId={storyCutscene?.id ?? ''}
         chapter={storyCutscene?.chapter ?? ''}
         title={storyCutscene?.title ?? ''}
         body={storyCutscene?.body ?? ''}
         onContinue={() => {
           if (storyCutscene) {
-            setStoryBeatModal(storyCutscene);
+            setStoryBeatModal({
+              ...storyCutscene,
+              presentationMode: 'brief',
+            });
           }
           setStoryCutscene(null);
         }}
@@ -2647,6 +2653,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         title={storyBeatModal?.title ?? ''}
         body={storyBeatModal?.body ?? ''}
         wave={storyBeatModal?.wave ?? 0}
+        presentationMode={storyBeatModal?.presentationMode ?? 'full'}
         onDismiss={() => setStoryBeatModal(null)}
       />
 

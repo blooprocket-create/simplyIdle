@@ -8,6 +8,7 @@ interface StoryEntry {
   chapter: string;
   body: string;
   unlockWave: number;
+  hasCutscene: boolean;
 }
 
 interface RewardPopup {
@@ -34,22 +35,38 @@ export function useGameOverlays({
 }: UseGameOverlaysArgs) {
   const [idleChestReward, setIdleChestReward] = useState<{ title: string; detail: string } | null>(null);
   const [storyCutscene, setStoryCutscene] = useState<{
+    id: string;
     chapter: string;
     title: string;
     body: string;
     wave: number;
   } | null>(null);
   const [storyBeatModal, setStoryBeatModal] = useState<{
+    id: string;
     chapter: string;
     title: string;
     body: string;
     wave: number;
+    presentationMode: 'full' | 'brief';
   } | null>(null);
   const { storyUnlockToast, setStoryUnlockToast } = useStoryUnlockToast(storyEntries);
 
   const queueStorySequence = (entry: StoryEntry) => {
     queueMicrotask(() => {
+      if (!entry.hasCutscene) {
+        setStoryBeatModal({
+          id: entry.id,
+          chapter: entry.chapter,
+          title: entry.title,
+          body: entry.body,
+          wave: entry.unlockWave,
+          presentationMode: 'full',
+        });
+        return;
+      }
+
       setStoryCutscene({
+        id: entry.id,
         chapter: entry.chapter,
         title: entry.title,
         body: entry.body,

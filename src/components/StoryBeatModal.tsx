@@ -7,20 +7,30 @@ interface StoryBeatModalProps {
   title: string;
   body: string;
   wave: number;
+  presentationMode?: 'full' | 'brief';
   onDismiss: () => void;
 }
 
 /**
- * Cinematic story beat presentation modal.
- * Shows chapter header, title, and body text with a typewriter-style
- * reveal animation when a new story beat unlocks.
+ * Story beat confirmation modal.
+ * Uses a full narrative layout when there is no media cutscene and a brief
+ * status layout after video playback to avoid repeating the same text twice.
  */
-export default function StoryBeatModal({ visible, chapter, title, body, wave, onDismiss }: StoryBeatModalProps) {
+export default function StoryBeatModal({
+  visible,
+  chapter,
+  title,
+  body,
+  wave,
+  presentationMode = 'full',
+  onDismiss,
+}: StoryBeatModalProps) {
   const fadeIn = useMemo(() => new Animated.Value(0), []);
   const slideUp = useMemo(() => new Animated.Value(40), []);
   const headerOpacity = useMemo(() => new Animated.Value(0), []);
   const bodyOpacity = useMemo(() => new Animated.Value(0), []);
   const ctaOpacity = useMemo(() => new Animated.Value(0), []);
+  const isBrief = presentationMode === 'brief';
 
   useEffect(() => {
     if (!visible) {
@@ -77,13 +87,17 @@ export default function StoryBeatModal({ visible, chapter, title, body, wave, on
           {/* Title */}
           <Text style={styles.title}>{title}</Text>
 
-          {/* Body text */}
+          {/* Body text / post-cutscene status */}
           <Animated.View style={{ opacity: bodyOpacity }}>
-            <Text style={styles.body}>{body}</Text>
+            {!isBrief && <Text style={styles.body}>{body}</Text>}
+            <View style={styles.statusCard}>
+              <Text style={styles.statusEyebrow}>{isBrief ? 'Campaign record updated' : 'Chapter unlocked'}</Text>
+              <Text style={styles.waveMeta}>Wave {wave} reached</Text>
+              {isBrief && (
+                <Text style={styles.briefNote}>The cinematic is complete. The frontier log has been updated.</Text>
+              )}
+            </View>
           </Animated.View>
-
-          {/* Wave requirement tag */}
-          <Text style={styles.waveMeta}>Wave {wave} reached</Text>
 
           {/* Continue button */}
           <Animated.View style={{ opacity: ctaOpacity }}>
@@ -93,7 +107,7 @@ export default function StoryBeatModal({ visible, chapter, title, body, wave, on
               accessibilityRole="button"
               accessibilityLabel="Continue"
             >
-              <Text style={styles.continueBtnText}>CONTINUE</Text>
+              <Text style={styles.continueBtnText}>{isBrief ? 'DEPLOY' : 'CONTINUE'}</Text>
             </Pressable>
           </Animated.View>
         </Animated.View>
@@ -163,12 +177,37 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingHorizontal: 8,
   },
-  waveMeta: {
-    color: '#5A5980',
+  statusCard: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#2A2450',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    backgroundColor: 'rgba(15, 12, 35, 0.88)',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  statusEyebrow: {
+    color: '#8F9BC7',
     fontSize: 11,
     letterSpacing: 2,
-    marginBottom: 20,
     textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  waveMeta: {
+    color: '#D6DEFF',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
+  briefNote: {
+    color: '#97A5C6',
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginTop: 10,
   },
   continueBtn: {
     borderWidth: 1,
