@@ -32,15 +32,7 @@ interface MobileCardProps {
   style?: ViewStyle;
 }
 
-export default function MobileCard({
-  title,
-  icon,
-  sections,
-  action,
-  actions,
-  footer,
-  style,
-}: MobileCardProps) {
+export default function MobileCard({ title, icon, sections, action, actions, footer, style }: MobileCardProps) {
   const allActions = actions || (action ? [action] : []);
 
   return (
@@ -54,20 +46,12 @@ export default function MobileCard({
 
       {sections.map((section, idx) => (
         <View key={idx} style={styles.section}>
-          {section.title && (
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-          )}
+          {section.title && <Text style={styles.sectionTitle}>{section.title}</Text>}
           {section.items.map((item, itemIdx) => (
             <View key={itemIdx} style={styles.row}>
-              <Text style={[styles.label, item.highlight && styles.labelHighlight]}>
-                {item.label}
-              </Text>
+              <Text style={[styles.label, item.highlight && styles.labelHighlight]}>{item.label}</Text>
               <Text
-                style={[
-                  styles.value,
-                  item.highlight && styles.valueHighlight,
-                  item.color && { color: item.color },
-                ]}
+                style={[styles.value, item.highlight && styles.valueHighlight, item.color && { color: item.color }]}
               >
                 {typeof item.value === 'string' ? item.value : item.value}
               </Text>
@@ -90,9 +74,7 @@ export default function MobileCard({
               onPress={actionItem.onPress}
               disabled={actionItem.disabled}
             >
-              <Text style={[styles.actionText, getActionTextStyle(actionItem.variant)]}>
-                {actionItem.label}
-              </Text>
+              <Text style={[styles.actionText, getActionTextStyle(actionItem.variant)]}>{actionItem.label}</Text>
             </Pressable>
           ))}
         </View>

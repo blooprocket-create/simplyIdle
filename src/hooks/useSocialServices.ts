@@ -44,20 +44,22 @@ export function useSocialServices({
     const uid = getFirebaseAuth()?.currentUser?.uid;
     if (!uid) return;
 
-    void fetchCloudMail(uid).then(mails => {
-      const mapped = mails.map(mail => ({
-        id: mail.id,
-        subject: mail.subject,
-        message: mail.message,
-        from: mail.from,
-        sentAt: mail.sentAt,
-        attachments: mail.attachments,
-      }));
-      appendMailboxMessages(mapped);
-      setMailSyncError(null);
-    }).catch(() => {
-      setMailSyncError('Mail sync failed. Your mailbox may be incomplete.');
-    });
+    void fetchCloudMail(uid)
+      .then(mails => {
+        const mapped = mails.map(mail => ({
+          id: mail.id,
+          subject: mail.subject,
+          message: mail.message,
+          from: mail.from,
+          sentAt: mail.sentAt,
+          attachments: mail.attachments,
+        }));
+        appendMailboxMessages(mapped);
+        setMailSyncError(null);
+      })
+      .catch(() => {
+        setMailSyncError('Mail sync failed. Your mailbox may be incomplete.');
+      });
 
     return subscribeToCloudMail(uid, mails => {
       const mapped = mails.map(mail => ({

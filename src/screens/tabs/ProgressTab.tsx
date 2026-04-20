@@ -141,19 +141,13 @@ export default function ProgressTab(props: ProgressTabProps) {
       {props.nearUnlocks.length > 0 && (
         <Pressable
           style={styles.collapsibleHeader}
-          onPress={() =>
-            setExpandedSection(expandedSection === 'near-unlocks' ? '' : 'near-unlocks')
-          }
+          onPress={() => setExpandedSection(expandedSection === 'near-unlocks' ? '' : 'near-unlocks')}
         >
           <View style={styles.collapsibleTitle}>
             <Text style={styles.collapsibleIcon}>🎯</Text>
-            <Text style={styles.collapsibleText}>
-              Near Unlocks ({props.nearUnlocks.length})
-            </Text>
+            <Text style={styles.collapsibleText}>Near Unlocks ({props.nearUnlocks.length})</Text>
           </View>
-          <Text style={styles.collapsibleChevron}>
-            {expandedSection === 'near-unlocks' ? '−' : '+'}
-          </Text>
+          <Text style={styles.collapsibleChevron}>{expandedSection === 'near-unlocks' ? '−' : '+'}</Text>
         </Pressable>
       )}
       {expandedSection === 'near-unlocks' &&
@@ -185,17 +179,13 @@ export default function ProgressTab(props: ProgressTabProps) {
         <>
           <Pressable
             style={[styles.collapsibleHeader, { marginTop: theme.spacing.lg }]}
-            onPress={() =>
-              setExpandedSection(expandedSection === 'missions' ? '' : 'missions')
-            }
+            onPress={() => setExpandedSection(expandedSection === 'missions' ? '' : 'missions')}
           >
             <View style={styles.collapsibleTitle}>
               <Text style={styles.collapsibleIcon}>📋</Text>
               <Text style={styles.collapsibleText}>Missions</Text>
             </View>
-            <Text style={styles.collapsibleChevron}>
-              {expandedSection === 'missions' ? '−' : '+'}
-            </Text>
+            <Text style={styles.collapsibleChevron}>{expandedSection === 'missions' ? '−' : '+'}</Text>
           </Pressable>
           {expandedSection === 'missions' &&
             props.missions.map(mission => (
@@ -219,10 +209,7 @@ export default function ProgressTab(props: ProgressTabProps) {
                 {mission.claimed ? (
                   <Text style={styles.claimed}>✓</Text>
                 ) : (
-                  <Pressable
-                    style={styles.claimBtn}
-                    onPress={() => props.onClaimMission(mission.id)}
-                  >
+                  <Pressable style={styles.claimBtn} onPress={() => props.onClaimMission(mission.id)}>
                     <Text style={styles.claimBtnText}>Claim</Text>
                   </Pressable>
                 )}

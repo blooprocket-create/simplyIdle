@@ -45,10 +45,7 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
  * Writes an immutable audit log entry to the `adminAuditLog` collection.
  * Best-effort — failures are silently caught so they don't block admin actions.
  */
-export async function logAdminAction(
-  action: string,
-  details: Record<string, unknown>,
-): Promise<void> {
+export async function logAdminAction(action: string, details: Record<string, unknown>): Promise<void> {
   try {
     const db = getFirebaseFirestore();
     const auth = getFirebaseAuth();

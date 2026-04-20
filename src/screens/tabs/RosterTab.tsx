@@ -38,7 +38,11 @@ export default function RosterTab(props: RosterTabProps) {
 
   return (
     <MobileScrollContainer>
-      <SectionHeader icon="👥" title="Roster" subtitle={`${props.heroCount} heroes • ${props.activeTeamCount}/${props.teamSlotCap} active`} />
+      <SectionHeader
+        icon="👥"
+        title="Roster"
+        subtitle={`${props.heroCount} heroes • ${props.activeTeamCount}/${props.teamSlotCap} active`}
+      />
 
       {/* Summon card */}
       <MobileCard
@@ -113,9 +117,7 @@ export default function RosterTab(props: RosterTabProps) {
               key={hero.uid}
               hero={hero}
               isExpanded={expandedHeroId === hero.uid}
-              onToggleExpand={() =>
-                setExpandedHeroId(expandedHeroId === hero.uid ? null : hero.uid)
-              }
+              onToggleExpand={() => setExpandedHeroId(expandedHeroId === hero.uid ? null : hero.uid)}
               onToggle={() => props.onToggleHero(hero.uid)}
             />
           ))}
@@ -148,10 +150,7 @@ function HeroCard({
             </Text>
           </View>
         </View>
-        <Pressable
-          onPress={onToggle}
-          style={[styles.heroToggle, hero.inActiveTeam && styles.heroToggleActive]}
-        >
+        <Pressable onPress={onToggle} style={[styles.heroToggle, hero.inActiveTeam && styles.heroToggleActive]}>
           <Text style={styles.heroToggleText}>{hero.inActiveTeam ? '✓' : '+'}</Text>
         </Pressable>
       </View>

@@ -56,7 +56,7 @@ export async function trackEvent(
 
 export async function getTelemetryEvents(): Promise<TelemetryEvent[]> {
   try {
-      return [];
+    return [];
   } catch {
     return [];
   }
@@ -120,10 +120,7 @@ export async function trackGameplayAction(
  * Uses Firebase Analytics as the transport until a dedicated service
  * (Sentry / Crashlytics) is integrated.
  */
-export function reportCrash(
-  error: Error,
-  context?: { label?: string; componentStack?: string },
-): void {
+export function reportCrash(error: Error, context?: { label?: string; componentStack?: string }): void {
   const message = error.message?.slice(0, 200) ?? 'Unknown error';
   const stack = (error.stack ?? '').slice(0, 500);
   debugLog('crash', message, { stack, ...context });

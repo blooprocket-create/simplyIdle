@@ -35,7 +35,7 @@ const MINI_OPS_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 function isMiniOpOnCooldown(lastUsedMs: number | null, nowMs: number): boolean {
   if (lastUsedMs == null) return false;
   const clamped = Math.min(lastUsedMs, nowMs);
-  return (nowMs - clamped) < MINI_OPS_COOLDOWN_MS;
+  return nowMs - clamped < MINI_OPS_COOLDOWN_MS;
 }
 
 function toDayNumber(ts: number): number {
@@ -78,25 +78,29 @@ export function minigamesReducer(state: GameState, action: MinigameAction, ctx: 
       const nowMs = Date.now();
       if (isMiniOpOnCooldown(state.lastDiceRollDay, nowMs)) return state;
 
-      const forcedRoll = typeof action.forcedRoll === 'number' && Number.isFinite(action.forcedRoll)
-        ? Math.floor(action.forcedRoll)
-        : null;
+      const forcedRoll =
+        typeof action.forcedRoll === 'number' && Number.isFinite(action.forcedRoll)
+          ? Math.floor(action.forcedRoll)
+          : null;
       const roll = forcedRoll == null ? 1 + Math.floor(Math.random() * 20) : Math.max(1, Math.min(20, forcedRoll));
       const diamonds = roll === 20 ? 30 : roll >= 17 ? 18 : roll >= 13 ? 12 : roll >= 9 ? 8 : 5;
       const shardBonus = roll >= 15 ? Math.floor(roll * 1.5 * 8) : 0;
 
-      return queueReward({
-        ...state,
-        diamonds: state.diamonds + diamonds,
-        heroShards: state.heroShards + shardBonus,
-        lastDiceRollDay: nowMs,
-        lastDiceRollValue: roll,
-      }, {
-        id: `dice_roll_${toDayNumber(nowMs)}`,
-        kind: 'system',
-        title: 'Dice Protocol Complete',
-        detail: `Rolled ${roll}/20: +${diamonds} diamonds${shardBonus > 0 ? `, +${shardBonus} shards` : ''}`,
-      });
+      return queueReward(
+        {
+          ...state,
+          diamonds: state.diamonds + diamonds,
+          heroShards: state.heroShards + shardBonus,
+          lastDiceRollDay: nowMs,
+          lastDiceRollValue: roll,
+        },
+        {
+          id: `dice_roll_${toDayNumber(nowMs)}`,
+          kind: 'system',
+          title: 'Dice Protocol Complete',
+          detail: `Rolled ${roll}/20: +${diamonds} diamonds${shardBonus > 0 ? `, +${shardBonus} shards` : ''}`,
+        },
+      );
     }
 
     case 'PLAY_RECON_SWEEP': {
@@ -104,9 +108,10 @@ export function minigamesReducer(state: GameState, action: MinigameAction, ctx: 
       if (isMiniOpOnCooldown(state.lastReconSweepDay, nowMs)) return state;
 
       const picks = ['intel_gold', 'intel_shards', 'intel_buff', 'ambush'] as const;
-      const rolled = action.forcedOutcome && (picks as readonly string[]).includes(action.forcedOutcome)
-        ? action.forcedOutcome as (typeof picks)[number]
-        : picks[Math.floor(Math.random() * picks.length)];
+      const rolled =
+        action.forcedOutcome && (picks as readonly string[]).includes(action.forcedOutcome)
+          ? (action.forcedOutcome as (typeof picks)[number])
+          : picks[Math.floor(Math.random() * picks.length)];
 
       const baseGold = Math.max(2500, Math.floor(getMonsterGold(state.wave) * 18));
       const baseShards = Math.max(90, Math.floor(40 + state.highestWaveReached * 1.8));
@@ -115,26 +120,30 @@ export function minigamesReducer(state: GameState, action: MinigameAction, ctx: 
       const buffPct = rolled === 'intel_buff' ? 0.18 : 0;
       const buffMs = rolled === 'intel_buff' ? 120_000 : 0;
 
-      return queueReward({
-        ...state,
-        gold: state.gold + goldGain,
-        totalGold: state.totalGold + goldGain,
-        heroShards: state.heroShards + shardGain,
-        damageBuffPct: Math.max(state.damageBuffPct, buffPct),
-        damageBuffMs: Math.max(state.damageBuffMs, buffMs),
-        lastReconSweepDay: nowMs,
-      }, {
-        id: `recon_sweep_${toDayNumber(nowMs)}`,
-        kind: 'system',
-        title: 'Recon Sweep Complete',
-        detail: rolled === 'intel_shards'
-          ? `Intel cache secured: +${goldGain} gold, +${shardGain} shards`
-          : rolled === 'intel_buff'
-            ? `Combat telemetry synced: +${goldGain} gold, +18% DPS for 2m`
-            : rolled === 'ambush'
-              ? `Ambush contact: partial extraction +${goldGain} gold`
-              : `Supply intel acquired: +${goldGain} gold`,
-      });
+      return queueReward(
+        {
+          ...state,
+          gold: state.gold + goldGain,
+          totalGold: state.totalGold + goldGain,
+          heroShards: state.heroShards + shardGain,
+          damageBuffPct: Math.max(state.damageBuffPct, buffPct),
+          damageBuffMs: Math.max(state.damageBuffMs, buffMs),
+          lastReconSweepDay: nowMs,
+        },
+        {
+          id: `recon_sweep_${toDayNumber(nowMs)}`,
+          kind: 'system',
+          title: 'Recon Sweep Complete',
+          detail:
+            rolled === 'intel_shards'
+              ? `Intel cache secured: +${goldGain} gold, +${shardGain} shards`
+              : rolled === 'intel_buff'
+                ? `Combat telemetry synced: +${goldGain} gold, +18% DPS for 2m`
+                : rolled === 'ambush'
+                  ? `Ambush contact: partial extraction +${goldGain} gold`
+                  : `Supply intel acquired: +${goldGain} gold`,
+        },
+      );
     }
 
     case 'PLAY_LOCKPICK_CACHE': {
@@ -145,59 +154,72 @@ export function minigamesReducer(state: GameState, action: MinigameAction, ctx: 
       const diamondGain = success ? Math.max(30, Math.floor(16 + state.highestWaveReached * 0.6)) : 0;
       const goldConsolation = success ? 0 : Math.max(4000, Math.floor(getMonsterGold(state.wave) * 20));
 
-      return queueReward({
-        ...state,
-        diamonds: state.diamonds + diamondGain,
-        gold: state.gold + goldConsolation,
-        totalGold: state.totalGold + goldConsolation,
-        lastLockpickDay: nowMs,
-      }, {
-        id: `lockpick_cache_${toDayNumber(nowMs)}`,
-        kind: success ? 'system' : 'gold',
-        title: success ? 'Lockpick Cache Cracked' : 'Lockpick Cache Jammed',
-        detail: success ? `Vault breached: +${diamondGain} diamonds` : `Mechanism failed: +${goldConsolation} salvage gold`,
-      });
+      return queueReward(
+        {
+          ...state,
+          diamonds: state.diamonds + diamondGain,
+          gold: state.gold + goldConsolation,
+          totalGold: state.totalGold + goldConsolation,
+          lastLockpickDay: nowMs,
+        },
+        {
+          id: `lockpick_cache_${toDayNumber(nowMs)}`,
+          kind: success ? 'system' : 'gold',
+          title: success ? 'Lockpick Cache Cracked' : 'Lockpick Cache Jammed',
+          detail: success
+            ? `Vault breached: +${diamondGain} diamonds`
+            : `Mechanism failed: +${goldConsolation} salvage gold`,
+        },
+      );
     }
 
     case 'PLAY_TARGET_PRACTICE': {
       const nowMs = Date.now();
       if (isMiniOpOnCooldown(state.lastTargetPracticeDay, nowMs)) return state;
 
-      const score = action.forcedScore == null
-        ? Math.floor(Math.random() * 101)
-        : Math.max(0, Math.min(100, Math.floor(action.forcedScore)));
+      const score =
+        action.forcedScore == null
+          ? Math.floor(Math.random() * 101)
+          : Math.max(0, Math.min(100, Math.floor(action.forcedScore)));
 
       const weekly: WeeklyEventConfig = { shardMultiplier: ctx.weeklyShardMult };
-      const shardGain = score >= 85
-        ? Math.max(140, Math.floor((80 + state.highestWaveReached * 1.8) * weekly.shardMultiplier))
-        : score >= 60
-          ? Math.max(70, Math.floor((40 + state.highestWaveReached * 1.1) * weekly.shardMultiplier))
-          : Math.max(35, Math.floor((20 + state.highestWaveReached * 0.7) * weekly.shardMultiplier));
+      const shardGain =
+        score >= 85
+          ? Math.max(140, Math.floor((80 + state.highestWaveReached * 1.8) * weekly.shardMultiplier))
+          : score >= 60
+            ? Math.max(70, Math.floor((40 + state.highestWaveReached * 1.1) * weekly.shardMultiplier))
+            : Math.max(35, Math.floor((20 + state.highestWaveReached * 0.7) * weekly.shardMultiplier));
       const diamondGain = score >= 85 ? 12 : score >= 60 ? 6 : 2;
 
-      return queueReward({
-        ...state,
-        heroShards: state.heroShards + shardGain,
-        diamonds: state.diamonds + diamondGain,
-        lastTargetPracticeDay: nowMs,
-      }, {
-        id: `target_practice_${toDayNumber(nowMs)}`,
-        kind: 'shard',
-        title: 'Target Practice Complete',
-        detail: `Score ${score}: +${shardGain} shards, +${diamondGain} diamonds`,
-      });
+      return queueReward(
+        {
+          ...state,
+          heroShards: state.heroShards + shardGain,
+          diamonds: state.diamonds + diamondGain,
+          lastTargetPracticeDay: nowMs,
+        },
+        {
+          id: `target_practice_${toDayNumber(nowMs)}`,
+          kind: 'shard',
+          title: 'Target Practice Complete',
+          detail: `Score ${score}: +${shardGain} shards, +${diamondGain} diamonds`,
+        },
+      );
     }
 
     case 'START_MINI_BOUNTY_DRAFT': {
       const nowMs = Date.now();
       if (isMiniOpOnCooldown(state.lastBountyDraftDay, nowMs) || state.miniBounty) return state;
 
-      const draftByType: Record<MiniBountyDraftType, {
-        title: string;
-        metric: MiniBountyMetric;
-        targetDelta: number;
-        rewards: { gold: number; shards: number; diamonds: number };
-      }> = {
+      const draftByType: Record<
+        MiniBountyDraftType,
+        {
+          title: string;
+          metric: MiniBountyMetric;
+          targetDelta: number;
+          rewards: { gold: number; shards: number; diamonds: number };
+        }
+      > = {
         assault: {
           title: 'Assault Writ',
           metric: 'kills',
@@ -231,58 +253,58 @@ export function minigamesReducer(state: GameState, action: MinigameAction, ctx: 
       };
 
       const draft = draftByType[action.draftType];
-      const currentMetric = draft.metric === 'wave'
-        ? state.wave
-        : draft.metric === 'summons'
-          ? state.totalSummons
-          : state.totalKills;
+      const currentMetric =
+        draft.metric === 'wave' ? state.wave : draft.metric === 'summons' ? state.totalSummons : state.totalKills;
 
-      return queueReward({
-        ...state,
-        lastBountyDraftDay: nowMs,
-        miniBounty: {
-          id: `bounty_${toDayNumber(nowMs)}_${action.draftType}`,
-          title: draft.title,
-          metric: draft.metric,
-          startValue: currentMetric,
-          targetValue: currentMetric + draft.targetDelta,
-          rewardGold: draft.rewards.gold,
-          rewardShards: draft.rewards.shards,
-          rewardDiamonds: draft.rewards.diamonds,
-          claimed: false,
+      return queueReward(
+        {
+          ...state,
+          lastBountyDraftDay: nowMs,
+          miniBounty: {
+            id: `bounty_${toDayNumber(nowMs)}_${action.draftType}`,
+            title: draft.title,
+            metric: draft.metric,
+            startValue: currentMetric,
+            targetValue: currentMetric + draft.targetDelta,
+            rewardGold: draft.rewards.gold,
+            rewardShards: draft.rewards.shards,
+            rewardDiamonds: draft.rewards.diamonds,
+            claimed: false,
+          },
         },
-      }, {
-        id: `bounty_start_${toDayNumber(nowMs)}`,
-        kind: 'system',
-        title: 'Bounty Draft Accepted',
-        detail: `${draft.title}: reach +${draft.targetDelta} ${draft.metric}`,
-      });
+        {
+          id: `bounty_start_${toDayNumber(nowMs)}`,
+          kind: 'system',
+          title: 'Bounty Draft Accepted',
+          detail: `${draft.title}: reach +${draft.targetDelta} ${draft.metric}`,
+        },
+      );
     }
 
     case 'CLAIM_MINI_BOUNTY_DRAFT': {
       const bounty = state.miniBounty;
       if (!bounty || bounty.claimed) return state;
 
-      const current = bounty.metric === 'wave'
-        ? state.wave
-        : bounty.metric === 'summons'
-          ? state.totalSummons
-          : state.totalKills;
+      const current =
+        bounty.metric === 'wave' ? state.wave : bounty.metric === 'summons' ? state.totalSummons : state.totalKills;
       if (current < bounty.targetValue) return state;
 
-      return queueReward({
-        ...state,
-        gold: state.gold + bounty.rewardGold,
-        totalGold: state.totalGold + bounty.rewardGold,
-        heroShards: state.heroShards + bounty.rewardShards,
-        diamonds: state.diamonds + bounty.rewardDiamonds,
-        miniBounty: null,
-      }, {
-        id: `bounty_claim_${Date.now()}`,
-        kind: 'system',
-        title: `Bounty Complete: ${bounty.title}`,
-        detail: `+${bounty.rewardGold} gold, +${bounty.rewardShards} shards, +${bounty.rewardDiamonds} diamonds`,
-      });
+      return queueReward(
+        {
+          ...state,
+          gold: state.gold + bounty.rewardGold,
+          totalGold: state.totalGold + bounty.rewardGold,
+          heroShards: state.heroShards + bounty.rewardShards,
+          diamonds: state.diamonds + bounty.rewardDiamonds,
+          miniBounty: null,
+        },
+        {
+          id: `bounty_claim_${Date.now()}`,
+          kind: 'system',
+          title: `Bounty Complete: ${bounty.title}`,
+          detail: `+${bounty.rewardGold} gold, +${bounty.rewardShards} shards, +${bounty.rewardDiamonds} diamonds`,
+        },
+      );
     }
 
     case 'RUN_RIFT_DUNGEON': {
@@ -300,19 +322,22 @@ export function minigamesReducer(state: GameState, action: MinigameAction, ctx: 
         const raidDiamonds = Math.max(10, Math.floor(12 + targetLevel * 5.5));
         const raidShards = Math.max(80, Math.floor(140 + targetLevel * 130));
 
-        return queueReward({
-          ...state,
-          diamonds: state.diamonds + raidDiamonds,
-          heroShards: state.heroShards + raidShards,
-          riftRaidTickets: state.riftRaidTickets - 1,
-          lastRiftBossDamagePct: 1,
-          lastRiftWavesCleared: 1,
-        }, {
-          id: `rift_raid_${Date.now()}`,
-          kind: 'system',
-          title: 'Rift Raid Complete',
-          detail: `Raided L${targetLevel} boss (+${raidDiamonds} diamonds, +${raidShards} shards). Free entries not consumed.`,
-        });
+        return queueReward(
+          {
+            ...state,
+            diamonds: state.diamonds + raidDiamonds,
+            heroShards: state.heroShards + raidShards,
+            riftRaidTickets: state.riftRaidTickets - 1,
+            lastRiftBossDamagePct: 1,
+            lastRiftWavesCleared: 1,
+          },
+          {
+            id: `rift_raid_${Date.now()}`,
+            kind: 'system',
+            title: 'Rift Raid Complete',
+            detail: `Raided L${targetLevel} boss (+${raidDiamonds} diamonds, +${raidShards} shards). Free entries not consumed.`,
+          },
+        );
       }
 
       if (entriesUsed >= entryCap) return state;
@@ -334,21 +359,24 @@ export function minigamesReducer(state: GameState, action: MinigameAction, ctx: 
       const nextLevel = cleared ? targetLevel + 1 : targetLevel;
       const nextEntriesUsed = entriesUsed + 1;
 
-      return queueReward({
-        ...state,
-        diamonds: state.diamonds + diamonds,
-        heroShards: state.heroShards + shardReward,
-        riftDungeonLevel: nextLevel,
-        riftEntryDay: today,
-        riftEntriesUsedToday: nextEntriesUsed,
-        lastRiftBossDamagePct: damagePct,
-        lastRiftWavesCleared: cleared ? 1 : 0,
-      }, {
-        id: `rift_run_${Date.now()}`,
-        kind: 'system',
-        title: cleared ? 'Rift Breach Cleared' : 'Rift Breach Failed',
-        detail: `L${targetLevel} boss (Lv ${bossLevel}) • ${Math.round(damagePct * 100)}% damage • +${diamonds} diamonds, +${shardReward} shards${cleared ? ` • Dungeon advanced to L${nextLevel}` : ''}`,
-      });
+      return queueReward(
+        {
+          ...state,
+          diamonds: state.diamonds + diamonds,
+          heroShards: state.heroShards + shardReward,
+          riftDungeonLevel: nextLevel,
+          riftEntryDay: today,
+          riftEntriesUsedToday: nextEntriesUsed,
+          lastRiftBossDamagePct: damagePct,
+          lastRiftWavesCleared: cleared ? 1 : 0,
+        },
+        {
+          id: `rift_run_${Date.now()}`,
+          kind: 'system',
+          title: cleared ? 'Rift Breach Cleared' : 'Rift Breach Failed',
+          detail: `L${targetLevel} boss (Lv ${bossLevel}) • ${Math.round(damagePct * 100)}% damage • +${diamonds} diamonds, +${shardReward} shards${cleared ? ` • Dungeon advanced to L${nextLevel}` : ''}`,
+        },
+      );
     }
 
     case 'RUN_TREASURY_RAID': {
@@ -366,20 +394,23 @@ export function minigamesReducer(state: GameState, action: MinigameAction, ctx: 
         const raidGold = Math.max(500, Math.floor(800 + targetLevel * 600));
         const raidScrap = Math.max(2, Math.floor(3 + targetLevel * 1.5));
 
-        return queueReward({
-          ...state,
-          gold: state.gold + raidGold,
-          totalGold: state.totalGold + raidGold,
-          equipmentScrap: state.equipmentScrap + raidScrap,
-          riftRaidTickets: state.riftRaidTickets - 1,
-          lastTreasureHaulPct: 1,
-          lastTreasureWiped: false,
-        }, {
-          id: `treasury_raid_${Date.now()}`,
-          kind: 'system',
-          title: 'Treasury Raid Complete',
-          detail: `Raided Vault L${targetLevel} (+${raidGold.toLocaleString()} gold, +${raidScrap} scrap). Free entries not consumed.`,
-        });
+        return queueReward(
+          {
+            ...state,
+            gold: state.gold + raidGold,
+            totalGold: state.totalGold + raidGold,
+            equipmentScrap: state.equipmentScrap + raidScrap,
+            riftRaidTickets: state.riftRaidTickets - 1,
+            lastTreasureHaulPct: 1,
+            lastTreasureWiped: false,
+          },
+          {
+            id: `treasury_raid_${Date.now()}`,
+            kind: 'system',
+            title: 'Treasury Raid Complete',
+            detail: `Raided Vault L${targetLevel} (+${raidGold.toLocaleString()} gold, +${raidScrap} scrap). Free entries not consumed.`,
+          },
+        );
       }
 
       if (entriesUsed >= entryCap) return state;
@@ -406,22 +437,25 @@ export function minigamesReducer(state: GameState, action: MinigameAction, ctx: 
       const nextEntriesUsed = entriesUsed + 1;
       const wipeNote = wiped ? ' (wiped — 50% haul penalty)' : '';
 
-      return queueReward({
-        ...state,
-        gold: state.gold + goldReward,
-        totalGold: state.totalGold + goldReward,
-        equipmentScrap: state.equipmentScrap + scrapReward,
-        treasureDungeonLevel: nextLevel,
-        treasureEntryDay: today,
-        treasureEntriesUsedToday: nextEntriesUsed,
-        lastTreasureHaulPct: haulPct,
-        lastTreasureWiped: wiped,
-      }, {
-        id: `treasury_entry_${Date.now()}`,
-        kind: 'system',
-        title: cleared ? 'Treasury Raid Cleared' : wiped ? 'Treasury Raid — Wiped!' : 'Treasury Raid — Partial Haul',
-        detail: `Vault L${targetLevel} • ${wavesCleared}/${waveCount} waves • +${goldReward.toLocaleString()} gold, +${scrapReward} scrap${wipeNote}`,
-      });
+      return queueReward(
+        {
+          ...state,
+          gold: state.gold + goldReward,
+          totalGold: state.totalGold + goldReward,
+          equipmentScrap: state.equipmentScrap + scrapReward,
+          treasureDungeonLevel: nextLevel,
+          treasureEntryDay: today,
+          treasureEntriesUsedToday: nextEntriesUsed,
+          lastTreasureHaulPct: haulPct,
+          lastTreasureWiped: wiped,
+        },
+        {
+          id: `treasury_entry_${Date.now()}`,
+          kind: 'system',
+          title: cleared ? 'Treasury Raid Cleared' : wiped ? 'Treasury Raid — Wiped!' : 'Treasury Raid — Partial Haul',
+          detail: `Vault L${targetLevel} • ${wavesCleared}/${waveCount} waves • +${goldReward.toLocaleString()} gold, +${scrapReward} scrap${wipeNote}`,
+        },
+      );
     }
 
     default:

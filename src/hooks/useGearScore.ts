@@ -31,9 +31,10 @@ export interface GearScoreRow {
 
 export function useGearScore(state: GameState) {
   const equippedItemsForScore = useMemo(
-    () => Object.values(state.equippedItems)
-      .map(id => (id ? state.equipmentInventory[id] ?? getEquipmentItem(id) : null))
-      .filter(Boolean) as Equipment[],
+    () =>
+      Object.values(state.equippedItems)
+        .map(id => (id ? (state.equipmentInventory[id] ?? getEquipmentItem(id)) : null))
+        .filter(Boolean) as Equipment[],
     [state.equippedItems, state.equipmentInventory],
   );
 

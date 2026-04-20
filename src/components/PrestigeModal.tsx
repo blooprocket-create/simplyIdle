@@ -12,7 +12,15 @@ interface Props {
   onCancel: () => void;
 }
 
-export default function RebirthModal({ visible, wave, highestWave, requiredWave, prestigeCount, onConfirm, onCancel }: Props) {
+export default function RebirthModal({
+  visible,
+  wave,
+  highestWave,
+  requiredWave,
+  prestigeCount,
+  onConfirm,
+  onCancel,
+}: Props) {
   const canRebirth = highestWave >= requiredWave;
   const currentBonus = prestigeCount > 0 ? Math.pow(REBIRTH_BONUS, prestigeCount).toFixed(2) : '1.00';
   const nextBonus = Math.pow(REBIRTH_BONUS, prestigeCount + 1).toFixed(2);
@@ -59,7 +67,12 @@ export default function RebirthModal({ visible, wave, highestWave, requiredWave,
           )}
 
           <View style={styles.buttons}>
-            <Pressable style={styles.cancelBtn} onPress={onCancel} accessibilityRole="button" accessibilityLabel="Cancel rebirth">
+            <Pressable
+              style={styles.cancelBtn}
+              onPress={onCancel}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel rebirth"
+            >
               <Text style={styles.cancelText}>Not Yet</Text>
             </Pressable>
             <Pressable
@@ -67,7 +80,11 @@ export default function RebirthModal({ visible, wave, highestWave, requiredWave,
               onPress={canRebirth ? onConfirm : undefined}
               disabled={!canRebirth}
               accessibilityRole="button"
-              accessibilityLabel={canRebirth ? `Ascend and rebirth. New bonus: ${nextBonus}x` : `Cannot rebirth yet. Reach wave ${requiredWave} first`}
+              accessibilityLabel={
+                canRebirth
+                  ? `Ascend and rebirth. New bonus: ${nextBonus}x`
+                  : `Cannot rebirth yet. Reach wave ${requiredWave} first`
+              }
             >
               <Text style={styles.confirmText}>Ascend ✨</Text>
             </Pressable>

@@ -26,12 +26,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
       accessibilityRole="progressbar"
       accessibilityValue={{ min: 0, max: 100, now: clamped }}
     >
-      <View
-        style={[
-          styles.fill,
-          { width: `${clamped}%`, backgroundColor: color, borderRadius },
-        ]}
-      />
+      <View style={[styles.fill, { width: `${clamped}%`, backgroundColor: color, borderRadius }]} />
     </View>
   );
 };

@@ -109,7 +109,10 @@ export async function loginOnlineWithGooglePopup(): Promise<string> {
   return getAccountNameFromUser(cred.user);
 }
 
-export async function loginOnlineWithGoogleTokens(idToken?: string | null, accessToken?: string | null): Promise<string> {
+export async function loginOnlineWithGoogleTokens(
+  idToken?: string | null,
+  accessToken?: string | null,
+): Promise<string> {
   const auth = getFirebaseAuth();
   if (!auth) throw new Error('Online auth is not configured.');
   if (!idToken && !accessToken) throw new Error('Google sign-in did not return a usable token.');

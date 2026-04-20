@@ -74,12 +74,22 @@ export default function MobileHeader({ primary, secondary, onSettingsPress, onSh
       {/* Top-right action buttons */}
       <View style={styles.actions}>
         {onShopPress && (
-          <Pressable style={styles.actionBtn} onPress={onShopPress} accessibilityRole="button" accessibilityLabel="Shop">
+          <Pressable
+            style={styles.actionBtn}
+            onPress={onShopPress}
+            accessibilityRole="button"
+            accessibilityLabel="Shop"
+          >
             <Text style={styles.actionIcon}>🛒</Text>
           </Pressable>
         )}
         {onSettingsPress && (
-          <Pressable style={styles.actionBtn} onPress={onSettingsPress} accessibilityRole="button" accessibilityLabel="Settings">
+          <Pressable
+            style={styles.actionBtn}
+            onPress={onSettingsPress}
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+          >
             <Text style={styles.actionIcon}>⚙️</Text>
           </Pressable>
         )}

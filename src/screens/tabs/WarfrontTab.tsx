@@ -48,7 +48,9 @@ export default function WarfrontTab(props: WarfrontTabProps) {
           <View style={styles.hpBar}>
             <View style={[styles.hpFill, { width: `${teamHpPct}%`, backgroundColor: theme.status.positive }]} />
           </View>
-          <Text style={styles.hpText}>{Math.ceil(props.teamHp)} / {props.teamMaxHp}</Text>
+          <Text style={styles.hpText}>
+            {Math.ceil(props.teamHp)} / {props.teamMaxHp}
+          </Text>
         </View>
 
         <View style={styles.vs}>
@@ -61,7 +63,9 @@ export default function WarfrontTab(props: WarfrontTabProps) {
           <View style={styles.hpBar}>
             <View style={[styles.hpFill, { width: `${monsterHpPct}%`, backgroundColor: theme.status.danger }]} />
           </View>
-          <Text style={styles.hpText}>{Math.ceil(props.monsterHp)} / {props.monsterMaxHp}</Text>
+          <Text style={styles.hpText}>
+            {Math.ceil(props.monsterHp)} / {props.monsterMaxHp}
+          </Text>
         </View>
       </View>
 
@@ -73,13 +77,13 @@ export default function WarfrontTab(props: WarfrontTabProps) {
         </View>
         <View style={styles.statChip}>
           <Text style={styles.statLabel}>Danger</Text>
-          <Text style={[styles.statValue, getDangerColor(props.dangerScore)]}>
-            {props.dangerLabel}
-          </Text>
+          <Text style={[styles.statValue, getDangerColor(props.dangerScore)]}>{props.dangerLabel}</Text>
         </View>
         <View style={styles.statChip}>
           <Text style={styles.statLabel}>Team</Text>
-          <Text style={styles.statValue}>{props.activeTeamCount}/{props.teamSlotCap}</Text>
+          <Text style={styles.statValue}>
+            {props.activeTeamCount}/{props.teamSlotCap}
+          </Text>
         </View>
       </View>
 
