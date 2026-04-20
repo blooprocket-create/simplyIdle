@@ -27,24 +27,64 @@ export interface AchievementsTabContentProps {
   stats: Stats;
   achievementsSubTab: string;
   setAchievementsSubTab: (tab: 'overview' | 'missions' | 'achievements' | 'collection' | 'codex') => void;
-  missionCards: any[];
-  claimableWeeklyMilestones: any[];
-  claimableMissionIds: any[];
+  missionCards: MissionCard[];
+  claimableWeeklyMilestones: number[];
+  claimableMissionIds: string[];
   hasClaimableRewards: boolean;
-  weeklyEvent: any;
-  storyEntries: any[];
-  nextStoryEntry: any;
+  weeklyEvent: WeeklyEventSummary;
+  storyEntries: StoryEntry[];
+  nextStoryEntry: StoryEntry | null;
   claimWeeklyTrack: (ms: number) => void;
   claimMission: (missionId: string) => void;
   claimCodexHeroVip: (heroId: string) => void;
   claimCodexUniqueVip: (heroId: string) => void;
   claimAllRewards: () => void;
-  renderSubTabBar: (tabs: any[]) => React.ReactNode;
+  renderSubTabBar: (tabs: SubTabItem[]) => React.ReactNode;
 }
 
 type CodexHero = (typeof HERO_POOL)[number];
 type CodexFactionFilter = 'all' | 'vanguard' | 'ranger' | 'arcanum' | 'aegis';
 type RecordsFilter = 'all' | 'unlocked' | 'locked' | 'hidden';
+type MissionHorizon = 'short' | 'medium' | 'long';
+
+interface MissionCard {
+  mission: {
+    id: string;
+    title: string;
+    description: string;
+    horizon: MissionHorizon;
+    target: number;
+  };
+  progress: {
+    value: number;
+    done: boolean;
+  };
+  claimed: boolean;
+}
+
+interface WeeklyEventSummary {
+  emoji: string;
+  name: string;
+  description: string;
+}
+
+interface StoryEntry {
+  id: string;
+  chapter: string;
+  title: string;
+  body: string;
+  unlockWave: number;
+  unlockPrestige?: number | null;
+  unlocked: boolean;
+}
+
+interface SubTabItem {
+  id: string;
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  notificationCount?: number;
+}
 
 function getMissionHorizonLabel(horizon: 'short' | 'medium' | 'long'): string {
   if (horizon === 'short') return 'Daily';
@@ -122,12 +162,16 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
     renderSubTabBar,
   }) => {
     const { width: viewportWidth } = useWindowDimensions();
-    const codexVipClaimedHeroIds = Array.isArray(state.codexVipClaimedHeroIds) ? state.codexVipClaimedHeroIds : [];
-    const codexVipClaimedUniqueIds = Array.isArray(state.codexVipClaimedUniqueIds)
-      ? state.codexVipClaimedUniqueIds
-      : [];
-    const heroUniqueGearByHeroId = state.heroUniqueGearByHeroId ?? {};
-    const safeStoryEntries = Array.isArray(storyEntries) ? storyEntries : [];
+    const codexVipClaimedHeroIds = useMemo(
+      () => (Array.isArray(state.codexVipClaimedHeroIds) ? state.codexVipClaimedHeroIds : []),
+      [state.codexVipClaimedHeroIds],
+    );
+    const codexVipClaimedUniqueIds = useMemo(
+      () => (Array.isArray(state.codexVipClaimedUniqueIds) ? state.codexVipClaimedUniqueIds : []),
+      [state.codexVipClaimedUniqueIds],
+    );
+    const heroUniqueGearByHeroId = useMemo(() => state.heroUniqueGearByHeroId ?? {}, [state.heroUniqueGearByHeroId]);
+    const safeStoryEntries = useMemo(() => (Array.isArray(storyEntries) ? storyEntries : []), [storyEntries]);
     const unlockedHeroIds = useMemo(() => new Set(state.heroRoster.map(hero => hero.id)), [state.heroRoster]);
     const codexHeroes = useMemo(() => HERO_POOL.filter(hero => unlockedHeroIds.has(hero.id)), [unlockedHeroIds]);
     const codexUniqueEntries = useMemo(() => {
@@ -228,7 +272,7 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
       return achievementRows;
     }, [achievementRows, hiddenLockedAchievements, openLockedAchievements, recordsFilter, unlockedAchievements]);
     const missionGroups = useMemo(() => {
-      const grouped: Record<'short' | 'medium' | 'long', typeof missionCards> = {
+      const grouped: Record<MissionHorizon, MissionCard[]> = {
         short: [],
         medium: [],
         long: [],
