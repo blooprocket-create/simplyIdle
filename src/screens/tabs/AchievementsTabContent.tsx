@@ -321,11 +321,6 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
         {tab === 'achievements' && (
           <View style={styles.achievementsTab}>
             <View pointerEvents="none" style={styles.achievementsAtmosphere}>
-              <Image
-                source={achievementsAtmosphereNoise}
-                style={styles.achievementsAtmosphereNoise}
-                resizeMode="cover"
-              />
               <View style={styles.achievementsAtmosphereOrbPrimary} />
               <View style={styles.achievementsAtmosphereOrbSecondary} />
               <View style={styles.achievementsAtmosphereGrid} />
@@ -356,53 +351,51 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
             )}
 
             {(achievementsSubTab === 'overview' || achievementsSubTab === 'missions') && (
-              <View style={styles.achievementBonusCard}>
-                <Image source={achievementsCommandDeckBanner} style={styles.achievementBonusArt} resizeMode="cover" />
-                <View pointerEvents="none" style={styles.achievementBonusScrim} />
-                <View style={styles.achievementBonusHeader}>
-                  <Text style={styles.achievementBonusTitle}>Legacy Bonus Engine</Text>
-                  <Text style={styles.achievementBonusValue}>+{(stats.achievementBonusPercent * 100).toFixed(0)}%</Text>
-                </View>
-                <Text style={styles.achievementBonusDesc}>
-                  Each unlocked achievement grants +{ACH_BONUS_PER_UNLOCK_PCT}% to final DPS, gold gain, and EXP gain
-                  multipliers.
-                </Text>
-                <Text style={styles.achievementBonusDesc}>
-                  Unlocked: {state.achievements.size}/{ACHIEVEMENTS.length} • Current multiplier: x
-                  {(1 + stats.achievementBonusPercent).toFixed(2)}
-                </Text>
-                <View style={styles.claimAllRow}>
-                  <Text style={styles.claimAllInfo}>Ready to claim: {overviewClaimableCount}</Text>
-                  <Pressable
-                    style={[styles.claimAllBtn, !hasClaimableRewards && styles.claimAllBtnDisabled]}
-                    disabled={!hasClaimableRewards}
-                    onPress={claimAllRewards}
-                  >
-                    <Text style={styles.claimAllBtnText}>Claim All Rewards</Text>
-                  </Pressable>
-                </View>
-                <View style={styles.achievementOverviewGrid}>
-                  <View style={styles.achievementOverviewCard}>
-                    <Text style={styles.achievementOverviewLabel}>Records Secured</Text>
-                    <Text style={styles.achievementOverviewValue}>{unlockedAchievements.length}</Text>
-                    <Text style={styles.achievementOverviewHint}>
-                      {ACHIEVEMENTS.length - unlockedAchievements.length} remaining
-                    </Text>
-                  </View>
-                  <View style={styles.achievementOverviewCard}>
-                    <Text style={styles.achievementOverviewLabel}>Mission Board</Text>
-                    <Text style={styles.achievementOverviewValue}>{missionCompletionCounts.done}</Text>
-                    <Text style={styles.achievementOverviewHint}>of {missionCompletionCounts.total} claimed</Text>
-                  </View>
-                  <View style={styles.achievementOverviewCard}>
-                    <Text style={styles.achievementOverviewLabel}>Collection Depth</Text>
-                    <Text style={styles.achievementOverviewValue}>
-                      {Math.floor(collectionProgress.heroCompletionPct)}%
-                    </Text>
-                    <Text style={styles.achievementOverviewHint}>hero archive discovered</Text>
-                  </View>
-                </View>
-              </View>
+              <MobileCard
+                title="Legacy Bonus Engine"
+                icon="🏛️"
+                sections={[
+                  {
+                    title: 'Power Multiplier',
+                    items: [
+                      {
+                        label: 'Achievement Bonus',
+                        value: `+${(stats.achievementBonusPercent * 100).toFixed(0)}%`,
+                        highlight: true,
+                        color: theme.status.positive,
+                      },
+                      {
+                        label: 'Unlocked',
+                        value: `${state.achievements.size}/${ACHIEVEMENTS.length}`,
+                      },
+                      {
+                        label: 'Current Multiplier',
+                        value: `x${(1 + stats.achievementBonusPercent).toFixed(2)}`,
+                        highlight: true,
+                      },
+                    ],
+                  },
+                  {
+                    title: 'Command Summary',
+                    items: [
+                      { label: 'Ready to Claim', value: `${overviewClaimableCount}` },
+                      { label: 'Records Secured', value: `${unlockedAchievements.length}` },
+                      {
+                        label: 'Mission Board',
+                        value: `${missionCompletionCounts.done}/${missionCompletionCounts.total}`,
+                      },
+                      { label: 'Collection Depth', value: `${Math.floor(collectionProgress.heroCompletionPct)}%` },
+                    ],
+                  },
+                ]}
+                action={{
+                  label: 'Claim All Rewards',
+                  onPress: claimAllRewards,
+                  disabled: !hasClaimableRewards,
+                  variant: hasClaimableRewards ? 'primary' : 'secondary',
+                }}
+                footer={`Each unlocked achievement grants +${ACH_BONUS_PER_UNLOCK_PCT}% to final DPS, gold gain, and EXP gain multipliers.`}
+              />
             )}
 
             {achievementsSubTab === 'overview' && (
@@ -424,12 +417,11 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
 
             {(achievementsSubTab === 'overview' || achievementsSubTab === 'missions') && (
               <View style={styles.missionBoardCard}>
-                <Image source={achievementsMissionOverlay} style={styles.missionBoardArt} resizeMode="cover" />
-                <View pointerEvents="none" style={styles.missionBoardScrim} />
-                <Text style={styles.sectionTitle}>🎯 Mission Board</Text>
-                <Text style={styles.sectionHelperText}>
-                  Weekly progression now lives here with daily, weekly, and lifetime categories.
-                </Text>
+                <SectionHeader
+                  title="Mission Board"
+                  icon="🎯"
+                  subtitle="Weekly progression now lives here with daily, weekly, and lifetime categories."
+                />
 
                 <View style={styles.weeklyEventCard}>
                   <Text style={styles.weeklyEventTitle}>
@@ -512,8 +504,11 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
 
             {achievementsSubTab === 'achievements' && (
               <View>
-                <Text style={styles.sectionTitle}>🏆 Records Hall</Text>
-                <Text style={styles.sectionHelperText}>Filter by state to avoid scrolling a full wall of records.</Text>
+                <SectionHeader
+                  title="Records Hall"
+                  icon="🏆"
+                  subtitle="Filter by state to avoid scrolling a full wall of records."
+                />
                 <View style={styles.recordsFilterRow}>
                   {(
                     [
@@ -541,8 +536,6 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                 </View>
                 {filteredAchievementRows.map(({ ach, unlocked, hiddenLocked }) => (
                   <View key={ach.id} style={[styles.achCard, unlocked && styles.achCardUnlocked]}>
-                    <Image source={achievementsRecordsPlaque} style={styles.recordPlaqueArt} resizeMode="cover" />
-                    <View pointerEvents="none" style={styles.recordPlaqueScrim} />
                     <View style={[styles.recordStateRail, unlocked && styles.recordStateRailUnlocked]} />
                     <Text style={styles.achEmoji}>{hiddenLocked ? '❔' : ach.emoji}</Text>
                     <View style={styles.achCardInfo}>
@@ -572,14 +565,13 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
 
             {achievementsSubTab === 'collection' && (
               <View>
-                <Text style={styles.sectionTitle}>📚 Collection Matrix</Text>
-                <Text style={styles.sectionHelperText}>
-                  Collection now tracks category completion and milestone power thresholds.
-                </Text>
+                <SectionHeader
+                  title="Collection Matrix"
+                  icon="📚"
+                  subtitle="Collection now tracks category completion and milestone power thresholds."
+                />
 
                 <View style={styles.collectionCard}>
-                  <Image source={achievementsCollectionPanel} style={styles.collectionVaultArt} resizeMode="cover" />
-                  <View pointerEvents="none" style={styles.collectionVaultScrim} />
                   <Text style={styles.collectionCardTitle}>Archive Completion</Text>
                   <View style={styles.collectionProgressRow}>
                     <Text style={styles.collectionProgressLabel}>Heroes</Text>
@@ -620,23 +612,11 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
 
                 <View style={styles.collectionGrid}>
                   <View style={styles.collectionCardCompact}>
-                    <Image
-                      source={achievementsCollectionPanel}
-                      style={styles.collectionVaultArtCompact}
-                      resizeMode="cover"
-                    />
-                    <View pointerEvents="none" style={styles.collectionVaultScrimCompact} />
                     <Text style={styles.collectionCardTitle}>Heroes</Text>
                     <Text style={styles.collectionStat}>{state.heroRoster.length} summoned</Text>
                     <Text style={styles.collectionHint}>Boss waves cleared: {Math.floor(state.wave / 10)}</Text>
                   </View>
                   <View style={styles.collectionCardCompact}>
-                    <Image
-                      source={achievementsCollectionPanel}
-                      style={styles.collectionVaultArtCompact}
-                      resizeMode="cover"
-                    />
-                    <View pointerEvents="none" style={styles.collectionVaultScrimCompact} />
                     <Text style={styles.collectionCardTitle}>Equipment</Text>
                     <Text style={styles.collectionStat}>{state.inventoryItemIds.length} total items</Text>
                     <Text style={styles.collectionHint}>
@@ -644,12 +624,6 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                     </Text>
                   </View>
                   <View style={styles.collectionCardCompact}>
-                    <Image
-                      source={achievementsCollectionPanel}
-                      style={styles.collectionVaultArtCompact}
-                      resizeMode="cover"
-                    />
-                    <View pointerEvents="none" style={styles.collectionVaultScrimCompact} />
                     <Text style={styles.collectionCardTitle}>Rebirth</Text>
                     <Text style={styles.collectionStat}>Ascensions: {state.prestigeCount ?? 0}</Text>
                     <Text style={styles.collectionHint}>Rebirth Cores: {state.rebirthCores}</Text>
@@ -657,8 +631,6 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                 </View>
 
                 <View style={styles.collectionCard}>
-                  <Image source={achievementsCollectionPanel} style={styles.collectionVaultArt} resizeMode="cover" />
-                  <View pointerEvents="none" style={styles.collectionVaultScrim} />
                   <Text style={styles.collectionCardTitle}>Permanent Unlock Registry</Text>
                   {state.permanentUnlocks.length === 0 ? (
                     <Text style={styles.collectionStat}>No permanent unlocks cataloged yet.</Text>
@@ -677,10 +649,11 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
 
             {achievementsSubTab === 'codex' && (
               <View>
-                <Text style={styles.sectionTitle}>📖 Legacy Codex</Text>
-                <Text style={styles.sectionHelperText}>
-                  Build your war archive. Heroes, relics, and chapters should feel discovered, not merely listed.
-                </Text>
+                <SectionHeader
+                  title="Legacy Codex"
+                  icon="📖"
+                  subtitle="Build your war archive. Heroes, relics, and chapters should feel discovered, not merely listed."
+                />
 
                 <View style={styles.codexOverviewRow}>
                   <View style={[styles.codexOverviewCard, styles.codexOverviewCardPrimary]}>
