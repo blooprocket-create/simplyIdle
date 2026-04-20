@@ -340,11 +340,7 @@ export const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   heroCardBackdropImage: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100%',
-    aspectRatio: 1,
+    ...StyleSheet.absoluteFillObject,
     opacity: 0.38,
   },
   heroCardBackdropFallback: {
