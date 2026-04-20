@@ -4896,6 +4896,7 @@ export function useGameState(saveSlot: string = 'default') {
   const prevSummonsRef = useRef(0);
   const prevHighestWaveRef = useRef(1);
   const prevPrestigeRef = useRef(0);
+  const isGamePausedRef = useRef(false);
   const actionDispatchCountsRef = useRef<Partial<Record<Action['type'], number>>>({});
   stateRef.current = state;
 
@@ -5191,7 +5192,9 @@ export function useGameState(saveSlot: string = 'default') {
       const now = Date.now();
       const elapsed = now - lastTickRef.current;
       lastTickRef.current = now;
-      dispatch({ type: 'TICK', elapsed });
+      if (!isGamePausedRef.current) {
+        dispatch({ type: 'TICK', elapsed });
+      }
 
       if (stateRef.current.characterCreated && now - lastSaveRef.current >= SAVE_INTERVAL_MS) {
         lastSaveRef.current = now;
@@ -5666,6 +5669,10 @@ export function useGameState(saveSlot: string = 'default') {
     [dispatch, persistSnapshot],
   );
 
+  const setGamePaused = useCallback((paused: boolean) => {
+    isGamePausedRef.current = paused;
+  }, []);
+
   const stats = computeStats(state);
 
   return {
@@ -5762,5 +5769,6 @@ export function useGameState(saveSlot: string = 'default') {
     getMissionProgress,
     applyOfflineProgress,
     setLastActiveAt,
+    setGamePaused,
   };
 }

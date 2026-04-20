@@ -19,6 +19,7 @@ interface UseGameOverlaysArgs {
   storyEntries: StoryEntry[];
   rewardPopup: RewardPopup | null;
   activeModal: string | null;
+  allowInitialStoryModal: boolean;
   setActiveModal: (modal: string | null) => void;
   clearRewardPopup: () => void;
 }
@@ -27,10 +28,17 @@ export function useGameOverlays({
   storyEntries,
   rewardPopup,
   activeModal,
+  allowInitialStoryModal,
   setActiveModal,
   clearRewardPopup,
 }: UseGameOverlaysArgs) {
   const [idleChestReward, setIdleChestReward] = useState<{ title: string; detail: string } | null>(null);
+  const [storyCutscene, setStoryCutscene] = useState<{
+    chapter: string;
+    title: string;
+    body: string;
+    wave: number;
+  } | null>(null);
   const [storyBeatModal, setStoryBeatModal] = useState<{
     chapter: string;
     title: string;
@@ -38,6 +46,17 @@ export function useGameOverlays({
     wave: number;
   } | null>(null);
   const { storyUnlockToast, setStoryUnlockToast } = useStoryUnlockToast(storyEntries);
+
+  const queueStorySequence = (entry: StoryEntry) => {
+    queueMicrotask(() => {
+      setStoryCutscene({
+        chapter: entry.chapter,
+        title: entry.title,
+        body: entry.body,
+        wave: entry.unlockWave,
+      });
+    });
+  };
 
   // Direct chapter transition detection — track the highest unlocked beat
   // index and show the modal whenever it increases, regardless of how the
@@ -51,23 +70,15 @@ export function useGameOverlays({
   }, [storyEntries]);
 
   const prevBeatIndexRef = useRef<number | null>(null);
-  const initialPrologueShownRef = useRef(false);
 
   useEffect(() => {
     if (prevBeatIndexRef.current === null) {
       // First run — seed baseline index.
-      // Exception: show the testing prologue beat when it is already unlocked.
+      // For brand-new runs, allow the currently unlocked opening story beat
+      // to present before regular unlock delta tracking takes over.
       const initialEntry = highestUnlockedIndex >= 0 ? storyEntries[highestUnlockedIndex] : null;
-      if (initialEntry && initialEntry.id === 'prologue_ash' && !initialPrologueShownRef.current) {
-        queueMicrotask(() => {
-          setStoryBeatModal({
-            chapter: initialEntry.chapter,
-            title: initialEntry.title,
-            body: initialEntry.body,
-            wave: initialEntry.unlockWave,
-          });
-        });
-        initialPrologueShownRef.current = true;
+      if (allowInitialStoryModal && initialEntry) {
+        queueStorySequence(initialEntry);
       }
 
       prevBeatIndexRef.current = highestUnlockedIndex;
@@ -77,19 +88,12 @@ export function useGameOverlays({
     if (highestUnlockedIndex > prevBeatIndexRef.current) {
       const entry = storyEntries[highestUnlockedIndex];
       if (entry) {
-        queueMicrotask(() => {
-          setStoryBeatModal({
-            chapter: entry.chapter,
-            title: entry.title,
-            body: entry.body,
-            wave: entry.unlockWave,
-          });
-        });
+        queueStorySequence(entry);
       }
     }
 
     prevBeatIndexRef.current = highestUnlockedIndex;
-  }, [highestUnlockedIndex, storyEntries]);
+  }, [allowInitialStoryModal, highestUnlockedIndex, storyEntries]);
 
   const isOfflineRewardPopup = useMemo(() => {
     if (!rewardPopup) return false;
@@ -124,6 +128,8 @@ export function useGameOverlays({
     isOfflineRewardPopup,
     idleChestReward,
     setIdleChestReward,
+    storyCutscene,
+    setStoryCutscene,
     storyUnlockToast,
     setStoryUnlockToast,
     storyBeatModal,

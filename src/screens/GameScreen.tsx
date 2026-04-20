@@ -71,6 +71,7 @@ import {
 } from '../gameConfig';
 import { getHeroPortraitSource } from '../heroPortraits';
 import { fmt } from '../utils';
+import StoryBeatCutscene from '../components/StoryBeatCutscene';
 import StoryBeatModal from '../components/StoryBeatModal';
 import RebirthModal from '../components/PrestigeModal';
 import BottomNavigation, { BottomTabType } from '../components/BottomNavigation';
@@ -393,6 +394,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     completeExpedition,
     applyOfflineProgress,
     setLastActiveAt,
+    setGamePaused,
   } = useGameState(
     selectedCharacterClass ? getCharacterSaveSlot(accountName, selectedCharacterClass) : '__character_slot_preview__',
   );
@@ -917,13 +919,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const currentVipMilestoneClaimed = vipClaimedLevels.includes(currentVipMilestone.level);
   const currentVipMilestoneCanClaim = !currentVipMilestoneClaimed && vipLevel >= currentVipMilestone.level;
 
-  const { idleChestReward, setIdleChestReward, storyBeatModal, setStoryBeatModal } = useGameOverlays({
-    storyEntries,
-    rewardPopup,
-    activeModal,
-    setActiveModal: modal => setActiveModal(modal as ActiveModal),
-    clearRewardPopup,
-  });
+  const { idleChestReward, setIdleChestReward, storyCutscene, setStoryCutscene, storyBeatModal, setStoryBeatModal } =
+    useGameOverlays({
+      storyEntries,
+      rewardPopup,
+      activeModal,
+      allowInitialStoryModal: tutorialStep === 'welcome',
+      setActiveModal: modal => setActiveModal(modal as ActiveModal),
+      clearRewardPopup,
+    });
+
+  useEffect(() => {
+    setGamePaused(!!storyCutscene || !!storyBeatModal);
+  }, [setGamePaused, storyCutscene, storyBeatModal]);
 
   useModalOpenTelemetry({
     activeModal,
@@ -2616,6 +2624,19 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
 
       {/* Bottom Navigation */}
       {renderCommandDeck()}
+
+      <StoryBeatCutscene
+        visible={!!storyCutscene}
+        chapter={storyCutscene?.chapter ?? ''}
+        title={storyCutscene?.title ?? ''}
+        body={storyCutscene?.body ?? ''}
+        onContinue={() => {
+          if (storyCutscene) {
+            setStoryBeatModal(storyCutscene);
+          }
+          setStoryCutscene(null);
+        }}
+      />
 
       <StoryBeatModal
         visible={!!storyBeatModal}
