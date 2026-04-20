@@ -10,7 +10,7 @@ import {
 } from '../../gameConfig';
 import { getHeroPortraitSource } from '../../heroPortraits';
 import { getHeroAnimationUri } from '../../heroAnimations';
-import { ACH_BONUS_PER_UNLOCK_PCT } from '../GameScreen';
+import { ACH_BONUS_PER_UNLOCK_PCT } from '../gameScreenShared';
 import { styles } from './AchievementsTabContent.styles';
 
 export interface AchievementsTabContentProps {

@@ -3,7 +3,7 @@ import { View, Text, Pressable } from 'react-native';
 import { GameState } from '../../useGameState';
 import { PermanentUnlockId } from '../../gameConfig';
 import { fmt } from '../../utils';
-import { Tab } from '../GameScreen';
+import type { Tab } from '../gameScreenShared';
 import { styles } from './WarroomTabContent.styles';
 import { t } from '../../i18n';
 
