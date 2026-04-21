@@ -1,7 +1,6 @@
 import React, { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
 import { Audio, ResizeMode, Video, type AVPlaybackStatus } from 'expo-av';
-import { Modal, View, Text, StyleSheet, Platform, useWindowDimensions } from 'react-native';
-import { BREAKPOINTS } from '../gameConfig';
+import { Modal, View, Text, StyleSheet, Platform } from 'react-native';
 import { getStoryCutsceneUri } from '../storyCutscenes';
 import { FeedbackPressable as Pressable } from './FeedbackPressable';
 
@@ -25,19 +24,11 @@ export default function StoryBeatCutscene({
   body,
   onContinue,
 }: StoryBeatCutsceneProps) {
-  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
   const completionHandledRef = useRef(false);
   const [playbackBlockedBeatId, setPlaybackBlockedBeatId] = useState<string | null>(null);
   const videoUri = beatId ? getStoryCutsceneUri(beatId) : null;
   const playbackBlocked = playbackBlockedBeatId === beatId;
-  const isPortraitPhone = viewportHeight > viewportWidth && viewportWidth < BREAKPOINTS.compactPhone;
-  const videoResizeMode = isPortraitPhone ? ResizeMode.CONTAIN : ResizeMode.COVER;
-  const webVideoStyle: CSSProperties = {
-    width: '100%',
-    height: '100%',
-    objectFit: isPortraitPhone ? 'contain' : 'cover',
-  };
 
   const handlePlaybackComplete = useCallback(() => {
     if (completionHandledRef.current) return;
@@ -103,8 +94,8 @@ export default function StoryBeatCutscene({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onContinue}>
       <View style={styles.backdrop}>
-        <View style={[styles.frame, isPortraitPhone && styles.framePortrait]}>
-          <View style={[styles.mediaViewport, isPortraitPhone && styles.mediaViewportPortrait]}>
+        <View style={styles.frame}>
+          <View style={styles.mediaViewport}>
             {videoUri ? (
               Platform.OS === 'web' ? (
                 <video
@@ -120,7 +111,7 @@ export default function StoryBeatCutscene({
                   onCanPlay={() => {
                     void startWebPlayback();
                   }}
-                  style={webVideoStyle}
+                  style={styles.webVideo as CSSProperties}
                 />
               ) : (
                 <Video
@@ -131,7 +122,7 @@ export default function StoryBeatCutscene({
                   isLooping={false}
                   isMuted={false}
                   volume={1}
-                  resizeMode={videoResizeMode}
+                  resizeMode={ResizeMode.COVER}
                   onPlaybackStatusUpdate={handleNativePlaybackStatus}
                 />
               )
@@ -142,20 +133,20 @@ export default function StoryBeatCutscene({
                 <Text style={styles.fallbackLabel}>Scene File Missing</Text>
               </View>
             )}
-            {!isPortraitPhone && <View pointerEvents="none" style={styles.mediaScrim} />}
+            <View pointerEvents="none" style={styles.mediaScrim} />
             <View pointerEvents="none" style={styles.edgeVignette} />
           </View>
 
-          <View style={isPortraitPhone ? styles.textPanelStacked : styles.textPanelOverlay}>
-            <View style={[styles.kickerRow, isPortraitPhone && styles.kickerRowStacked]}>
+          <View style={styles.textPanelOverlay}>
+            <View style={styles.kickerRow}>
               <Text style={styles.chapter}>{chapter}</Text>
               <Text style={styles.sceneBadge}>{videoUri ? 'Cutscene' : 'Briefing'}</Text>
             </View>
-            <Text style={[styles.title, isPortraitPhone && styles.titlePortrait]}>{title}</Text>
-            <Text style={[styles.body, isPortraitPhone && styles.bodyPortrait]}>{body}</Text>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.body}>{body}</Text>
 
-            <View style={[styles.footerRow, isPortraitPhone && styles.footerRowStacked]}>
-              <Text style={[styles.footerHint, isPortraitPhone && styles.footerHintStacked]}>
+            <View style={styles.footerRow}>
+              <Text style={styles.footerHint}>
                 {playbackBlocked
                   ? 'Autoplay with sound was blocked. Start the cutscene once and it will close on its own when finished.'
                   : videoUri
@@ -200,22 +191,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#060A14',
     overflow: 'hidden',
   },
-  framePortrait: {
-    height: 'auto',
-    maxWidth: 520,
-  },
   mediaViewport: {
     flex: 1,
     backgroundColor: '#02050D',
     position: 'relative',
   },
-  mediaViewportPortrait: {
-    flex: 0,
-    aspectRatio: 16 / 9,
-  },
   media: {
     width: '100%',
     height: '100%',
+  },
+  webVideo: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
   },
   fallbackScene: {
     flex: 1,
@@ -271,21 +259,12 @@ const styles = StyleSheet.create({
     paddingTop: 22,
     paddingBottom: 22,
   },
-  textPanelStacked: {
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 20,
-    backgroundColor: '#060A14',
-  },
   kickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
     marginBottom: 12,
-  },
-  kickerRowStacked: {
-    alignItems: 'flex-start',
   },
   chapter: {
     color: '#9BB0DD',
@@ -312,18 +291,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 12,
   },
-  titlePortrait: {
-    fontSize: 28,
-  },
   body: {
     color: '#C6D3ED',
     fontSize: 15,
     lineHeight: 23,
     maxWidth: 700,
-  },
-  bodyPortrait: {
-    fontSize: 14,
-    lineHeight: 21,
   },
   footerRow: {
     marginTop: 18,
@@ -332,18 +304,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
-  footerRowStacked: {
-    flexDirection: 'column',
-    alignItems: 'stretch',
-  },
   footerHint: {
     flex: 1,
     color: '#8EA1C8',
     fontSize: 12,
     lineHeight: 18,
-  },
-  footerHintStacked: {
-    flex: 0,
   },
   cta: {
     paddingHorizontal: 18,
