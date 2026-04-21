@@ -32,6 +32,11 @@ export default function StoryBeatCutscene({
   const playbackBlocked = playbackBlockedBeatId === beatId;
   const isPortraitPhone = viewportHeight > viewportWidth && viewportWidth < BREAKPOINTS.compactPhone;
   const videoResizeMode = isPortraitPhone ? ResizeMode.CONTAIN : ResizeMode.COVER;
+  const webVideoStyle: CSSProperties = {
+    width: '100%',
+    height: '100%',
+    objectFit: isPortraitPhone ? 'contain' : 'cover',
+  };
 
   const handlePlaybackComplete = useCallback(() => {
     if (completionHandledRef.current) return;
@@ -114,7 +119,7 @@ export default function StoryBeatCutscene({
                   onCanPlay={() => {
                     void startWebPlayback();
                   }}
-                  style={[styles.webVideo, isPortraitPhone && styles.webVideoPortrait] as CSSProperties}
+                  style={webVideoStyle}
                 />
               ) : (
                 <Video
@@ -210,14 +215,6 @@ const styles = StyleSheet.create({
   media: {
     width: '100%',
     height: '100%',
-  },
-  webVideo: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-  },
-  webVideoPortrait: {
-    objectFit: 'contain',
   },
   fallbackScene: {
     flex: 1,
