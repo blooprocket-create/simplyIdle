@@ -27,14 +27,20 @@ export default function StoryBeatCutscene({
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
   const completionHandledRef = useRef(false);
   const [playbackBlockedBeatId, setPlaybackBlockedBeatId] = useState<string | null>(null);
+  const [playbackIssueBeatId, setPlaybackIssueBeatId] = useState<string | null>(null);
   const videoUri = beatId ? getStoryCutsceneUri(beatId) : null;
   const playbackBlocked = playbackBlockedBeatId === beatId;
+  const playbackIssue = playbackIssueBeatId === beatId;
 
   const handlePlaybackComplete = useCallback(() => {
     if (completionHandledRef.current) return;
     completionHandledRef.current = true;
     onContinue();
   }, [onContinue]);
+
+  const handlePlaybackProblem = useCallback(() => {
+    setPlaybackIssueBeatId(beatId);
+  }, [beatId]);
 
   const startWebPlayback = useCallback(async () => {
     const video = webVideoRef.current;
@@ -48,6 +54,7 @@ export default function StoryBeatCutscene({
     try {
       await video.play();
       setPlaybackBlockedBeatId(null);
+      setPlaybackIssueBeatId(null);
     } catch {
       setPlaybackBlockedBeatId(beatId);
     }
@@ -55,12 +62,22 @@ export default function StoryBeatCutscene({
 
   const handleNativePlaybackStatus = useCallback(
     (status: AVPlaybackStatus) => {
-      if (!status.isLoaded) return;
+      if (!status.isLoaded) {
+        if (status.error) {
+          handlePlaybackProblem();
+        }
+        return;
+      }
+
+      if (status.isPlaying || status.positionMillis > 0) {
+        setPlaybackIssueBeatId(null);
+      }
+
       if (status.didJustFinish) {
         handlePlaybackComplete();
       }
     },
-    [handlePlaybackComplete],
+    [handlePlaybackComplete, handlePlaybackProblem],
   );
 
   useEffect(() => {
@@ -111,6 +128,11 @@ export default function StoryBeatCutscene({
                   onCanPlay={() => {
                     void startWebPlayback();
                   }}
+                  onPlaying={() => {
+                    setPlaybackBlockedBeatId(null);
+                    setPlaybackIssueBeatId(null);
+                  }}
+                  onError={handlePlaybackProblem}
                   style={styles.webVideo as CSSProperties}
                 />
               ) : (
@@ -124,6 +146,7 @@ export default function StoryBeatCutscene({
                   volume={1}
                   resizeMode={ResizeMode.COVER}
                   onPlaybackStatusUpdate={handleNativePlaybackStatus}
+                  onError={handlePlaybackProblem}
                 />
               )
             ) : (
@@ -148,21 +171,33 @@ export default function StoryBeatCutscene({
             <View style={styles.footerRow}>
               <Text style={styles.footerHint}>
                 {playbackBlocked
-                  ? 'Autoplay with sound was blocked. Start the cutscene once and it will close on its own when finished.'
-                  : videoUri
-                    ? 'This cutscene will close automatically when playback finishes.'
-                    : 'No cutscene file found for this beat.'}
+                  ? 'Autoplay with sound was blocked. Start the cutscene manually or skip it.'
+                  : playbackIssue
+                    ? 'The cutscene hit a playback problem. Skip it to keep the story moving.'
+                    : videoUri
+                      ? 'This cutscene will close automatically when playback finishes. You can also skip it at any time.'
+                      : 'No cutscene file found for this beat.'}
               </Text>
-              {(playbackBlocked || !videoUri) && (
+              <View style={styles.footerActions}>
+                {playbackBlocked && (
+                  <Pressable
+                    style={styles.secondaryCta}
+                    onPress={() => void startWebPlayback()}
+                    accessibilityRole="button"
+                    accessibilityLabel="Play cutscene"
+                  >
+                    <Text style={styles.secondaryCtaText}>Play Cutscene</Text>
+                  </Pressable>
+                )}
                 <Pressable
                   style={styles.cta}
-                  onPress={playbackBlocked ? () => void startWebPlayback() : onContinue}
+                  onPress={onContinue}
                   accessibilityRole="button"
-                  accessibilityLabel={playbackBlocked ? 'Play cutscene' : 'Continue'}
+                  accessibilityLabel={videoUri && !playbackIssue ? 'Skip cutscene' : 'Continue'}
                 >
-                  <Text style={styles.ctaText}>{playbackBlocked ? 'Play Cutscene' : 'Continue'}</Text>
+                  <Text style={styles.ctaText}>{videoUri && !playbackIssue ? 'Skip Scene' : 'Continue'}</Text>
                 </Pressable>
-              )}
+              </View>
             </View>
           </View>
         </View>
@@ -299,16 +334,34 @@ const styles = StyleSheet.create({
   },
   footerRow: {
     marginTop: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    alignItems: 'stretch',
     gap: 12,
   },
+  footerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
   footerHint: {
-    flex: 1,
     color: '#8EA1C8',
     fontSize: 12,
     lineHeight: 18,
+  },
+  secondaryCta: {
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(143, 173, 255, 0.45)',
+    backgroundColor: 'rgba(10, 21, 44, 0.72)',
+  },
+  secondaryCtaText: {
+    color: '#D9E7FF',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
   cta: {
     paddingHorizontal: 18,
