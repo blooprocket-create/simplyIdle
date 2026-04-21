@@ -26,6 +26,8 @@ interface SaveDocRecord {
   payloadJson?: string;
   /** Present on schema v2+ saves; lists the chunk doc IDs in the /chunks subcollection. */
   chunkKeys?: string[];
+  /** Present on schema v2+ save headers; lets writers skip unchanged chunk docs. */
+  chunkHashes?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,6 +202,84 @@ export function mergeChunks(chunks: Record<string, Record<string, unknown>>): Re
     Object.assign(merged, chunkPayload);
   }
   return merged;
+}
+
+interface ChunkMutationPlan {
+  chunkEntries: Array<[string, Record<string, unknown>]>;
+  chunkKeyList: string[];
+  chunkHashes: Record<string, string>;
+  changedChunkNames: string[];
+  deletedChunkNames: string[];
+  isNoop: boolean;
+}
+
+function sortKeysDeep(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortKeysDeep);
+  }
+
+  if (!value || typeof value !== 'object' || value instanceof Date) {
+    return value;
+  }
+
+  const sorted: Record<string, unknown> = {};
+  for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+    sorted[key] = sortKeysDeep((value as Record<string, unknown>)[key]);
+  }
+  return sorted;
+}
+
+function stableStringify(value: unknown): string {
+  return JSON.stringify(sortKeysDeep(value)) ?? 'null';
+}
+
+function hashString(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function getChunkFingerprint(chunkPayload: Record<string, unknown>): string {
+  const stableJson = stableStringify(chunkPayload);
+  return `${stableJson.length.toString(36)}:${hashString(stableJson)}`;
+}
+
+function planChunkMutations(
+  chunks: Record<string, Record<string, unknown>>,
+  remoteChunkHashes?: Record<string, string> | null,
+  remoteChunkKeys?: string[] | null,
+): ChunkMutationPlan {
+  const chunkEntries = Object.entries(chunks);
+  const chunkKeyList = chunkEntries.map(([chunkName]) => chunkName);
+  const chunkHashes = Object.fromEntries(
+    chunkEntries.map(([chunkName, chunkPayload]) => [chunkName, getChunkFingerprint(chunkPayload)]),
+  );
+  const safeRemoteChunkHashes = remoteChunkHashes ?? null;
+  const safeRemoteChunkKeys = Array.isArray(remoteChunkKeys) ? remoteChunkKeys : [];
+  const hasRemoteHashBaseline = !!safeRemoteChunkHashes && Object.keys(safeRemoteChunkHashes).length > 0;
+  const changedChunkNames = hasRemoteHashBaseline
+    ? chunkEntries
+        .filter(([chunkName]) => safeRemoteChunkHashes[chunkName] !== chunkHashes[chunkName])
+        .map(([chunkName]) => chunkName)
+    : chunkKeyList;
+  const deletedChunkNames = safeRemoteChunkKeys.filter(chunkName => !(chunkName in chunkHashes));
+  const remoteChunkKeySet = new Set(safeRemoteChunkKeys);
+  const hasSameChunkSet =
+    safeRemoteChunkKeys.length === chunkKeyList.length &&
+    chunkKeyList.every(chunkName => remoteChunkKeySet.has(chunkName));
+
+  return {
+    chunkEntries,
+    chunkKeyList,
+    chunkHashes,
+    changedChunkNames,
+    deletedChunkNames,
+    isNoop:
+      hasRemoteHashBaseline && changedChunkNames.length === 0 && deletedChunkNames.length === 0 && hasSameChunkSet,
+  };
 }
 
 /** Progress callback type for chunked loads. */
@@ -495,42 +575,59 @@ export async function writeOnlineSave<TPayload extends Record<string, unknown>>(
     const ref = doc(db, 'users', uid, 'saveSlots', safeSlot);
     const now = Date.now();
     const chunks = splitPayloadIntoChunks(payload as unknown as Record<string, unknown>);
-    const chunkEntries = Object.entries(chunks);
-    const chunkKeyList = chunkEntries.map(([name]) => name);
 
     return runTransaction(db, async tx => {
       const snap = await tx.get(ref);
-      const remote = snap.exists() ? toEnvelope<TPayload>(snap.data()) : null;
+      const remoteRawData = snap.exists() ? (snap.data() as SaveDocRecord) : null;
+      const remote = remoteRawData ? toEnvelope<TPayload>(remoteRawData) : null;
       const remoteRevision = remote?.revision ?? 0;
       const baseRevision = expectedRevision ?? remoteRevision;
 
       if (remoteRevision !== baseRevision) {
         // Conflict detected — load remote chunks if needed for conflict resolution
-        if (remote && snap.exists()) {
-          const rawData = snap.data() as SaveDocRecord;
-          if (Array.isArray(rawData.chunkKeys) && rawData.chunkKeys.length > 0) {
-            const remotePayload = await loadChunksForSlot(db, ['users', uid, 'saveSlots', safeSlot], rawData.chunkKeys);
+        if (remote && remoteRawData) {
+          if (Array.isArray(remoteRawData.chunkKeys) && remoteRawData.chunkKeys.length > 0) {
+            const remotePayload = await loadChunksForSlot(
+              db,
+              ['users', uid, 'saveSlots', safeSlot],
+              remoteRawData.chunkKeys,
+            );
             remote.payload = remotePayload as TPayload;
           }
         }
         return { ok: false, remote } as OnlineSaveWriteResult<TPayload>;
       }
 
+      const mutationPlan = planChunkMutations(chunks, remoteRawData?.chunkHashes, remoteRawData?.chunkKeys);
+      if (mutationPlan.isNoop) {
+        return { ok: true, revision: remoteRevision } as OnlineSaveWriteResult<TPayload>;
+      }
+
       const nextRevision = remoteRevision + 1;
 
-      // Write header doc (no inline payload — data is in chunks)
+      // Write header doc (no inline payload — data is in chunks).
+      // chunkHashes lets future writes skip chunk docs whose payload did not change.
       tx.set(ref, {
         revision: nextRevision,
         updatedAt: now,
         schemaVersion: SAVE_SCHEMA_VERSION,
         saveSlot: safeSlot,
-        chunkKeys: chunkKeyList,
+        chunkKeys: mutationPlan.chunkKeyList,
+        chunkHashes: mutationPlan.chunkHashes,
       });
 
-      // Write each chunk
-      for (const [chunkName, chunkPayload] of chunkEntries) {
+      const chunkLookup = new Map(mutationPlan.chunkEntries);
+
+      for (const chunkName of mutationPlan.changedChunkNames) {
+        const chunkPayload = chunkLookup.get(chunkName);
+        if (!chunkPayload) continue;
         const chunkRef = doc(db, 'users', uid, 'saveSlots', safeSlot, 'chunks', chunkName);
         tx.set(chunkRef, serializeChunkForWrite(chunkName, chunkPayload));
+      }
+
+      for (const chunkName of mutationPlan.deletedChunkNames) {
+        const chunkRef = doc(db, 'users', uid, 'saveSlots', safeSlot, 'chunks', chunkName);
+        tx.delete(chunkRef);
       }
 
       return { ok: true, revision: nextRevision } as OnlineSaveWriteResult<TPayload>;
@@ -612,8 +709,7 @@ export async function writeOnlineSaveForUid<TPayload extends Record<string, unkn
 
     // Write chunked format
     const chunks = splitPayloadIntoChunks(payload as unknown as Record<string, unknown>);
-    const chunkEntries = Object.entries(chunks);
-    const chunkKeyList = chunkEntries.map(([name]) => name);
+    const mutationPlan = planChunkMutations(chunks, existing.chunkHashes, existing.chunkKeys);
 
     const batch = writeBatch(db);
     batch.set(ref, {
@@ -621,12 +717,23 @@ export async function writeOnlineSaveForUid<TPayload extends Record<string, unkn
       updatedAt: Date.now(),
       schemaVersion: SAVE_SCHEMA_VERSION,
       saveSlot: existing.saveSlot,
-      chunkKeys: chunkKeyList,
+      chunkKeys: mutationPlan.chunkKeyList,
+      chunkHashes: mutationPlan.chunkHashes,
     });
-    for (const [chunkName, chunkPayload] of chunkEntries) {
+
+    const chunkLookup = new Map(mutationPlan.chunkEntries);
+    for (const chunkName of mutationPlan.changedChunkNames) {
+      const chunkPayload = chunkLookup.get(chunkName);
+      if (!chunkPayload) continue;
       const chunkRef = doc(db, 'users', uid, 'saveSlots', saveSlotId, 'chunks', chunkName);
       batch.set(chunkRef, serializeChunkForWrite(chunkName, chunkPayload));
     }
+
+    for (const chunkName of mutationPlan.deletedChunkNames) {
+      const chunkRef = doc(db, 'users', uid, 'saveSlots', saveSlotId, 'chunks', chunkName);
+      batch.delete(chunkRef);
+    }
+
     await batch.commit();
 
     await logAdminAction('write_save_for_uid', { targetUid: uid, saveSlotId });

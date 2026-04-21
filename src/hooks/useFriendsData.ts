@@ -80,9 +80,23 @@ export function useFriendsData(uid: string, displayName: string, active: boolean
   useEffect(() => {
     if (!active || !uid) return;
 
+    let fallbackTimer: ReturnType<typeof setInterval> | null = null;
+    const stopFallbackPolling = () => {
+      if (!fallbackTimer) return;
+      clearInterval(fallbackTimer);
+      fallbackTimer = null;
+    };
+    const startFallbackPolling = () => {
+      if (fallbackTimer) return;
+      fallbackTimer = setInterval(() => {
+        void refreshFriendsData();
+      }, FALLBACK_POLL_MS);
+    };
+
     const stopRealtime = subscribeFriendsRealtime(
       uid,
       snapshot => {
+        stopFallbackPolling();
         setFriends(snapshot.friends);
         setPendingRequests(snapshot.pendingRequests);
         setGiftCooldowns(snapshot.giftCooldowns);
@@ -92,16 +106,14 @@ export function useFriendsData(uid: string, displayName: string, active: boolean
       () => {
         setFriendsError('Failed to load friends data.');
         setFriendsLoadedOnce(true);
+        void refreshFriendsData();
+        startFallbackPolling();
       },
     );
 
-    const fallbackTimer = setInterval(() => {
-      void refreshFriendsData();
-    }, FALLBACK_POLL_MS);
-
     return () => {
       stopRealtime();
-      clearInterval(fallbackTimer);
+      stopFallbackPolling();
     };
   }, [active, uid, refreshFriendsData]);
 
