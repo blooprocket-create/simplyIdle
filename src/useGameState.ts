@@ -1447,13 +1447,11 @@ function getHeroPassiveMultipliers(state: GameState): {
     if (trait === 'bulwark_instinct') incomingDmgMult *= 0.98;
   }
 
-  const uniqueSkills = getActiveUniqueSkillMultipliers(state);
-
   return {
-    dpsMult: Math.min(12, dpsMult * uniqueSkills.dpsMult),
-    goldMult: Math.min(4, goldMult * uniqueSkills.goldMult),
-    expMult: Math.min(4, expMult * uniqueSkills.expMult),
-    incomingDmgMult: Math.max(0.35, incomingDmgMult * uniqueSkills.incomingDmgMult),
+    dpsMult: Math.min(12, dpsMult),
+    goldMult: Math.min(4, goldMult),
+    expMult: Math.min(4, expMult),
+    incomingDmgMult: Math.max(0.35, incomingDmgMult),
   };
 }
 
@@ -3505,6 +3503,7 @@ function killMonster(state: GameState): GameState {
   const achievementMult = getAchievementBonusMultiplier(state);
   const economyMult = getMetaEconomyMultiplier(state);
   const heroPassive = getHeroPassiveMultipliers(state);
+  const uniqueSkills = getActiveUniqueSkillMultipliers(state);
   const synergy = getTeamSynergy(state);
   const masteryLevel = getClassMasteryLevel(state, state.playerClass);
   const masteryEconomyMult = 1 + Math.min(0.25, Math.floor(masteryLevel / 5) * 0.01);
@@ -3516,6 +3515,7 @@ function killMonster(state: GameState): GameState {
       economyMult *
       getRebirthEconomyMultiplier(state) *
       heroPassive.goldMult *
+      uniqueSkills.goldMult *
       synergy.goldMult *
       masteryEconomyMult *
       weekly.goldMultiplier *
@@ -3527,6 +3527,7 @@ function killMonster(state: GameState): GameState {
       achievementMult *
       affix.expMult *
       heroPassive.expMult *
+      uniqueSkills.expMult *
       synergy.expMult *
       weekly.expMultiplier *
       getVipExpMultiplier(state) *
@@ -3855,7 +3856,7 @@ function applyAutoTempo(state: GameState): GameState {
   return { ...state, combatTempo: state.autoTempoTarget };
 }
 
-function advanceCombatStep(state: GameState, elapsedMs: number): GameState {
+export function advanceCombatStep(state: GameState, elapsedMs: number): GameState {
   if (!state.characterCreated) return state;
 
   const refreshedState = maybeAutoRefreshExpeditionContracts(state, Date.now());
@@ -3878,6 +3879,7 @@ function advanceCombatStep(state: GameState, elapsedMs: number): GameState {
   const passive = working.playerClass ? getClassPassive(working.playerClass) : null;
   const passiveIncomingMult = hasUnlock(working, 'class_passive') && passive ? passive.incomingDamageMultiplier : 1;
   const heroPassive = getHeroPassiveMultipliers(working);
+  const uniqueSkills = getActiveUniqueSkillMultipliers(working);
   const formation = getFormationMultipliers(working);
   const synergy = getTeamSynergy(working);
   const activeReductionMult = 1 - Math.max(0, Math.min(0.7, working.damageReductionBuffPct));
@@ -3886,6 +3888,7 @@ function advanceCombatStep(state: GameState, elapsedMs: number): GameState {
     (1 - damageReduction) *
     passiveIncomingMult *
     heroPassive.incomingDmgMult *
+    uniqueSkills.incomingDmgMult *
     formation.incomingMult *
     synergy.incomingMult *
     activeReductionMult *
@@ -3968,6 +3971,7 @@ function getOfflineStepElapsedMs(state: GameState, remainingMs: number): number 
   const passiveIncomingMult =
     hasUnlock(withAutoTempo, 'class_passive') && passive ? passive.incomingDamageMultiplier : 1;
   const heroPassive = getHeroPassiveMultipliers(withAutoTempo);
+  const uniqueSkills = getActiveUniqueSkillMultipliers(withAutoTempo);
   const formation = getFormationMultipliers(withAutoTempo);
   const synergy = getTeamSynergy(withAutoTempo);
   const activeReductionMult = 1 - Math.max(0, Math.min(0.7, withAutoTempo.damageReductionBuffPct));
@@ -3976,6 +3980,7 @@ function getOfflineStepElapsedMs(state: GameState, remainingMs: number): number 
     (1 - damageReduction) *
     passiveIncomingMult *
     heroPassive.incomingDmgMult *
+    uniqueSkills.incomingDmgMult *
     formation.incomingMult *
     synergy.incomingMult *
     activeReductionMult *
@@ -4030,6 +4035,7 @@ function tryBatchOfflineKills(state: GameState, remainingMs: number): { state: G
   const passive = withTempo.playerClass ? getClassPassive(withTempo.playerClass) : null;
   const passiveIncomingMult = hasUnlock(withTempo, 'class_passive') && passive ? passive.incomingDamageMultiplier : 1;
   const heroPassive = getHeroPassiveMultipliers(withTempo);
+  const uniqueSkills = getActiveUniqueSkillMultipliers(withTempo);
   const formation = getFormationMultipliers(withTempo);
   const synergy = getTeamSynergy(withTempo);
   const incomingDmgPerMs =
@@ -4037,6 +4043,7 @@ function tryBatchOfflineKills(state: GameState, remainingMs: number): { state: G
     (1 - damageReduction) *
     passiveIncomingMult *
     heroPassive.incomingDmgMult *
+    uniqueSkills.incomingDmgMult *
     formation.incomingMult *
     synergy.incomingMult *
     (combatTempo / 1000);
@@ -4068,6 +4075,7 @@ function tryBatchOfflineKills(state: GameState, remainingMs: number): { state: G
         (1 - newDmgRed) *
         passiveIncomingMult *
         heroPassive.incomingDmgMult *
+        uniqueSkills.incomingDmgMult *
         formation.incomingMult *
         synergy.incomingMult *
         (combatTempo / 1000);
