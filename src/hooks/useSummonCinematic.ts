@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing } from 'react-native';
+import { Animated, Easing, Platform } from 'react-native';
 import { Rarity } from '../gameConfig';
 
 type SummonHistoryEntry = {
@@ -43,6 +43,7 @@ export function useSummonCinematic({
   const lastSummonIdRef = useRef<string | null>(null);
   const pendingCinematicSummonRef = useRef(false);
   const cinematicTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+  const supportsNativeDriver = Platform.OS !== 'web';
 
   const cinematicPulse = useMemo(() => new Animated.Value(0), []);
   const cinematicRevealScale = useMemo(() => new Animated.Value(0.8), []);
@@ -74,17 +75,17 @@ export function useSummonCinematic({
           toValue: 1,
           duration: 700,
           easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: supportsNativeDriver,
         }),
         Animated.timing(cinematicPulse, {
           toValue: 0,
           duration: 700,
           easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: supportsNativeDriver,
         }),
       ]),
     ).start();
-  }, [cinematicPulse, isCinematicModalOpen]);
+  }, [cinematicPulse, isCinematicModalOpen, supportsNativeDriver]);
 
   useEffect(() => {
     if (cinematicSummonPhase !== 'reveal') return;
@@ -93,9 +94,9 @@ export function useSummonCinematic({
       toValue: 1,
       friction: 7,
       tension: 90,
-      useNativeDriver: true,
+      useNativeDriver: supportsNativeDriver,
     }).start();
-  }, [cinematicRevealScale, cinematicSummonPhase]);
+  }, [cinematicRevealScale, cinematicSummonPhase, supportsNativeDriver]);
 
   useEffect(() => {
     return () => {

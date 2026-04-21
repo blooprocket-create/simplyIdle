@@ -5,9 +5,11 @@
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'fs';
 
 const filePath = 'dist/index.html';
-const baseUrl = 'https://simplyidle.vercel.app';
-const previewImageSource = 'assets/social-preview.png';
-const previewImageFileName = 'social-preview.png';
+const baseUrl = 'https://simply-idle.vercel.app';
+const previewImageSource = 'assets/social-preview.jpg';
+const previewImageFallbackSource = 'assets/social-preview.png';
+const previewImageFileName = 'social-preview.jpg';
+const previewImageFallbackFileName = 'social-preview.png';
 const pageTitle = 'Simply Idle';
 const pageDescription =
   'Idle RPG / incremental auto-battler. Build your roster, push deeper waves, and rebirth stronger.';
@@ -50,6 +52,10 @@ if (!existsSync(previewImageSource)) {
 }
 
 copyFileSync(previewImageSource, `dist/${previewImageFileName}`);
+
+if (existsSync(previewImageFallbackSource)) {
+  copyFileSync(previewImageFallbackSource, `dist/${previewImageFallbackFileName}`);
+}
 
 let html = readFileSync(filePath, 'utf8');
 
@@ -97,6 +103,7 @@ const socialMeta = [
   `    <meta property="og:url" content="${canonicalUrl}" />`,
   `    <meta property="og:image" content="${previewImageUrl}" />`,
   `    <meta property="og:image:secure_url" content="${previewImageUrl}" />`,
+  '    <meta property="og:image:type" content="image/jpeg" />',
   '    <meta property="og:image:width" content="1200" />',
   '    <meta property="og:image:height" content="630" />',
   '    <meta property="og:image:alt" content="Simply Idle social preview featuring legendary hero art." />',
@@ -104,6 +111,7 @@ const socialMeta = [
   `    <meta name="twitter:title" content="${pageTitle}" />`,
   `    <meta name="twitter:description" content="${pageDescription}" />`,
   `    <meta name="twitter:image" content="${previewImageUrl}" />`,
+  '    <meta name="twitter:image:type" content="image/jpeg" />',
   '    <meta name="twitter:image:alt" content="Simply Idle social preview featuring legendary hero art." />',
   '    <!-- simplyidle-social-meta:end -->',
 ].join('\n');

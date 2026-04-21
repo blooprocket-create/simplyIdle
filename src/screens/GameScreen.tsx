@@ -210,7 +210,7 @@ export const ACH_BONUS_CAP_PCT = 75;
 const FEEDBACK_FORM_URL =
   'https://docs.google.com/forms/d/e/1FAIpQLSf6txIw9UL-F9kItXZfOfr9d0qA_XCvaNIsBUf_4NZ1HZpfrw/viewform?usp=publish-editor';
 const HAS_BETA_FEEDBACK_FORM = !FEEDBACK_FORM_URL.includes('replace-with-your-beta-form');
-const FALLBACK_WIKI_URL = 'https://wiki.simplyidle.com/';
+const FALLBACK_WIKI_URL = 'https://simply-idle.vercel.app/wiki/';
 const GEAR_RARITY_POINTS: Record<string, number> = {
   common: 40,
   rare: 90,
@@ -305,6 +305,7 @@ const VIP_UNLOCK_FEATURES = [
 
 export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   useRenderTracker('GameScreen');
+  const supportsNativeDriver = Platform.OS !== 'web';
   const [selectedCharacterClass, setSelectedCharacterClass] = useState<PlayerClass | null>(null);
   const {
     hydrated,
@@ -1283,7 +1284,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       Animated.timing(reconFlipAnims[pickIndex], {
         toValue: 1,
         duration: 320,
-        useNativeDriver: true,
+        useNativeDriver: supportsNativeDriver,
       }),
     ];
     otherIndices.forEach(index => {
@@ -1291,7 +1292,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         Animated.timing(reconFlipAnims[index], {
           toValue: 1,
           duration: 260,
-          useNativeDriver: true,
+          useNativeDriver: supportsNativeDriver,
         }),
       );
     });
@@ -1301,7 +1302,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         toValue: 1.1,
         friction: 6,
         tension: 90,
-        useNativeDriver: true,
+        useNativeDriver: supportsNativeDriver,
       }).start(() => {
         setReconRevealInProgress(false);
         setReconRevealComplete(true);
@@ -1464,20 +1465,20 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         toValue: 1,
         duration: 750,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: supportsNativeDriver,
       }),
       Animated.sequence([
         Animated.timing(diceTranslateY, {
           toValue: -90,
           duration: 180,
           easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
+          useNativeDriver: supportsNativeDriver,
         }),
         Animated.spring(diceTranslateY, {
           toValue: 0,
           friction: 5,
           tension: 120,
-          useNativeDriver: true,
+          useNativeDriver: supportsNativeDriver,
         }),
       ]),
     ]).start(() => {

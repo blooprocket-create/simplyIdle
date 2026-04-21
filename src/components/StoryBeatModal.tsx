@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, Modal, Animated } from 'react-native';
+import { View, Text, StyleSheet, Modal, Animated, Platform } from 'react-native';
 import { FeedbackPressable as Pressable } from './FeedbackPressable';
 
 interface StoryBeatModalProps {
@@ -32,6 +32,7 @@ export default function StoryBeatModal({
   const bodyOpacity = useMemo(() => new Animated.Value(0), []);
   const ctaOpacity = useMemo(() => new Animated.Value(0), []);
   const isBrief = presentationMode === 'brief';
+  const supportsNativeDriver = Platform.OS !== 'web';
 
   useEffect(() => {
     if (!visible) {
@@ -46,21 +47,21 @@ export default function StoryBeatModal({
 
     Animated.sequence([
       // Backdrop fade
-      Animated.timing(fadeIn, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.timing(fadeIn, { toValue: 1, duration: 600, useNativeDriver: supportsNativeDriver }),
       // Header slide + fade
       Animated.parallel([
-        Animated.timing(headerOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
-        Animated.timing(slideUp, { toValue: 0, duration: 500, useNativeDriver: true }),
+        Animated.timing(headerOpacity, { toValue: 1, duration: 500, useNativeDriver: supportsNativeDriver }),
+        Animated.timing(slideUp, { toValue: 0, duration: 500, useNativeDriver: supportsNativeDriver }),
       ]),
       // Brief pause
       Animated.delay(400),
       // Body text reveal
-      Animated.timing(bodyOpacity, { toValue: 1, duration: 800, useNativeDriver: true }),
+      Animated.timing(bodyOpacity, { toValue: 1, duration: 800, useNativeDriver: supportsNativeDriver }),
       // CTA after body
       Animated.delay(600),
-      Animated.timing(ctaOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.timing(ctaOpacity, { toValue: 1, duration: 300, useNativeDriver: supportsNativeDriver }),
     ]).start();
-  }, [visible, fadeIn, slideUp, headerOpacity, bodyOpacity, ctaOpacity]);
+  }, [visible, fadeIn, slideUp, headerOpacity, bodyOpacity, ctaOpacity, supportsNativeDriver]);
 
   if (!visible) return null;
 

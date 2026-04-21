@@ -10,7 +10,12 @@ export interface OnlineSaveEnvelope<TPayload extends Record<string, unknown>> {
   payload: TPayload;
 }
 
-export type OnlineSaveErrorCode = 'permission-denied' | 'invalid-slot' | 'unavailable' | 'unknown';
+export type OnlineSaveErrorCode =
+  | 'permission-denied'
+  | 'invalid-slot'
+  | 'unavailable'
+  | 'resource-exhausted'
+  | 'unknown';
 
 interface SaveDocRecord {
   revision: number;
@@ -231,6 +236,8 @@ function mapFirestoreErrorCode(error: unknown): OnlineSaveErrorCode {
   const code = typeof error === 'object' && error && 'code' in error ? String((error as { code: unknown }).code) : '';
   if (code.includes('permission-denied')) return 'permission-denied';
   if (code.includes('invalid-argument')) return 'invalid-slot';
+  if (code.includes('resource-exhausted')) return 'resource-exhausted';
+  if (code.includes('unavailable')) return 'unavailable';
   return 'unknown';
 }
 

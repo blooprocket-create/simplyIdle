@@ -5,6 +5,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import GameScreen from './src/screens/GameScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import TitleScreen from './src/screens/TitleScreen';
+import { APP_MAINTENANCE } from './src/appMaintenance';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { ProgressBar } from './src/components/ProgressBar';
 import { debugLog, identifyTelemetryDevice, initTelemetry, reportCrash, trackEvent, trackTelemetryHeartbeat } from './src/telemetry';
@@ -22,16 +23,17 @@ const LOADING_HINTS = [
 
 function LoadingSplash({ progress }: { progress: number }) {
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
+  const supportsNativeDriver = Platform.OS !== 'web';
   const [hint, setHint] = useState(() => LOADING_HINTS[Math.floor(Math.random() * LOADING_HINTS.length)]);
 
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 0.4, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: supportsNativeDriver }),
+        Animated.timing(pulseAnim, { toValue: 0.4, duration: 900, useNativeDriver: supportsNativeDriver }),
       ]),
     ).start();
-  }, [pulseAnim]);
+  }, [pulseAnim, supportsNativeDriver]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -59,6 +61,7 @@ export default function App() {
   const [loadProgress, setLoadProgress] = useState(0);
   const [accountName, setAccountName] = useState<string | null>(null);
   const [showTitle, setShowTitle] = useState(true);
+  const maintenanceEnabled = APP_MAINTENANCE.enabled;
 
   useEffect(() => {
     initTelemetry();
@@ -107,6 +110,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (maintenanceEnabled) {
+      setLoadProgress(100);
+      setLoading(false);
+      return;
+    }
+
     if (!isOnlineAuthAvailable()) {
       setLoadProgress(100);
       setLoading(false);
@@ -131,24 +140,24 @@ export default function App() {
     });
 
     return unsubscribe;
-  }, []);
+  }, [maintenanceEnabled]);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || maintenanceEnabled) return;
     debugLog('app', 'Session resolution complete', { hasAccount: !!accountName });
     void trackEvent('auth_session_resolved', {
       hasAccount: !!accountName,
       platform: Platform.OS,
     });
     void trackTelemetryHeartbeat('auth_session_resolved');
-  }, [loading, accountName]);
+  }, [loading, accountName, maintenanceEnabled]);
 
   useEffect(() => {
     void identifyTelemetryDevice(accountName);
   }, [accountName]);
 
   useEffect(() => {
-    if (!accountName) return;
+    if (!accountName || maintenanceEnabled) return;
     const uid = getFirebaseAuth()?.currentUser?.uid;
     if (!uid) return;
 
@@ -157,15 +166,24 @@ export default function App() {
       stop();
       void markPresenceOffline(uid);
     };
-  }, [accountName]);
+  }, [accountName, maintenanceEnabled]);
 
   if (loading) {
     return <LoadingSplash progress={loadProgress} />;
   }
 
-  if (showTitle) {
+  if (showTitle || maintenanceEnabled) {
     return (
-      <TitleScreen onStart={() => setShowTitle(false)} />
+      <TitleScreen
+        onStart={() => {
+          if (maintenanceEnabled) return;
+          setShowTitle(false);
+        }}
+        startDisabled={maintenanceEnabled}
+        startLabel={maintenanceEnabled ? APP_MAINTENANCE.ctaLabel : undefined}
+        startA11yLabel={maintenanceEnabled ? APP_MAINTENANCE.a11yLabel : undefined}
+        statusMessage={maintenanceEnabled ? APP_MAINTENANCE.message : undefined}
+      />
     );
   }
 

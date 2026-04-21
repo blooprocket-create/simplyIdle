@@ -78,7 +78,14 @@ function Add-CoverImage {
 $width = 1200
 $height = 630
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
-$outputPath = Join-Path $repoRoot 'assets\social-preview.png'
+$pngOutputPath = Join-Path $repoRoot 'assets\social-preview.png'
+$jpgOutputPath = Join-Path $repoRoot 'assets\social-preview.jpg'
+
+function Get-Encoder {
+  param([string]$MimeType)
+
+  return [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object { $_.MimeType -eq $MimeType } | Select-Object -First 1
+}
 
 $bitmap = New-Object System.Drawing.Bitmap($width, $height)
 $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
@@ -149,7 +156,7 @@ try {
   $bodyRect = New-Object System.Drawing.RectangleF(74, 405, 430, 96)
   $graphics.DrawString('Build your roster. Push deeper waves. Rebirth stronger.', $subtitleFont, $softBrush, $subtitleRect)
   $graphics.DrawString('Command a growing lineup of heroes across an idle progression warfront built for long-term power climbs.', $bodyFont, $softBrush, $bodyRect)
-  $graphics.DrawString('simplyidle.vercel.app', $footerFont, $footerBrush, 74, 535)
+  $graphics.DrawString('simply-idle.vercel.app', $footerFont, $footerBrush, 74, 535)
 
   foreach ($shadow in @(
     @{ X = 646; Y = 94; W = 176; H = 404; R = 28 },
@@ -168,8 +175,20 @@ try {
   $highlightPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(90, 255, 255, 255), 2)
   $graphics.DrawArc($highlightPen, 742, 22, 350, 350, 208, 92)
 
-  $bitmap.Save($outputPath, [System.Drawing.Imaging.ImageFormat]::Png)
-  Write-Output "Created $outputPath"
+  $bitmap.Save($pngOutputPath, [System.Drawing.Imaging.ImageFormat]::Png)
+
+  $jpegCodec = Get-Encoder 'image/jpeg'
+  if ($null -eq $jpegCodec) {
+    throw 'JPEG encoder not available.'
+  }
+
+  $encoderParameters = New-Object System.Drawing.Imaging.EncoderParameters(1)
+  $encoderParameters.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter([System.Drawing.Imaging.Encoder]::Quality, 92L)
+  $bitmap.Save($jpgOutputPath, $jpegCodec, $encoderParameters)
+
+  $encoderParameters.Dispose()
+  Write-Output "Created $pngOutputPath"
+  Write-Output "Created $jpgOutputPath"
 }
 finally {
   $graphics.Dispose()

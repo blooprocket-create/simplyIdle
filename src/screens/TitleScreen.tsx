@@ -1,16 +1,29 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Animated, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated, Platform, useWindowDimensions } from 'react-native';
 import { t } from '../i18n';
 import { FeedbackPressable as Pressable } from '../components/FeedbackPressable';
 
 interface TitleScreenProps {
   onStart: () => void;
+  startLabel?: string;
+  startA11yLabel?: string;
+  startDisabled?: boolean;
+  statusMessage?: string;
 }
 
-export default function TitleScreen({ onStart }: TitleScreenProps) {
+export default function TitleScreen({
+  onStart,
+  startLabel,
+  startA11yLabel,
+  startDisabled = false,
+  statusMessage,
+}: TitleScreenProps) {
   const { width } = useWindowDimensions();
   const isPhone = width < 600;
+  const supportsNativeDriver = Platform.OS !== 'web';
   const loreLines = [t('title.line1'), t('title.line2'), t('title.line3')];
+  const buttonLabel = startLabel ?? t('title.beginCampaign');
+  const buttonA11yLabel = startA11yLabel ?? t('title.beginCampaignA11y');
 
   // Fade-in animations
   const titleOpacity = useMemo(() => new Animated.Value(0), []);
@@ -23,35 +36,45 @@ export default function TitleScreen({ onStart }: TitleScreenProps) {
   const loreLineOpacity = useMemo(() => new Animated.Value(0), []);
 
   useEffect(() => {
+    let pulseLoop: Animated.CompositeAnimation | null = null;
+
     Animated.sequence([
-      Animated.timing(titleOpacity, { toValue: 1, duration: 1200, useNativeDriver: true }),
-      Animated.timing(subtitleOpacity, { toValue: 1, duration: 800, useNativeDriver: true }),
-      Animated.timing(loreOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.timing(titleOpacity, { toValue: 1, duration: 1200, useNativeDriver: supportsNativeDriver }),
+      Animated.timing(subtitleOpacity, { toValue: 1, duration: 800, useNativeDriver: supportsNativeDriver }),
+      Animated.timing(loreOpacity, { toValue: 1, duration: 600, useNativeDriver: supportsNativeDriver }),
     ]).start();
 
     // Start CTA after lore finishes
     const ctaTimer = setTimeout(() => {
-      Animated.timing(ctaOpacity, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-      // Pulsing CTA
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(ctaPulse, { toValue: 1.06, duration: 1200, useNativeDriver: true }),
-          Animated.timing(ctaPulse, { toValue: 1, duration: 1200, useNativeDriver: true }),
-        ]),
-      ).start();
+      Animated.timing(ctaOpacity, { toValue: 1, duration: 500, useNativeDriver: supportsNativeDriver }).start();
+      if (!startDisabled) {
+        pulseLoop = Animated.loop(
+          Animated.sequence([
+            Animated.timing(ctaPulse, { toValue: 1.06, duration: 1200, useNativeDriver: supportsNativeDriver }),
+            Animated.timing(ctaPulse, { toValue: 1, duration: 1200, useNativeDriver: supportsNativeDriver }),
+          ]),
+        );
+        pulseLoop.start();
+        return;
+      }
+
+      ctaPulse.setValue(1);
     }, 4000);
 
-    return () => clearTimeout(ctaTimer);
-  }, [titleOpacity, subtitleOpacity, loreOpacity, ctaOpacity, ctaPulse]);
+    return () => {
+      clearTimeout(ctaTimer);
+      pulseLoop?.stop();
+    };
+  }, [titleOpacity, subtitleOpacity, loreOpacity, ctaOpacity, ctaPulse, startDisabled, supportsNativeDriver]);
 
   // Cycle lore lines
   useEffect(() => {
     const showLine = () => {
       loreLineOpacity.setValue(0);
       Animated.sequence([
-        Animated.timing(loreLineOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(loreLineOpacity, { toValue: 1, duration: 600, useNativeDriver: supportsNativeDriver }),
         Animated.delay(1800),
-        Animated.timing(loreLineOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+        Animated.timing(loreLineOpacity, { toValue: 0, duration: 400, useNativeDriver: supportsNativeDriver }),
       ]).start(() => {
         setLoreIndex(prev => (prev + 1) % loreLines.length);
       });
@@ -59,7 +82,7 @@ export default function TitleScreen({ onStart }: TitleScreenProps) {
 
     const timer = setTimeout(showLine, 2200); // Start after title fades in
     return () => clearTimeout(timer);
-  }, [loreIndex, loreLineOpacity, loreLines.length]);
+  }, [loreIndex, loreLineOpacity, loreLines.length, supportsNativeDriver]);
 
   return (
     <View style={styles.root}>
@@ -84,15 +107,20 @@ export default function TitleScreen({ onStart }: TitleScreenProps) {
         </Animated.View>
 
         {/* CTA */}
-        <Animated.View style={{ opacity: ctaOpacity, transform: [{ scale: ctaPulse }] }}>
-          <Pressable
-            style={styles.startBtn}
-            onPress={onStart}
-            accessibilityRole="button"
-            accessibilityLabel={t('title.beginCampaignA11y')}
-          >
-            <Text style={styles.startBtnText}>{t('title.beginCampaign')}</Text>
-          </Pressable>
+        <Animated.View style={[styles.ctaWrap, { opacity: ctaOpacity }]}>
+          <Animated.View style={{ transform: [{ scale: startDisabled ? 1 : ctaPulse }] }}>
+            <Pressable
+              style={[styles.startBtn, startDisabled && styles.startBtnDisabled]}
+              onPress={onStart}
+              disabled={startDisabled}
+              accessibilityRole="button"
+              accessibilityLabel={buttonA11yLabel}
+              accessibilityState={startDisabled ? { disabled: true } : undefined}
+            >
+              <Text style={[styles.startBtnText, startDisabled && styles.startBtnTextDisabled]}>{buttonLabel}</Text>
+            </Pressable>
+          </Animated.View>
+          {statusMessage ? <Text style={styles.statusMessage}>{statusMessage}</Text> : null}
         </Animated.View>
       </View>
 
@@ -121,6 +149,10 @@ const styles = StyleSheet.create({
     gap: 24,
     paddingHorizontal: 32,
     maxWidth: 600,
+  },
+  ctaWrap: {
+    alignItems: 'center',
+    gap: 12,
   },
   title: {
     color: '#E8D5B5',
@@ -179,11 +211,25 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginTop: 12,
   },
+  startBtnDisabled: {
+    borderColor: '#7A8BA0',
+    backgroundColor: 'rgba(122, 139, 160, 0.12)',
+  },
   startBtnText: {
     color: '#E8D5B5',
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 4,
+    textAlign: 'center',
+  },
+  startBtnTextDisabled: {
+    color: '#BFC7D4',
+  },
+  statusMessage: {
+    maxWidth: 340,
+    color: '#9AAABE',
+    fontSize: 13,
+    lineHeight: 20,
     textAlign: 'center',
   },
   version: {

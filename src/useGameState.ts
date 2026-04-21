@@ -82,7 +82,11 @@ import { getFirebaseAuth } from './services/firebase';
 
 const TICK_MS = 100;
 const SAVE_INTERVAL_MS = 5000;
-const ONLINE_SAVE_INTERVAL_MS = 12000;
+// Cloud sync is intentionally much slower than local persistence so one active
+// player does not burn through Firestore write quota on background autosaves.
+const ONLINE_SAVE_INTERVAL_MS = 3 * 60 * 1000;
+const ONLINE_SAVE_BACKOFF_BASE_MS = 60 * 1000;
+const ONLINE_SAVE_BACKOFF_MAX_MS = 15 * 60 * 1000;
 const STAT_POINTS_PER_LEVEL = 5;
 const OFFLINE_PROGRESS_CAP_MS = 8 * 60 * 60 * 1000;
 const OFFLINE_SIM_MAX_SLICE_MS = 1000;
@@ -4881,14 +4885,19 @@ export function useGameState(saveSlot: string = 'default') {
     'local-only',
   );
   const [onlineSyncAt, setOnlineSyncAt] = useState<number | null>(null);
-  // eslint-disable-next-line react-hooks/purity -- ref initial values only evaluate once; Date.now() is intentional for tick/save baselines
+
   const lastTickRef = useRef(Date.now());
-  // eslint-disable-next-line react-hooks/purity
+
   const lastSaveRef = useRef(Date.now());
   const stateRef = useRef(state);
   const claimFingerprintRef = useRef('');
+  const claimFingerprintPrimedRef = useRef(false);
   const onlineRevisionRef = useRef<number | null>(null);
   const lastOnlineSaveRef = useRef(0);
+  const onlineSaveInFlightRef = useRef(false);
+  const pendingOnlineSaveRef = useRef<{ forceOnline: boolean; snapshotOverride?: SaveData } | null>(null);
+  const onlineSaveBackoffUntilRef = useRef(0);
+  const onlineSaveBackoffMsRef = useRef(ONLINE_SAVE_BACKOFF_BASE_MS);
   const onlineSyncDisabledRef = useRef(false);
   const sessionStartedRef = useRef(false);
   const sessionStartedAtRef = useRef(0);
@@ -4975,65 +4984,123 @@ export function useGameState(saveSlot: string = 'default') {
 
   const persistSnapshot = useCallback(
     async (forceOnline = false, snapshotOverride?: SaveData) => {
-      const snapshot = snapshotOverride ?? serialize(stateRef.current);
       if (!onlineSlotEligible || onlineSyncDisabledRef.current || !isOnlineSaveAvailable()) {
+        pendingOnlineSaveRef.current = null;
         setOnlineSyncState('local-only');
         return;
       }
 
       const now = Date.now();
-      if (!forceOnline && now - lastOnlineSaveRef.current < ONLINE_SAVE_INTERVAL_MS) return;
+      const queuePendingSave = () => {
+        pendingOnlineSaveRef.current = {
+          forceOnline: forceOnline || pendingOnlineSaveRef.current?.forceOnline || false,
+          snapshotOverride: snapshotOverride ?? pendingOnlineSaveRef.current?.snapshotOverride,
+        };
+      };
 
-      setOnlineSyncState('syncing');
-      const firstAttempt = await writeOnlineSave(
-        saveSlot,
-        snapshot as unknown as Record<string, unknown>,
-        onlineRevisionRef.current,
-      );
-      if (firstAttempt.ok) {
-        onlineRevisionRef.current = firstAttempt.revision;
-        lastOnlineSaveRef.current = now;
-        setOnlineSyncState('synced');
-        setOnlineSyncAt(now);
+      if (onlineSaveInFlightRef.current) {
+        queuePendingSave();
         return;
       }
 
-      const remote = firstAttempt.remote;
-      if (!remote) {
-        if (firstAttempt.errorCode === 'permission-denied' || firstAttempt.errorCode === 'invalid-slot') {
-          onlineSyncDisabledRef.current = true;
-          setOnlineSyncState('local-only');
-          return;
+      if (onlineSaveBackoffUntilRef.current > now) {
+        if (forceOnline) {
+          queuePendingSave();
         }
         setOnlineSyncState('error');
         return;
       }
 
-      const remoteUpdatedAt = Math.max(0, Math.floor(remote.updatedAt));
-      const localUpdatedAt = typeof snapshot.lastActiveAt === 'number' ? snapshot.lastActiveAt : now;
-      if (remoteUpdatedAt > localUpdatedAt) {
-        onlineRevisionRef.current = remote.revision;
-        setOnlineSyncState('conflict');
-        dispatch({ type: 'LOAD', payload: remote.payload as Partial<SaveData> });
-        return;
-      }
+      if (!forceOnline && now - lastOnlineSaveRef.current < ONLINE_SAVE_INTERVAL_MS) return;
 
-      const retryAttempt = await writeOnlineSave(
-        saveSlot,
-        snapshot as unknown as Record<string, unknown>,
-        remote.revision,
-      );
-      if (retryAttempt.ok) {
-        onlineRevisionRef.current = retryAttempt.revision;
-        lastOnlineSaveRef.current = now;
-        setOnlineSyncState('synced');
-        setOnlineSyncAt(now);
-      } else if (retryAttempt.remote) {
-        onlineRevisionRef.current = retryAttempt.remote.revision;
+      const snapshot = snapshotOverride ?? serialize(stateRef.current);
+      const clearQuotaBackoff = () => {
+        onlineSaveBackoffUntilRef.current = 0;
+        onlineSaveBackoffMsRef.current = ONLINE_SAVE_BACKOFF_BASE_MS;
+      };
+      const applyQuotaBackoff = (failedAt: number) => {
+        const backoffMs = onlineSaveBackoffMsRef.current;
+        onlineSaveBackoffUntilRef.current = failedAt + backoffMs;
+        onlineSaveBackoffMsRef.current = Math.min(ONLINE_SAVE_BACKOFF_MAX_MS, backoffMs * 2);
+        lastOnlineSaveRef.current = failedAt;
         setOnlineSyncState('error');
-      } else if (retryAttempt.errorCode === 'permission-denied' || retryAttempt.errorCode === 'invalid-slot') {
-        onlineSyncDisabledRef.current = true;
-        setOnlineSyncState('local-only');
+      };
+
+      onlineSaveInFlightRef.current = true;
+      setOnlineSyncState('syncing');
+      try {
+        const firstAttempt = await writeOnlineSave(
+          saveSlot,
+          snapshot as unknown as Record<string, unknown>,
+          onlineRevisionRef.current,
+        );
+        if (firstAttempt.ok) {
+          clearQuotaBackoff();
+          onlineRevisionRef.current = firstAttempt.revision;
+          lastOnlineSaveRef.current = now;
+          setOnlineSyncState('synced');
+          setOnlineSyncAt(now);
+          return;
+        }
+
+        if (firstAttempt.errorCode === 'resource-exhausted') {
+          applyQuotaBackoff(Date.now());
+          return;
+        }
+
+        const remote = firstAttempt.remote;
+        if (!remote) {
+          if (firstAttempt.errorCode === 'permission-denied' || firstAttempt.errorCode === 'invalid-slot') {
+            onlineSyncDisabledRef.current = true;
+            setOnlineSyncState('local-only');
+            return;
+          }
+          setOnlineSyncState('error');
+          return;
+        }
+
+        const remoteUpdatedAt = Math.max(0, Math.floor(remote.updatedAt));
+        const localUpdatedAt = typeof snapshot.lastActiveAt === 'number' ? snapshot.lastActiveAt : now;
+        if (remoteUpdatedAt > localUpdatedAt) {
+          onlineRevisionRef.current = remote.revision;
+          setOnlineSyncState('conflict');
+          dispatch({ type: 'LOAD', payload: remote.payload as Partial<SaveData> });
+          return;
+        }
+
+        const retryAttempt = await writeOnlineSave(
+          saveSlot,
+          snapshot as unknown as Record<string, unknown>,
+          remote.revision,
+        );
+        if (retryAttempt.ok) {
+          clearQuotaBackoff();
+          onlineRevisionRef.current = retryAttempt.revision;
+          lastOnlineSaveRef.current = now;
+          setOnlineSyncState('synced');
+          setOnlineSyncAt(now);
+        } else if (retryAttempt.errorCode === 'resource-exhausted') {
+          applyQuotaBackoff(Date.now());
+        } else if (retryAttempt.remote) {
+          onlineRevisionRef.current = retryAttempt.remote.revision;
+          setOnlineSyncState('error');
+        } else if (retryAttempt.errorCode === 'permission-denied' || retryAttempt.errorCode === 'invalid-slot') {
+          onlineSyncDisabledRef.current = true;
+          setOnlineSyncState('local-only');
+        }
+      } finally {
+        onlineSaveInFlightRef.current = false;
+
+        const pendingSave = pendingOnlineSaveRef.current;
+        pendingOnlineSaveRef.current = null;
+        if (
+          pendingSave &&
+          !onlineSyncDisabledRef.current &&
+          isOnlineSaveAvailable() &&
+          onlineSaveBackoffUntilRef.current <= Date.now()
+        ) {
+          void persistSnapshot(pendingSave.forceOnline, pendingSave.snapshotOverride);
+        }
       }
     },
     [dispatch, onlineSlotEligible, saveSlot],
@@ -5052,10 +5119,15 @@ export function useGameState(saveSlot: string = 'default') {
     prevPrestigeRef.current = 0;
     onlineRevisionRef.current = null;
     lastOnlineSaveRef.current = 0;
+    onlineSaveInFlightRef.current = false;
+    pendingOnlineSaveRef.current = null;
+    onlineSaveBackoffUntilRef.current = 0;
+    onlineSaveBackoffMsRef.current = ONLINE_SAVE_BACKOFF_BASE_MS;
     onlineSyncDisabledRef.current = false;
     setOnlineSyncState(onlineSlotEligible && isOnlineSaveAvailable() ? 'syncing' : 'local-only');
     setOnlineSyncAt(null);
     claimFingerprintRef.current = '';
+    claimFingerprintPrimedRef.current = false;
     lastTickRef.current = Date.now();
     lastSaveRef.current = Date.now();
 
@@ -5171,6 +5243,11 @@ export function useGameState(saveSlot: string = 'default') {
   useEffect(() => {
     if (!hydrated || !state.characterCreated) return;
     const fingerprint = `${state.weeklyTrackClaimed.join(',')}|${state.claimedMissionIds.join(',')}|${state.codexVipClaimedHeroIds.join(',')}|${state.codexVipClaimedUniqueIds.join(',')}|${state.vipRewardClaimedLevels.join(',')}|${state.dollarFirstPurchaseClaimedOfferIds.join(',')}`;
+    if (!claimFingerprintPrimedRef.current) {
+      claimFingerprintRef.current = fingerprint;
+      claimFingerprintPrimedRef.current = true;
+      return;
+    }
     if (fingerprint === claimFingerprintRef.current) return;
     claimFingerprintRef.current = fingerprint;
     lastSaveRef.current = Date.now();
