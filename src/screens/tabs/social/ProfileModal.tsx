@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { THEME, RADIUS } from '../../../theme';
+import { FeedbackPressable as Pressable } from '../../../components/FeedbackPressable';
 import {
   fetchFriendRelationshipStatus,
   FriendRelationshipStatus,

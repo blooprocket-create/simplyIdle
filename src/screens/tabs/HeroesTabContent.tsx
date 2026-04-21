@@ -2,7 +2,6 @@ import React, { useMemo, useState, type CSSProperties } from 'react';
 import {
   View,
   Text,
-  Pressable,
   ScrollView,
   useWindowDimensions,
   Image,
@@ -11,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
+import { FeedbackPressable as Pressable } from '../../components/FeedbackPressable';
 import {
   RARITIES,
   Rarity,

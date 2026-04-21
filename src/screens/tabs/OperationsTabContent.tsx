@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text } from 'react-native';
 import {
   FacilityId,
   GameState,
@@ -10,6 +10,7 @@ import {
   MINI_OPS_COOLDOWN_MS,
   getFacilityUpgradeCost,
 } from '../../useGameState';
+import { FeedbackPressable as Pressable } from '../../components/FeedbackPressable';
 import {
   EXPEDITION_TYPES,
   EXPEDITION_TYPE_META,

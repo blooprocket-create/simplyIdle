@@ -4,7 +4,6 @@ import {
   View,
   Text,
   TextInput,
-  Pressable,
   StyleSheet,
   StatusBar,
   KeyboardAvoidingView,
@@ -14,6 +13,7 @@ import {
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import { FeedbackPressable as Pressable } from '../components/FeedbackPressable';
 import { debugLog, trackEvent, trackGameplayAction } from '../telemetry';
 import {
   getGoogleAuthConfig,

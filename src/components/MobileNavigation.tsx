@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Pressable, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../theme/colors';
 import { debugLog } from '../telemetry';
+import { FeedbackPressable as Pressable } from './FeedbackPressable';
 
 export type MobileTab = 'warfront' | 'warroom' | 'roster' | 'equipment' | 'engine' | 'progress' | 'social';
 

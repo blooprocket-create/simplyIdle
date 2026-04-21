@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
+import { View, Text, StyleSheet, Modal } from 'react-native';
 import { REBIRTH_BONUS } from '../gameConfig.ts';
+import { FeedbackPressable as Pressable } from './FeedbackPressable';
 
 interface Props {
   visible: boolean;

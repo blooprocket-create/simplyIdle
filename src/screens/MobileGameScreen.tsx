@@ -1,8 +1,9 @@
 import React, { useState, useMemo, Suspense } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Modal, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import { theme } from '../theme/colors';
 import MobileNavigation, { MobileTab } from '../components/MobileNavigation';
 import MobileHeader from '../components/MobileHeader';
+import { FeedbackPressable as Pressable } from '../components/FeedbackPressable';
 import WarfrontTab from './tabs/WarfrontTab';
 import RosterTab from './tabs/RosterTab';
 import EngineTab from './tabs/EngineTab';

@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, Text, Pressable, Image, Modal, Platform, useWindowDimensions } from 'react-native';
+import { View, Text, Image, Modal, Platform, useWindowDimensions } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
+import { FeedbackPressable as Pressable } from '../../components/FeedbackPressable';
 import {
   ACHIEVEMENTS,
   HERO_POOL,

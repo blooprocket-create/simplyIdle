@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
-import { View, Text, Pressable, StyleSheet, Modal, Animated } from 'react-native';
+import { View, Text, StyleSheet, Modal, Animated } from 'react-native';
+import { FeedbackPressable as Pressable } from './FeedbackPressable';
 
 interface StoryBeatModalProps {
   visible: boolean;

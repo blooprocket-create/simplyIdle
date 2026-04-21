@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, Easing } from 'react-native-reanimated';
 import { ACHIEVEMENTS } from '../gameConfig.ts';
+import { FeedbackPressable as Pressable } from './FeedbackPressable';
 
 interface Props {
   achievementId: string | null;

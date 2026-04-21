@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Text, View } from 'react-native';
 import {
   DMThread,
   DirectMessage,
@@ -12,6 +12,7 @@ import { SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives
 import { socialStyles as styles } from './social.styles';
 import { useSocialMe, useSocialFriends } from './SocialContext';
 import { trackEvent } from '../../../telemetry';
+import { FeedbackPressable as Pressable } from '../../../components/FeedbackPressable';
 
 type DMView = 'inbox' | 'conversation';
 

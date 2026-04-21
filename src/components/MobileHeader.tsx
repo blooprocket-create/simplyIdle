@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../theme/colors';
+import { FeedbackPressable as Pressable } from './FeedbackPressable';
 
 interface HeaderChip {
   id: string;

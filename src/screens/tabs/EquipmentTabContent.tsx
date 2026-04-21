@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
+import { FeedbackPressable as Pressable } from '../../components/FeedbackPressable';
 import {
   EquipmentSlot,
   EquipmentRarity,

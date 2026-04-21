@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { GiftPreference } from '../../../gameConfig';
 import { FriendListEntry, PendingFriendRequest } from '../../../services/friends';
 import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
 import { socialStyles } from './social.styles';
+import { FeedbackPressable as Pressable } from '../../../components/FeedbackPressable';
 
 type SocialStyles = typeof socialStyles;
 

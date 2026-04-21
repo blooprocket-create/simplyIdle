@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import {
   attackBoss,
   contributeToGuildEvent,
@@ -31,6 +31,7 @@ import {
 } from '../../../services/guild';
 import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton, SocialProgressBar } from './SocialPrimitives';
 import { socialStyles } from './social.styles';
+import { FeedbackPressable as Pressable } from '../../../components/FeedbackPressable';
 
 type SocialStyles = typeof socialStyles;
 

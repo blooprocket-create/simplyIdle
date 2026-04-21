@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Text, View } from 'react-native';
 import {
   type ActiveWar,
   type WarChallenge,
@@ -21,6 +21,7 @@ import { SocialAsyncState, SocialProgressBar } from './SocialPrimitives';
 import { socialStyles as styles } from './social.styles';
 import { useSocialMe, useSocialGuild } from './SocialContext';
 import { trackEvent } from '../../../telemetry';
+import { FeedbackPressable as Pressable } from '../../../components/FeedbackPressable';
 
 type WarSubView = 'overview' | 'matchmake' | 'history';
 

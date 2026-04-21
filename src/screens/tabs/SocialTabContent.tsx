@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Modal, NativeSyntheticEvent, NativeTouchEvent, Platform, Pressable, Text, View } from 'react-native';
+import { Animated, Modal, NativeSyntheticEvent, NativeTouchEvent, Platform, Text, View } from 'react-native';
 import { GlobalChatMessage } from '../../services/chat';
 import { fetchFriendRelationshipStatus, FriendRelationshipStatus, sendFriendRequest } from '../../services/friends';
 import { blockUser, unblockUser, reportUser, subscribeBlockList } from '../../services/blockReport';
 import { GiftPreference } from '../../gameConfig';
 import { trackEvent } from '../../telemetry';
 import { SOCIAL_FEATURE_FLAGS } from '../../socialFeatureFlags';
+import { FeedbackPressable as Pressable } from '../../components/FeedbackPressable';
 import { ChatSection } from './social/ChatSection';
 import { FriendsSection } from './social/FriendsSection';
 import { GuildSection } from './social/GuildSection';

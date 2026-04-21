@@ -6,7 +6,6 @@ import {
   Image,
   ScrollView,
   SafeAreaView,
-  Pressable,
   Platform,
   StatusBar,
   TextInput,
@@ -76,6 +75,7 @@ import StoryBeatCutscene from '../components/StoryBeatCutscene';
 import StoryBeatModal from '../components/StoryBeatModal';
 import RebirthModal from '../components/PrestigeModal';
 import BottomNavigation, { BottomTabType } from '../components/BottomNavigation';
+import { FeedbackPressable as Pressable } from '../components/FeedbackPressable';
 import GameHeader from '../components/GameHeader';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ProgressBar } from '../components/ProgressBar';

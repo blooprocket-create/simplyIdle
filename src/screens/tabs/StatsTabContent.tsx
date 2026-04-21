@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text } from 'react-native';
 import { GameState, Stats } from '../../useGameState';
 import { StatKey } from '../../gameConfig';
 import { STAT_LABELS } from '../gameScreenShared';
 import { fmt } from '../../utils';
 import { styles } from './StatsTabContent.styles';
+import { FeedbackPressable as Pressable } from '../../components/FeedbackPressable';
 
 interface StatsClassConfig {
   statDescriptions: Record<StatKey, string>;

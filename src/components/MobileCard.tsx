@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { theme } from '../theme/colors';
+import { FeedbackPressable as Pressable } from './FeedbackPressable';
 
 interface CardSection {
   title?: string;

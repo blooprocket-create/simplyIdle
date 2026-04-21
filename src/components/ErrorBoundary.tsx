@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { reportCrash } from '../telemetry';
+import { FeedbackPressable as Pressable } from './FeedbackPressable';
 
 interface Props {
   children: React.ReactNode;

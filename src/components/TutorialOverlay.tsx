@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { FeedbackPressable as Pressable } from './FeedbackPressable';
 
 // ─── Tutorial step definitions ──────────────────────────────────
 // Steps auto-advance based on game state milestones.

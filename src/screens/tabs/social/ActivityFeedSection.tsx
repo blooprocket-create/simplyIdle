@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Text, View } from 'react-native';
 import { ActivityEvent, subscribeToFriendActivity } from '../../../services/activityFeed';
 import { SocialCard } from './SocialPrimitives';
 import { socialStyles as styles } from './social.styles';
 import { useSocialFriends } from './SocialContext';
+import { FeedbackPressable as Pressable } from '../../../components/FeedbackPressable';
 
 const ACTIVITY_ICONS: Record<string, string> = {
   prestige_completed: '🔄',

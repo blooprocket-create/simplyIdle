@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Animated, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated, useWindowDimensions } from 'react-native';
 import { t } from '../i18n';
+import { FeedbackPressable as Pressable } from '../components/FeedbackPressable';
 
 interface TitleScreenProps {
   onStart: () => void;

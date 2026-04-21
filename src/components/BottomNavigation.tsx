@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, StyleSheet, Pressable, Text, Platform } from 'react-native';
+import { View, StyleSheet, Text, Platform } from 'react-native';
 import { THEME, RADIUS, Z_INDEX } from '../theme';
 import { debugLog } from '../telemetry';
+import { FeedbackPressable as Pressable } from './FeedbackPressable';
 
 export type BottomTabType =
   | 'warroom'

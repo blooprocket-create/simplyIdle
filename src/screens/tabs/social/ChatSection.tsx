@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, NativeScrollEvent, NativeSyntheticEvent, Pressable, Text, View } from 'react-native';
+import { FlatList, NativeScrollEvent, NativeSyntheticEvent, Text, View } from 'react-native';
 import { GlobalChatMessage } from '../../../services/chat';
 import { GuildChatMessage } from '../../../services/guild';
 import { SocialAsyncState, SocialCard, SocialInput, SocialPrimaryButton } from './SocialPrimitives';
 import { socialStyles } from './social.styles';
+import { FeedbackPressable as Pressable } from '../../../components/FeedbackPressable';
 
 type SocialStyles = typeof socialStyles;
 

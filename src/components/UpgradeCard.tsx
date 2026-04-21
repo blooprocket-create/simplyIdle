@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { SkillConfig } from '../gameConfig.ts';
 import { fmt } from '../utils';
+import { FeedbackPressable as Pressable } from './FeedbackPressable';
 
 interface Props {
   config: SkillConfig;

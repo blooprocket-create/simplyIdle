@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { View, StyleSheet, Pressable, Text, StatusBar, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, Text, StatusBar, useWindowDimensions } from 'react-native';
 import { THEME, TYPOGRAPHY, SPACING, Z_INDEX, RADIUS } from '../theme';
 import { debugLog } from '../telemetry';
 import { t } from '../i18n';
+import { FeedbackPressable as Pressable } from './FeedbackPressable';
 
 interface GameHeaderProps {
   playerName: string;

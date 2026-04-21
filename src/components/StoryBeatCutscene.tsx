@@ -1,8 +1,9 @@
 import React, { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
 import { Audio, ResizeMode, Video, type AVPlaybackStatus } from 'expo-av';
-import { Modal, View, Text, Pressable, StyleSheet, Platform, useWindowDimensions } from 'react-native';
+import { Modal, View, Text, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { BREAKPOINTS } from '../gameConfig';
 import { getStoryCutsceneUri } from '../storyCutscenes';
+import { FeedbackPressable as Pressable } from './FeedbackPressable';
 
 interface StoryBeatCutsceneProps {
   visible: boolean;

@@ -1,7 +1,8 @@
 import React from 'react';
-import { Pressable, Text, TextInput, TextInputProps, View } from 'react-native';
+import { Text, TextInput, TextInputProps, View } from 'react-native';
 import { THEME } from '../../../theme';
 import { socialStyles } from './social.styles';
+import { FeedbackPressable as Pressable } from '../../../components/FeedbackPressable';
 
 type SocialStyles = typeof socialStyles;
 

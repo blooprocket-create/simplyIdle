@@ -1,8 +1,9 @@
 import React from 'react';
-import { Alert, Platform, View, Text, Pressable } from 'react-native';
+import { Alert, Platform, View, Text } from 'react-native';
 import { GameState, Stats, getUsableItemDescription } from '../../useGameState';
 import { PlayerClass, rarityConfig, type UsableItem } from '../../gameConfig';
 import { styles } from './BattleTabContent.styles';
+import { FeedbackPressable as Pressable } from '../../components/FeedbackPressable';
 
 interface BattleClassConfig {
   emoji: string;

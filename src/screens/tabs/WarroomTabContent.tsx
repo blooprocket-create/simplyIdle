@@ -1,11 +1,12 @@
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text } from 'react-native';
 import { GameState } from '../../useGameState';
 import { PermanentUnlockId } from '../../gameConfig';
 import { fmt } from '../../utils';
 import type { Tab } from '../gameScreenShared';
 import { styles } from './WarroomTabContent.styles';
 import { t } from '../../i18n';
+import { FeedbackPressable as Pressable } from '../../components/FeedbackPressable';
 
 export interface GuidanceItem {
   title: string;
