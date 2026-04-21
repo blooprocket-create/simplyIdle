@@ -218,6 +218,17 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
       if (filteredArchiveHeroes.length === 0) return null;
       return filteredArchiveHeroes.find(hero => hero.id === selectedCodexHeroId) ?? filteredArchiveHeroes[0];
     }, [filteredArchiveHeroes, selectedCodexHeroId]);
+    const openCodexHeroDossier = useCallback(
+      (hero: CodexHero) => {
+        setSelectedCodexHeroId(hero.id);
+        if (!unlockedHeroIds.has(hero.id)) return;
+        if (!codexVipClaimedHeroIds.includes(hero.id)) {
+          claimCodexHeroVip(hero.id);
+        }
+        setPortraitModalHero(hero);
+      },
+      [claimCodexHeroVip, codexVipClaimedHeroIds, unlockedHeroIds],
+    );
     const codexUniqueRankByHeroId = useMemo(() => {
       const ranks: Record<string, number> = {};
       for (const entry of codexUniqueEntries) {
@@ -795,17 +806,14 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                           !codexVipClaimedHeroIds.includes(archiveSpotlightHero.id) ? (
                             <Pressable
                               style={styles.codexActionPrimary}
-                              onPress={() => {
-                                claimCodexHeroVip(archiveSpotlightHero.id);
-                                setPortraitModalHero(archiveSpotlightHero);
-                              }}
+                              onPress={() => openCodexHeroDossier(archiveSpotlightHero)}
                             >
                               <Text style={styles.codexActionPrimaryText}>Reveal Dossier +10 VIP</Text>
                             </Pressable>
                           ) : unlockedHeroIds.has(archiveSpotlightHero.id) ? (
                             <Pressable
                               style={styles.codexActionPrimary}
-                              onPress={() => setPortraitModalHero(archiveSpotlightHero)}
+                              onPress={() => openCodexHeroDossier(archiveSpotlightHero)}
                             >
                               <Text style={styles.codexActionPrimaryText}>Inspect Full Dossier</Text>
                             </Pressable>
@@ -857,12 +865,7 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                             unlocked && styles.codexGalleryCardUnlocked,
                             selectedCodexHeroId === hero.id && styles.codexGalleryCardSelected,
                           ]}
-                          onPress={() => {
-                            setSelectedCodexHeroId(hero.id);
-                            if (unlocked) {
-                              setPortraitModalHero(hero);
-                            }
-                          }}
+                          onPress={() => openCodexHeroDossier(hero)}
                         >
                           <View style={[styles.codexGalleryPortraitWrap, { borderColor: getTierAccent(hero.tier) }]}>
                             {unlocked ? (
