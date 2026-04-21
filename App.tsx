@@ -5,7 +5,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import GameScreen from './src/screens/GameScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import TitleScreen from './src/screens/TitleScreen';
-import { APP_MAINTENANCE } from './src/appMaintenance';
+import { APP_MAINTENANCE, loadAppMaintenanceConfig, subscribeToAppMaintenance } from './src/appMaintenance';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { ProgressBar } from './src/components/ProgressBar';
 import { debugLog, identifyTelemetryDevice, initTelemetry, reportCrash, trackEvent, trackTelemetryHeartbeat } from './src/telemetry';
@@ -61,7 +61,9 @@ export default function App() {
   const [loadProgress, setLoadProgress] = useState(0);
   const [accountName, setAccountName] = useState<string | null>(null);
   const [showTitle, setShowTitle] = useState(true);
-  const maintenanceEnabled = APP_MAINTENANCE.enabled;
+  const [maintenanceConfig, setMaintenanceConfig] = useState(APP_MAINTENANCE);
+  const [maintenanceReady, setMaintenanceReady] = useState(false);
+  const maintenanceEnabled = maintenanceConfig.enabled;
 
   useEffect(() => {
     initTelemetry();
@@ -110,11 +112,44 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+
+    const unsubscribe = subscribeToAppMaintenance(nextConfig => {
+      if (!active) return;
+      setMaintenanceConfig(nextConfig);
+      setMaintenanceReady(true);
+    });
+
+    setLoadProgress(prev => Math.max(prev, 40));
+
+    void loadAppMaintenanceConfig()
+      .then(nextConfig => {
+        if (!active) return;
+        setMaintenanceConfig(nextConfig);
+      })
+      .finally(() => {
+        if (!active) return;
+        setMaintenanceReady(true);
+        setLoadProgress(prev => Math.max(prev, 45));
+      });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!maintenanceReady) return;
+
     if (maintenanceEnabled) {
       setLoadProgress(100);
       setLoading(false);
       return;
     }
+
+    setLoading(true);
+    setLoadProgress(prev => Math.max(prev, 50));
 
     if (!isOnlineAuthAvailable()) {
       setLoadProgress(100);
@@ -140,7 +175,7 @@ export default function App() {
     });
 
     return unsubscribe;
-  }, [maintenanceEnabled]);
+  }, [maintenanceEnabled, maintenanceReady]);
 
   useEffect(() => {
     if (loading || maintenanceEnabled) return;
@@ -180,9 +215,9 @@ export default function App() {
           setShowTitle(false);
         }}
         startDisabled={maintenanceEnabled}
-        startLabel={maintenanceEnabled ? APP_MAINTENANCE.ctaLabel : undefined}
-        startA11yLabel={maintenanceEnabled ? APP_MAINTENANCE.a11yLabel : undefined}
-        statusMessage={maintenanceEnabled ? APP_MAINTENANCE.message : undefined}
+        startLabel={maintenanceEnabled ? maintenanceConfig.ctaLabel : undefined}
+        startA11yLabel={maintenanceEnabled ? maintenanceConfig.a11yLabel : undefined}
+        statusMessage={maintenanceEnabled ? maintenanceConfig.message : undefined}
       />
     );
   }
