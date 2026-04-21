@@ -11,45 +11,6 @@ export const styles = StyleSheet.create({
   },
   sceneDecor: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 0,
-  },
-  sceneOrbA: {
-    position: 'absolute',
-    top: -80,
-    left: -40,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: '#18455D',
-    opacity: 0.28,
-  },
-  sceneOrbB: {
-    position: 'absolute',
-    top: 90,
-    right: -60,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: '#7A3F1F',
-    opacity: 0.22,
-  },
-  sceneGrid: {
-    ...StyleSheet.absoluteFillObject,
-    borderTopWidth: 1,
-    borderTopColor: '#1A2A34',
-    opacity: 0.2,
-  },
-  summonRevealOverlay: {
-    position: 'absolute',
-    top: 88,
-    left: 14,
-    right: 14,
-    zIndex: 5,
-    alignItems: 'center',
-  },
-  summonRevealCard: {
-    width: '100%',
-    maxWidth: 360,
     borderRadius: 12,
     borderWidth: 2,
     backgroundColor: '#101828',
@@ -4436,47 +4397,6 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#E4F2FF',
     lineHeight: 18,
-  },
-
-  // Daily quest rows
-  dailyQuestRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#1E3348',
-  },
-  dailyQuestRowDone: {
-    opacity: 0.7,
-  },
-  dailyQuestCheck: {
-    fontSize: 14,
-    paddingTop: 2,
-    minWidth: 20,
-  },
-  dailyQuestInfo: {
-    flex: 1,
-    gap: 3,
-  },
-  dailyQuestTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#DDEFFF',
-  },
-  dailyQuestDesc: {
-    fontSize: 10,
-    color: '#9ABBD5',
-  },
-  dailyQuestProgress: {
-    fontSize: 10,
-    color: '#7FA3BF',
-  },
-  dailyQuestReward: {
-    fontSize: 10,
-    color: '#FFD98A',
-    fontWeight: '700',
-    alignSelf: 'center',
   },
 
   // Seasonal ladder

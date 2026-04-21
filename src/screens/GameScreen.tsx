@@ -3125,57 +3125,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 </Text>
               </View>
 
-              {/* Daily Quest Chain */}
-              <View style={styles.eventsCard}>
-                <Text style={styles.eventsCardTitle}>📋 Daily Chain</Text>
-                <Text style={styles.eventsSubtitle}>Complete all 3 for bonus essence cache</Text>
-                {[
-                  {
-                    id: 'd1',
-                    title: 'Wave Pusher',
-                    desc: `Defeat ${Math.ceil(state.wave / 10) * 10 + 10} waves`,
-                    progress: state.wave,
-                    target: Math.ceil(state.wave / 10) * 10 + 10,
-                    reward: '10 Shards',
-                  },
-                  {
-                    id: 'd2',
-                    title: 'Recruiter',
-                    desc: 'Have 5 heroes in your roster',
-                    progress: state.heroRoster.length,
-                    target: 5,
-                    reward: '200 Gold',
-                  },
-                  {
-                    id: 'd3',
-                    title: 'Gear Up',
-                    desc: 'Fill all 3 equipment slots',
-                    progress: Object.values(state.equippedItems).filter(Boolean).length,
-                    target: 3,
-                    reward: '50 Scrap',
-                  },
-                ].map(q => {
-                  const done = q.progress >= q.target;
-                  return (
-                    <View key={q.id} style={[styles.dailyQuestRow, done && styles.dailyQuestRowDone]}>
-                      <Text style={styles.dailyQuestCheck}>{done ? '✅' : '○'}</Text>
-                      <View style={styles.dailyQuestInfo}>
-                        <Text style={styles.dailyQuestTitle}>{q.title}</Text>
-                        <Text style={styles.dailyQuestDesc}>{q.desc}</Text>
-                        <Text style={styles.dailyQuestProgress}>
-                          {Math.min(q.progress, q.target)}/{q.target}
-                        </Text>
-                        <ProgressBar
-                          percent={Math.min(100, (q.progress / q.target) * 100)}
-                          color={done ? '#6DDB7B' : '#5DA8FF'}
-                        />
-                      </View>
-                      <Text style={styles.dailyQuestReward}>{q.reward}</Text>
-                    </View>
-                  );
-                })}
-              </View>
-
               {/* Weekly Event */}
               <View style={styles.eventsCard}>
                 <Text style={styles.eventsCardTitle}>
