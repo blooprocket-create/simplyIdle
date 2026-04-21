@@ -378,6 +378,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     claimMission,
     claimCodexHeroVip,
     claimCodexUniqueVip,
+    markStoryBeatSeen,
     markHintSeen,
     appendMailboxMessages,
     claimMailAttachment,
@@ -917,9 +918,11 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const { idleChestReward, setIdleChestReward, storyCutscene, setStoryCutscene, storyBeatModal, setStoryBeatModal } =
     useGameOverlays({
       storyEntries,
+      seenStoryBeatIds: state.seenStoryBeatIds,
       rewardPopup,
       activeModal,
       allowInitialStoryModal: tutorialStep === 'welcome',
+      markStoryBeatSeen,
       setActiveModal: modal => setActiveModal(modal as ActiveModal),
       clearRewardPopup,
     });

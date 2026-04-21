@@ -17,6 +17,7 @@ export type SettingsAction =
   | { type: 'SET_AUTO_USE_POTION'; enabled: boolean }
   | { type: 'SET_AUTO_USE_COOLANT'; enabled: boolean }
   | { type: 'SET_AUTO_USE_POTION_THRESHOLD'; thresholdPct: number }
+  | { type: 'MARK_STORY_BEAT_SEEN'; storyBeatId: string }
   | { type: 'MARK_HINT_SEEN'; hintId: string }
   | { type: 'APPEND_MAIL_MESSAGES'; mails: MailMessage[] }
   | { type: 'SET_LAST_ACTIVE_AT'; timestampMs: number }
@@ -36,6 +37,7 @@ export const SETTINGS_ACTION_TYPES = new Set<string>([
   'SET_AUTO_USE_POTION',
   'SET_AUTO_USE_COOLANT',
   'SET_AUTO_USE_POTION_THRESHOLD',
+  'MARK_STORY_BEAT_SEEN',
   'MARK_HINT_SEEN',
   'APPEND_MAIL_MESSAGES',
   'SET_LAST_ACTIVE_AT',
@@ -91,6 +93,11 @@ export function settingsReducer(state: GameState, action: SettingsAction, ctx: S
     case 'SET_AUTO_USE_POTION_THRESHOLD': {
       const clamped = Math.max(0.1, Math.min(1, action.thresholdPct));
       return { ...state, autoUsePotionThresholdPct: clamped };
+    }
+
+    case 'MARK_STORY_BEAT_SEEN': {
+      if (state.seenStoryBeatIds.includes(action.storyBeatId)) return state;
+      return { ...state, seenStoryBeatIds: [...state.seenStoryBeatIds, action.storyBeatId] };
     }
 
     case 'MARK_HINT_SEEN': {

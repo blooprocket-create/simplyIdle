@@ -141,4 +141,16 @@ describe('serialize → sanitizeSaveData round-trip', () => {
     expect(restored.equipmentInventory['inst_001']).toBeDefined();
     expect(restored.equippedItems.weapon).toBe('inst_001');
   });
+
+  it('preserves seen story beat ids', () => {
+    const modified: GameState = {
+      ...DEFAULT_STATE,
+      seenStoryBeatIds: ['prologue_ash', 'chapter_1_raiders'],
+    };
+
+    const saved = serialize(modified);
+    const restored = sanitizeSaveData(saved);
+
+    expect(restored.seenStoryBeatIds).toEqual(['prologue_ash', 'chapter_1_raiders']);
+  });
 });

@@ -480,6 +480,7 @@ export interface GameState {
   claimedMissionIds: string[];
   codexVipClaimedHeroIds: string[];
   codexVipClaimedUniqueIds: string[];
+  seenStoryBeatIds: string[];
   seenHintIds: string[];
   permanentUnlocks: PermanentUnlockId[];
   metaDamageLevel: number;
@@ -557,7 +558,7 @@ export interface EquipmentInstance {
  * Save schema version. Increment when save format changes.
  * sanitizeSaveData handles migration from any version to current.
  */
-const SAVE_SCHEMA_VERSION = 1;
+const SAVE_SCHEMA_VERSION = 2;
 
 export const DEFAULT_STATE: GameState = {
   playerName: '',
@@ -663,6 +664,7 @@ export const DEFAULT_STATE: GameState = {
   claimedMissionIds: [],
   codexVipClaimedHeroIds: [],
   codexVipClaimedUniqueIds: [],
+  seenStoryBeatIds: [],
   seenHintIds: [],
   permanentUnlocks: [],
   metaDamageLevel: 0,
@@ -3153,6 +3155,7 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     codexVipClaimedUniqueIds: sanitizeStringList(payload.codexVipClaimedUniqueIds, VALID_HERO_TEMPLATE_IDS.size).filter(
       id => VALID_HERO_TEMPLATE_IDS.has(id),
     ),
+    seenStoryBeatIds: sanitizeStringList(payload.seenStoryBeatIds, MAX_SAVE_LOG_ENTRIES),
     seenHintIds: sanitizeStringList(payload.seenHintIds, MAX_SAVE_LOG_ENTRIES),
     permanentUnlocks: sanitizeStringList(payload.permanentUnlocks, VALID_PERMANENT_UNLOCKS.size).filter(
       (id): id is PermanentUnlockId => VALID_PERMANENT_UNLOCKS.has(id as PermanentUnlockId),
@@ -4257,6 +4260,7 @@ type Action =
   | { type: 'CLAIM_MISSION'; missionId: string }
   | { type: 'CLAIM_CODEX_HERO_VIP'; heroId: string }
   | { type: 'CLAIM_CODEX_UNIQUE_VIP'; heroId: string }
+  | { type: 'MARK_STORY_BEAT_SEEN'; storyBeatId: string }
   | { type: 'MARK_HINT_SEEN'; hintId: string }
   | { type: 'APPEND_MAIL_MESSAGES'; mails: MailMessage[] }
   | { type: 'CLAIM_MAIL_ATTACHMENT'; mailId: string; attachment: MailAttachmentKey }
@@ -4402,7 +4406,7 @@ function reducer(state: GameState, action: Action): GameState {
     // CRAFT_EQUIPMENT, UPGRADE_EQUIPMENT_RARITY handled by economyReducer
 
     // SET_AUTO_USE_POTION, SET_AUTO_USE_COOLANT, SET_AUTO_USE_POTION_THRESHOLD,
-    // MARK_HINT_SEEN, APPEND_MAIL_MESSAGES, SET_LAST_ACTIVE_AT,
+    // MARK_STORY_BEAT_SEEN, MARK_HINT_SEEN, APPEND_MAIL_MESSAGES, SET_LAST_ACTIVE_AT,
     // SET_AUTO_RECYCLE_MAX_RARITY, SET_AUTO_RECYCLE_ENABLED,
     // SET_AUTO_SUMMON_ENABLED, SET_AUTO_SUMMON_MODE, SET_AUTO_BURST_ENABLED,
     // SET_COMBAT_TEMPO, SET_AUTO_TEMPO_ENABLED, SET_AUTO_TEMPO_TARGET,
@@ -4581,6 +4585,7 @@ function reducer(state: GameState, action: Action): GameState {
           claimedMissionIds: p.claimedMissionIds,
           codexVipClaimedHeroIds: p.codexVipClaimedHeroIds,
           codexVipClaimedUniqueIds: p.codexVipClaimedUniqueIds,
+          seenStoryBeatIds: p.seenStoryBeatIds,
           seenHintIds: p.seenHintIds,
           permanentUnlocks: p.permanentUnlocks,
           metaDamageLevel: p.metaDamageLevel,
@@ -4732,6 +4737,7 @@ export interface SaveData {
   claimedMissionIds: string[];
   codexVipClaimedHeroIds?: string[];
   codexVipClaimedUniqueIds?: string[];
+  seenStoryBeatIds?: string[];
   seenHintIds: string[];
   permanentUnlocks: PermanentUnlockId[];
   metaDamageLevel: number;
@@ -4858,6 +4864,7 @@ export function serialize(state: GameState): SaveData {
     claimedMissionIds: state.claimedMissionIds,
     codexVipClaimedHeroIds: state.codexVipClaimedHeroIds,
     codexVipClaimedUniqueIds: state.codexVipClaimedUniqueIds,
+    seenStoryBeatIds: state.seenStoryBeatIds,
     seenHintIds: state.seenHintIds,
     permanentUnlocks: state.permanentUnlocks,
     metaDamageLevel: state.metaDamageLevel,
@@ -5628,6 +5635,12 @@ export function useGameState(saveSlot: string = 'default') {
     },
     [dispatch],
   );
+  const markStoryBeatSeen = useCallback(
+    (storyBeatId: string) => {
+      dispatch({ type: 'MARK_STORY_BEAT_SEEN', storyBeatId });
+    },
+    [dispatch],
+  );
   const markHintSeen = useCallback(
     (hintId: string) => {
       dispatch({ type: 'MARK_HINT_SEEN', hintId });
@@ -5866,6 +5879,7 @@ export function useGameState(saveSlot: string = 'default') {
     claimMission,
     claimCodexHeroVip,
     claimCodexUniqueVip,
+    markStoryBeatSeen,
     markHintSeen,
     appendMailboxMessages,
     claimMailAttachment,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStoryUnlockToast } from './useStoryUnlockToast';
 
 interface StoryEntry {
@@ -18,18 +18,22 @@ interface RewardPopup {
 
 interface UseGameOverlaysArgs {
   storyEntries: StoryEntry[];
+  seenStoryBeatIds: string[];
   rewardPopup: RewardPopup | null;
   activeModal: string | null;
   allowInitialStoryModal: boolean;
+  markStoryBeatSeen: (storyBeatId: string) => void;
   setActiveModal: (modal: string | null) => void;
   clearRewardPopup: () => void;
 }
 
 export function useGameOverlays({
   storyEntries,
+  seenStoryBeatIds,
   rewardPopup,
   activeModal,
   allowInitialStoryModal,
+  markStoryBeatSeen,
   setActiveModal,
   clearRewardPopup,
 }: UseGameOverlaysArgs) {
@@ -51,29 +55,37 @@ export function useGameOverlays({
   } | null>(null);
   const { storyUnlockToast, setStoryUnlockToast } = useStoryUnlockToast(storyEntries);
 
-  const queueStorySequence = (entry: StoryEntry) => {
-    queueMicrotask(() => {
-      if (!entry.hasCutscene) {
-        setStoryBeatModal({
+  const queueStorySequence = useCallback(
+    (entry: StoryEntry) => {
+      if (seenStoryBeatIds.includes(entry.id)) {
+        return;
+      }
+
+      markStoryBeatSeen(entry.id);
+      queueMicrotask(() => {
+        if (!entry.hasCutscene) {
+          setStoryBeatModal({
+            id: entry.id,
+            chapter: entry.chapter,
+            title: entry.title,
+            body: entry.body,
+            wave: entry.unlockWave,
+            presentationMode: 'full',
+          });
+          return;
+        }
+
+        setStoryCutscene({
           id: entry.id,
           chapter: entry.chapter,
           title: entry.title,
           body: entry.body,
           wave: entry.unlockWave,
-          presentationMode: 'full',
         });
-        return;
-      }
-
-      setStoryCutscene({
-        id: entry.id,
-        chapter: entry.chapter,
-        title: entry.title,
-        body: entry.body,
-        wave: entry.unlockWave,
       });
-    });
-  };
+    },
+    [markStoryBeatSeen, seenStoryBeatIds],
+  );
 
   // Direct chapter transition detection — track the highest unlocked beat
   // index and show the modal whenever it increases, regardless of how the
@@ -110,7 +122,7 @@ export function useGameOverlays({
     }
 
     prevBeatIndexRef.current = highestUnlockedIndex;
-  }, [allowInitialStoryModal, highestUnlockedIndex, storyEntries]);
+  }, [allowInitialStoryModal, highestUnlockedIndex, queueStorySequence, storyEntries]);
 
   const isOfflineRewardPopup = useMemo(() => {
     if (!rewardPopup) return false;
