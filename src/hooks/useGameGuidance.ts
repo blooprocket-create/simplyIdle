@@ -15,16 +15,11 @@ interface MissionCard {
   mission: { title: string; id: string };
 }
 
-interface CurrentAct {
-  bossWave: number;
-}
-
 export function useGameGuidance(
   canRebirthNow: boolean,
   state: GameState,
   teamSlotCap: number,
   missionCards: MissionCard[],
-  currentAct: CurrentAct,
 ) {
   return useMemo(() => {
     const recs: Array<{ title: string; detail: string; tab: Tab }> = [];
@@ -67,11 +62,6 @@ export function useGameGuidance(
         tab: 'achievements',
       });
     }
-    recs.push({
-      title: 'Push Act Boss',
-      detail: `Advance to Wave ${currentAct.bossWave} for permanent unlock progress.`,
-      tab: 'battle',
-    });
 
     return recs.slice(0, 3);
   }, [
@@ -81,7 +71,6 @@ export function useGameGuidance(
     state.activeTeamHeroIds.length,
     state.unspentStatPoints,
     missionCards,
-    currentAct.bossWave,
     teamSlotCap,
   ]);
 }

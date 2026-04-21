@@ -792,20 +792,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         tab: 'achievements',
       });
     }
-    recs.push({
-      title: 'Push Act Boss',
-      detail: `Advance to Wave ${currentAct.bossWave} for permanent unlock progress.`,
-      tab: 'battle',
-    });
     return recs.slice(0, 3);
-  }, [
-    canRebirthNow,
-    state.activeTeamHeroIds.length,
-    state.unspentStatPoints,
-    missionCards,
-    currentAct.bossWave,
-    teamSlotCap,
-  ]);
+  }, [canRebirthNow, state.activeTeamHeroIds.length, state.unspentStatPoints, missionCards, teamSlotCap]);
   const nextGuidance = guidanceList[0];
   const extraGuidanceCount = Math.max(0, guidanceList.length - 1);
   const equipmentInventory = state.equipmentInventory;
@@ -2218,7 +2206,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         </View>
       )}
 
-      {tutorialStep === 'done' && (
+      {tutorialStep === 'done' && nextGuidance && (
         <View style={styles.nextStepBannerCompact}>
           <Pressable style={styles.nextStepChipCompact} onPress={() => onTabChange(nextGuidance.tab)}>
             <Text style={styles.nextStepChipText}>💡 {nextGuidance.title}</Text>
