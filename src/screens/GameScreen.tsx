@@ -14,6 +14,7 @@ import {
   Alert,
   Animated,
   Easing,
+  ActivityIndicator,
   useWindowDimensions,
   AppState,
 } from 'react-native';
@@ -129,7 +130,7 @@ import { deleteOnlineSave, loadOnlineSave } from '../services/onlineSave';
 import { t } from '../i18n';
 
 /** Smoothly animated progress bar for save-slot hydration, driven by real load progress. */
-function HydrationProgressBar({ progress }: { progress: number }) {
+function HydrationProgressBar({ progress, debugText }: { progress: number; debugText?: string }) {
   const [anim] = useState(() => new Animated.Value(0));
   const [displayPct, setDisplayPct] = useState(0);
   const [widthPct] = useState(() => anim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }));
@@ -164,6 +165,7 @@ function HydrationProgressBar({ progress }: { progress: number }) {
         <Animated.View style={{ height: '100%', borderRadius: 5, backgroundColor: '#C77DFF', width: widthPct }} />
       </View>
       <Text style={{ color: '#C77DFF', fontSize: 13, fontWeight: '600', marginBottom: 8 }}>{displayPct}%</Text>
+      {!!debugText && <Text style={styles.loadingDebugText}>{debugText}</Text>}
     </>
   );
 }
@@ -397,6 +399,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     applyOfflineProgress,
     setLastActiveAt,
     setGamePaused,
+    loadDebugMessage,
   } = useGameState(
     selectedCharacterClass ? getCharacterSaveSlot(accountName, selectedCharacterClass) : '__character_slot_preview__',
   );
@@ -407,6 +410,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setSlotSummaries,
     slotListLoading,
     slotLoadProgress,
+    slotLoadDebugLabel,
     clearLastUsedClass,
   } = useCharacterSlots({
     accountName,
@@ -1816,6 +1820,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       <SafeAreaView style={styles.safe}>
         <StatusBar barStyle="light-content" backgroundColor="#0A0A18" />
         <View style={styles.characterLoadingWrap}>
+          <ActivityIndicator size="large" color="#C77DFF" style={styles.loadingSpinner} />
           <Text style={styles.createTitle}>Loading Characters...</Text>
           <View style={{ width: '60%', maxWidth: 280, marginVertical: 16 }}>
             <ProgressBar percent={slotLoadProgress} color="#C77DFF" height={10} borderRadius={5} />
@@ -1823,6 +1828,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
           <Text style={{ color: '#C77DFF', fontSize: 13, fontWeight: '600', marginBottom: 8 }}>
             {Math.round(slotLoadProgress)}%
           </Text>
+          <Text style={styles.loadingDebugText}>{slotLoadDebugLabel}</Text>
           <Text style={styles.createSubtitle}>Checking your class slots for this account.</Text>
         </View>
       </SafeAreaView>
@@ -1903,8 +1909,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
       <SafeAreaView style={styles.safe}>
         <StatusBar barStyle="light-content" backgroundColor="#0A0A18" />
         <View style={styles.characterLoadingWrap}>
+          <ActivityIndicator size="large" color="#C77DFF" style={styles.loadingSpinner} />
           <Text style={styles.createTitle}>Loading {selectedClassConfig?.name ?? 'Character'}...</Text>
-          <HydrationProgressBar progress={loadProgress} />
+          <HydrationProgressBar progress={loadProgress} debugText={loadDebugMessage} />
           <Text style={styles.createSubtitle}>Preparing your save slot.</Text>
         </View>
       </SafeAreaView>
@@ -2349,7 +2356,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
         <Suspense
           fallback={
             <View style={styles.tabLoadingFallback}>
+              <ActivityIndicator size="small" color="#C77DFF" style={styles.loadingSpinner} />
               <Text style={styles.tabLoadingText}>Loading…</Text>
+              <Text style={styles.tabLoadingDebug}>Preparing tab bundle...</Text>
             </View>
           }
         >

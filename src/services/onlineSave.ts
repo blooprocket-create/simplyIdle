@@ -17,6 +17,14 @@ export type OnlineSaveErrorCode =
   | 'resource-exhausted'
   | 'unknown';
 
+export interface OnlineSaveSlotSummary {
+  characterCreated: boolean;
+  playerName: string | null;
+  level: number;
+  highestWaveReached: number;
+  vipLevel: number;
+}
+
 interface SaveDocRecord {
   revision: number;
   updatedAt: number;
@@ -28,7 +36,11 @@ interface SaveDocRecord {
   chunkKeys?: string[];
   /** Present on schema v2+ save headers; lets writers skip unchanged chunk docs. */
   chunkHashes?: Record<string, string>;
+  /** Lightweight slot-picker summary stored on the save header. */
+  slotSummary?: OnlineSaveSlotSummary | null;
 }
+
+const SLOT_SUMMARY_CHUNKS = new Set(['identity', 'economy', 'combat', 'progression']);
 
 // ---------------------------------------------------------------------------
 // Chunk definitions – each chunk groups related SaveData keys.
@@ -282,6 +294,49 @@ function planChunkMutations(
   };
 }
 
+function normalizeOnlineSaveSlotSummary(value: unknown): OnlineSaveSlotSummary | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Partial<OnlineSaveSlotSummary>;
+  const playerName = typeof record.playerName === 'string' ? record.playerName.trim().slice(0, 24) : '';
+  const characterCreated = record.characterCreated === true && playerName.length > 0;
+  const level =
+    typeof record.level === 'number' && Number.isFinite(record.level) ? Math.max(1, Math.floor(record.level)) : 1;
+  const highestWaveReached =
+    typeof record.highestWaveReached === 'number' && Number.isFinite(record.highestWaveReached)
+      ? Math.max(1, Math.floor(record.highestWaveReached))
+      : 1;
+  const vipLevel =
+    typeof record.vipLevel === 'number' && Number.isFinite(record.vipLevel)
+      ? Math.max(0, Math.min(10, Math.floor(record.vipLevel)))
+      : 0;
+
+  return {
+    characterCreated,
+    playerName: characterCreated ? playerName : null,
+    level,
+    highestWaveReached,
+    vipLevel: characterCreated ? vipLevel : 0,
+  };
+}
+
+function buildOnlineSaveSlotSummary(payload: Record<string, unknown>): OnlineSaveSlotSummary {
+  return (
+    normalizeOnlineSaveSlotSummary({
+      characterCreated: payload.characterCreated === true,
+      playerName: typeof payload.playerName === 'string' ? payload.playerName : null,
+      level: payload.level,
+      highestWaveReached: payload.highestWaveReached ?? payload.wave,
+      vipLevel: payload.vipLevel,
+    }) ?? {
+      characterCreated: false,
+      playerName: null,
+      level: 1,
+      highestWaveReached: 1,
+      vipLevel: 0,
+    }
+  );
+}
+
 /** Progress callback type for chunked loads. */
 export type LoadProgressCallback = (loaded: number, total: number, chunkName: string) => void;
 
@@ -294,6 +349,10 @@ export type OnlineSaveWriteResult<TPayload extends Record<string, unknown>> =
 
 export type OnlineSaveLoadResult<TPayload extends Record<string, unknown>> =
   | { ok: true; data: OnlineSaveEnvelope<TPayload> | null }
+  | { ok: false; errorCode: OnlineSaveErrorCode };
+
+export type OnlineSaveSlotSummaryLoadResult =
+  | { ok: true; data: OnlineSaveSlotSummary | null }
   | { ok: false; errorCode: OnlineSaveErrorCode };
 
 export interface OnlineSaveLoadOptions {
@@ -559,6 +618,43 @@ async function loadChunksForSlot(
   return mergeChunks(chunks);
 }
 
+export async function loadOnlineSaveSlotSummary(saveSlot: string): Promise<OnlineSaveSlotSummaryLoadResult> {
+  const db = getFirebaseFirestore();
+  const uid = getCurrentUid();
+  if (!db || !uid) return { ok: false, errorCode: 'unavailable' };
+
+  try {
+    const safeSlot = sanitizeSaveSlot(saveSlot);
+    const ref = doc(db, 'users', uid, 'saveSlots', safeSlot);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return { ok: true, data: null };
+
+    const raw = snap.data() as SaveDocRecord;
+    const headerSummary = normalizeOnlineSaveSlotSummary(raw.slotSummary);
+    if (headerSummary) {
+      return { ok: true, data: headerSummary };
+    }
+
+    const inlineEnvelope = toEnvelope<Record<string, unknown>>(raw);
+    if (inlineEnvelope && Object.keys(inlineEnvelope.payload).length > 0) {
+      return { ok: true, data: buildOnlineSaveSlotSummary(inlineEnvelope.payload) };
+    }
+
+    if (Array.isArray(raw.chunkKeys) && raw.chunkKeys.length > 0) {
+      const summaryChunkKeys = raw.chunkKeys.filter(chunkName => SLOT_SUMMARY_CHUNKS.has(chunkName));
+      if (summaryChunkKeys.length === 0) return { ok: true, data: null };
+
+      const payload = await loadChunksForSlot(db, ['users', uid, 'saveSlots', safeSlot], summaryChunkKeys);
+      if (Object.keys(payload).length === 0) return { ok: true, data: null };
+      return { ok: true, data: buildOnlineSaveSlotSummary(payload) };
+    }
+
+    return { ok: true, data: null };
+  } catch (error) {
+    return { ok: false, errorCode: mapFirestoreErrorCode(error) };
+  }
+}
+
 export async function writeOnlineSave<TPayload extends Record<string, unknown>>(
   saveSlot: string,
   payload: TPayload,
@@ -574,7 +670,9 @@ export async function writeOnlineSave<TPayload extends Record<string, unknown>>(
     const safeSlot = sanitizeSaveSlot(saveSlot);
     const ref = doc(db, 'users', uid, 'saveSlots', safeSlot);
     const now = Date.now();
-    const chunks = splitPayloadIntoChunks(payload as unknown as Record<string, unknown>);
+    const payloadRecord = payload as unknown as Record<string, unknown>;
+    const chunks = splitPayloadIntoChunks(payloadRecord);
+    const slotSummary = buildOnlineSaveSlotSummary(payloadRecord);
 
     return runTransaction(db, async tx => {
       const snap = await tx.get(ref);
@@ -614,6 +712,7 @@ export async function writeOnlineSave<TPayload extends Record<string, unknown>>(
         saveSlot: safeSlot,
         chunkKeys: mutationPlan.chunkKeyList,
         chunkHashes: mutationPlan.chunkHashes,
+        slotSummary,
       });
 
       const chunkLookup = new Map(mutationPlan.chunkEntries);
@@ -708,8 +807,10 @@ export async function writeOnlineSaveForUid<TPayload extends Record<string, unkn
     const existing = snap.data() as SaveDocRecord;
 
     // Write chunked format
-    const chunks = splitPayloadIntoChunks(payload as unknown as Record<string, unknown>);
+    const payloadRecord = payload as unknown as Record<string, unknown>;
+    const chunks = splitPayloadIntoChunks(payloadRecord);
     const mutationPlan = planChunkMutations(chunks, existing.chunkHashes, existing.chunkKeys);
+    const slotSummary = buildOnlineSaveSlotSummary(payloadRecord);
 
     const batch = writeBatch(db);
     batch.set(ref, {
@@ -719,6 +820,7 @@ export async function writeOnlineSaveForUid<TPayload extends Record<string, unkn
       saveSlot: existing.saveSlot,
       chunkKeys: mutationPlan.chunkKeyList,
       chunkHashes: mutationPlan.chunkHashes,
+      slotSummary,
     });
 
     const chunkLookup = new Map(mutationPlan.chunkEntries);

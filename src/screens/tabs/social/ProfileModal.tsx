@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Platform, ScrollView, StyleSheet, Text, TextInput, View, ActivityIndicator } from 'react-native';
 import { THEME, RADIUS } from '../../../theme';
 import { FeedbackPressable as Pressable } from '../../../components/FeedbackPressable';
 import {
@@ -153,7 +153,12 @@ export function ProfileModal({
         <Pressable style={styles.card} onPress={() => {}}>
           <Text style={styles.cardTitle}>Player Profile</Text>
 
-          {loading && <Text style={styles.metaText}>Loading profile data...</Text>}
+          {loading && (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator size="small" color="#7EC8FF" />
+              <Text style={styles.metaText}>Loading profile data...</Text>
+            </View>
+          )}
           {!!error && <Text style={styles.errorText}>⚠️ {error}</Text>}
 
           {!loading && !error && !!profile && (
@@ -422,6 +427,11 @@ const styles = StyleSheet.create({
   metaText: {
     fontSize: 12,
     color: THEME.text.secondary,
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   errorText: {
     fontSize: 12,

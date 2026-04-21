@@ -87,6 +87,17 @@ const SAVE_INTERVAL_MS = 5000;
 const ONLINE_SAVE_INTERVAL_MS = 3 * 60 * 1000;
 const ONLINE_SAVE_BACKOFF_BASE_MS = 60 * 1000;
 const ONLINE_SAVE_BACKOFF_MAX_MS = 15 * 60 * 1000;
+const LOAD_DEBUG_LABELS: Record<string, string> = {
+  identity: 'identity data',
+  economy: 'economy data',
+  combat: 'combat state',
+  progression: 'progression systems',
+  roster: 'hero roster',
+  equipment: 'equipment inventory',
+  minigames: 'operations data',
+  settings: 'player settings',
+  _extra: 'miscellaneous data',
+};
 const STAT_POINTS_PER_LEVEL = 5;
 const OFFLINE_PROGRESS_CAP_MS = 8 * 60 * 60 * 1000;
 const OFFLINE_SIM_MAX_SLICE_MS = 1000;
@@ -139,6 +150,11 @@ const VIP_LEVEL_THRESHOLDS = [0, 50, 150, 350, 700, 1500, 3000, 6500, 15000, 350
 const VIP_DAMAGE_PER_LEVEL = 0.03;
 const VIP_GOLD_PER_LEVEL = 0.025;
 const VIP_EXP_PER_LEVEL = 0.025;
+
+function formatLoadDebugMessage(chunkName: string, loaded: number, total: number): string {
+  const label = LOAD_DEBUG_LABELS[chunkName] ?? chunkName.replace(/_/g, ' ');
+  return `Loading ${label} (${loaded}/${total})...`;
+}
 const MAX_FORMATION_ROLE_HEROES = 2;
 const TEAM_SLOT_UNLOCK_RULES: Record<number, { requiredWave: number; goldCost: number; shardCost: number }> = {
   5: { requiredWave: 50, goldCost: 125000, shardCost: 450 },
@@ -4889,6 +4905,7 @@ export function useGameState(saveSlot: string = 'default') {
   const [state, rawDispatch] = useReducer(reducer, DEFAULT_STATE);
   const [hydrated, setHydrated] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
+  const [loadDebugMessage, setLoadDebugMessage] = useState('Preparing save slot...');
   const [onlineSyncState, setOnlineSyncState] = useState<'local-only' | 'syncing' | 'synced' | 'conflict' | 'error'>(
     'local-only',
   );
@@ -5117,6 +5134,7 @@ export function useGameState(saveSlot: string = 'default') {
   useEffect(() => {
     setHydrated(false);
     setLoadProgress(0);
+    setLoadDebugMessage('Resetting slot state...');
     debugLog('save', 'Loading save slot', { saveSlot });
     dispatch({ type: 'LOAD', payload: {} });
     sessionStartedRef.current = false;
@@ -5144,15 +5162,18 @@ export function useGameState(saveSlot: string = 'default') {
       const onlineAvailable = onlineSlotEligible && isOnlineSaveAvailable();
       if (!onlineAvailable) {
         debugLog('save', 'No online save available; using defaults', { saveSlot });
+        setLoadDebugMessage('Using local defaults for this slot.');
         setLoadProgress(100);
         return;
       }
       setLoadProgress(5); // header fetch started
+      setLoadDebugMessage('Fetching cloud save header...');
       const remoteResult = await loadOnlineSave<Record<string, unknown>>(saveSlot, (loaded, total, chunkName) => {
         if (!cancelled) {
           // Map chunk progress into the 5–85% range (header=5%, chunks=5-85%, post-processing=85-100%)
           const pct = Math.round(5 + (loaded / total) * 80);
           setLoadProgress(pct);
+          setLoadDebugMessage(formatLoadDebugMessage(chunkName, loaded, total));
           debugLog('save', `Loaded chunk ${chunkName}`, { loaded, total });
         }
       });
@@ -5162,8 +5183,10 @@ export function useGameState(saveSlot: string = 'default') {
         if (remoteResult.errorCode === 'permission-denied' || remoteResult.errorCode === 'invalid-slot') {
           onlineSyncDisabledRef.current = true;
           setOnlineSyncState('local-only');
+          setLoadDebugMessage('Cloud save unavailable for this slot.');
         } else {
           setOnlineSyncState('error');
+          setLoadDebugMessage('Cloud save failed. Falling back to defaults.');
         }
         setLoadProgress(100);
         return;
@@ -5174,6 +5197,7 @@ export function useGameState(saveSlot: string = 'default') {
       if (!remote) {
         debugLog('save', 'No existing save found; using defaults', { saveSlot });
         setOnlineSyncState('synced');
+        setLoadDebugMessage('No cloud save found. Starting fresh slot.');
         setLoadProgress(100);
         return;
       }
@@ -5190,7 +5214,9 @@ export function useGameState(saveSlot: string = 'default') {
 
       const payload = remote.payload as Partial<SaveData>;
       setLoadProgress(88);
+      setLoadDebugMessage('Applying save payload...');
       setLoadProgress(95);
+      setLoadDebugMessage('Applying offline progress and rollovers...');
       dispatch({ type: 'LOAD', payload });
       const elapsed = Date.now() - (payload.lastActiveAt ?? Date.now());
       dispatch({ type: 'APPLY_OFFLINE_PROGRESS', elapsedMs: elapsed });
@@ -5223,6 +5249,7 @@ export function useGameState(saveSlot: string = 'default') {
       }
 
       setLoadProgress(100);
+      setLoadDebugMessage('Ready.');
     })().finally(() => {
       if (!cancelled) setHydrated(true);
     });
@@ -5763,6 +5790,7 @@ export function useGameState(saveSlot: string = 'default') {
   return {
     hydrated,
     loadProgress,
+    loadDebugMessage,
     onlineSyncState,
     onlineSyncAt,
     state,

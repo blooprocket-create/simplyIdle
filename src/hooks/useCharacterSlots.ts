@@ -2,10 +2,8 @@ import { useEffect, useState } from 'react';
 import { getDoc, doc as firestoreDoc, setDoc } from 'firebase/firestore';
 import { CLASSES, PlayerClass } from '../gameConfig';
 import { getCharacterSaveSlot } from '../useGameState';
-import { loadOnlineSave } from '../services/onlineSave';
+import { loadOnlineSaveSlotSummary } from '../services/onlineSave';
 import { getFirebaseAuth, getFirebaseFirestore } from '../services/firebase';
-
-const VIP_LEVEL_THRESHOLDS = [0, 50, 150, 350, 700, 1500, 3000, 6500, 15000, 35000, 100000] as const;
 
 export interface CharacterSlotSummary {
   classId: PlayerClass;
@@ -32,18 +30,6 @@ interface UseCharacterSlotsParams {
   state: CharacterSlotStateSnapshot;
 }
 
-function getVipLevelFromPoints(points: number): number {
-  let level = 0;
-  for (let i = 0; i < VIP_LEVEL_THRESHOLDS.length; i += 1) {
-    if (points >= VIP_LEVEL_THRESHOLDS[i]) {
-      level = i;
-    } else {
-      break;
-    }
-  }
-  return Math.max(0, Math.min(10, level));
-}
-
 async function loadLastCharacterSlot(uid: string): Promise<PlayerClass | null> {
   const db = getFirebaseFirestore();
   if (!db) return null;
@@ -67,8 +53,6 @@ async function saveLastCharacterSlot(uid: string, playerClass: PlayerClass | nul
   }
 }
 
-const SLOT_SUMMARY_CHUNKS = ['identity', 'economy', 'combat', 'progression'] as const;
-
 export function useCharacterSlots({
   accountName,
   selectedCharacterClass,
@@ -80,6 +64,7 @@ export function useCharacterSlots({
   const [slotSummaries, setSlotSummaries] = useState<CharacterSlotSummary[]>([]);
   const [slotListLoading, setSlotListLoading] = useState(true);
   const [slotLoadProgress, setSlotLoadProgress] = useState(0);
+  const [slotLoadDebugLabel, setSlotLoadDebugLabel] = useState('Checking cloud slot headers...');
 
   useEffect(() => {
     let cancelled = false;
@@ -87,19 +72,23 @@ export function useCharacterSlots({
     async function loadCharacterSlots() {
       setSlotListLoading(true);
       setSlotLoadProgress(0);
+      setSlotLoadDebugLabel('Checking cloud slot headers...');
       let loaded = 0;
       const total = CLASSES.length;
-      const summaries = await Promise.all(
+      const uid = getFirebaseAuth()?.currentUser?.uid ?? '';
+      const lastSelectedPromise = uid ? loadLastCharacterSlot(uid) : Promise.resolve(null);
+
+      const summariesPromise = Promise.all(
         CLASSES.map(async cls => {
-          const slotResult = await loadOnlineSave<Record<string, unknown>>(
-            getCharacterSaveSlot(accountName, cls.id),
-            undefined,
-            { includeChunks: [...SLOT_SUMMARY_CHUNKS] },
-          );
+          const slotResult = await loadOnlineSaveSlotSummary(getCharacterSaveSlot(accountName, cls.id));
           loaded++;
-          if (!cancelled) setSlotLoadProgress(Math.round((loaded / total) * 80));
-          const parsed = slotResult.ok && slotResult.data ? slotResult.data.payload : null;
-          if (!parsed) {
+          if (!cancelled) {
+            setSlotLoadProgress(Math.round((loaded / total) * 88));
+            setSlotLoadDebugLabel(`Loaded ${cls.name} slot (${loaded}/${total})`);
+          }
+
+          const summary = slotResult.ok ? slotResult.data : null;
+          if (!summary) {
             return {
               classId: cls.id,
               playerName: null,
@@ -110,46 +99,28 @@ export function useCharacterSlots({
             } satisfies CharacterSlotSummary;
           }
 
-          const playerName = typeof parsed.playerName === 'string' ? parsed.playerName.trim().slice(0, 24) : '';
-          const occupied = !!playerName && parsed.characterCreated === true;
-          const parsedVipPoints =
-            typeof parsed.vipPoints === 'number' && Number.isFinite(parsed.vipPoints)
-              ? Math.max(0, Math.floor(parsed.vipPoints))
-              : 0;
-          const parsedVipLevel =
-            typeof parsed.vipLevel === 'number' && Number.isFinite(parsed.vipLevel)
-              ? Math.max(0, Math.min(10, Math.floor(parsed.vipLevel)))
-              : getVipLevelFromPoints(parsedVipPoints);
-
           return {
             classId: cls.id,
-            playerName: occupied ? playerName : null,
-            level:
-              typeof parsed.level === 'number' && Number.isFinite(parsed.level)
-                ? Math.max(1, Math.floor(parsed.level))
-                : 1,
-            highestWaveReached:
-              typeof parsed.highestWaveReached === 'number' && Number.isFinite(parsed.highestWaveReached)
-                ? Math.max(1, Math.floor(parsed.highestWaveReached))
-                : typeof parsed.wave === 'number' && Number.isFinite(parsed.wave)
-                  ? Math.max(1, Math.floor(parsed.wave))
-                  : 1,
-            vipLevel: occupied ? parsedVipLevel : 0,
-            occupied,
+            playerName: summary.playerName,
+            level: summary.level,
+            highestWaveReached: summary.highestWaveReached,
+            vipLevel: summary.vipLevel,
+            occupied: summary.characterCreated,
           } satisfies CharacterSlotSummary;
         }),
       );
+
+      const [summaries, lastSelected] = await Promise.all([summariesPromise, lastSelectedPromise]);
 
       if (cancelled) return;
       setSlotSummaries(summaries);
 
       const occupiedClasses = summaries.filter(slot => slot.occupied).map(slot => slot.classId);
-      const uid = getFirebaseAuth()?.currentUser?.uid ?? '';
-      const lastSelected = uid ? await loadLastCharacterSlot(uid) : null;
       const normalizedLastSelected = lastSelected && CLASSES.some(cls => cls.id === lastSelected) ? lastSelected : null;
 
       if (cancelled) return;
-      setSlotLoadProgress(90);
+      setSlotLoadProgress(94);
+      setSlotLoadDebugLabel('Restoring last used slot...');
       setLastUsedCharacterClass(normalizedLastSelected);
 
       if (normalizedLastSelected && occupiedClasses.includes(normalizedLastSelected)) {
@@ -161,6 +132,7 @@ export function useCharacterSlots({
       }
 
       setSlotLoadProgress(100);
+      setSlotLoadDebugLabel('Ready.');
       setSlotListLoading(false);
     }
 
@@ -217,6 +189,7 @@ export function useCharacterSlots({
     setSlotSummaries,
     slotListLoading,
     slotLoadProgress,
+    slotLoadDebugLabel,
     clearLastUsedClass,
   };
 }

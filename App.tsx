@@ -1,6 +1,6 @@
 import 'react-native-reanimated';
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Platform, Animated } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Platform, Animated, ActivityIndicator } from 'react-native';
 import { onAuthStateChanged } from 'firebase/auth';
 import GameScreen from './src/screens/GameScreen';
 import AuthScreen from './src/screens/AuthScreen';
@@ -21,8 +21,8 @@ const LOADING_HINTS = [
   'Consulting the oracle…',
 ];
 
-function LoadingSplash({ progress }: { progress: number }) {
-  const pulseAnim = useRef(new Animated.Value(0.4)).current;
+function LoadingSplash({ progress, detail }: { progress: number; detail: string }) {
+  const [pulseAnim] = useState(() => new Animated.Value(0.4));
   const supportsNativeDriver = Platform.OS !== 'web';
   const [hint, setHint] = useState(() => LOADING_HINTS[Math.floor(Math.random() * LOADING_HINTS.length)]);
 
@@ -45,10 +45,12 @@ function LoadingSplash({ progress }: { progress: number }) {
   return (
     <View style={styles.loadingWrap}>
       <Text style={styles.loadingTitle}>SIMPLY IDLE</Text>
+      <ActivityIndicator size="large" color="#C77DFF" style={styles.loadingSpinner} />
       <View style={styles.progressWrap}>
         <ProgressBar percent={progress} color="#7B68EE" height={10} borderRadius={5} />
       </View>
       <Text style={styles.progressPercent}>{Math.round(progress)}%</Text>
+      <Text style={styles.loadingDebug}>{detail}</Text>
       <Animated.Text style={[styles.loadingHint, { opacity: pulseAnim }]}>
         {hint}
       </Animated.Text>
@@ -59,20 +61,24 @@ function LoadingSplash({ progress }: { progress: number }) {
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [loadProgress, setLoadProgress] = useState(0);
+  const [loadDebugMessage, setLoadDebugMessage] = useState('Booting telemetry...');
   const [accountName, setAccountName] = useState<string | null>(null);
   const [showTitle, setShowTitle] = useState(true);
   const [maintenanceConfig, setMaintenanceConfig] = useState(APP_MAINTENANCE);
   const [maintenanceReady, setMaintenanceReady] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
   const maintenanceEnabled = maintenanceConfig.enabled;
 
   useEffect(() => {
     initTelemetry();
+    setLoadDebugMessage('Booting telemetry...');
     setLoadProgress(20);
     void trackEvent('app_boot', {
       platform: Platform.OS,
       source: 'App.tsx',
     });
     void trackTelemetryHeartbeat('app_boot');
+    setLoadDebugMessage('Preparing diagnostics...');
     setLoadProgress(35);
 
     // Global unhandled error reporting
@@ -113,6 +119,7 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
+    setLoadDebugMessage('Checking maintenance flag...');
 
     const unsubscribe = subscribeToAppMaintenance(nextConfig => {
       if (!active) return;
@@ -130,6 +137,7 @@ export default function App() {
       .finally(() => {
         if (!active) return;
         setMaintenanceReady(true);
+        setLoadDebugMessage('Maintenance flag ready.');
         setLoadProgress(prev => Math.max(prev, 45));
       });
 
@@ -140,42 +148,82 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!maintenanceReady) return;
+    let cancelled = false;
+    let settled = false;
 
-    if (maintenanceEnabled) {
-      setLoadProgress(100);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
+    setLoadDebugMessage('Checking saved sign-in...');
     setLoadProgress(prev => Math.max(prev, 50));
 
+    const resolveSession = async (debugLabel: string, progressFloor: number) => {
+      if (cancelled || settled) return;
+      settled = true;
+      setLoadDebugMessage(debugLabel);
+      setLoadProgress(prev => Math.max(prev, progressFloor));
+      try {
+        const online = await getValidOnlineSession();
+        if (cancelled) return;
+        setAccountName(online);
+        setLoadProgress(prev => Math.max(prev, 90));
+      } finally {
+        if (!cancelled) setSessionReady(true);
+      }
+    };
+
     if (!isOnlineAuthAvailable()) {
-      setLoadProgress(100);
-      setLoading(false);
-      return;
+      setLoadDebugMessage('Online auth unavailable. Using local title flow.');
+      setLoadProgress(prev => Math.max(prev, 90));
+      setSessionReady(true);
+      return () => {
+        cancelled = true;
+      };
     }
 
     const auth = getFirebaseAuth();
     if (!auth) {
+      setLoadDebugMessage('Auth service unavailable. Using sign-in screen.');
+      setLoadProgress(prev => Math.max(prev, 90));
+      setSessionReady(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (auth.currentUser) {
+      void resolveSession('Restoring cached session...', 72);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, () => {
+      void resolveSession('Resolving sign-in session...', 72);
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!maintenanceReady) return;
+
+    if (maintenanceEnabled) {
+      setLoadDebugMessage('Maintenance notice ready.');
       setLoadProgress(100);
       setLoading(false);
       return;
     }
 
-    setLoadProgress(50);
-    const unsubscribe = onAuthStateChanged(auth, () => {
-      setLoadProgress(70);
-      void (async () => {
-        const online = await getValidOnlineSession();
-        setAccountName(online);
-        setLoadProgress(100);
-      })().finally(() => setLoading(false));
-    });
+    if (!sessionReady) {
+      setLoading(true);
+      return;
+    }
 
-    return unsubscribe;
-  }, [maintenanceEnabled, maintenanceReady]);
+    setLoadDebugMessage(accountName ? 'Session ready.' : 'Waiting for sign-in.');
+    setLoadProgress(100);
+    setLoading(false);
+  }, [accountName, maintenanceEnabled, maintenanceReady, sessionReady]);
 
   useEffect(() => {
     if (loading || maintenanceEnabled) return;
@@ -204,7 +252,7 @@ export default function App() {
   }, [accountName, maintenanceEnabled]);
 
   if (loading) {
-    return <LoadingSplash progress={loadProgress} />;
+    return <LoadingSplash progress={loadProgress} detail={loadDebugMessage} />;
   }
 
   if (showTitle || maintenanceEnabled) {
@@ -272,6 +320,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#0A0A18',
   },
+  loadingSpinner: {
+    marginBottom: 18,
+  },
   loadingTitle: {
     color: '#FFF',
     fontSize: 22,
@@ -288,7 +339,13 @@ const styles = StyleSheet.create({
     color: '#7B68EE',
     fontSize: 13,
     fontWeight: '600',
-    marginBottom: 16,
+    marginBottom: 8,
+  },
+  loadingDebug: {
+    color: '#CFC7EE',
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 14,
   },
   loadingHint: {
     color: '#9B8FCC',

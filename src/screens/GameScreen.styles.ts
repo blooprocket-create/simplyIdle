@@ -177,6 +177,16 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingSpinner: {
+    marginBottom: 16,
+  },
+  loadingDebugText: {
+    fontSize: 11,
+    color: '#CDBBFF',
+    lineHeight: 16,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
   characterSlotList: {
     gap: 10,
   },
@@ -5686,9 +5696,14 @@ export const styles = StyleSheet.create({
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     paddingVertical: 64,
+    gap: 6,
   },
   tabLoadingText: {
     color: '#aaa',
     fontSize: 14,
+  },
+  tabLoadingDebug: {
+    color: '#8E95B5',
+    fontSize: 11,
   },
 });

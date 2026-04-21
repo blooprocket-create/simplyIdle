@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TextInput, TextInputProps, View } from 'react-native';
+import { Text, TextInput, TextInputProps, View, ActivityIndicator } from 'react-native';
 import { THEME } from '../../../theme';
 import { socialStyles } from './social.styles';
 import { FeedbackPressable as Pressable } from '../../../components/FeedbackPressable';
@@ -119,6 +119,7 @@ export function SocialAsyncState({
   if (variant === 'inline') {
     return (
       <View style={styles.asyncInlineContainer}>
+        {!!isLoading && <ActivityIndicator size="small" color="#7EC8FF" />}
         <Text style={styles.asyncInlineTitle}>{title}</Text>
         <Text style={error ? styles.errorText : styles.metaText}>{subtitle}</Text>
         {!!isLoading && (
@@ -138,6 +139,7 @@ export function SocialAsyncState({
 
   return (
     <SocialCard styles={styles} title={title}>
+      {!!isLoading && <ActivityIndicator size="small" color="#7EC8FF" />}
       <Text style={error ? styles.errorText : styles.metaText}>{subtitle}</Text>
       {!!isLoading && (
         <View style={styles.skeletonStack}>
