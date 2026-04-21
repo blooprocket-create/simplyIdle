@@ -1077,6 +1077,9 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                 (() => {
                   const animUri = getHeroAnimationUri(portraitModalHero.id);
                   const source = getHeroPortraitSource(portraitModalHero.id);
+                  const uniqueRank = codexUniqueRankByHeroId[portraitModalHero.id] ?? 0;
+                  const canClaimRelicArchiveVip =
+                    uniqueRank > 0 && !codexVipClaimedUniqueIds.includes(portraitModalHero.id);
                   const tierLabel =
                     portraitModalHero.tier >= 5
                       ? '⭐ Transcendent'
@@ -1118,6 +1121,14 @@ export const AchievementsTabContent = React.memo<AchievementsTabContentProps>(
                       <Text style={styles.portraitModalWeaponSkill}>
                         {getHeroUniqueSkillDescription(portraitModalHero.id, 1)}
                       </Text>
+                      {canClaimRelicArchiveVip ? (
+                        <Pressable
+                          style={[styles.codexActionSecondary, styles.portraitModalActionButton]}
+                          onPress={() => claimCodexUniqueVip(portraitModalHero.id)}
+                        >
+                          <Text style={styles.codexActionSecondaryText}>Archive Relic +10 VIP</Text>
+                        </Pressable>
+                      ) : null}
                     </>
                   );
                 })()}

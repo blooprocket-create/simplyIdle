@@ -1321,6 +1321,11 @@ export const styles = StyleSheet.create({
     lineHeight: 16,
     marginBottom: 16,
   },
+  portraitModalActionButton: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   portraitModalCloseBtn: {
     backgroundColor: '#1C2E42',
     borderRadius: 8,

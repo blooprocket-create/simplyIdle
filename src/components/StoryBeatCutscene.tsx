@@ -42,23 +42,33 @@ export default function StoryBeatCutscene({
     setPlaybackIssueBeatId(beatId);
   }, [beatId]);
 
-  const startWebPlayback = useCallback(async () => {
-    const video = webVideoRef.current;
-    if (!video) return;
-
+  const prepareWebVideo = useCallback((video: HTMLVideoElement) => {
     video.currentTime = 0;
     video.loop = false;
     video.muted = false;
     video.volume = 1;
+  }, []);
+
+  const playWebVideo = useCallback(
+    async (video: HTMLVideoElement) => {
+      prepareWebVideo(video);
+      await video.play();
+    },
+    [prepareWebVideo],
+  );
+
+  const startWebPlayback = useCallback(async () => {
+    const video = webVideoRef.current;
+    if (!video) return;
 
     try {
-      await video.play();
+      await playWebVideo(video);
       setPlaybackBlockedBeatId(null);
       setPlaybackIssueBeatId(null);
     } catch {
       setPlaybackBlockedBeatId(beatId);
     }
-  }, [beatId]);
+  }, [beatId, playWebVideo]);
 
   const handleNativePlaybackStatus = useCallback(
     (status: AVPlaybackStatus) => {
@@ -95,16 +105,29 @@ export default function StoryBeatCutscene({
       // Non-critical; continue playback even if audio mode configuration fails.
     });
 
-    if (Platform.OS !== 'web') return;
-
     const video = webVideoRef.current;
+    if (Platform.OS !== 'web' || !video) return;
+
+    let cancelled = false;
+
+    void playWebVideo(video)
+      .then(() => {
+        if (cancelled) return;
+        setPlaybackBlockedBeatId(null);
+        setPlaybackIssueBeatId(null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPlaybackBlockedBeatId(beatId);
+      });
 
     return () => {
+      cancelled = true;
       if (!video) return;
       video.pause();
       video.currentTime = 0;
     };
-  }, [startWebPlayback, videoUri, visible]);
+  }, [beatId, playWebVideo, videoUri, visible]);
 
   if (!visible) return null;
 
@@ -119,15 +142,11 @@ export default function StoryBeatCutscene({
                   key={videoUri}
                   ref={webVideoRef}
                   src={videoUri}
-                  autoPlay
                   loop={false}
                   muted={false}
                   preload="auto"
                   playsInline
                   onEnded={handlePlaybackComplete}
-                  onCanPlay={() => {
-                    void startWebPlayback();
-                  }}
                   onPlaying={() => {
                     setPlaybackBlockedBeatId(null);
                     setPlaybackIssueBeatId(null);
