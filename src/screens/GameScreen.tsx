@@ -919,6 +919,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     useGameOverlays({
       storyEntries,
       seenStoryBeatIds: state.seenStoryBeatIds,
+      storySequenceEnabled: hydrated && state.characterCreated,
       rewardPopup,
       activeModal,
       allowInitialStoryModal: tutorialStep === 'welcome',

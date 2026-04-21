@@ -19,6 +19,7 @@ interface RewardPopup {
 interface UseGameOverlaysArgs {
   storyEntries: StoryEntry[];
   seenStoryBeatIds: string[];
+  storySequenceEnabled: boolean;
   rewardPopup: RewardPopup | null;
   activeModal: string | null;
   allowInitialStoryModal: boolean;
@@ -30,6 +31,7 @@ interface UseGameOverlaysArgs {
 export function useGameOverlays({
   storyEntries,
   seenStoryBeatIds,
+  storySequenceEnabled,
   rewardPopup,
   activeModal,
   allowInitialStoryModal,
@@ -101,6 +103,11 @@ export function useGameOverlays({
   const prevBeatIndexRef = useRef<number | null>(null);
 
   useEffect(() => {
+    if (!storySequenceEnabled) {
+      prevBeatIndexRef.current = null;
+      return;
+    }
+
     if (prevBeatIndexRef.current === null) {
       // First run — seed baseline index.
       // For brand-new runs, allow the currently unlocked opening story beat
@@ -122,7 +129,7 @@ export function useGameOverlays({
     }
 
     prevBeatIndexRef.current = highestUnlockedIndex;
-  }, [allowInitialStoryModal, highestUnlockedIndex, queueStorySequence, storyEntries]);
+  }, [allowInitialStoryModal, highestUnlockedIndex, queueStorySequence, storyEntries, storySequenceEnabled]);
 
   const isOfflineRewardPopup = useMemo(() => {
     if (!rewardPopup) return false;
