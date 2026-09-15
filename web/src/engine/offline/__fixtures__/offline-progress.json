@@ -1,0 +1,243 @@
+{
+  "note": "Shipped offline progress, measured. Owned by __tests__/offlineProgressFixture.test.ts.",
+  "generatedFrom": "src/useGameState.ts simulateOfflineProgress via APPLY_OFFLINE_PROGRESS",
+  "nowMs": 1768478400000,
+  "tickMs": 100,
+  "scenarios": [
+    {
+      "name": "fresh",
+      "note": "A new account: two level-one commons at wave three.",
+      "inputs": {
+        "wave": 3,
+        "finalDps": 55.268276049771956,
+        "teamHp": 324,
+        "teamMaxHp": 324,
+        "monsterMaxHp": 37,
+        "incomingDmgPerSec": 0.3552776201627239,
+        "goldPerKill": 12,
+        "expPerKill": 8,
+        "msToFirstKill": 900
+      },
+      "windows": [
+        {
+          "elapsedMs": 60000,
+          "kills": 17,
+          "waveDelta": 17,
+          "endWave": 20,
+          "gold": 984,
+          "exp": 442,
+          "endHeroLevel": 18,
+          "endPlayerLevel": 7
+        },
+        {
+          "elapsedMs": 600000,
+          "kills": 37,
+          "waveDelta": 37,
+          "endWave": 40,
+          "gold": 25237,
+          "exp": 5125,
+          "endHeroLevel": 38,
+          "endPlayerLevel": 17
+        },
+        {
+          "elapsedMs": 3600000,
+          "kills": 54,
+          "waveDelta": 38,
+          "endWave": 41,
+          "gold": 302509,
+          "exp": 38334,
+          "endHeroLevel": 55,
+          "endPlayerLevel": 30
+        }
+      ]
+    },
+    {
+      "name": "climbing",
+      "note": "A mid-game team comfortably below their ceiling, so the window is a pure climb.",
+      "inputs": {
+        "wave": 40,
+        "finalDps": 1274.4721562683496,
+        "teamHp": 6153,
+        "teamMaxHp": 6153,
+        "monsterMaxHp": 12460,
+        "incomingDmgPerSec": 4.461993593431544,
+        "goldPerKill": 20812,
+        "expPerKill": 2498,
+        "msToFirstKill": 10600
+      },
+      "windows": [
+        {
+          "elapsedMs": 60000,
+          "kills": 10,
+          "waveDelta": 10,
+          "endWave": 50,
+          "gold": 76795,
+          "exp": 11819,
+          "endHeroLevel": 150,
+          "endPlayerLevel": 60
+        },
+        {
+          "elapsedMs": 600000,
+          "kills": 34,
+          "waveDelta": 34,
+          "endWave": 74,
+          "gold": 2086140,
+          "exp": 303556,
+          "endHeroLevel": 174,
+          "endPlayerLevel": 60
+        },
+        {
+          "elapsedMs": 3600000,
+          "kills": 98,
+          "waveDelta": 42,
+          "endWave": 82,
+          "gold": 22807704,
+          "exp": 3444955,
+          "endHeroLevel": 238,
+          "endPlayerLevel": 64
+        }
+      ]
+    },
+    {
+      "name": "post-rebirth",
+      "note": "A maxed roster parked back at wave one — the state every prestige produces.",
+      "inputs": {
+        "wave": 1,
+        "finalDps": 10855992.872580381,
+        "teamHp": 82453,
+        "teamMaxHp": 82453,
+        "monsterMaxHp": 30,
+        "incomingDmgPerSec": null,
+        "goldPerKill": 538,
+        "expPerKill": 7,
+        "msToFirstKill": 100
+      },
+      "windows": [
+        {
+          "elapsedMs": 60000,
+          "kills": 126,
+          "waveDelta": 126,
+          "endWave": 127,
+          "gold": 90968219992,
+          "exp": 119224975,
+          "endHeroLevel": 999,
+          "endPlayerLevel": 500
+        },
+        {
+          "elapsedMs": 600000,
+          "kills": 157,
+          "waveDelta": 124,
+          "endWave": 125,
+          "gold": 1310666449358,
+          "exp": 1233640041,
+          "endHeroLevel": 999,
+          "endPlayerLevel": 500
+        },
+        {
+          "elapsedMs": 3600000,
+          "kills": 821,
+          "waveDelta": 120,
+          "endWave": 121,
+          "gold": 7387383093061,
+          "exp": 8092585326,
+          "endHeroLevel": 999,
+          "endPlayerLevel": 500
+        }
+      ]
+    },
+    {
+      "name": "at-ceiling",
+      "note": "A team already at the wave they cannot pass. This is the expensive case.",
+      "inputs": {
+        "wave": 121,
+        "finalDps": 10855992.872580381,
+        "teamHp": 82371,
+        "teamMaxHp": 82371,
+        "monsterMaxHp": 24170407,
+        "incomingDmgPerSec": 7655.892456293368,
+        "goldPerKill": 3624793617,
+        "expPerKill": 5331052,
+        "msToFirstKill": 2300
+      },
+      "windows": [
+        {
+          "elapsedMs": 60000,
+          "kills": 15,
+          "waveDelta": 1,
+          "endWave": 122,
+          "gold": 86339603125,
+          "exp": 119157752,
+          "endHeroLevel": 999,
+          "endPlayerLevel": 500
+        },
+        {
+          "elapsedMs": 600000,
+          "kills": 154,
+          "waveDelta": 2,
+          "endWave": 123,
+          "gold": 885760563712,
+          "exp": 1222412866,
+          "endHeroLevel": 999,
+          "endPlayerLevel": 500
+        },
+        {
+          "elapsedMs": 3600000,
+          "kills": 966,
+          "waveDelta": 7,
+          "endWave": 128,
+          "gold": 5929284133335,
+          "exp": 8010314082,
+          "endHeroLevel": 999,
+          "endPlayerLevel": 500
+        }
+      ]
+    },
+    {
+      "name": "loses-ground",
+      "note": "Just below the ceiling, over windows short enough to see a single death.",
+      "inputs": {
+        "wave": 118,
+        "finalDps": 10855992.872580381,
+        "teamHp": 82371,
+        "teamMaxHp": 82371,
+        "monsterMaxHp": 17204018,
+        "incomingDmgPerSec": 5885.249245728919,
+        "goldPerKill": 2446632443,
+        "expPerKill": 3830676,
+        "msToFirstKill": 1600
+      },
+      "windows": [
+        {
+          "elapsedMs": 30000,
+          "kills": 21,
+          "waveDelta": -17,
+          "endWave": 101,
+          "gold": 34241771963,
+          "exp": 51119921,
+          "endHeroLevel": 999,
+          "endPlayerLevel": 500
+        },
+        {
+          "elapsedMs": 60000,
+          "kills": 49,
+          "waveDelta": -8,
+          "endWave": 110,
+          "gold": 67271755713,
+          "exp": 102526783,
+          "endHeroLevel": 999,
+          "endPlayerLevel": 500
+        },
+        {
+          "elapsedMs": 300000,
+          "kills": 245,
+          "waveDelta": -2,
+          "endWave": 116,
+          "gold": 365848242163,
+          "exp": 549441647,
+          "endHeroLevel": 999,
+          "endPlayerLevel": 500
+        }
+      ]
+    }
+  ]
+}
