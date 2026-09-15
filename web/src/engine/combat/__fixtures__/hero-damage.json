@@ -1,0 +1,97 @@
+{
+  "note": "Per-hero damage from the shipped implementation, read out one hero at a time. Owned by __tests__/heroDamageFixture.test.ts.",
+  "generatedFrom": "src/useGameState.ts getDpsBreakdown",
+  "heroes": [
+    {
+      "heroId": "h13",
+      "heroClass": "archer",
+      "tier": 1,
+      "level": 1,
+      "rank": 1,
+      "rarity": "common",
+      "damage": 9.057003372510872
+    },
+    {
+      "heroId": "h63",
+      "heroClass": "archer",
+      "tier": 5,
+      "level": 17,
+      "rank": 3,
+      "rarity": "rare",
+      "damage": 52.56154884664724
+    },
+    {
+      "heroId": "h12",
+      "heroClass": "berserker",
+      "tier": 1,
+      "level": 60,
+      "rank": 5,
+      "rarity": "epic",
+      "damage": 88.56807165723666
+    },
+    {
+      "heroId": "h62",
+      "heroClass": "berserker",
+      "tier": 5,
+      "level": 140,
+      "rank": 6,
+      "rarity": "legendary",
+      "damage": 336.7527092986782
+    },
+    {
+      "heroId": "h14",
+      "heroClass": "mage",
+      "tier": 1,
+      "level": 400,
+      "rank": 9,
+      "rarity": "mythic",
+      "damage": 599.9014887153776
+    },
+    {
+      "heroId": "h64",
+      "heroClass": "mage",
+      "tier": 5,
+      "level": 999,
+      "rank": 10,
+      "rarity": "transcendent",
+      "damage": 2682.4113830667447
+    },
+    {
+      "heroId": "h10",
+      "heroClass": "monk",
+      "tier": 1,
+      "level": 1,
+      "rank": 1,
+      "rarity": "common",
+      "damage": 9.061552887045089
+    },
+    {
+      "heroId": "h65",
+      "heroClass": "monk",
+      "tier": 5,
+      "level": 17,
+      "rank": 3,
+      "rarity": "rare",
+      "damage": 48.59313975638018
+    },
+    {
+      "heroId": "h1",
+      "heroClass": "warrior",
+      "tier": 1,
+      "level": 60,
+      "rank": 5,
+      "rarity": "epic",
+      "damage": 76.30977862554417
+    },
+    {
+      "heroId": "h61",
+      "heroClass": "warrior",
+      "tier": 5,
+      "level": 140,
+      "rank": 6,
+      "rarity": "legendary",
+      "damage": 371.8032568959012
+    }
+  ],
+  "teamTotal": 4275.0199331220665
+}
