@@ -5,6 +5,7 @@ import type { PlayerClass } from '../content/classes';
 import { getIntendedFormationRole, type FormationHero } from '../engine/combat/formation';
 import { createHeroEntity, type HeroEntity } from '../engine/entities/HeroEntity';
 import { heroModelKey } from '../game/models/manifest';
+import { silhouetteFor } from '../game/models/silhouette';
 import type { Cast } from '../game/models/cast';
 
 /**
@@ -49,6 +50,7 @@ export function demoCast(): Cast {
       // screen, which is a second wrong rather than parity.
       role: getIntendedFormationRole(formation),
       modelKey: heroModelKey(hero.uid),
+      silhouette: silhouetteFor(hero.uid, hero.heroClass),
     };
   });
 }

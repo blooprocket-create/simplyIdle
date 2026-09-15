@@ -1,7 +1,6 @@
-import { Color3 } from '@babylonjs/core/Maths/math.color';
-
 import type { Placement } from '../layout/battleLine';
 import type { ModelKey } from '../models/manifest';
+import type { Silhouette } from '../models/silhouette';
 import type { LoadedActor, ModelLoader } from './ModelLoader';
 
 /**
@@ -17,7 +16,7 @@ export interface ActorRequest {
   id: string;
   modelKey: ModelKey;
   name: string;
-  tint?: Color3;
+  silhouette: Silhouette;
 }
 
 export class ActorPool {
@@ -53,7 +52,7 @@ export class ActorPool {
       if (this.actors.has(request.id) || this.pending.has(request.id)) continue;
       this.pending.add(request.id);
       void this.loader
-        .acquire(request.modelKey, request.name, request.tint)
+        .acquire(request.modelKey, request.name, request.silhouette)
         .then(actor => {
           this.pending.delete(request.id);
           // The roster can change while a model is in flight; if this id is

@@ -1,5 +1,6 @@
 import type { FormationRole } from '../../engine/combat/formation';
 import type { ModelKey } from './manifest';
+import type { Silhouette } from './silhouette';
 
 /**
  * Who is on the field, as opposed to what they are doing.
@@ -22,6 +23,8 @@ export interface CastMember {
   role: FormationRole;
   /** What to draw them as. A key the pack may or may not have. */
   modelKey: ModelKey;
+  /** What to draw them as when it does not — their outline, not a capsule. */
+  silhouette: Silhouette;
 }
 
 export type Cast = readonly CastMember[];

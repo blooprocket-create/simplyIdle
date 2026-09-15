@@ -14,7 +14,7 @@ import {
   type QualityTier,
 } from './device/DeviceProfile';
 import { FrameGovernor } from './device/FrameGovernor';
-import { isBossWave } from '../content/monsters';
+import { getMonsterForWave, isBossWave } from '../content/monsters';
 import { CastBars } from './fx/CastBars';
 import { DamageNumbers } from './fx/DamageNumbers';
 import { HealthBars } from './fx/HealthBars';
@@ -22,6 +22,7 @@ import { REACTION_MS, hitFlash, hitRecoil, telegraphPulse } from './fx/reactions
 import { layOutEnemy, layOutHeroes, type Placement } from './layout/battleLine';
 import { EMPTY_CAST, type Cast } from './models/cast';
 import { EMPTY_MANIFEST, monsterModelKey, type ModelManifest } from './models/manifest';
+import { monsterSilhouette } from './models/silhouette';
 import { buildStage, type Stage } from './scene/stage';
 
 /**
@@ -35,12 +36,6 @@ import { buildStage, type Stage } from './scene/stage';
  * takes a snapshot and draws it. It never decides an outcome, and nothing
  * here calls back into the simulation.
  */
-
-const RANK_TINTS: Record<string, Color3> = {
-  front: new Color3(0.44, 0.5, 0.58),
-  mid: new Color3(0.38, 0.46, 0.56),
-  back: new Color3(0.34, 0.42, 0.54),
-};
 
 export interface DioramaOptions {
   manifest?: ModelManifest;
@@ -66,6 +61,7 @@ export class Diorama {
   private cast: Cast = EMPTY_CAST;
   private placements = new Map<string, Placement>();
   private enemyId: string | null = null;
+  private enemyWave = 1;
 
   constructor(canvas: HTMLCanvasElement, options: DioramaOptions = {}) {
     this.engine = new Engine(canvas, true, { preserveDrawingBuffer: false, stencil: false });
@@ -109,6 +105,7 @@ export class Diorama {
     const enemyId = snapshot.enemy?.id ?? null;
     if (enemyId !== this.enemyId) {
       this.enemyId = enemyId;
+      this.enemyWave = snapshot.enemy?.wave ?? this.enemyWave;
       this.syncActors();
     }
 
@@ -196,7 +193,7 @@ export class Diorama {
       id: member.uid,
       modelKey: member.modelKey,
       name: member.uid,
-      tint: RANK_TINTS[member.role],
+      silhouette: member.silhouette,
     }));
     if (this.enemyId) {
       requests.push({
@@ -206,7 +203,10 @@ export class Diorama {
         id: ENEMY_SLOT,
         modelKey: monsterModelKey(this.enemyId),
         name: 'enemy',
-        tint: new Color3(0.62, 0.34, 0.28),
+        // The wave names the monster, and the name says whether it is
+        // crowned, so the enemy's look comes from content rather than from
+        // anything the renderer decides for itself.
+        silhouette: monsterSilhouette(getMonsterForWave(this.enemyWave).name),
       });
     }
     this.actors.sync(requests);

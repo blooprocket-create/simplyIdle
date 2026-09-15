@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Cast, CastMember } from '../models/cast';
+import { CLASS_SILHOUETTE } from '../models/silhouette';
 import { ENEMY_POSITION, RANK_SPACING, RANK_X, layOutEnemy, layOutHeroes } from './battleLine';
 
 const member = (uid: string, role: CastMember['role']): CastMember => ({
@@ -7,6 +8,7 @@ const member = (uid: string, role: CastMember['role']): CastMember => ({
   name: uid,
   role,
   modelKey: `hero/${uid}`,
+  silhouette: CLASS_SILHOUETTE.warrior,
 });
 
 const TEAM: Cast = [

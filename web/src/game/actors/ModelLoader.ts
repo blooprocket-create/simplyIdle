@@ -1,13 +1,13 @@
 import type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup';
 import type { AssetContainer } from '@babylonjs/core/assetContainer';
 import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
-import { Color3 } from '@babylonjs/core/Maths/math.color';
 import type { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import type { Scene } from '@babylonjs/core/scene';
 import '@babylonjs/loaders/glTF/2.0';
 
 import { resolve, type ClipRole, type ModelKey, type ModelManifest } from '../models/manifest';
-import { buildPlaceholder } from './placeholder';
+import type { Silhouette } from '../models/silhouette';
+import { buildSilhouette } from './buildSilhouette';
 
 /**
  * Turns a model key into something on the screen.
@@ -50,17 +50,17 @@ export class ModelLoader {
     this.report.fallbacks.clear();
   }
 
-  async acquire(key: ModelKey, name: string, tint?: Color3): Promise<LoadedActor> {
+  async acquire(key: ModelKey, name: string, silhouette: Silhouette): Promise<LoadedActor> {
     const resolved = resolve(this.manifest, key);
     if (resolved.kind === 'placeholder') {
       this.report.fallbacks.set(key, 'missing');
-      return this.placeholder(name, tint);
+      return this.placeholder(name, silhouette);
     }
 
     const container = await this.container(key, resolved.url);
     if (!container) {
       this.report.fallbacks.set(key, 'failed');
-      return this.placeholder(name, tint);
+      return this.placeholder(name, silhouette);
     }
 
     const entries = container.instantiateModelsToScene(source => `${name}-${source}`, false, {
@@ -91,8 +91,8 @@ export class ModelLoader {
     };
   }
 
-  private placeholder(name: string, tint?: Color3): LoadedActor {
-    const root = buildPlaceholder(this.scene, name, { tint });
+  private placeholder(name: string, silhouette: Silhouette): LoadedActor {
+    const root = buildSilhouette(this.scene, name, silhouette);
     return { root, clips: new Map(), provisional: true, dispose: () => root.dispose(false, true) };
   }
 

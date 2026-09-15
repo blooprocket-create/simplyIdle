@@ -15,7 +15,12 @@ import { createBar, type Bar } from './bars';
 
 const BAR_WIDTH = 0.9;
 const BAR_HEIGHT = 0.1;
-const BAR_ABOVE = 2.15;
+/**
+ * Clear of the tallest thing a hero can be holding. A staff reaches well
+ * above its owner's head, and a swing timer drawn through a weapon is a
+ * timer nobody can read.
+ */
+const BAR_ABOVE = 2.62;
 const FILL = new Color3(0.55, 0.78, 0.95);
 
 export class CastBars {
