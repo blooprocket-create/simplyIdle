@@ -185,6 +185,73 @@ def seg_dist(p, a, b):
     return _seg_dist(Vector(p), Vector(a), Vector(b))
 
 
+def _band(z, pts):
+    """Linear interpolation over (height, value) control points."""
+    if z <= pts[0][0]:
+        return pts[0][1]
+    for (z0, v0), (z1, v1) in zip(pts, pts[1:]):
+        if z0 <= z <= z1:
+            return v0 + (v1 - v0) * ((z - z0) / (z1 - z0))
+    return pts[-1][1]
+
+
+def bulk(obj, widen, deepen, limbs=(), torso_x=0.20, blend=0.14, flatten=None, neck=None):
+    """Reshape a base mesh towards a particular build.
+
+    The CC0 base is deliberately androgynous and lightly built. Kael is a
+    heavy veteran, so the torso broadens and deepens on a height profile, the
+    chest flattens, and each limb thickens radially about its own axis. The
+    torso profile blends out towards the arms so widening the chest does not
+    drag the shoulders apart with it.
+
+    `limbs` is a sequence of (head, tail, factor, radius).
+
+    Returns the torso transform as a callable. The skeleton has to be put
+    through the same reshaping as the mesh, or widening the chest moves the
+    shoulders of the body without moving the bones that skin them. Limb
+    thickening is radial about each axis and leaves that axis fixed, so it
+    does not affect joints and is not part of the returned transform.
+    """
+    def xf(p):
+        p = Vector(p)
+        t = 1.0 if abs(p.x) < torso_x else max(0.0, 1.0 - (abs(p.x) - torso_x) / blend)
+        if t > 0.0:
+            p.x *= 1 + (_band(p.z, widen) - 1) * t
+            p.y *= 1 + (_band(p.z, deepen) - 1) * t
+        if flatten:
+            z0, z1, xr, amount = flatten
+            if z0 < p.z < z1 and abs(p.x) < xr and p.y < -0.05:
+                fz = 1 - abs(p.z - (z0 + z1) / 2) / ((z1 - z0) / 2)
+                fx = 1 - abs(p.x) / xr
+                p.y *= 1 - amount * max(0.0, fz) * max(0.0, fx)
+        if neck:
+            z0, z1, k = neck
+            if z0 < p.z < z1:
+                p.x *= k
+                p.y *= k
+        return p
+
+    for v in obj.data.vertices:
+        v.co = xf(v.co)
+    for v in obj.data.vertices:
+        best = None
+        for head, tail, factor, radius in limbs:
+            a, b = Vector(head), Vector(tail)
+            ab = b - a
+            denom = ab.dot(ab)
+            s = 0.0 if denom < 1e-12 else max(0.0, min(1.0, (v.co - a).dot(ab) / denom))
+            foot = a + ab * s
+            d = (v.co - foot).length
+            if d < radius and (best is None or d < best[0]):
+                best = (d, foot, factor, radius)
+        if best:
+            d, foot, factor, radius = best
+            w = 1 - (d / radius) ** 2
+            v.co = foot + (v.co - foot) * (1 + (factor - 1) * w)
+    obj.data.update()
+    return xf
+
+
 def garment(name, body, keep, material, offset=0.011, thick=0.009):
     """A copy of the body, trimmed to a region and pushed out along normals.
 
