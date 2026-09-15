@@ -3,12 +3,10 @@ name: Game CI
 on:
   pull_request:
     paths-ignore:
-      - 'wiki/**'
       - '*.md'
   push:
     branches: [main]
     paths-ignore:
-      - 'wiki/**'
       - '*.md'
 
 jobs:
