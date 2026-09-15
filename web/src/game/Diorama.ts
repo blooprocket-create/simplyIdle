@@ -1,5 +1,6 @@
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { Color3 } from '@babylonjs/core/Maths/math.color';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Scene } from '@babylonjs/core/scene';
 
 import type { SimulationSnapshot } from '../engine/types';
@@ -7,6 +8,7 @@ import { ActorPool, type ActorRequest } from './actors/ActorPool';
 import { ModelLoader } from './actors/ModelLoader';
 import { detectCapabilities, profileFor, type DeviceProfile } from './device/DeviceProfile';
 import { FrameGovernor } from './device/FrameGovernor';
+import { DamageNumbers } from './fx/DamageNumbers';
 import { layOutEnemy, layOutHeroes, type Placement } from './layout/battleLine';
 import { EMPTY_CAST, type Cast } from './models/cast';
 import { EMPTY_MANIFEST, monsterModelKey, type ModelManifest } from './models/manifest';
@@ -43,6 +45,7 @@ export class Diorama {
   private readonly loader: ModelLoader;
   private readonly actors: ActorPool;
   private readonly governor: FrameGovernor;
+  private readonly damage: DamageNumbers;
   readonly profile: DeviceProfile;
 
   private cast: Cast = EMPTY_CAST;
@@ -60,6 +63,7 @@ export class Diorama {
     this.stage = buildStage(this.scene, this.profile);
     this.loader = new ModelLoader(this.scene, options.manifest ?? EMPTY_MANIFEST);
     this.actors = new ActorPool(this.loader);
+    this.damage = new DamageNumbers(this.scene, this.profile.maxDamageNumbers);
   }
 
   /** Which keys the pack could not supply, for a debug overlay or a report. */
@@ -90,6 +94,12 @@ export class Diorama {
     }
 
     const decision = this.governor.frame(snapshot.elapsedMs);
+
+    // Before the draw decision, not after. A snapshot carries only the hits
+    // from its own step, so a skipped frame would drop those numbers on the
+    // floor — and skipped frames are exactly when the fight is busiest.
+    this.spawnHits(snapshot);
+    this.damage.update(decision.stepMs);
     if (!decision.draw) return;
 
     this.actors.place(this.placements);
@@ -100,6 +110,21 @@ export class Diorama {
       enemy.root.rotation.y = placement.yaw;
     }
     this.scene.render();
+  }
+
+  private spawnHits(snapshot: SimulationSnapshot): void {
+    if (snapshot.hits.length === 0) return;
+    const enemy = layOutEnemy();
+    for (const hit of snapshot.hits) {
+      // Spread along the line the hit came from, so simultaneous swings do
+      // not stack into one unreadable smear.
+      const jitter = (hashUnit(hit.heroUid) - 0.5) * 2;
+      this.damage.spawn(
+        hit.dealt,
+        new Vector3(enemy.x + jitter * 0.35, 1.5 + jitter * 0.25, enemy.z + jitter * 0.9),
+        hit.killed,
+      );
+    }
   }
 
   private syncActors(): void {
@@ -128,6 +153,7 @@ export class Diorama {
   }
 
   dispose(): void {
+    this.damage.dispose();
     this.actors.dispose();
     this.loader.dispose();
     this.stage.dispose();
@@ -138,3 +164,14 @@ export class Diorama {
 
 /** The enemy occupies one slot, whatever is standing in it this wave. */
 export const ENEMY_SLOT = 'enemy';
+
+/**
+ * A stable 0..1 from a uid, so a given hero's numbers always appear in the
+ * same place. Random jitter would make the same swing land somewhere new
+ * every time, which reads as noise rather than as that hero hitting.
+ */
+function hashUnit(uid: string): number {
+  let hash = 0;
+  for (let index = 0; index < uid.length; index += 1) hash = (hash * 31 + uid.charCodeAt(index)) & 0xffff;
+  return hash / 0x10000;
+}
