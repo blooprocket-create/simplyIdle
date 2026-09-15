@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import {
@@ -50,6 +51,78 @@ const DEEP_WAVES = [240, 250, 255, 259];
 
 const SAMPLE_LEVELS = [1, 2, 10, 25, 50, 100, 150, 200];
 
+/**
+ * Full-range coverage, as a digest rather than tens of thousands of rows.
+ *
+ * Sampling twenty-eight waves was enough to catch a balance change to a
+ * *curve*, since these are smooth functions of the wave number. It was not
+ * enough to be called a parity suite over the campaign, and it could not see a
+ * divergence that only appears at depth — which matters now that the rewrite
+ * computes these on `Decimal` and the shipped code on doubles.
+ *
+ * So every wave in each band is enumerated on both sides and hashed. The
+ * explicit rows above stay for debuggability: a digest mismatch says *that*
+ * something diverged, and diffing the sampled rows says *what*.
+ */
+const EXACT_BAND_END = 230;
+/** Just inside where gold — the tightest of the four — stops being finite. */
+const WIDE_BAND_END = 5_400;
+/** Every this many waves is carried explicitly through the wide band. */
+const WIDE_BAND_STRIDE = 50;
+
+function digestOf(lines: readonly string[]): string {
+  return createHash('sha256').update(lines.join('\n')).digest('hex').slice(0, 32);
+}
+
+/** Exact band: the values agree bit for bit, so they are hashed verbatim. */
+function exactDigest(): string {
+  const lines: string[] = [];
+  for (let wave = 1; wave <= EXACT_BAND_END; wave += 1) {
+    lines.push(
+      `${wave}:${getMonsterMaxHp(wave)}:${getMonsterGold(wave)}:${getMonsterExp(wave)}:${getMonsterDamage(wave)}`,
+    );
+  }
+  return digestOf(lines);
+}
+
+/**
+ * Wide band: carried as values, not as a digest.
+ *
+ * A digest of rounded values was tried first and is the wrong instrument here.
+ * Past roughly wave 230 these curves floor a magnitude big enough that the two
+ * implementations differ in the last couple of digits — measured at worst
+ * 2.2e-13 relative — and rounding both to a fixed number of significant digits
+ * turns any value sitting near a rounding boundary into a mismatch even though
+ * the two agree far more closely than the comparison claims to require. At
+ * twelve digits roughly a fifth of values are close enough to a boundary to
+ * flip. A digest cannot express "agrees to within a relative tolerance", so
+ * the wide band carries real values and is compared as a number should be.
+ */
+function wideRows(): WaveRow[] {
+  const rows: WaveRow[] = [];
+  for (let wave = EXACT_BAND_END + WIDE_BAND_STRIDE; wave <= WIDE_BAND_END; wave += WIDE_BAND_STRIDE) {
+    rows.push(row(wave));
+  }
+  return rows;
+}
+
+/** The wave at which each curve stops being a finite double. */
+function finiteLimits(): Record<string, number> {
+  const curves: Record<string, (wave: number) => number> = {
+    hp: getMonsterMaxHp,
+    gold: getMonsterGold,
+    exp: getMonsterExp,
+    damage: getMonsterDamage,
+  };
+  const limits: Record<string, number> = {};
+  for (const [name, curve] of Object.entries(curves)) {
+    let last = 0;
+    for (let wave = 1; wave <= 20_000; wave += 1) if (Number.isFinite(curve(wave))) last = wave;
+    limits[name] = last;
+  }
+  return limits;
+}
+
 interface WaveRow {
   wave: number;
   hp: number;
@@ -67,6 +140,17 @@ interface Fixture {
   waves: WaveRow[];
   deepWaves: WaveRow[];
   levels: { level: number; exp: number }[];
+  fullRange: {
+    exactBandEnd: number;
+    wideBandEnd: number;
+    wideStride: number;
+    /** Every wave 1..exactBandEnd, hashed. Bit-exact on both sides. */
+    exactDigest: string;
+    /** Strided rows through the wide band, compared on relative difference. */
+    wideRows: WaveRow[];
+    /** The wave at which each curve stops being a finite double. */
+    finiteThrough: Record<string, number>;
+  };
 }
 
 function row(wave: number): WaveRow {
@@ -90,11 +174,61 @@ function build(): Fixture {
     waves: SAMPLE_WAVES.map(row),
     deepWaves: DEEP_WAVES.map(row),
     levels: SAMPLE_LEVELS.map(level => ({ level, exp: expForLevel(level) })),
+    fullRange: {
+      exactBandEnd: EXACT_BAND_END,
+      wideBandEnd: WIDE_BAND_END,
+      wideStride: WIDE_BAND_STRIDE,
+      exactDigest: exactDigest(),
+      wideRows: wideRows(),
+      finiteThrough: finiteLimits(),
+    },
   };
 }
 
 describe('wave curve fixture', () => {
   const fixture = build();
+
+  it('covers the whole campaign, not a sample of it', () => {
+    // The digests are only worth anything if the bands they cover are real.
+    expect(fixture.fullRange.exactBandEnd).toBe(EXACT_BAND_END);
+    expect(fixture.fullRange.wideBandEnd).toBe(WIDE_BAND_END);
+    expect(WIDE_BAND_END - EXACT_BAND_END).toBeGreaterThan(5_000);
+    expect(fixture.fullRange.exactDigest).toMatch(/^[0-9a-f]{32}$/);
+    // The wide band reaches past wave five thousand at a fifty wave stride, so
+    // it is a hundred real rows rather than the four it used to be.
+    expect(fixture.fullRange.wideRows.length).toBeGreaterThan(100);
+    expect(fixture.fullRange.wideRows[0].wave).toBe(EXACT_BAND_END + WIDE_BAND_STRIDE);
+    expect(fixture.fullRange.wideRows.at(-1)!.wave).toBeLessThanOrEqual(WIDE_BAND_END);
+  });
+
+  it('digests change when a curve changes', () => {
+    // Otherwise the digest is decoration. A single wave moved by one gold has
+    // to move the hash, which is the property the whole approach rests on.
+    const baseline = exactDigest();
+    const tampered = createHash('sha256')
+      .update(
+        Array.from({ length: EXACT_BAND_END }, (_, index) => {
+          const wave = index + 1;
+          const gold = getMonsterGold(wave) + (wave === 137 ? 1 : 0);
+          return `${wave}:${getMonsterMaxHp(wave)}:${gold}:${getMonsterExp(wave)}:${getMonsterDamage(wave)}`;
+        }).join('\n'),
+      )
+      .digest('hex')
+      .slice(0, 32);
+    expect(tampered).not.toBe(baseline);
+  });
+
+  it('records where each curve stops being a finite double', () => {
+    // The reason the rewrite is on Decimal at all: these curves die long
+    // before MAX_SAVE_WAVE, which is 1,000,000.
+    expect(fixture.fullRange.finiteThrough).toEqual({ hp: 6234, gold: 5402, exp: 6249, damage: 6264 });
+    for (const limit of Object.values(fixture.fullRange.finiteThrough)) {
+      expect(limit).toBeLessThan(10_000);
+    }
+    // And the wide band stops inside the tightest of them, so every value the
+    // digest covers is a number the old implementation can actually produce.
+    expect(WIDE_BAND_END).toBeLessThan(fixture.fullRange.finiteThrough.gold);
+  });
 
   it('every sampled value is an exact integer in the old implementation', () => {
     // Past MAX_SAFE_INTEGER the old curves' own Math.floor stops returning

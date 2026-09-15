@@ -1,3 +1,5 @@
+import Decimal from 'break_eternity.js';
+
 /**
  * Guards ported from the shipped `src/utils.ts`. They exist because an idle
  * game multiplies a dozen unbounded numbers together every tick, and one NaN
@@ -28,4 +30,19 @@ export function safeDivide(numerator: number, denominator: number, fallback = 0)
  */
 export function roundTo4(value: number): number {
   return Math.round(value * 10000) / 10000;
+}
+
+/**
+ * The `Decimal` sibling of `safeMultiplier`.
+ *
+ * Needed because the progression stack is the one place a multiplier can run
+ * out of float range: rebirth legacy is `1.5^prestigeCount`, and `Math.pow`
+ * returns `Infinity` from prestige 1,760 on. Handed that, `safeMultiplier`
+ * does exactly what it was written to do and returns 1 — which silently
+ * deletes every rebirth the player ever did. Keeping the stack on `Decimal`
+ * means the guard never has to fire for range alone.
+ */
+export function safeDecimalMultiplier(value: Decimal, cap?: Decimal): Decimal {
+  if (value.isNan() || value.lt(0)) return new Decimal(1);
+  return cap && value.gt(cap) ? cap : value;
 }

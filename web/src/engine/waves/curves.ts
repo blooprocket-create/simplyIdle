@@ -17,8 +17,8 @@ import { isBossWave } from '../../content/monsters';
  */
 
 const HP_BASE = 30;
-const HP_RATE = 1.12;
-const HP_BOSS_MULT = 5;
+export const HP_RATE = 1.12;
+export const HP_BOSS_MULT = 5;
 
 const GOLD_BASE = 8;
 const GOLD_RATE = 1.14;
@@ -72,9 +72,28 @@ export function getMonsterExp(wave: number): Decimal {
   return isBossWave(wave) ? base.mul(EXP_BOSS_MULT) : base;
 }
 
+/**
+ * Divide by ten the way a double does.
+ *
+ * `Decimal.div` multiplies by the reciprocal, and `n * 0.1` is not `n / 10`:
+ * six tenths comes out as 0.6000000000000001 rather than 0.6. That is one ulp,
+ * and it slipped past the sampled fixture because the damage check allowed a
+ * relative difference of `Number.EPSILON` and the error is fractionally under
+ * it. Enumerating every wave is what caught it.
+ *
+ * So the double's answer is used while the numerator is a safe integer, and
+ * `div` is reached only past the point where there is no double to be faithful
+ * to — the same rule the rebirth multiplier follows.
+ */
+function divideByTen(value: Decimal): Decimal {
+  const asNumber = value.toNumber();
+  if (Number.isSafeInteger(asNumber)) return new Decimal(asNumber / 10);
+  return value.div(10);
+}
+
 /** Enemy damage per second. Divided by ten *after* the floor, as shipped. */
 export function getMonsterDamage(wave: number): Decimal {
-  const base = Decimal.max(DAMAGE_FLOOR, growth(DAMAGE_BASE, DAMAGE_RATE, wave).floor().div(10));
+  const base = Decimal.max(DAMAGE_FLOOR, divideByTen(growth(DAMAGE_BASE, DAMAGE_RATE, wave).floor()));
   return isBossWave(wave) ? base.mul(DAMAGE_BOSS_MULT) : base;
 }
 

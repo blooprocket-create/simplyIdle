@@ -9,6 +9,7 @@ import {
   sumContributions,
   type HeroUnit,
 } from './heroDamage';
+import { ACTIVE_TEAM_SIZE, HERO_LEVEL_CAP, HERO_RANK_CAP, MAX_REBIRTH_STAT_MULT } from '../save/migrate';
 import fixture from './__fixtures__/hero-damage.json';
 
 /**
@@ -105,5 +106,70 @@ describe('splitting the team into entities is lossless', () => {
 
   it('drops to zero for an empty team rather than throwing', () => {
     expect(getTeamBaseDps([])).toBe(0);
+  });
+});
+
+describe('hero damage stays inside float range, which is why it is not Decimal', () => {
+  /*
+   * The progression multipliers are on `Decimal` because rebirth legacy
+   * compounds without a cap and overflows a double at prestige 1,760. A hero's
+   * own damage is a different shape: every input to it is bounded, so it can
+   * stay a `number` and keep full double precision.
+   *
+   * That is an argument, not a measurement, so here is the measurement. If a
+   * future change unbounds any of these inputs, this fails and the decision
+   * gets made again rather than inherited.
+   */
+
+  const RARITIES: Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'godly', 'transcendent'];
+  const CLASSES: PlayerClass[] = ['warrior', 'berserker', 'archer', 'mage', 'monk'];
+  const TIERS: HeroTemplate['tier'][] = [1, 2, 3, 4, 5];
+
+  function strongestPossible(): number {
+    let worst = 0;
+    for (const heroClass of CLASSES) {
+      for (const tier of TIERS) {
+        for (const rarity of RARITIES) {
+          const damage = getHeroContribution({
+            uid: 'max',
+            template: { id: 'max', name: 'max', heroClass, emoji: '', baseTeamBoost: 0, tier },
+            level: HERO_LEVEL_CAP,
+            rank: HERO_RANK_CAP,
+            rarity,
+            rebirthStatMult: MAX_REBIRTH_STAT_MULT,
+          }).damage;
+          worst = Math.max(worst, damage);
+        }
+      }
+    }
+    return worst;
+  }
+
+  it('cannot exceed 2^53 even at every cap at once', () => {
+    const strongest = strongestPossible();
+    expect(strongest).toBeGreaterThan(0);
+    expect(Number.isFinite(strongest)).toBe(true);
+    // Not "under 2^53" by a hair — orders of magnitude under it, so the
+    // headroom survives a balance pass without anyone having to re-check.
+    expect(strongest).toBeLessThan(Number.MAX_SAFE_INTEGER / 1e6);
+  });
+
+  it('a full team of the strongest hero is still nowhere near the ceiling', () => {
+    expect(strongestPossible() * ACTIVE_TEAM_SIZE).toBeLessThan(Number.MAX_SAFE_INTEGER / 1e5);
+  });
+
+  it('depends on bounds the save reader actually enforces', () => {
+    /*
+     * Imported from the reader rather than restated here. An earlier draft
+     * declared its own copies and then asserted they equalled the literals it
+     * had just written — a test that passes for any values at all. These are
+     * the real ones, so unbounding a hero's level or rebirth multiplier in the
+     * reader fails this file and forces the `number` vs `Decimal` decision to
+     * be made again instead of inherited.
+     */
+    expect(HERO_LEVEL_CAP).toBe(999);
+    expect(HERO_RANK_CAP).toBe(10);
+    expect(MAX_REBIRTH_STAT_MULT).toBe(20);
+    expect(ACTIVE_TEAM_SIZE).toBe(6);
   });
 });
