@@ -176,7 +176,17 @@ Content and formulas into `content/` and `engine/`. No UI. Deliverable is a pari
 > **Offline constraint.** `simulateOfflineProgress` steps `advanceCombatStep` up to `OFFLINE_SIM_MAX_ITERATIONS = 300,000` times on resume. An entity sim cannot. `engine/` ships both: the live entity sim and a closed-form estimator, with divergence pinned by test. Evercast's `AwayClock` monotonic high-water mark is worth taking at the same time — SimplyIdle currently has no clock-tamper defence.
 
 ### Phase 2 — The diorama *(~3 weeks)*
-Babylon scene, hero line, enemies, floating damage numbers, hit reactions, cast bars, boss telegraphs. Port `DeviceProfile` and `FrameGovernor` with it. Art starts as primitives — Evercast's companions are *"procedural placeholder art built from primitives at runtime"* with `modelKey` as the seam for a Blender pack later. Do the same; do not block the renderer on modelling 66 heroes.
+Babylon scene, hero line, enemies, floating damage numbers, hit reactions, cast bars, boss telegraphs. Port `DeviceProfile` and `FrameGovernor` with it. Art starts as primitives — Evercast's companions are *"procedural placeholder art built from primitives at runtime"* with `modelKey` as the seam for a Blender pack later. Do the same; do not block the renderer on modelling 65 heroes.
+
+> **Placeholders must be silhouette-matched, not capsules.**
+>
+> Every hero already has authored portrait art: **65 PNGs in `IMG/HeroIcon/`**, mapped 1:1 to hero ids by `src/heroPortraits.ts` (`h1` → `KaelIronheart.png`, and so on), plus a `HeroIcon.psd` source and per-hero `.mp4` clips in `IMG/HeroAnimate/`.
+>
+> Use them as reference. Kael Ironheart is armoured bulk with pauldrons and a kite shield; Lunara Frostweave is a hooded cloak and a staff on a slight frame. A capsule for both throws away identity that is already drawn and paid for, and it is identity the player is supposed to recognise on the battle line at a glance.
+>
+> So a placeholder is a small assembly of primitives whose **outline reads as that hero** at gameplay distance — bulk, stance, headgear and the weapon shape — not a single mesh. That is a constraint on Phase 2's placeholders, not a reason to delay them: it is cheap in primitives and it is what makes the diorama legible before any GLB exists.
+>
+> One caveat for whoever builds them: the portraits are **busts, chest-up**. They are reference for upper body, weapon, headgear and build; legs and full stance have to be extrapolated.
 
 ### Phase 3 — Shell and shelf *(~2 weeks)*
 Port the destination registry, shelf, rail and `SurfaceHost`. File all ~50 surfaces into the four groups. Battle becomes the persistent screen. Port the token sheet and the UI architecture test with it, so the surfaces are built under the constraints rather than retrofitted to them.
@@ -199,7 +209,7 @@ Retire the Expo app. Vercel points at the Vite build. Supabase migration afterwa
 | Inactive accounts lose saves | v2→v3 migration + round-trip tests before cutover |
 | Offline sim can't step an entity model 300k times | Dual-path engine, divergence pinned |
 | Babylon is heavier than the current bundle | `DeviceProfile` tiers and the boot gate exist for exactly this; Evercast ships ~6MB of models behind one |
-| Art becomes the bottleneck | Primitives first, `modelKey` seam, GLBs later |
+| Art becomes the bottleneck | Silhouette-matched primitives first (see Phase 2), `modelKey` seam, GLBs later |
 | Rewrite stalls half-finished | Every phase ends runnable; the Expo app keeps shipping until Phase 5 |
 | The new structure rots the way this one did | Architecture tests from Phase 0, god-file guard included |
 
