@@ -1,0 +1,86 @@
+{
+  "note": "Hero passive dps multipliers from the shipped implementation. Owned by __tests__/heroPassiveFixture.test.ts.",
+  "generatedFrom": "src/useGameState.ts getDpsBreakdown",
+  "rows": [
+    {
+      "scenario": {
+        "name": "empty",
+        "traits": []
+      },
+      "passiveDps": 1
+    },
+    {
+      "scenario": {
+        "name": "one warpath",
+        "traits": [
+          "warpath_instinct"
+        ]
+      },
+      "passiveDps": 1.03
+    },
+    {
+      "scenario": {
+        "name": "three warpath stack",
+        "traits": [
+          "warpath_instinct",
+          "warpath_instinct",
+          "warpath_instinct"
+        ]
+      },
+      "passiveDps": 1.092727
+    },
+    {
+      "scenario": {
+        "name": "six warpath stack",
+        "traits": [
+          "warpath_instinct",
+          "warpath_instinct",
+          "warpath_instinct",
+          "warpath_instinct",
+          "warpath_instinct",
+          "warpath_instinct"
+        ]
+      },
+      "passiveDps": 1.1940522965290001
+    },
+    {
+      "scenario": {
+        "name": "one fortune hunter",
+        "traits": [
+          "fortune_hunter"
+        ]
+      },
+      "passiveDps": 1
+    },
+    {
+      "scenario": {
+        "name": "one sage",
+        "traits": [
+          "sage_instinct"
+        ]
+      },
+      "passiveDps": 1
+    },
+    {
+      "scenario": {
+        "name": "one bulwark",
+        "traits": [
+          "bulwark_instinct"
+        ]
+      },
+      "passiveDps": 1
+    },
+    {
+      "scenario": {
+        "name": "one of each",
+        "traits": [
+          "warpath_instinct",
+          "fortune_hunter",
+          "sage_instinct",
+          "bulwark_instinct"
+        ]
+      },
+      "passiveDps": 1.03
+    }
+  ]
+}
