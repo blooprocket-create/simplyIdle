@@ -1,17 +1,36 @@
-import bpy, bmesh, math, os, sys, colorsys
+"""Which surface am I actually looking at.\n\nFlat emission per material, no lighting and no view transform, so\nnothing can be hidden by a reflection or crushed into a neighbour.
+
+Run: python scripts/blender/idpass.py [args]
+"""
+import os
+import runpy
+import sys
 from pathlib import Path
+
+import bpy
+from mathutils import Vector  # noqa: F401  (available to diagnostics)
+
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+HERO = os.environ.get('HERO', 'kael')
 OUT = Path(os.environ.get('HERO_OUT', HERE.parents[1] / '.render'))
 OUT.mkdir(parents=True, exist_ok=True)
-src = (HERE / 'kael.py').read_text()
-exec(compile(src.split("# ── stage")[0], 'kael.py', 'exec'))
 
-# Flat emission per material, so every surface is identifiable by colour and
-# nothing is hidden by lighting, reflection or the view transform.
+_argv = sys.argv
+sys.argv = [f'{HERO}.py', '--build-only']
+try:
+    runpy.run_path(str(HERE / f'{HERO}.py'), run_name='hero')
+except SystemExit:
+    pass
+sys.argv = _argv
+import herolib as H  # noqa: E402
+
+import colorsys
+
 names = sorted({m.name for o in bpy.data.objects if o.type == 'MESH' for m in o.data.materials})
 flat = {}
 for i, nm in enumerate(names):
-    r, g, b = colorsys.hsv_to_rgb(i / len(names), 0.95, 1.0)
+    r, g, b = colorsys.hsv_to_rgb(i / max(len(names), 1), 0.95, 1.0)
     m = bpy.data.materials.new('id_' + nm)
     m.node_tree.nodes.clear()
     e = m.node_tree.nodes.new('ShaderNodeEmission')
@@ -25,16 +44,10 @@ for o in bpy.data.objects:
         for i, m in enumerate(o.data.materials):
             o.data.materials[i] = flat[m.name]
 
+shot = H.stage(fast=True, floor=False)
 sc = bpy.context.scene
-sc.render.engine = 'CYCLES'; sc.cycles.device = 'CPU'; sc.cycles.samples = 1
-sc.view_settings.view_transform = 'Standard'; sc.view_settings.look = 'None'
-w = bpy.data.worlds.new('w'); sc.world = w
-w.node_tree.nodes['Background'].inputs['Color'].default_value = (0, 0, 0, 1)
-bpy.ops.object.empty_add(location=(0, 0, 1.58)); aim = bpy.context.object
-bpy.ops.object.camera_add(location=(0.70, -1.85, 1.72)); cam = bpy.context.object; sc.camera = cam
-c = cam.constraints.new('TRACK_TO'); c.target = aim
-c.track_axis = 'TRACK_NEGATIVE_Z'; c.up_axis = 'UP_Y'
-cam.data.lens = 80
-sc.render.resolution_x = 560; sc.render.resolution_y = 620
-sc.render.filepath = str(OUT / 'kael-id.png')
-bpy.ops.render.render(write_still=True)
+sc.cycles.samples = 1
+sc.view_settings.view_transform = 'Standard'
+sc.view_settings.look = 'None'
+sc.world.node_tree.nodes['Background'].inputs['Color'].default_value = (0, 0, 0, 1)
+shot(OUT / f'{HERO}-id.png', (0.70, -1.85, 1.72), 80, 560, 620, at=(0, 0, 1.58))

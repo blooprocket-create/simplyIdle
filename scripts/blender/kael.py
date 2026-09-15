@@ -1,308 +1,144 @@
-import bpy, bmesh, math, os, sys
-from pathlib import Path
+"""Kael Ironheart: a veteran warrior in weathered plate over a green gambeson.
 
-# Repo-relative, so the pipeline runs from a checkout rather than one
-# machine's scratch directory. HERO_OUT overrides where renders land.
-ROOT = Path(__file__).resolve().parents[2]
-OUT = Path(os.environ.get('HERO_OUT', ROOT / '.render'))
-OUT.mkdir(parents=True, exist_ok=True)
+Run headless:
+    python scripts/blender/kael.py                 # full body + bust
+    python scripts/blender/kael.py --fast          # 24 samples, for iterating
+    python scripts/blender/kael.py --fast --head   # head only, seconds per look
+    python scripts/blender/kael.py --pose          # IK test pose, proves the rig
+    python scripts/blender/kael.py --export        # also write the GLB
 
-bpy.ops.wm.read_factory_settings(use_empty=True)
-R = math.radians
+Renders land in `.render/`, or wherever HERO_OUT points.
+"""
+import sys
+
+import bpy
+
+from mathutils import Euler, Vector
+
+import herolib as H
+from herolib import R
+
 FAST = '--fast' in sys.argv
+H.reset()
+
+bpy.ops.object.empty_add(location=(0, 0, 0))
+TEXSPACE = bpy.context.object
+TEXSPACE.name = 'texspace'
 
 # ── materials ─────────────────────────────────────────────────────────────
 # The portrait is dark and desaturated: weathered brown-grey everywhere, with
-# the green gambeson the only saturated thing in frame.
+# the green gambeson the only saturated thing in frame. Plate in it is dull
+# and pitted, closer to wrought iron than to polished steel.
+def _worn(*a, **k):
+    return H.worn(*a, texspace=TEXSPACE, **k)
 
-bpy.ops.object.empty_add(location=(0, 0, 0))
-ORIGIN = bpy.context.object; ORIGIN.name = 'texspace'
+SKIN  = H.plain('skin', (0.292, 0.162, 0.114), 0.54)
+GREEN = _worn('green', (0.030, 0.070, 0.028), (0.058, 0.110, 0.043), (0.74, 0.93), 0.0, 60.0, 0.15)
+LEATH = _worn('leather', (0.052, 0.030, 0.017), (0.088, 0.055, 0.030), (0.55, 0.85), 0.0, 44.0, 0.20)
+DARKL = _worn('darkleather', (0.017, 0.013, 0.010), (0.038, 0.027, 0.019), (0.55, 0.85), 0.0, 48.0, 0.20)
+STEEL = _worn('steel', (0.168, 0.162, 0.156), (0.112, 0.076, 0.048), (0.36, 0.82), 0.50, 38.0, 0.36)
+WOOD  = _worn('wood', (0.058, 0.033, 0.017), (0.098, 0.060, 0.030), (0.62, 0.86), 0.0, 14.0, 0.35)
+HAIR  = H.plain('hair', (0.026, 0.021, 0.017), 0.92)
+DARK  = H.plain('dark', (0.014, 0.013, 0.012), 0.85)
 
-def plain(name, rgb, rough=0.6, metal=0.0):
-    m = bpy.data.materials.new(name)
-    b = m.node_tree.nodes['Principled BSDF']
-    b.inputs['Base Color'].default_value = (*rgb, 1)
-    b.inputs['Roughness'].default_value = rough
-    b.inputs['Metallic'].default_value = metal
-    return m
+# The head occupies x 0.375..0.640 of the 1024px painting and rows
+# 0.078..0.462 from the top. Cropped to that, with a little margin, the
+# texture is a few hundred pixels rather than a megabyte of background.
+FACE_CROP = (0.365, 0.650, 0.068, 0.472)
+PORTRAIT = H.crop_image(
+    bpy.data.images.load(str(H.ROOT / 'IMG' / 'HeroIcon' / 'KaelIronheart.png')), *FACE_CROP)
+FACE = H.painted('face', PORTRAIT)
 
-def worn(name, base, accent, rough=(0.30, 0.78), metal=1.0, scale=11.0, bump=0.25):
-    """Two-tone noise over base colour, roughness and a shallow bump.
 
-    Plate in the portrait is scuffed and pitted. A flat metallic shader can
-    only ever look like a mirror ball; the scuffs are what read as metal.
+def in_crop(ur, yr):
+    """Re-express a region of the painting in the cropped image."""
+    u0, u1, y0, y1 = FACE_CROP
+    return ((ur[0] - u0) / (u1 - u0), (ur[1] - u0) / (u1 - u0)), \
+           ((yr[0] - y0) / (y1 - y0), (yr[1] - y0) / (y1 - y0))
 
-    The noise is anchored to one shared empty so it measures in world metres
-    for every part. Left in each object's own space it is a different size on
-    every mesh, and a large smooth one like the cuirass can land wholly on
-    the rust side of the ramp and come out looking like bare skin.
-    """
-    m = bpy.data.materials.new(name)
-    nt = m.node_tree; b = nt.nodes['Principled BSDF']
-    co = nt.nodes.new('ShaderNodeTexCoord'); co.object = ORIGIN
-    n = nt.nodes.new('ShaderNodeTexNoise')
-    nt.links.new(co.outputs['Object'], n.inputs['Vector'])
-    n.inputs['Scale'].default_value = scale
-    n.inputs['Detail'].default_value = 8.0
-    n.inputs['Roughness'].default_value = 0.65
-    ramp = nt.nodes.new('ShaderNodeValToRGB')
-    ramp.color_ramp.elements[0].position = 0.36
-    ramp.color_ramp.elements[0].color = (*base, 1)
-    ramp.color_ramp.elements[1].position = 0.64
-    ramp.color_ramp.elements[1].color = (*accent, 1)
-    nt.links.new(n.outputs['Fac'], ramp.inputs['Fac'])
-    nt.links.new(ramp.outputs['Color'], b.inputs['Base Color'])
-    mr = nt.nodes.new('ShaderNodeMapRange')
-    mr.inputs['From Min'].default_value = 0.28
-    mr.inputs['From Max'].default_value = 0.72
-    mr.inputs['To Min'].default_value = rough[0]
-    mr.inputs['To Max'].default_value = rough[1]
-    nt.links.new(n.outputs['Fac'], mr.inputs['Value'])
-    nt.links.new(mr.outputs['Result'], b.inputs['Roughness'])
-    b.inputs['Metallic'].default_value = metal
-    if bump:
-        bp = nt.nodes.new('ShaderNodeBump')
-        bp.inputs['Strength'].default_value = bump
-        nt.links.new(n.outputs['Fac'], bp.inputs['Height'])
-        nt.links.new(bp.outputs['Normal'], b.inputs['Normal'])
-    return m
-
-SKIN  = plain('skin',   (0.292, 0.162, 0.114), 0.54)
-GREEN = worn('green',   (0.032, 0.076, 0.030), (0.062, 0.118, 0.046), (0.74, 0.93), 0.0, 60.0, 0.15)
-LEATH = worn('leather', (0.044, 0.026, 0.015), (0.078, 0.048, 0.026), (0.55, 0.85), 0.0, 44.0, 0.20)
-DARKL = worn('darkleather', (0.017, 0.013, 0.010), (0.038, 0.027, 0.019), (0.55, 0.85), 0.0, 48.0, 0.20)
-STEEL = worn('steel',   (0.270, 0.284, 0.312), (0.196, 0.166, 0.134), (0.30, 0.68), 0.58, 38.0, 0.30)
-WOOD  = worn('wood',    (0.058, 0.033, 0.017), (0.098, 0.060, 0.030), (0.62, 0.86), 0.0, 14.0, 0.35)
-HAIR  = plain('hair',   (0.026, 0.021, 0.017), 0.92)
-GREY  = plain('greyhair', (0.172, 0.163, 0.155), 0.94)
-BEARD = plain('beard',  (0.072, 0.064, 0.058), 0.94)
-DARK  = plain('dark',   (0.014, 0.013, 0.012), 0.85)
-EYE   = plain('eye',    (0.040, 0.055, 0.058), 0.28)
-
-PORTRAIT = str(ROOT / 'IMG' / 'HeroIcon' / 'KaelIronheart.png')
-
-def facefit(xr, zr, ur, yr):
-    """Solve the projection mapping from measured ranges.
-
-    Given how far the head reaches in metres and where the face sits in the
-    painting, this is the scale and offset that line them up. `yr` is in
-    image rows from the top, which is how a painting is measured and the
-    opposite of how a texture is sampled.
-    """
-    vr = (1 - yr[1], 1 - yr[0])
-    sx = (ur[1] - ur[0]) / (xr[1] - xr[0])
-    sz = (vr[1] - vr[0]) / (zr[1] - zr[0])
-    return (sx, sz), (ur[0] - xr[0] * sx, vr[0] - zr[0] * sz)
-
-def projected(name, image, ref, scale, loc, emit=0.22):
-    """The painted portrait, front-projected onto head geometry.
-
-    Stacked ellipsoids get to a passable cartoon and no further; the scar,
-    the eyes, the weathering and the salt-and-pepper beard are all in the
-    artwork already. The geometry supplies silhouette and lighting, the
-    painting supplies the face. Coordinates come from one shared reference
-    empty rather than each mesh's own object space, or every piece of the
-    head gets its own copy of the whole painting.
-    """
-    m = bpy.data.materials.new(name)
-    nt = m.node_tree; b = nt.nodes['Principled BSDF']
-    b.inputs['Roughness'].default_value = 0.62
-    co = nt.nodes.new('ShaderNodeTexCoord')
-    co.object = ref
-    sep = nt.nodes.new('ShaderNodeSeparateXYZ')
-    com = nt.nodes.new('ShaderNodeCombineXYZ')
-    mp = nt.nodes.new('ShaderNodeMapping')
-    tex = nt.nodes.new('ShaderNodeTexImage')
-    tex.image = image
-    tex.extension = 'EXTEND'
-    nt.links.new(co.outputs['Object'], sep.inputs['Vector'])
-    nt.links.new(sep.outputs['X'], com.inputs['X'])
-    nt.links.new(sep.outputs['Z'], com.inputs['Y'])
-    nt.links.new(com.outputs['Vector'], mp.inputs['Vector'])
-    mp.inputs['Scale'].default_value = (scale[0], scale[1], 1)
-    mp.inputs['Location'].default_value = (loc[0], loc[1], 0)
-    nt.links.new(mp.outputs['Vector'], tex.inputs['Vector'])
-    nt.links.new(tex.outputs['Color'], b.inputs['Base Color'])
-    if emit:
-        # The painting carries its own light. A little self-emission keeps
-        # the painted detail from being crushed by the scene's key.
-        nt.links.new(tex.outputs['Color'], b.inputs['Emission Color'])
-        b.inputs['Emission Strength'].default_value = emit
-    return m
-
-def smooth(o, auto=None):
-    bpy.ops.object.select_all(action='DESELECT')
-    o.select_set(True)
-    bpy.context.view_layer.objects.active = o
-    if auto is None:
-        bpy.ops.object.shade_smooth()
-    else:
-        try:
-            bpy.ops.object.shade_auto_smooth(angle=R(auto))
-        except Exception:
-            bpy.ops.object.shade_smooth()
-    return o
-
-# ── every layer is a shell grown on the shared skeleton ───────────────────
-# Boxes parked next to a limb never stop reading as boxes parked next to a
-# limb. Growing each layer over the same joints at a larger radius is what
-# makes a pauldron wrap a shoulder and a boot swallow an ankle.
-def skinned(name, joints, bones, material, sub=2):
-    me = bpy.data.meshes.new(name)
-    ob = bpy.data.objects.new(name, me)
-    bpy.context.collection.objects.link(ob)
-    bm = bmesh.new()
-    order = list(joints.keys())
-    verts = {n: bm.verts.new(joints[n][0]) for n in order}
-    bm.verts.ensure_lookup_table()
-    for a, b in bones:
-        bm.edges.new((verts[a], verts[b]))
-    bm.to_mesh(me); bm.free()
-    ob.modifiers.new('skin', 'SKIN')
-    me.skin_vertices[0].data[0].use_root = True
-    for i, n in enumerate(order):
-        r = joints[n][1]
-        rx, ry = (r, r) if isinstance(r, (int, float)) else r
-        me.skin_vertices[0].data[i].radius = (rx, ry)
-    s = ob.modifiers.new('sub', 'SUBSURF'); s.levels = sub; s.render_levels = sub
-    me.materials.append(material)
-    return smooth(ob)
-
-def chain(name, pts, material, sub=2):
-    """Shorthand for a shell along one run of joints."""
-    j = {f'{name}{i}': (p, r) for i, (p, r) in enumerate(pts)}
-    b = [(f'{name}{i}', f'{name}{i+1}') for i in range(len(pts) - 1)]
-    return skinned(name, j, b, material, sub)
-
-def solid(name, kind, loc, scale, material, rot=(0, 0, 0), bevel=0.008, sub=2, auto=None):
-    if kind == 'cube':
-        bpy.ops.mesh.primitive_cube_add(size=1, location=loc)
-    elif kind == 'cone':
-        bpy.ops.mesh.primitive_cone_add(radius1=0.5, radius2=0.0, depth=1, vertices=20, location=loc)
-    else:
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.5, location=loc, segments=28, ring_count=18)
-    o = bpy.context.object; o.name = name; o.scale = scale; o.rotation_euler = rot
-    if kind == 'cube' and bevel:
-        b = o.modifiers.new('b', 'BEVEL'); b.width = bevel; b.segments = 3
-    if sub:
-        s = o.modifiers.new('s', 'SUBSURF'); s.levels = sub; s.render_levels = sub
-    o.data.materials.append(material)
-    return smooth(o, auto)
-
-def plate(name, w, h, thick, wrap, loc, rot, material, taper=0.0, cuts=14, bevel=0.004):
-    """A curved shell: a flat slab subdivided, then bent around its own Z.
-
-    Used for lame edges and flat props only. The bend axis is local Z, so a
-    rotation of +-90 about Y turns the wrap axis to point along an arm.
-    """
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0))
-    o = bpy.context.object; o.name = name
-    o.scale = (w, thick, h)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.mesh.subdivide(number_cuts=cuts)
-    bpy.ops.object.mode_set(mode='OBJECT')
-    if taper:
-        t = o.modifiers.new('taper', 'SIMPLE_DEFORM')
-        t.deform_method = 'TAPER'; t.factor = taper; t.deform_axis = 'Z'
-    if wrap:
-        d = o.modifiers.new('bend', 'SIMPLE_DEFORM')
-        d.deform_method = 'BEND'; d.angle = R(wrap); d.deform_axis = 'Z'
-    bv = o.modifiers.new('bev', 'BEVEL'); bv.width = bevel; bv.segments = 2
-    o.location = loc; o.rotation_euler = rot
-    o.data.materials.append(material)
-    return smooth(o, 38)
-
-def slab(name, outline, thick, material, loc=(0, 0, 0), rot=(0, 0, 0),
-         scale=1.0, bevel=0.006, bend=0.0, cuts=0):
-    """A flat prop built from its own silhouette.
-
-    A kite shield is a kite; four plank-shaped cubes in a row are a crate.
-    The outline is given in XZ and extruded along Y.
-    """
-    me = bpy.data.meshes.new(name)
-    ob = bpy.data.objects.new(name, me)
-    bpy.context.collection.objects.link(ob)
-    bm = bmesh.new()
-    bm.faces.new([bm.verts.new((x * scale, 0.0, z * scale)) for x, z in outline])
-    bm.to_mesh(me); bm.free()
-    if cuts:
-        bpy.ops.object.select_all(action='DESELECT')
-        ob.select_set(True)
-        bpy.context.view_layer.objects.active = ob
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.select_all(action='SELECT')
-        bpy.ops.mesh.subdivide(number_cuts=cuts)
-        bpy.ops.object.mode_set(mode='OBJECT')
-    s = ob.modifiers.new('sol', 'SOLIDIFY'); s.thickness = thick; s.offset = 0
-    if bend:
-        d = ob.modifiers.new('bend', 'SIMPLE_DEFORM')
-        d.deform_method = 'BEND'; d.angle = R(bend); d.deform_axis = 'Z'
-    b = ob.modifiers.new('bev', 'BEVEL'); b.width = bevel; b.segments = 3
-    ob.location = loc; ob.rotation_euler = rot
-    me.materials.append(material)
-    return smooth(ob, 40)
-
-def cone_shell(name, r_bottom, r_top, depth, loc, material, thick=0.014,
-               rot=(0, 0, 0), squash=(1, 1, 1)):
-    """An open cone, for armour that slopes.
-
-    Tapering a bent plate varies how far it wraps, not its radius, so it
-    makes a bucket rather than a yoke. A cone is a cone.
-    """
-    bpy.ops.mesh.primitive_cone_add(radius1=r_bottom, radius2=r_top, depth=depth,
-                                    vertices=32, end_fill_type='NOTHING', location=loc)
-    o = bpy.context.object; o.name = name
-    o.rotation_euler = rot; o.scale = squash
-    s = o.modifiers.new('sol', 'SOLIDIFY'); s.thickness = thick; s.offset = 0
-    o.data.materials.append(material)
-    return smooth(o, 40)
-
-def ring(name, loc, major, minor, material, rot=(0, 0, 0), squash=(1, 1, 1)):
-    """A band around a limb or a waist.
-
-    A torus already lies perpendicular to its own axis, so a belt or a lame
-    edge needs no reasoning about which way a bend modifier curls — which is
-    what put the last pass's lames out in the air beside the shoulders.
-    """
-    bpy.ops.mesh.primitive_torus_add(location=loc, major_radius=major, minor_radius=minor,
-                                     major_segments=32, minor_segments=12)
-    o = bpy.context.object; o.name = name
-    o.rotation_euler = rot; o.scale = squash
-    o.data.materials.append(material)
-    return smooth(o)
-
-_riv = [0]
-def rivet(loc, r=0.010):
-    _riv[0] += 1
-    return solid(f'rivet{_riv[0]}', 'sphere', loc, (r * 2, r * 2, r * 2), STEEL, sub=1)
-
-# ── body: 1.85m, heavy-set, thick-necked and broad, as the portrait is ────
+# ── skeleton ──────────────────────────────────────────────────────────────
+# One set of joint positions drives both the mesh shells and the bones, so a
+# pauldron grown over the shoulder joint is skinned to the bone that shares
+# it. L is the character's left, which is screen right with the camera in
+# front — the side the portrait carries the shield on.
+HZ = 1.672
+SIDES = ((1, 'L'), (-1, 'R'))
+PELVIS, WAIST, CHEST, CLAV, NECK = 0.94, 1.11, 1.34, 1.474, 1.548
 SHO, ELB, WRI = 0.192, 0.290, 0.318
+
+
+def sho(s): return (s * SHO, 0.0, 1.456)
+def elb(s): return (s * ELB, 0.0, 1.190)
+def wri(s): return (s * WRI, -0.030, 0.955)
+def fist(s): return (s * WRI, -0.052, 0.832)
+def hip(s): return (s * 0.102, 0.0, 0.900)
+def kne(s): return (s * 0.122, 0.0, 0.510)
+def ank(s): return (s * 0.122, 0.0, 0.100)
+def toe(s): return (s * 0.122, -0.135, 0.042)
+
+
+DEFORM = {
+    'root':  ((0, 0, 0), (0, 0, 0.22), None),
+    'hips':  ((0, 0, PELVIS), (0, 0, WAIST), 'root'),
+    'spine': ((0, 0, WAIST), (0, 0, CHEST), 'hips'),
+    'chest': ((0, 0, CHEST), (0, 0, CLAV), 'spine'),
+    'neck':  ((0, 0, CLAV), (0, 0, NECK), 'chest'),
+    'head':  ((0, 0, NECK), (0, 0, 1.86), 'neck'),
+}
+for _s, _t in SIDES:
+    DEFORM[f'shoulder.{_t}'] = ((0, 0, CLAV), sho(_s), 'chest')
+    DEFORM[f'upper_arm.{_t}'] = (sho(_s), elb(_s), f'shoulder.{_t}')
+    DEFORM[f'forearm.{_t}'] = (elb(_s), wri(_s), f'upper_arm.{_t}')
+    DEFORM[f'hand.{_t}'] = (wri(_s), fist(_s), f'forearm.{_t}')
+    DEFORM[f'thigh.{_t}'] = (hip(_s), kne(_s), 'hips')
+    DEFORM[f'shin.{_t}'] = (kne(_s), ank(_s), f'thigh.{_t}')
+    DEFORM[f'foot.{_t}'] = (ank(_s), toe(_s), f'shin.{_t}')
+
+# What an animator grabs. Poles decide which way an elbow or a knee breaks;
+# without them a two-bone chain is free to flip through itself.
+CONTROLS, IK = {}, []
+for _s, _t in SIDES:
+    CONTROLS[f'foot_ik.{_t}'] = (ank(_s), (_s * 0.122, -0.14, 0.100))
+    CONTROLS[f'knee_pole.{_t}'] = ((_s * 0.122, -0.50, 0.560), (_s * 0.122, -0.60, 0.560))
+    CONTROLS[f'hand_ik.{_t}'] = (wri(_s), (_s * WRI, -0.16, 0.955))
+    CONTROLS[f'elbow_pole.{_t}'] = ((_s * ELB, 0.50, 1.190), (_s * ELB, 0.60, 1.190))
+    IK.append((f'shin.{_t}', f'foot_ik.{_t}', f'knee_pole.{_t}', 2, -90))
+    IK.append((f'forearm.{_t}', f'hand_ik.{_t}', f'elbow_pole.{_t}', 2, 90))
+
+# ── body ──────────────────────────────────────────────────────────────────
+PARTS = []
+
+
+def part(obj, bones):
+    PARTS.append((obj, bones))
+    return obj
+
+
+ALL_BONES = [b for b in DEFORM if b != 'root']
 BODY_J = {
-    'pelvis': ((0, 0, 0.94), (0.118, 0.098)),
-    'waist':  ((0, 0, 1.11), (0.115, 0.094)),
-    'chest':  ((0, 0, 1.34), (0.162, 0.118)),
-    'clav':   ((0, 0, 1.474), (0.104, 0.090)),
-    'neck':   ((0, 0, 1.548), (0.064, 0.060)),
+    'pelvis': ((0, 0, PELVIS), (0.118, 0.098)),
+    'waist':  ((0, 0, WAIST), (0.115, 0.094)),
+    'chest':  ((0, 0, CHEST), (0.162, 0.118)),
+    'clav':   ((0, 0, CLAV), (0.104, 0.090)),
+    'neck':   ((0, 0, NECK), (0.064, 0.060)),
 }
 BODY_B = [('pelvis', 'waist'), ('waist', 'chest'), ('chest', 'clav'), ('clav', 'neck')]
-for s, t in ((-1, 'L'), (1, 'R')):
-    BODY_J[f'sho{t}'] = ((s * SHO, 0, 1.456), (0.080, 0.080))
-    BODY_J[f'elb{t}'] = ((s * ELB, 0, 1.190), (0.058, 0.058))
-    BODY_J[f'wri{t}'] = ((s * WRI, -0.030, 0.955), (0.042, 0.042))
-    BODY_J[f'hip{t}'] = ((s * 0.102, 0, 0.900), (0.094, 0.094))
-    BODY_J[f'kne{t}'] = ((s * 0.122, 0, 0.510), (0.068, 0.068))
-    BODY_J[f'ank{t}'] = ((s * 0.122, 0, 0.100), (0.050, 0.050))
+for s, t in SIDES:
+    BODY_J[f'sho{t}'] = (sho(s), (0.080, 0.080))
+    BODY_J[f'elb{t}'] = (elb(s), (0.058, 0.058))
+    BODY_J[f'wri{t}'] = (wri(s), (0.042, 0.042))
+    BODY_J[f'hip{t}'] = (hip(s), (0.094, 0.094))
+    BODY_J[f'kne{t}'] = (kne(s), (0.068, 0.068))
+    BODY_J[f'ank{t}'] = (ank(s), (0.050, 0.050))
     BODY_B += [('clav', f'sho{t}'), (f'sho{t}', f'elb{t}'), (f'elb{t}', f'wri{t}'),
                ('pelvis', f'hip{t}'), (f'hip{t}', f'kne{t}'), (f'kne{t}', f'ank{t}')]
-skinned('body', BODY_J, BODY_B, SKIN)
+part(H.skinned('body', BODY_J, BODY_B, SKIN), ALL_BONES)
 
-for s, t in ((-1, 'L'), (1, 'R')):
-    chain(f'hand{t}', [((s * WRI, -0.036, 0.930), 0.046),
-                       ((s * WRI, -0.062, 0.878), 0.052),
-                       ((s * WRI, -0.052, 0.832), 0.044)], SKIN)
+# Gloved fists. Bare hands read as pale lumps against everything else here.
+for s, t in SIDES:
+    part(H.chain(f'hand{t}', [((s * WRI, -0.036, 0.930), 0.044),
+                              ((s * WRI, -0.062, 0.878), 0.050),
+                              ((s * WRI, -0.052, 0.834), 0.042)], DARKL), f'hand.{t}')
 
 # ── cloth ─────────────────────────────────────────────────────────────────
 GAMB_J = {
@@ -312,173 +148,194 @@ GAMB_J = {
     'g_clav':  ((0, 0, 1.506), (0.152, 0.130)),
 }
 GAMB_B = [('g_hem', 'g_waist'), ('g_waist', 'g_chest'), ('g_chest', 'g_clav')]
-for s, t in ((-1, 'L'), (1, 'R')):
-    GAMB_J[f'g_sho{t}'] = ((s * SHO, 0, 1.470), (0.110, 0.110))
+for s, t in SIDES:
+    GAMB_J[f'g_sho{t}'] = ((s * SHO, 0, 1.478), (0.126, 0.124))
     GAMB_J[f'g_elb{t}'] = ((s * ELB, 0, 1.205), (0.074, 0.074))
     GAMB_B += [('g_clav', f'g_sho{t}'), (f'g_sho{t}', f'g_elb{t}')]
-skinned('gambeson', GAMB_J, GAMB_B, GREEN)
+part(H.skinned('gambeson', GAMB_J, GAMB_B, GREEN),
+     ['chest', 'spine', 'hips', 'neck'] + [f'{b}.{t}' for _, t in SIDES
+                                           for b in ('shoulder', 'upper_arm')])
 
-# Skirt hanging from the belt, and trousers under it.
-chain('skirt', [((0, 0, 1.012), (0.168, 0.140)), ((0, 0, 0.896), (0.192, 0.158))], GREEN)
+part(H.chain('skirt', [((0, 0, 1.020), (0.176, 0.150)),
+                       ((0, 0, 0.930), (0.204, 0.172)),
+                       ((0, 0, 0.872), (0.196, 0.166))], GREEN),
+     ['hips', 'thigh.L', 'thigh.R'])
+
 TROU_J = {'t_pelvis': ((0, 0, 0.90), (0.130, 0.110))}
 TROU_B = []
-for s, t in ((-1, 'L'), (1, 'R')):
+for s, t in SIDES:
     TROU_J[f't_hip{t}'] = ((s * 0.102, 0, 0.855), (0.112, 0.112))
     TROU_J[f't_kne{t}'] = ((s * 0.122, 0, 0.520), (0.090, 0.090))
     TROU_J[f't_ank{t}'] = ((s * 0.122, 0, 0.230), (0.074, 0.074))
     TROU_B += [('t_pelvis', f't_hip{t}'), (f't_hip{t}', f't_kne{t}'), (f't_kne{t}', f't_ank{t}')]
-skinned('trousers', TROU_J, TROU_B, LEATH)
+part(H.skinned('trousers', TROU_J, TROU_B, LEATH),
+     ['hips'] + [f'{b}.{t}' for _, t in SIDES for b in ('thigh', 'shin')])
 
-# Boots grown over the ankle rather than parked beside it.
-for s, t in ((-1, 'L'), (1, 'R')):
-    chain(f'boot{t}', [((s * 0.122, 0.005, 0.300), (0.092, 0.092)),
-                       ((s * 0.122, 0.000, 0.075), (0.082, 0.086)),
-                       ((s * 0.122, -0.075, 0.048), (0.072, 0.062)),
-                       ((s * 0.122, -0.135, 0.042), (0.058, 0.044))], DARKL)
+for s, t in SIDES:
+    part(H.chain(f'boot{t}', [((s * 0.122, 0.005, 0.300), (0.092, 0.092)),
+                              ((s * 0.122, 0.000, 0.075), (0.082, 0.086)),
+                              ((s * 0.122, -0.075, 0.048), (0.072, 0.062)),
+                              ((s * 0.122, -0.135, 0.042), (0.058, 0.044))], DARKL),
+         [f'shin.{t}', f'foot.{t}'])
 
-# ── plate ────────────────────────────────────────────────────────────────
-# A bent plate of width w through angle t has radius w/t, keeps its front
-# face where it is put, and sweeps backwards in +Y. Those three facts are
-# measured, and every placement below is derived from them instead of
-# guessed — the last pass's cuirass was a 45cm flying saucer.
-def wrapped(name, radius, height, z, y_front, deg, material, cuts=16, thick=0.016,
-            taper=0.0, tilt=0.0):
-    t = R(deg)
-    return plate(name, radius * t, height, thick, deg, (0, y_front + thick / 2, z),
-                 (R(tilt), 0, 0), material, taper=taper, cuts=cuts)
+# ── plate ─────────────────────────────────────────────────────────────────
+part(H.cone_shell('yoke', 0.196, 0.116, 0.118, (0, 0.008, 1.468), STEEL, squash=(1, 0.82, 1)), 'chest')
+part(H.cone_shell('gorget', 0.098, 0.086, 0.062, (0, 0.006, 1.542), STEEL, squash=(1, 0.86, 1)), 'neck')
+part(H.ring('yokerim', (0, 0.008, 1.410), 0.196, 0.013, STEEL, squash=(1, 0.82, 1.3)), 'chest')
 
-# Collar band across the clavicles, and the gorget at the throat.
-cone_shell('yoke', 0.196, 0.116, 0.118, (0, 0.008, 1.468), STEEL, squash=(1, 0.82, 1))
-cone_shell('gorget', 0.098, 0.086, 0.062, (0, 0.006, 1.542), STEEL, squash=(1, 0.86, 1))
-ring('yokerim', (0, 0.008, 1.410), 0.196, 0.013, STEEL, squash=(1, 0.82, 1.3))
-# One pectoral plate lower on his right, as the portrait has, leaving the
+# One big riveted pectoral low on his left, as the portrait has, leaving the
 # centre and his other side in green.
-plate('pectoral', 0.260, 0.215, 0.016, 118, (0.106, -0.152, 1.326), (R(4), 0, R(-6)), STEEL, cuts=12)
-for x, z in ((-0.150, 1.492), (0.152, 1.492), (0.066, 1.258), (0.158, 1.262)):
-    rivet((x, -0.176, z))
+part(H.plate('pectoral', 0.268, 0.250, 0.017, 150, (0.100, -0.140, 1.284),
+             (R(3), 0, R(-6)), STEEL, cuts=14), 'chest')
+part(H.plate('pectoral_lip', 0.250, 0.034, 0.021, 150, (0.100, -0.146, 1.162),
+             (R(10), 0, R(-6)), STEEL, cuts=14), 'chest')
 
-for s, t in ((-1, 'L'), (1, 'R')):
-    # Shoulder shell, flattened rather than spherical, with torus lames
-    # riding around the arm axis to give the overlapping edges.
-    chain(f'pauld{t}', [((s * 0.168, 0.004, 1.488), (0.132, 0.122)),
-                        ((s * 0.226, 0.002, 1.404), (0.128, 0.118)),
-                        ((s * 0.262, 0.000, 1.330), (0.108, 0.100))], STEEL)
-    for maj, mnr, loc in ((0.074, 0.010, (s * 0.234, 0.002, 1.412)),
-                          (0.068, 0.009, (s * 0.266, 0.000, 1.352))):
-        ring(f'lame{t}{loc[2]:.2f}', loc, maj, mnr, STEEL,
-             rot=(0, R(72 * s + 18), 0), squash=(1, 1, 1.22))
-    for i in range(2):
-        rivet((s * (0.222 + i * 0.030), -0.092 - i * 0.004, 1.470 - i * 0.076))
-    # Vambrace: a shell down the forearm, capped by a ring at each end.
-    chain(f'vamb{t}', [((s * (ELB + 0.004), -0.008, 1.146), (0.086, 0.086)),
-                       ((s * WRI, -0.026, 0.978), (0.068, 0.068))], STEEL)
+_riv = 0
+def rivet(loc, bone, r=0.010):
+    global _riv
+    _riv += 1
+    return part(H.solid(f'rivet{_riv}', 'sphere', loc, (r * 2, r * 2, r * 2), STEEL,
+                        sub=0, segs=(10, 6)), bone)
 
-# Straps crossing the chest with the buckle where they meet, and the belt.
-for s in (-1, 1):
-    chain(f'strap{s}', [((s * 0.146, -0.082, 1.448), (0.032, 0.015)),
-                        ((s * 0.066, -0.172, 1.306), (0.030, 0.014)),
-                        ((-s * 0.026, -0.174, 1.150), (0.028, 0.013)),
-                        ((-s * 0.100, -0.126, 1.042), (0.026, 0.013))], LEATH)
-solid('buckle', 'cube', (0, -0.166, 1.186), (0.068, 0.022, 0.068), STEEL, bevel=0.008, sub=1, auto=38)
-solid('bucklein', 'cube', (0, -0.174, 1.186), (0.036, 0.030, 0.036), DARK, bevel=0.003, sub=1, auto=38)
-ring('belt', (0, 0, 1.020), 0.140, 0.030, DARKL, squash=(1, 0.86, 0.62))
-solid('beltbuckle', 'cube', (0, -0.128, 1.020), (0.082, 0.028, 0.064), STEEL, bevel=0.008, sub=1, auto=38)
+
+for x, z in ((-0.150, 1.492), (0.150, 1.492), (0.034, 1.382), (0.166, 1.390),
+             (0.036, 1.196), (0.164, 1.204)):
+    rivet((x, -0.172, z), 'chest')
+
+for s, t in SIDES:
+    # Three lames cascading down the outside of the arm, each flaring a
+    # little wider than the last — the portrait's shoulders are layered, not
+    # a single dome.
+    tilt = H.aim_rot(elb(s), sho(s))
+    for i, (at, rb, rt, dep) in enumerate(((-0.14, 0.168, 0.140, 0.098),
+                                           (0.18, 0.150, 0.132, 0.084),
+                                           (0.45, 0.132, 0.120, 0.074),
+                                           (0.68, 0.112, 0.104, 0.066))):
+        bone = f'shoulder.{t}' if i < 2 else f'upper_arm.{t}'
+        part(H.cone_shell(f'lame{t}{i}', rb, rt, dep, H.along(sho(s), elb(s), at),
+                          STEEL, thick=0.012, rot=tilt, squash=(1, 0.88, 1)), bone)
+        p = H.along(sho(s), elb(s), at)
+        rivet((p[0] + s * 0.052, -0.108, p[2] - 0.026), bone, 0.009)
+    # Vambrace down the forearm.
+    part(H.chain(f'vamb{t}', [((s * (ELB + 0.004), -0.008, 1.146), (0.086, 0.086)),
+                              ((s * WRI, -0.026, 0.978), (0.068, 0.068))], STEEL),
+         f'forearm.{t}')
+    part(H.ring(f'vambrim{t}', (s * (ELB + 0.004), -0.008, 1.150), 0.072, 0.011, STEEL,
+                rot=H.aim_rot(wri(s), elb(s))), f'forearm.{t}')
+
+# Two broad leather straps crossing the chest, with the square buckle where
+# they meet. Flat bands, not piping: the skin radii are per-axis.
+for s, t in SIDES:
+    part(H.chain(f'strap{t}', [((s * 0.158, -0.070, 1.436), (0.046, 0.015)),
+                               ((s * 0.082, -0.172, 1.268), (0.044, 0.014)),
+                               ((-s * 0.020, -0.174, 1.118), (0.042, 0.013)),
+                               ((-s * 0.108, -0.122, 1.026), (0.040, 0.013))], LEATH),
+         ['chest', 'spine'])
+part(H.solid('buckle', 'cube', (0, -0.168, 1.152), (0.076, 0.022, 0.076), STEEL,
+             bevel=0.008, sub=1, auto=38), 'spine')
+part(H.solid('bucklein', 'cube', (0, -0.176, 1.152), (0.040, 0.030, 0.040), DARK,
+             bevel=0.003, sub=1, auto=38), 'spine')
+part(H.ring('belt', (0, 0, 1.020), 0.142, 0.032, DARKL, squash=(1, 0.86, 0.62)), 'hips')
+part(H.solid('beltbuckle', 'cube', (0, -0.130, 1.020), (0.086, 0.028, 0.068), STEEL,
+             bevel=0.008, sub=1, auto=38), 'hips')
 
 # ── head ──────────────────────────────────────────────────────────────────
-# Stacked spheres cannot make a face, and the last pass proved it: cheek
-# spheres read as googly eyes and a slab brow read as a plank. Everything
-# here is either part of the skull volume or a mass of hair grown on joints.
-HZ = 1.672
-bpy.ops.object.empty_add(location=(0, 0.012, HZ))
-HEADREF = bpy.context.object; HEADREF.name = 'headref'
-_img = bpy.data.images.load(PORTRAIT)
-# Head reaches 0.105 either side and from 0.160 below the centre to 0.200
-# above it. In the 1024px painting the head spans x 0.378..0.638 and, in rows
-# from the top, 0.090..0.470. The one pairing gives the other.
-_s, _l = facefit((-0.119, 0.119), (-0.158, 0.202), (0.375, 0.640), (0.078, 0.462))
-FACE = projected('face', _img, HEADREF, _s, _l)
-
-# One connected head, so the projection has no seam to split across, running
-# down into the neck so the chin is not left floating above the gorget.
-chain('head', [((0, 0.016, HZ + 0.110), (0.092, 0.100)),
-               ((0, 0.012, HZ + 0.032), (0.115, 0.125)),
-               ((0, -0.008, HZ - 0.037), (0.111, 0.121)),
-               ((0, -0.024, HZ - 0.104), (0.083, 0.098)),
-               ((0, -0.006, HZ - 0.158), (0.052, 0.062))], FACE, sub=3)
+# Measured off the 1024px painting: the head spans x 0.375..0.640 and, in
+# rows from the top, 0.078..0.462. The mesh reaches 0.119 either side and
+# from 0.158 below its centre to 0.202 above. The pairing gives the mapping.
+FACE_FIT = H.facefit((-0.119, 0.119), (-0.158, 0.202), *in_crop((0.375, 0.640), (0.078, 0.462)))
+HEAD = part(H.chain('head', [((0, 0.016, HZ + 0.110), (0.092, 0.100)),
+                             ((0, 0.012, HZ + 0.032), (0.115, 0.125)),
+                             ((0, -0.008, HZ - 0.037), (0.111, 0.121)),
+                             ((0, -0.024, HZ - 0.104), (0.083, 0.098)),
+                             ((0, -0.006, HZ - 0.158), (0.052, 0.062))], FACE, sub=3), 'head')
 # Hair only where a front projection has nothing to say: behind the skull.
-chain('hair', [((0, 0.070, HZ + 0.082), (0.044, 0.034)),
-               ((0, 0.116, HZ + 0.026), (0.046, 0.038)),
-               ((0, 0.118, HZ - 0.036), (0.040, 0.034))], HAIR)
+for s, t in SIDES:
+    part(H.chain(f'temple{t}', [((s * 0.074, -0.052, HZ + 0.074), (0.020, 0.020)),
+                                ((s * 0.090, 0.006, HZ + 0.050), (0.026, 0.026)),
+                                ((s * 0.096, 0.062, HZ - 0.006), (0.028, 0.028)),
+                                ((s * 0.088, 0.104, HZ - 0.060), (0.024, 0.024))], HAIR), 'head')
+part(H.chain('hair', [((0, 0.070, HZ + 0.082), (0.044, 0.034)),
+                      ((0, 0.116, HZ + 0.026), (0.046, 0.038)),
+                      ((0, 0.118, HZ - 0.036), (0.040, 0.034))], HAIR), 'head')
 
-# ── kite shield, tucked against the forearm the portrait carries it on ────
+# ── kite shield, on the arm the portrait carries it ───────────────────────
 KITE = [(-0.215, 0.330), (0.215, 0.330), (0.232, 0.170), (0.215, -0.030),
         (0.140, -0.220), (0.000, -0.372), (-0.140, -0.220), (-0.215, -0.030),
         (-0.232, 0.170)]
-SX, SY, SZ = 0.328, -0.118, 1.132
+SX, SY, SZ = 0.336, -0.126, 1.186
 SROT = (R(4), R(17), 0)
-slab('shieldrim', KITE, 0.034, STEEL, (SX, SY, SZ), SROT, scale=0.86, bend=24, cuts=3)
-slab('shieldface', KITE, 0.030, WOOD, (SX - 0.006, SY - 0.026, SZ), SROT, scale=0.77, bend=24, cuts=3)
-for i, xx in enumerate((-0.092, 0.000, 0.092)):
-    solid(f'seam{i}', 'cube', (SX + xx * 0.96, SY - 0.050, SZ + 0.040), (0.010, 0.026, 0.380),
-          DARK, rot=SROT, bevel=0.002, sub=1, auto=40)
-solid('boss', 'sphere', (SX + 0.018, SY - 0.066, SZ + 0.020), (0.114, 0.096, 0.114), STEEL)
-solid('bossrim', 'sphere', (SX + 0.018, SY - 0.052, SZ + 0.020), (0.150, 0.048, 0.150), STEEL)
-for zz in (0.254, -0.128):
-    for xx in (-0.152, -0.050, 0.050, 0.152):
-        rivet((SX + xx, SY - 0.032 - abs(xx) * 0.12, SZ + zz), 0.008)
+
+
+def on_shield(lx, lz, ly=0.0):
+    """A point on the shield's face, in the shield's own frame."""
+    v = Vector((lx, ly, lz))
+    v.rotate(Euler(SROT, 'XYZ'))
+    return (SX + v.x, SY + v.y, SZ + v.z)
+part(H.slab('shieldrim', KITE, 0.036, STEEL, (SX, SY, SZ), SROT, scale=0.94, bend=24, cuts=3),
+     'forearm.L')
+part(H.slab('shieldface', KITE, 0.032, WOOD, (SX - 0.007, SY - 0.028, SZ), SROT,
+            scale=0.87, bend=24, cuts=3), 'forearm.L')
+for i, xx in enumerate((-0.104, 0.000, 0.104)):
+    part(H.solid(f'seam{i}', 'cube', on_shield(xx, 0.040, -0.050),
+                 (0.008, 0.022, 0.420), DARK, rot=SROT, bevel=0.002, sub=1, auto=40), 'forearm.L')
+part(H.solid('boss', 'sphere', on_shield(0.020, 0.010, -0.070), (0.126, 0.108, 0.126), STEEL),
+     'forearm.L')
+part(H.solid('bossrim', 'sphere', on_shield(0.020, 0.010, -0.054), (0.168, 0.052, 0.168), STEEL),
+     'forearm.L')
+for zz, half in ((0.276, 0.168), (-0.130, 0.150)):
+    for xx in (-half, -half / 3, half / 3, half):
+        rivet(on_shield(xx, zz, -0.030), 'forearm.L', 0.009)
 
 # ── sword ─────────────────────────────────────────────────────────────────
 BLADE = [(-0.040, -0.380), (0.040, -0.380), (0.033, 0.230), (0.000, 0.400), (-0.033, 0.230)]
 GX, GY = -WRI, -0.060
-solid('grip', 'cube', (GX, GY, 0.878), (0.034, 0.038, 0.190), DARKL, bevel=0.012, auto=45)
-solid('pommel', 'sphere', (GX, GY, 0.772), (0.072, 0.072, 0.058), STEEL)
-solid('guard', 'cube', (GX, GY, 0.986), (0.256, 0.046, 0.030), STEEL, bevel=0.012, auto=40)
-slab('blade', BLADE, 0.015, STEEL, (GX, GY, 1.392), (0, 0, 0), bevel=0.005, cuts=2)
+part(H.solid('grip', 'cube', (GX, GY, 0.878), (0.034, 0.038, 0.190), DARKL, bevel=0.012, auto=45), 'hand.R')
+part(H.solid('pommel', 'sphere', (GX, GY, 0.772), (0.072, 0.072, 0.058), STEEL), 'hand.R')
+part(H.solid('guard', 'cube', (GX, GY, 0.986), (0.256, 0.046, 0.030), STEEL, bevel=0.012, auto=40), 'hand.R')
+part(H.slab('blade', BLADE, 0.015, STEEL, (GX, GY, 1.392), (0, 0, 0), bevel=0.005, cuts=2), 'hand.R')
 
-# ── stage ─────────────────────────────────────────────────────────────────
-bpy.ops.mesh.primitive_plane_add(size=80, location=(0, 0, 0))
-bpy.context.object.data.materials.append(plain('floor', (0.013, 0.014, 0.016), 0.95))
+# ── freeze, rig, bind ─────────────────────────────────────────────────────
+# Modifiers and transforms are applied before anything reads a vertex: the
+# weighting measures distance to a bone, and a skin-modifier mesh that has
+# not been evaluated is a handful of skeleton vertices, not a surface.
+FROZEN = [(H.freeze(o), b) for o, b in PARTS]
+HEAD = next(o for o, _ in FROZEN if o.name.startswith('head'))
+H.face_uvs(HEAD, (0, 0, HZ), *FACE_FIT)
 
-world = bpy.data.worlds.new('w'); bpy.context.scene.world = world
-world.node_tree.nodes['Background'].inputs['Color'].default_value = (0.024, 0.028, 0.038, 1)
+ARM = H.build_rig('kael', DEFORM, CONTROLS, IK)
+for obj, bones in FROZEN:
+    H.bind(obj, ARM, bones, DEFORM)
 
-# Warm key, dim cool fill, warm rim from behind, all at a fraction of the
-# last pass's energy — the beige render was simply blown out.
-for loc, energy, size, colour in (
-    ((-2.3, -2.5, 3.1), 300, 2.4, (0.92, 0.95, 1.00)),
-    (( 3.0, -1.6, 1.7),  55, 3.6, (0.46, 0.60, 1.00)),
-    (( 1.5,  2.4, 2.5), 320, 1.8, (1.00, 0.56, 0.24)),
-    ((-2.2,  2.2, 2.2), 180, 1.6, (1.00, 0.62, 0.30)),
-):
-    bpy.ops.object.light_add(type='AREA', location=loc)
-    d = bpy.context.object.data
-    d.energy = energy; d.size = size; d.color = colour
-    bpy.context.object.rotation_euler = (
-        math.atan2(math.hypot(loc[0], loc[1]), loc[2]), 0,
-        math.atan2(loc[1], loc[0]) + R(90))
+if '--pose' in sys.argv:
+    # Move only the IK targets. If the limbs follow, the chains and poles
+    # are right; if an elbow inverts, the pole angle is wrong.
+    bpy.context.view_layer.objects.active = ARM
+    bpy.ops.object.mode_set(mode='POSE')
+    ARM.pose.bones['foot_ik.L'].location = (0.00, -0.26, 0.10)
+    ARM.pose.bones['foot_ik.R'].location = (0.00, 0.16, 0.04)
+    ARM.pose.bones['hand_ik.R'].location = (-0.10, -0.30, 0.34)
+    ARM.pose.bones['hand_ik.L'].location = (0.04, -0.14, 0.18)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.context.view_layer.update()
 
-sc = bpy.context.scene
-sc.render.engine = 'CYCLES'; sc.cycles.device = 'CPU'
-sc.cycles.samples = 24 if FAST else 90
-sc.view_settings.look = 'AgX - Base Contrast'
+if '--build-only' in sys.argv:
+    # The diagnostics build the scene and then stage it themselves.
+    print('BUILT')
+    sys.exit(0)
 
-bpy.ops.object.empty_add(location=(0, 0, 1.02))
-aim = bpy.context.object
-bpy.ops.object.camera_add(location=(0, -4, 1))
-cam = bpy.context.object; sc.camera = cam
-c = cam.constraints.new('TRACK_TO'); c.target = aim
-c.track_axis = 'TRACK_NEGATIVE_Z'; c.up_axis = 'UP_Y'
+if '--export' in sys.argv:
+    hero = H.join([o for o, _ in FROZEN], 'kael')
+    H.decimate(hero, 0.30)
+    print('GLB:', H.export_glb(H.OUT / 'kael.glb', hero, ARM))
 
-def shot(path, loc, lens, w, hgt, at=(0, 0, 1.02)):
-    aim.location = at
-    cam.location = loc; cam.data.lens = lens
-    sc.render.resolution_x = w; sc.render.resolution_y = hgt
-    sc.render.filepath = path
-    bpy.ops.render.render(write_still=True)
-
+shot = H.stage(fast=FAST)
 if '--head' in sys.argv:
-    shot(str(OUT / 'kael-head.png'), (0.34, -1.05, 1.80), 85, 460, 520, at=(0, -0.02, 1.68))
+    shot(H.OUT / 'kael-head.png', (0.34, -1.05, 1.80), 85, 460, 520, at=(0, -0.02, 1.68))
+elif '--pose' in sys.argv:
+    shot(H.OUT / 'kael-pose.png', (1.55, -4.20, 1.40), 62, 520, 780)
 else:
-    shot(str(OUT / 'kael-full.png'), (1.55, -4.20, 1.40), 62, 520, 780)
-    shot(str(OUT / 'kael-bust.png'), (0.70, -1.85, 1.72), 80, 560, 620, at=(0, 0, 1.58))
+    shot(H.OUT / 'kael-full.png', (1.55, -4.20, 1.40), 62, 520, 780)
+    shot(H.OUT / 'kael-bust.png', (0.70, -1.85, 1.72), 80, 560, 620, at=(0, 0, 1.58))
+
 print('DONE')

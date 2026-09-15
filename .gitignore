@@ -48,3 +48,4 @@ firestore.rules
 
 # Headless Blender renders
 .render/
+__pycache__/

@@ -1,38 +1,93 @@
 # Hero model pipeline
 
-Builds a hero as a Blender scene and renders it, with no GUI and no artist in
-the loop. Everything here runs headless from a checkout.
+Builds a hero as a Blender scene, rigs it, renders it and exports a GLB —
+headless, from a checkout, with no GUI and no artist in the loop.
 
 ```
-pip install bpy            # Blender as a Python module
-python scripts/blender/kael.py            # full body + bust
-python scripts/blender/kael.py --fast     # 24 samples, for iterating
-python scripts/blender/kael.py --fast --head   # head only, seconds per look
+pip install bpy                                   # Blender as a Python module
+python scripts/blender/kael.py                    # full body + bust
+python scripts/blender/kael.py --fast             # 24 samples, for iterating
+python scripts/blender/kael.py --fast --head      # head only, seconds per look
+python scripts/blender/kael.py --pose             # IK test pose
+python scripts/blender/kael.py --export           # also write the GLB
 ```
 
-Renders land in `.render/` at the repo root, or wherever `HERO_OUT` points.
+Output lands in `.render/`, or wherever `HERO_OUT` points. `herolib.py` holds
+the shared vocabulary; `kael.py` is the first hero written against it.
 
 ## How a hero is put together
 
 Every clothing and armour layer is a *shell grown over the same joint
-skeleton as the body*, at a larger radius. A box parked next to a limb never
-stops reading as a box parked next to a limb; a shell over the shoulder
-joints wraps the shoulder. `chain()` and `skinned()` do this.
+skeleton as the body*, at a larger radius. A box parked beside a limb never
+stops reading as a box parked beside a limb; a shell over the shoulder joints
+wraps the shoulder.
 
-Flat props — a shield, a blade — are built from their own silhouette by
-`slab()`. Curved armour uses `plate()` (a subdivided slab bent around its
-local Z), `cone_shell()` for anything that slopes, and `ring()` for bands
-around a limb or waist.
+| helper | for |
+| --- | --- |
+| `chain()` / `skinned()` | body, cloth, and armour that hugs |
+| `slab()` | flat props built from their own silhouette — a kite shield, a blade |
+| `plate()` / `wrapped()` | curved armour: a subdivided slab bent around its local Z |
+| `cone_shell()` | armour that slopes — a shoulder yoke, a pauldron lame |
+| `ring()` | bands around a limb or a waist |
 
-The face is the painted portrait, front-projected onto the head geometry by
-`projected()`. Stacked ellipsoids reach a passable cartoon and stop; the
-scar, the eyes and the weathering are all in the artwork already. Geometry
-supplies silhouette and lighting, the painting supplies the face.
+Measured, not guessed: a plate of width `w` bent through angle `t` has radius
+`w/t`, keeps its front face where it is put, and sweeps backwards in +Y.
+
+## The face
+
+Front-projected from the painted portrait, baked into a `face` UV layer.
+Stacked ellipsoids reach a passable cartoon and stop — six attempts proved
+it, the best of them an ape. The scar, the eyes and the weathering are all in
+the artwork already, so the geometry supplies silhouette and lighting and the
+painting supplies the face. Every other hero inherits their own likeness for
+free.
+
+It has to be UVs rather than a world-space projection: a projection slides
+off the face the moment the head is posed, and cannot be exported. The
+texture is cropped to the head, which takes it from ~7.5MB of mostly
+background to ~200KB.
+
+## The rig
+
+One set of joint positions drives both the mesh shells and the bones, so a
+pauldron grown over the shoulder joint skins to the bone that shares it.
+
+- **Deform bones**: `root`, `hips`, `spine`, `chest`, `neck`, `head`, and per
+  side `shoulder`, `upper_arm`, `forearm`, `hand`, `thigh`, `shin`, `foot`.
+  `.L` is the character's left — screen right with the camera in front, the
+  side the portrait carries the shield on.
+- **Controls** (non-deforming): `hand_ik`, `foot_ik`, and the `elbow_pole` /
+  `knee_pole` targets that decide which way a joint breaks. Without poles a
+  two-bone chain is free to flip through itself.
+- **Binding**: rigid to one bone for anything that is rigid — a pauldron, a
+  sword, a boot — and inverse-distance-to-bone-segment for the shells that
+  span joints. Bone-heat weighting gives up on overlapping shells like these;
+  distance weighting never does.
+
+A pauldron's upper lames ride `shoulder` and its lower ones ride `upper_arm`.
+Bound wholly to the arm they swing out like wings the moment an arm lifts.
+
+`--pose` moves only the IK targets. If the limbs follow, the chains and poles
+are right; if an elbow inverts, the pole angle is wrong.
+
+## Export
+
+`--export` joins every shell into one multi-material mesh, decimates to a
+game budget and writes a GLB: ~2.3MB, 9 primitives, 34k vertices, 28 joints,
+all primitives skinned.
+
+glTF carries no constraints, so the IK chains do not travel — they are for
+authoring. The exported skeleton is a plain bone hierarchy, which a runtime
+solver (Babylon's `BoneIKController`) drives through the same bones.
+
+glTF also carries no node graph, so the procedural weathering does not
+export. Each material seeds its Base Color socket with the midpoint of its
+ramp, which makes the GLB a plausible flat version rather than default grey;
+baking the noise to textures is still open.
 
 ## Diagnostics
 
-Renders are a slow way to find out that a mesh is inside another one. These
-answer the question directly:
+A beauty render is a slow way to find out that a mesh is inside another one.
 
 | script | question |
 | --- | --- |
@@ -41,8 +96,9 @@ answer the question directly:
 | `isolate.py steel` | what does one material's geometry look like on its own |
 | `isolate.py not-steel` | what is covering it |
 
-Reach for them before changing a number. Three separate bugs in this file —
-a cuirass hidden 2mm behind the gambeson, shade-smooth silently acting on
-the wrong object, and noise running in per-object space so a large mesh
-landed wholly on the rust side of its ramp — were all invisible in a beauty
-render and obvious in one of these.
+Reach for them before changing a number. Four bugs in this pipeline were
+invisible in a beauty render and obvious in one of these: a cuirass hidden
+2mm behind the gambeson, shade-smooth silently acting on the wrong object,
+noise running in per-object space so a large mesh landed wholly on the rust
+side of its ramp, and shield rivets placed in world coordinates while the
+shield itself was rotated.
