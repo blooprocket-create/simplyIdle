@@ -14,8 +14,8 @@
     "build:ios": "npx eas build --platform ios --profile production",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"web/src/**/*.{ts,tsx}\" \"__tests__/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"web/src/**/*.{ts,tsx}\" \"__tests__/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:coverage": "jest --coverage",
@@ -69,6 +69,12 @@
   "lint-staged": {
     "src/**/*.{ts,tsx}": [
       "eslint --fix",
+      "prettier --write"
+    ],
+    "web/src/**/*.{ts,tsx}": [
+      "prettier --write"
+    ],
+    "__tests__/**/*.ts": [
       "prettier --write"
     ]
   },

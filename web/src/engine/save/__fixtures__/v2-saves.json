@@ -1,0 +1,1690 @@
+{
+  "note": "v2 save payloads and what the shipped reader makes of them. Owned by __tests__/saveMigrationFixture.test.ts.",
+  "generatedFrom": "src/useGameState.ts serialize + sanitizeSaveData",
+  "nowMs": 1768478400000,
+  "heroTemplates": [
+    {
+      "id": "h1",
+      "heroClass": "warrior",
+      "baseTeamBoost": 0.05
+    },
+    {
+      "id": "h2",
+      "heroClass": "warrior",
+      "baseTeamBoost": 0.055
+    },
+    {
+      "id": "h3",
+      "heroClass": "berserker",
+      "baseTeamBoost": 0.06
+    },
+    {
+      "id": "h4",
+      "heroClass": "berserker",
+      "baseTeamBoost": 0.05
+    },
+    {
+      "id": "h5",
+      "heroClass": "archer",
+      "baseTeamBoost": 0.055
+    },
+    {
+      "id": "h6",
+      "heroClass": "archer",
+      "baseTeamBoost": 0.06
+    },
+    {
+      "id": "h7",
+      "heroClass": "mage",
+      "baseTeamBoost": 0.065
+    },
+    {
+      "id": "h8",
+      "heroClass": "mage",
+      "baseTeamBoost": 0.06
+    },
+    {
+      "id": "h9",
+      "heroClass": "monk",
+      "baseTeamBoost": 0.055
+    },
+    {
+      "id": "h10",
+      "heroClass": "monk",
+      "baseTeamBoost": 0.06
+    },
+    {
+      "id": "h11",
+      "heroClass": "warrior",
+      "baseTeamBoost": 0.05
+    },
+    {
+      "id": "h12",
+      "heroClass": "berserker",
+      "baseTeamBoost": 0.065
+    },
+    {
+      "id": "h13",
+      "heroClass": "archer",
+      "baseTeamBoost": 0.055
+    },
+    {
+      "id": "h14",
+      "heroClass": "mage",
+      "baseTeamBoost": 0.07
+    },
+    {
+      "id": "h15",
+      "heroClass": "monk",
+      "baseTeamBoost": 0.06
+    },
+    {
+      "id": "h16",
+      "heroClass": "warrior",
+      "baseTeamBoost": 0.058
+    },
+    {
+      "id": "h17",
+      "heroClass": "warrior",
+      "baseTeamBoost": 0.062
+    },
+    {
+      "id": "h18",
+      "heroClass": "berserker",
+      "baseTeamBoost": 0.068
+    },
+    {
+      "id": "h19",
+      "heroClass": "berserker",
+      "baseTeamBoost": 0.057
+    },
+    {
+      "id": "h20",
+      "heroClass": "archer",
+      "baseTeamBoost": 0.061
+    },
+    {
+      "id": "h21",
+      "heroClass": "archer",
+      "baseTeamBoost": 0.058
+    },
+    {
+      "id": "h22",
+      "heroClass": "mage",
+      "baseTeamBoost": 0.071
+    },
+    {
+      "id": "h23",
+      "heroClass": "mage",
+      "baseTeamBoost": 0.066
+    },
+    {
+      "id": "h24",
+      "heroClass": "monk",
+      "baseTeamBoost": 0.063
+    },
+    {
+      "id": "h25",
+      "heroClass": "monk",
+      "baseTeamBoost": 0.064
+    },
+    {
+      "id": "h26",
+      "heroClass": "warrior",
+      "baseTeamBoost": 0.06
+    },
+    {
+      "id": "h27",
+      "heroClass": "berserker",
+      "baseTeamBoost": 0.067
+    },
+    {
+      "id": "h28",
+      "heroClass": "archer",
+      "baseTeamBoost": 0.06
+    },
+    {
+      "id": "h29",
+      "heroClass": "mage",
+      "baseTeamBoost": 0.065
+    },
+    {
+      "id": "h30",
+      "heroClass": "monk",
+      "baseTeamBoost": 0.062
+    },
+    {
+      "id": "h31",
+      "heroClass": "warrior",
+      "baseTeamBoost": 0.061
+    },
+    {
+      "id": "h32",
+      "heroClass": "warrior",
+      "baseTeamBoost": 0.063
+    },
+    {
+      "id": "h33",
+      "heroClass": "berserker",
+      "baseTeamBoost": 0.069
+    },
+    {
+      "id": "h34",
+      "heroClass": "berserker",
+      "baseTeamBoost": 0.059
+    },
+    {
+      "id": "h35",
+      "heroClass": "archer",
+      "baseTeamBoost": 0.062
+    },
+    {
+      "id": "h36",
+      "heroClass": "archer",
+      "baseTeamBoost": 0.06
+    },
+    {
+      "id": "h37",
+      "heroClass": "mage",
+      "baseTeamBoost": 0.072
+    },
+    {
+      "id": "h38",
+      "heroClass": "mage",
+      "baseTeamBoost": 0.067
+    },
+    {
+      "id": "h39",
+      "heroClass": "monk",
+      "baseTeamBoost": 0.065
+    },
+    {
+      "id": "h40",
+      "heroClass": "monk",
+      "baseTeamBoost": 0.064
+    },
+    {
+      "id": "h41",
+      "heroClass": "warrior",
+      "baseTeamBoost": 0.073
+    },
+    {
+      "id": "h42",
+      "heroClass": "warrior",
+      "baseTeamBoost": 0.068
+    },
+    {
+      "id": "h43",
+      "heroClass": "berserker",
+      "baseTeamBoost": 0.075
+    },
+    {
+      "id": "h44",
+      "heroClass": "berserker",
+      "baseTeamBoost": 0.07
+    },
+    {
+      "id": "h45",
+      "heroClass": "archer",
+      "baseTeamBoost": 0.074
+    },
+    {
+      "id": "h46",
+      "heroClass": "archer",
+      "baseTeamBoost": 0.069
+    },
+    {
+      "id": "h47",
+      "heroClass": "mage",
+      "baseTeamBoost": 0.078
+    },
+    {
+      "id": "h48",
+      "heroClass": "mage",
+      "baseTeamBoost": 0.076
+    },
+    {
+      "id": "h49",
+      "heroClass": "monk",
+      "baseTeamBoost": 0.072
+    },
+    {
+      "id": "h50",
+      "heroClass": "monk",
+      "baseTeamBoost": 0.071
+    },
+    {
+      "id": "h51",
+      "heroClass": "warrior",
+      "baseTeamBoost": 0.085
+    },
+    {
+      "id": "h52",
+      "heroClass": "warrior",
+      "baseTeamBoost": 0.082
+    },
+    {
+      "id": "h53",
+      "heroClass": "berserker",
+      "baseTeamBoost": 0.088
+    },
+    {
+      "id": "h54",
+      "heroClass": "berserker",
+      "baseTeamBoost": 0.084
+    },
+    {
+      "id": "h55",
+      "heroClass": "archer",
+      "baseTeamBoost": 0.087
+    },
+    {
+      "id": "h56",
+      "heroClass": "archer",
+      "baseTeamBoost": 0.083
+    },
+    {
+      "id": "h57",
+      "heroClass": "mage",
+      "baseTeamBoost": 0.091
+    },
+    {
+      "id": "h58",
+      "heroClass": "mage",
+      "baseTeamBoost": 0.089
+    },
+    {
+      "id": "h59",
+      "heroClass": "monk",
+      "baseTeamBoost": 0.086
+    },
+    {
+      "id": "h60",
+      "heroClass": "monk",
+      "baseTeamBoost": 0.085
+    },
+    {
+      "id": "h61",
+      "heroClass": "warrior",
+      "baseTeamBoost": 0.095
+    },
+    {
+      "id": "h62",
+      "heroClass": "berserker",
+      "baseTeamBoost": 0.098
+    },
+    {
+      "id": "h63",
+      "heroClass": "archer",
+      "baseTeamBoost": 0.096
+    },
+    {
+      "id": "h64",
+      "heroClass": "mage",
+      "baseTeamBoost": 0.1
+    },
+    {
+      "id": "h65",
+      "heroClass": "monk",
+      "baseTeamBoost": 0.099
+    }
+  ],
+  "cases": [
+    {
+      "name": "pristine",
+      "note": "A brand-new save straight out of serialize(DEFAULT_STATE).",
+      "payload": {
+        "saveVersion": 2,
+        "playerName": "",
+        "playerClass": null,
+        "characterCreated": false,
+        "gold": 0,
+        "diamonds": 0,
+        "totalGold": 0,
+        "exp": 0,
+        "totalExp": 0,
+        "level": 1,
+        "highestWaveReached": 1,
+        "unspentStatPoints": 0,
+        "statsAlloc": {
+          "strength": 0,
+          "vitality": 0,
+          "agility": 0,
+          "intelligence": 0,
+          "spirit": 0
+        },
+        "totalKills": 0,
+        "burstCharge": 0,
+        "combatHeat": 0,
+        "wave": 1,
+        "monsterHp": 30,
+        "teamHp": 100,
+        "skills": [],
+        "heroRoster": [],
+        "activeTeamHeroIds": [],
+        "totalSummons": 0,
+        "firstSummonGiven": false,
+        "freeSummonCharges": 0,
+        "bossTears": 0,
+        "heroShards": 0,
+        "essence": 0,
+        "rebirthCores": 0,
+        "rebirthDamagePath": 0,
+        "rebirthEconomyPath": 0,
+        "rebirthSurvivalPath": 0,
+        "autoRecycleMaxRarity": "uncommon",
+        "equipmentScrap": 0,
+        "gachaPityCounter": 0,
+        "sparkTokens": 0,
+        "claimedSummonMilestones": [],
+        "guaranteedMinRarity": null,
+        "summonHistory": [],
+        "teamLoadouts": [
+          [],
+          [],
+          []
+        ],
+        "teamSlotsUnlocked": 4,
+        "heroFormationByUid": {},
+        "heroUniqueGearByHeroId": {},
+        "lastDiceRollDay": null,
+        "riftDungeonLevel": 1,
+        "riftEntriesUsedToday": 0,
+        "riftEntryDay": null,
+        "riftRaidTickets": 0,
+        "lastRiftBossDamagePct": 0,
+        "lastDiceRollValue": null,
+        "lastRiftWavesCleared": 0,
+        "treasureDungeonLevel": 1,
+        "treasureEntriesUsedToday": 0,
+        "treasureEntryDay": null,
+        "lastTreasureHaulPct": 0,
+        "lastTreasureWiped": false,
+        "lastReconSweepDay": null,
+        "lastLockpickDay": null,
+        "lastTargetPracticeDay": null,
+        "lastBountyDraftDay": null,
+        "miniBounty": null,
+        "guildhallFacilities": {
+          "training": {
+            "level": 0
+          },
+          "treasury": {
+            "level": 0
+          },
+          "forge": {
+            "level": 0
+          },
+          "tactics": {
+            "level": 0
+          }
+        },
+        "expeditionQueue": [],
+        "lastExpeditionDay": {
+          "artifact": null,
+          "merchant": null,
+          "ruins": null,
+          "vault": null,
+          "abyss": null
+        },
+        "expeditionContractOffers": {
+          "artifact": "rare",
+          "merchant": "rare",
+          "ruins": "rare",
+          "vault": "rare",
+          "abyss": "rare"
+        },
+        "expeditionContractsRefreshedAt": 1768478340000,
+        "classMasteryXp": {
+          "warrior": 0,
+          "berserker": 0,
+          "archer": 0,
+          "mage": 0,
+          "monk": 0
+        },
+        "seasonPoints": 0,
+        "bestSeasonPoints": 0,
+        "dailyLoginStreak": 0,
+        "lastDailyLoginDay": null,
+        "streakInsuranceCharges": 1,
+        "weeklyEventWeek": 2924,
+        "weeklyEventId": "hero_experience_surge",
+        "weeklyKills": 0,
+        "weeklyTrackClaimed": [],
+        "claimedMissionIds": [],
+        "codexVipClaimedHeroIds": [],
+        "codexVipClaimedUniqueIds": [],
+        "seenStoryBeatIds": [],
+        "seenHintIds": [],
+        "permanentUnlocks": [],
+        "metaDamageLevel": 0,
+        "metaEconomyLevel": 0,
+        "metaSurvivalLevel": 0,
+        "vipPoints": 0,
+        "vipLevel": 0,
+        "vipRewardClaimedLevels": [],
+        "dollarFirstPurchaseClaimedOfferIds": [],
+        "inventoryItemIds": [],
+        "equipmentInventory": {},
+        "equippedItems": {
+          "weapon": null,
+          "armor": null,
+          "accessory": null
+        },
+        "autoDismantleRarityFloor": "common",
+        "autoDismantleEnabled": false,
+        "usableItemCounts": {},
+        "autoUsePotionEnabled": false,
+        "autoUseCoolantEnabled": false,
+        "autoUsePotionThresholdPct": 0.35,
+        "autoRecycleEnabled": false,
+        "autoSummonEnabled": false,
+        "autoSummonMode": "single",
+        "autoBurstEnabled": false,
+        "autoCastHeroActivesEnabled": true,
+        "combatTempo": 1,
+        "autoTempoEnabled": false,
+        "autoTempoTarget": 2,
+        "autoSummonReserveGold": 5000,
+        "lastActiveAt": 1768478400000,
+        "prestigeCount": 0,
+        "achievements": [],
+        "combatLog": [],
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0,
+        "heroActiveCdMs": {},
+        "mailbox": [],
+        "giftPreference": "gold"
+      },
+      "expected": {
+        "identity": {
+          "name": "",
+          "playerClass": null,
+          "created": false
+        },
+        "progression": {
+          "level": 1,
+          "exp": 0,
+          "totalExp": 0,
+          "wave": 1,
+          "highestWave": 1,
+          "totalKills": 0,
+          "prestigeCount": 0,
+          "rebirthDamagePath": 0,
+          "rebirthEconomyPath": 0,
+          "rebirthSurvivalPath": 0,
+          "metaDamageLevel": 0,
+          "metaEconomyLevel": 0,
+          "metaSurvivalLevel": 0
+        },
+        "stats": {
+          "alloc": {
+            "strength": 0,
+            "vitality": 0,
+            "agility": 0,
+            "intelligence": 0,
+            "spirit": 0
+          },
+          "unspent": 0
+        },
+        "wallet": {
+          "gold": 0,
+          "totalGold": 0,
+          "diamonds": 0,
+          "heroShards": 0,
+          "bossTears": 0,
+          "essence": 0,
+          "rebirthCores": 0,
+          "equipmentScrap": 0,
+          "sparkTokens": 0
+        },
+        "roster": {
+          "heroes": [],
+          "activeUids": [],
+          "loadouts": [
+            [],
+            [],
+            []
+          ],
+          "slotsUnlocked": 4,
+          "formationByUid": {},
+          "uniqueByHeroId": {}
+        },
+        "lastActiveAt": 1768478400000
+      }
+    },
+    {
+      "name": "veteran",
+      "note": "A long-played account written by the shipped serialize.",
+      "payload": {
+        "saveVersion": 2,
+        "playerName": "Vetted",
+        "playerClass": "archer",
+        "characterCreated": true,
+        "gold": 918273645,
+        "diamonds": 1240,
+        "totalGold": 4000000000,
+        "exp": 500,
+        "totalExp": 88000000,
+        "level": 120,
+        "highestWaveReached": 512,
+        "unspentStatPoints": 13,
+        "statsAlloc": {
+          "strength": 210,
+          "vitality": 140,
+          "agility": 90,
+          "intelligence": 40,
+          "spirit": 66
+        },
+        "totalKills": 190004,
+        "burstCharge": 0,
+        "combatHeat": 0,
+        "wave": 341,
+        "monsterHp": 30,
+        "teamHp": 100,
+        "skills": [],
+        "heroRoster": [
+          {
+            "id": "h1",
+            "name": "Kael Ironheart",
+            "heroClass": "warrior",
+            "emoji": "⚔️",
+            "passiveTrait": "bulwark_instinct",
+            "activeSkillArchetype": "frontline_ward",
+            "baseTeamBoost": 0.05,
+            "tier": 1,
+            "uid": "w1",
+            "rarity": "legendary",
+            "level": 300,
+            "rank": 8,
+            "teamBoost": 0.4,
+            "rebirthStatMult": 3.5
+          },
+          {
+            "id": "h1",
+            "name": "Kael Ironheart",
+            "heroClass": "warrior",
+            "emoji": "⚔️",
+            "passiveTrait": "bulwark_instinct",
+            "activeSkillArchetype": "frontline_ward",
+            "baseTeamBoost": 0.05,
+            "tier": 1,
+            "uid": "w2",
+            "rarity": "rare",
+            "level": 40,
+            "rank": 2,
+            "teamBoost": 0.1,
+            "rebirthStatMult": 1
+          },
+          {
+            "id": "h3",
+            "name": "Drogan Ashfury",
+            "heroClass": "berserker",
+            "emoji": "🪓",
+            "passiveTrait": "warpath_instinct",
+            "activeSkillArchetype": "battle_chant",
+            "baseTeamBoost": 0.06,
+            "tier": 1,
+            "uid": "b1",
+            "rarity": "mythic",
+            "level": 500,
+            "rank": 10,
+            "teamBoost": 0.6,
+            "rebirthStatMult": 1
+          },
+          {
+            "id": "h7",
+            "name": "Lunara Frostweave",
+            "heroClass": "mage",
+            "emoji": "❄️",
+            "passiveTrait": "sage_instinct",
+            "activeSkillArchetype": "mending_pulse",
+            "baseTeamBoost": 0.065,
+            "tier": 1,
+            "uid": "m1",
+            "rarity": "epic",
+            "level": 210,
+            "rank": 6,
+            "teamBoost": 0.25,
+            "rebirthStatMult": 1
+          },
+          {
+            "id": "h5",
+            "name": "Sylvi Windmark",
+            "heroClass": "archer",
+            "emoji": "🏹",
+            "passiveTrait": "warpath_instinct",
+            "activeSkillArchetype": "burst_volley",
+            "baseTeamBoost": 0.055,
+            "tier": 1,
+            "uid": "a1",
+            "rarity": "godly",
+            "level": 700,
+            "rank": 9,
+            "teamBoost": 0.8,
+            "rebirthStatMult": 1
+          },
+          {
+            "id": "h9",
+            "name": "Shen Dawnfist",
+            "heroClass": "monk",
+            "emoji": "👊",
+            "passiveTrait": "bulwark_instinct",
+            "activeSkillArchetype": "mending_pulse",
+            "baseTeamBoost": 0.055,
+            "tier": 1,
+            "uid": "k1",
+            "rarity": "uncommon",
+            "level": 90,
+            "rank": 3,
+            "teamBoost": 0.12,
+            "rebirthStatMult": 1
+          }
+        ],
+        "activeTeamHeroIds": [
+          "w1",
+          "w2",
+          "b1",
+          "a1",
+          "m1",
+          "k1"
+        ],
+        "totalSummons": 0,
+        "firstSummonGiven": false,
+        "freeSummonCharges": 0,
+        "bossTears": 320,
+        "heroShards": 14500,
+        "essence": 9100,
+        "rebirthCores": 22,
+        "rebirthDamagePath": 5,
+        "rebirthEconomyPath": 3,
+        "rebirthSurvivalPath": 2,
+        "autoRecycleMaxRarity": "uncommon",
+        "equipmentScrap": 7777,
+        "gachaPityCounter": 0,
+        "sparkTokens": 45,
+        "claimedSummonMilestones": [],
+        "guaranteedMinRarity": null,
+        "summonHistory": [],
+        "teamLoadouts": [
+          [
+            "a1",
+            "m1"
+          ],
+          [],
+          [
+            "b1",
+            "w1",
+            "k1"
+          ]
+        ],
+        "teamSlotsUnlocked": 6,
+        "heroFormationByUid": {
+          "w1": "front",
+          "b1": "front",
+          "m1": "mid",
+          "a1": "back",
+          "k1": "mid"
+        },
+        "heroUniqueGearByHeroId": {
+          "h1": {
+            "rank": 6,
+            "equippedByUid": "w2"
+          },
+          "h5": {
+            "rank": 10,
+            "equippedByUid": "a1"
+          }
+        },
+        "lastDiceRollDay": null,
+        "riftDungeonLevel": 1,
+        "riftEntriesUsedToday": 0,
+        "riftEntryDay": null,
+        "riftRaidTickets": 0,
+        "lastRiftBossDamagePct": 0,
+        "lastDiceRollValue": null,
+        "lastRiftWavesCleared": 0,
+        "treasureDungeonLevel": 1,
+        "treasureEntriesUsedToday": 0,
+        "treasureEntryDay": null,
+        "lastTreasureHaulPct": 0,
+        "lastTreasureWiped": false,
+        "lastReconSweepDay": null,
+        "lastLockpickDay": null,
+        "lastTargetPracticeDay": null,
+        "lastBountyDraftDay": null,
+        "miniBounty": null,
+        "guildhallFacilities": {
+          "training": {
+            "level": 0
+          },
+          "treasury": {
+            "level": 0
+          },
+          "forge": {
+            "level": 0
+          },
+          "tactics": {
+            "level": 0
+          }
+        },
+        "expeditionQueue": [],
+        "lastExpeditionDay": {
+          "artifact": null,
+          "merchant": null,
+          "ruins": null,
+          "vault": null,
+          "abyss": null
+        },
+        "expeditionContractOffers": {
+          "artifact": "rare",
+          "merchant": "rare",
+          "ruins": "rare",
+          "vault": "rare",
+          "abyss": "rare"
+        },
+        "expeditionContractsRefreshedAt": 1768478340000,
+        "classMasteryXp": {
+          "warrior": 0,
+          "berserker": 0,
+          "archer": 0,
+          "mage": 0,
+          "monk": 0
+        },
+        "seasonPoints": 0,
+        "bestSeasonPoints": 0,
+        "dailyLoginStreak": 0,
+        "lastDailyLoginDay": null,
+        "streakInsuranceCharges": 1,
+        "weeklyEventWeek": 2924,
+        "weeklyEventId": "hero_experience_surge",
+        "weeklyKills": 0,
+        "weeklyTrackClaimed": [],
+        "claimedMissionIds": [],
+        "codexVipClaimedHeroIds": [],
+        "codexVipClaimedUniqueIds": [],
+        "seenStoryBeatIds": [],
+        "seenHintIds": [],
+        "permanentUnlocks": [],
+        "metaDamageLevel": 18,
+        "metaEconomyLevel": 11,
+        "metaSurvivalLevel": 9,
+        "vipPoints": 0,
+        "vipLevel": 0,
+        "vipRewardClaimedLevels": [],
+        "dollarFirstPurchaseClaimedOfferIds": [],
+        "inventoryItemIds": [],
+        "equipmentInventory": {},
+        "equippedItems": {
+          "weapon": null,
+          "armor": null,
+          "accessory": null
+        },
+        "autoDismantleRarityFloor": "common",
+        "autoDismantleEnabled": false,
+        "usableItemCounts": {},
+        "autoUsePotionEnabled": false,
+        "autoUseCoolantEnabled": false,
+        "autoUsePotionThresholdPct": 0.35,
+        "autoRecycleEnabled": false,
+        "autoSummonEnabled": false,
+        "autoSummonMode": "single",
+        "autoBurstEnabled": false,
+        "autoCastHeroActivesEnabled": true,
+        "combatTempo": 1,
+        "autoTempoEnabled": false,
+        "autoTempoTarget": 2,
+        "autoSummonReserveGold": 5000,
+        "lastActiveAt": 1768478400000,
+        "prestigeCount": 7,
+        "achievements": [],
+        "combatLog": [],
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0,
+        "heroActiveCdMs": {},
+        "mailbox": [],
+        "giftPreference": "gold"
+      },
+      "expected": {
+        "identity": {
+          "name": "Vetted",
+          "playerClass": "archer",
+          "created": true
+        },
+        "progression": {
+          "level": 120,
+          "exp": 500,
+          "totalExp": 88000000,
+          "wave": 341,
+          "highestWave": 512,
+          "totalKills": 190004,
+          "prestigeCount": 7,
+          "rebirthDamagePath": 5,
+          "rebirthEconomyPath": 3,
+          "rebirthSurvivalPath": 2,
+          "metaDamageLevel": 18,
+          "metaEconomyLevel": 11,
+          "metaSurvivalLevel": 9
+        },
+        "stats": {
+          "alloc": {
+            "strength": 210,
+            "vitality": 140,
+            "agility": 90,
+            "intelligence": 40,
+            "spirit": 66
+          },
+          "unspent": 62
+        },
+        "wallet": {
+          "gold": 918273645,
+          "totalGold": 4000000000,
+          "diamonds": 1240,
+          "heroShards": 14500,
+          "bossTears": 320,
+          "essence": 9100,
+          "rebirthCores": 22,
+          "equipmentScrap": 7777,
+          "sparkTokens": 45
+        },
+        "roster": {
+          "heroes": [
+            {
+              "id": "h1",
+              "uid": "w1",
+              "rarity": "legendary",
+              "level": 300,
+              "rank": 8,
+              "teamBoost": 0.4,
+              "rebirthStatMult": 3.5
+            },
+            {
+              "id": "h1",
+              "uid": "w2",
+              "rarity": "rare",
+              "level": 40,
+              "rank": 2,
+              "teamBoost": 0.1,
+              "rebirthStatMult": 1
+            },
+            {
+              "id": "h3",
+              "uid": "b1",
+              "rarity": "mythic",
+              "level": 500,
+              "rank": 10,
+              "teamBoost": 0.6,
+              "rebirthStatMult": 1
+            },
+            {
+              "id": "h7",
+              "uid": "m1",
+              "rarity": "epic",
+              "level": 210,
+              "rank": 6,
+              "teamBoost": 0.25,
+              "rebirthStatMult": 1
+            },
+            {
+              "id": "h5",
+              "uid": "a1",
+              "rarity": "godly",
+              "level": 700,
+              "rank": 9,
+              "teamBoost": 0.8,
+              "rebirthStatMult": 1
+            },
+            {
+              "id": "h9",
+              "uid": "k1",
+              "rarity": "uncommon",
+              "level": 90,
+              "rank": 3,
+              "teamBoost": 0.12,
+              "rebirthStatMult": 1
+            }
+          ],
+          "activeUids": [
+            "w1",
+            "b1",
+            "a1",
+            "m1",
+            "k1"
+          ],
+          "loadouts": [
+            [
+              "a1",
+              "m1"
+            ],
+            [],
+            [
+              "b1",
+              "w1",
+              "k1"
+            ]
+          ],
+          "slotsUnlocked": 6,
+          "formationByUid": {
+            "w1": "front",
+            "b1": "front",
+            "m1": "mid",
+            "a1": "back",
+            "k1": "mid"
+          },
+          "uniqueByHeroId": {
+            "h1": {
+              "rank": 6,
+              "equippedByUid": "w1"
+            },
+            "h5": {
+              "rank": 10,
+              "equippedByUid": "a1"
+            }
+          }
+        },
+        "lastActiveAt": 1768478400000
+      }
+    },
+    {
+      "name": "pre-v2-field-names",
+      "note": "No saveVersion at all, and the pre-v2 highestLevelReached spelling.",
+      "payload": {
+        "playerName": "Ancient",
+        "playerClass": "mage",
+        "characterCreated": true,
+        "level": 44,
+        "wave": 60,
+        "highestLevelReached": 175,
+        "gold": 1000,
+        "statsAlloc": {
+          "strength": 5,
+          "vitality": 5,
+          "agility": 5,
+          "intelligence": 5,
+          "spirit": 5
+        },
+        "unspentStatPoints": 0,
+        "heroRoster": [
+          {
+            "id": "h7",
+            "uid": "old_m",
+            "rarity": "rare",
+            "level": 20,
+            "rank": 2
+          }
+        ],
+        "activeTeamHeroIds": [
+          "old_m"
+        ],
+        "lastActiveAt": 1768478340000
+      },
+      "expected": {
+        "identity": {
+          "name": "Ancient",
+          "playerClass": "mage",
+          "created": true
+        },
+        "progression": {
+          "level": 44,
+          "exp": 0,
+          "totalExp": 0,
+          "wave": 60,
+          "highestWave": 175,
+          "totalKills": 0,
+          "prestigeCount": 0,
+          "rebirthDamagePath": 0,
+          "rebirthEconomyPath": 0,
+          "rebirthSurvivalPath": 0,
+          "metaDamageLevel": 0,
+          "metaEconomyLevel": 0,
+          "metaSurvivalLevel": 0
+        },
+        "stats": {
+          "alloc": {
+            "strength": 5,
+            "vitality": 5,
+            "agility": 5,
+            "intelligence": 5,
+            "spirit": 5
+          },
+          "unspent": 190
+        },
+        "wallet": {
+          "gold": 1000,
+          "totalGold": 1000,
+          "diamonds": 0,
+          "heroShards": 0,
+          "bossTears": 0,
+          "essence": 0,
+          "rebirthCores": 0,
+          "equipmentScrap": 0,
+          "sparkTokens": 0
+        },
+        "roster": {
+          "heroes": [
+            {
+              "id": "h7",
+              "uid": "old_m",
+              "rarity": "rare",
+              "level": 20,
+              "rank": 2,
+              "teamBoost": 0.0878,
+              "rebirthStatMult": 1
+            }
+          ],
+          "activeUids": [
+            "old_m"
+          ],
+          "loadouts": [
+            [],
+            [],
+            []
+          ],
+          "slotsUnlocked": 4,
+          "formationByUid": {},
+          "uniqueByHeroId": {}
+        },
+        "lastActiveAt": 1768478340000
+      }
+    },
+    {
+      "name": "pre-v2-unique-gear-number",
+      "note": "heroUniqueGearByHeroId stored a bare rank number before it stored a record.",
+      "payload": {
+        "playerName": "Relicless",
+        "playerClass": "warrior",
+        "characterCreated": true,
+        "level": 10,
+        "wave": 12,
+        "heroRoster": [
+          {
+            "id": "h1",
+            "uid": "r1",
+            "rarity": "common",
+            "level": 5,
+            "rank": 1
+          },
+          {
+            "id": "h1",
+            "uid": "r2",
+            "rarity": "epic",
+            "level": 5,
+            "rank": 1
+          }
+        ],
+        "activeTeamHeroIds": [
+          "r1"
+        ],
+        "heroUniqueGearByHeroId": {
+          "h1": 7
+        }
+      },
+      "expected": {
+        "identity": {
+          "name": "Relicless",
+          "playerClass": "warrior",
+          "created": true
+        },
+        "progression": {
+          "level": 10,
+          "exp": 0,
+          "totalExp": 0,
+          "wave": 12,
+          "highestWave": 12,
+          "totalKills": 0,
+          "prestigeCount": 0,
+          "rebirthDamagePath": 0,
+          "rebirthEconomyPath": 0,
+          "rebirthSurvivalPath": 0,
+          "metaDamageLevel": 0,
+          "metaEconomyLevel": 0,
+          "metaSurvivalLevel": 0
+        },
+        "stats": {
+          "alloc": {
+            "strength": 0,
+            "vitality": 0,
+            "agility": 0,
+            "intelligence": 0,
+            "spirit": 0
+          },
+          "unspent": 45
+        },
+        "wallet": {
+          "gold": 0,
+          "totalGold": 0,
+          "diamonds": 0,
+          "heroShards": 0,
+          "bossTears": 0,
+          "essence": 0,
+          "rebirthCores": 0,
+          "equipmentScrap": 0,
+          "sparkTokens": 0
+        },
+        "roster": {
+          "heroes": [
+            {
+              "id": "h1",
+              "uid": "r1",
+              "rarity": "common",
+              "level": 5,
+              "rank": 1,
+              "teamBoost": 0.05,
+              "rebirthStatMult": 1
+            },
+            {
+              "id": "h1",
+              "uid": "r2",
+              "rarity": "epic",
+              "level": 5,
+              "rank": 1,
+              "teamBoost": 0.08,
+              "rebirthStatMult": 1
+            }
+          ],
+          "activeUids": [
+            "r1"
+          ],
+          "loadouts": [
+            [],
+            [],
+            []
+          ],
+          "slotsUnlocked": 4,
+          "formationByUid": {},
+          "uniqueByHeroId": {
+            "h1": {
+              "rank": 7,
+              "equippedByUid": "r2"
+            }
+          }
+        },
+        "lastActiveAt": 1768478400000
+      }
+    },
+    {
+      "name": "unique-gear-unequipped-flag",
+      "note": "The intermediate shape: a record with an `equipped` boolean and no bearer uid.",
+      "payload": {
+        "playerName": "Benched",
+        "playerClass": "warrior",
+        "characterCreated": true,
+        "level": 10,
+        "wave": 3,
+        "heroRoster": [
+          {
+            "id": "h1",
+            "uid": "q1",
+            "rarity": "common",
+            "level": 2,
+            "rank": 1
+          }
+        ],
+        "heroUniqueGearByHeroId": {
+          "h1": {
+            "rank": 4,
+            "equipped": false
+          },
+          "h7": {
+            "rank": 2,
+            "equipped": true
+          }
+        }
+      },
+      "expected": {
+        "identity": {
+          "name": "Benched",
+          "playerClass": "warrior",
+          "created": true
+        },
+        "progression": {
+          "level": 10,
+          "exp": 0,
+          "totalExp": 0,
+          "wave": 3,
+          "highestWave": 3,
+          "totalKills": 0,
+          "prestigeCount": 0,
+          "rebirthDamagePath": 0,
+          "rebirthEconomyPath": 0,
+          "rebirthSurvivalPath": 0,
+          "metaDamageLevel": 0,
+          "metaEconomyLevel": 0,
+          "metaSurvivalLevel": 0
+        },
+        "stats": {
+          "alloc": {
+            "strength": 0,
+            "vitality": 0,
+            "agility": 0,
+            "intelligence": 0,
+            "spirit": 0
+          },
+          "unspent": 45
+        },
+        "wallet": {
+          "gold": 0,
+          "totalGold": 0,
+          "diamonds": 0,
+          "heroShards": 0,
+          "bossTears": 0,
+          "essence": 0,
+          "rebirthCores": 0,
+          "equipmentScrap": 0,
+          "sparkTokens": 0
+        },
+        "roster": {
+          "heroes": [
+            {
+              "id": "h1",
+              "uid": "q1",
+              "rarity": "common",
+              "level": 2,
+              "rank": 1,
+              "teamBoost": 0.05,
+              "rebirthStatMult": 1
+            }
+          ],
+          "activeUids": [],
+          "loadouts": [
+            [],
+            [],
+            []
+          ],
+          "slotsUnlocked": 4,
+          "formationByUid": {},
+          "uniqueByHeroId": {
+            "h1": {
+              "rank": 4,
+              "equippedByUid": null
+            },
+            "h7": {
+              "rank": 2,
+              "equippedByUid": null
+            }
+          }
+        },
+        "lastActiveAt": 1768478400000
+      }
+    },
+    {
+      "name": "over-allocated-stats",
+      "note": "A dormant account whose spent stat points exceed what its level would grant today.",
+      "payload": {
+        "playerName": "Grandfathered",
+        "playerClass": "berserker",
+        "characterCreated": true,
+        "level": 12,
+        "wave": 20,
+        "statsAlloc": {
+          "strength": 400,
+          "vitality": 300,
+          "agility": 100,
+          "intelligence": 50,
+          "spirit": 50
+        },
+        "unspentStatPoints": 40
+      },
+      "expected": {
+        "identity": {
+          "name": "Grandfathered",
+          "playerClass": "berserker",
+          "created": true
+        },
+        "progression": {
+          "level": 12,
+          "exp": 0,
+          "totalExp": 0,
+          "wave": 20,
+          "highestWave": 20,
+          "totalKills": 0,
+          "prestigeCount": 0,
+          "rebirthDamagePath": 0,
+          "rebirthEconomyPath": 0,
+          "rebirthSurvivalPath": 0,
+          "metaDamageLevel": 0,
+          "metaEconomyLevel": 0,
+          "metaSurvivalLevel": 0
+        },
+        "stats": {
+          "alloc": {
+            "strength": 400,
+            "vitality": 300,
+            "agility": 100,
+            "intelligence": 50,
+            "spirit": 50
+          },
+          "unspent": 40
+        },
+        "wallet": {
+          "gold": 0,
+          "totalGold": 0,
+          "diamonds": 0,
+          "heroShards": 0,
+          "bossTears": 0,
+          "essence": 0,
+          "rebirthCores": 0,
+          "equipmentScrap": 0,
+          "sparkTokens": 0
+        },
+        "roster": {
+          "heroes": [],
+          "activeUids": [],
+          "loadouts": [
+            [],
+            [],
+            []
+          ],
+          "slotsUnlocked": 4,
+          "formationByUid": {},
+          "uniqueByHeroId": {}
+        },
+        "lastActiveAt": 1768478400000
+      }
+    },
+    {
+      "name": "wallet-past-2-53",
+      "note": "Currency beyond exact integer range, to pin that the shipped cap does not cap.",
+      "payload": {
+        "playerName": "Rich",
+        "playerClass": "mage",
+        "characterCreated": true,
+        "level": 900,
+        "wave": 4000,
+        "gold": 1e+30,
+        "totalGold": 100000000000000000000,
+        "diamonds": 9007199254740994,
+        "essence": 1e+40
+      },
+      "expected": {
+        "identity": {
+          "name": "Rich",
+          "playerClass": "mage",
+          "created": true
+        },
+        "progression": {
+          "level": 900,
+          "exp": 0,
+          "totalExp": 0,
+          "wave": 4000,
+          "highestWave": 4000,
+          "totalKills": 0,
+          "prestigeCount": 0,
+          "rebirthDamagePath": 0,
+          "rebirthEconomyPath": 0,
+          "rebirthSurvivalPath": 0,
+          "metaDamageLevel": 0,
+          "metaEconomyLevel": 0,
+          "metaSurvivalLevel": 0
+        },
+        "stats": {
+          "alloc": {
+            "strength": 0,
+            "vitality": 0,
+            "agility": 0,
+            "intelligence": 0,
+            "spirit": 0
+          },
+          "unspent": 4495
+        },
+        "wallet": {
+          "gold": 1e+30,
+          "totalGold": 1e+30,
+          "diamonds": 9007199254740994,
+          "heroShards": 0,
+          "bossTears": 0,
+          "essence": 1e+40,
+          "rebirthCores": 0,
+          "equipmentScrap": 0,
+          "sparkTokens": 0
+        },
+        "roster": {
+          "heroes": [],
+          "activeUids": [],
+          "loadouts": [
+            [],
+            [],
+            []
+          ],
+          "slotsUnlocked": 4,
+          "formationByUid": {},
+          "uniqueByHeroId": {}
+        },
+        "lastActiveAt": 1768478400000
+      }
+    },
+    {
+      "name": "hostile",
+      "note": "Every field wrong at once: NaN, Infinity, negatives, wrong types, unknown ids, duplicate uids.",
+      "payload": {
+        "saveVersion": 99,
+        "playerName": "   an extremely long player name that goes well past the limit   ",
+        "playerClass": "necromancer",
+        "characterCreated": true,
+        "level": "__NaN__",
+        "exp": "__Infinity__",
+        "totalExp": -5,
+        "wave": -300,
+        "highestWaveReached": "eleven",
+        "totalKills": 12.9,
+        "gold": -1,
+        "totalGold": 10,
+        "statsAlloc": {
+          "strength": "40",
+          "vitality": -10,
+          "agility": 7.9,
+          "intelligence": null,
+          "spirit": "__NaN__"
+        },
+        "unspentStatPoints": -3,
+        "heroRoster": [
+          {
+            "id": "does_not_exist",
+            "uid": "x1"
+          },
+          {
+            "id": "h1",
+            "uid": "dup",
+            "rarity": "not_a_rarity",
+            "level": 99999,
+            "rank": 400
+          },
+          {
+            "id": "h3",
+            "uid": "dup",
+            "level": 3
+          },
+          {
+            "id": "h7",
+            "uid": "m9",
+            "teamBoost": 0.000001,
+            "rebirthStatMult": 900
+          },
+          null,
+          "nonsense"
+        ],
+        "activeTeamHeroIds": [
+          "dup",
+          "ghost",
+          "m9",
+          "dup"
+        ],
+        "teamSlotsUnlocked": 99,
+        "teamLoadouts": [
+          [
+            "m9",
+            "m9"
+          ],
+          "not-an-array",
+          [
+            "ghost"
+          ]
+        ],
+        "heroFormationByUid": {
+          "m9": "front",
+          "dup": "mid",
+          "ghost": "back"
+        },
+        "heroUniqueGearByHeroId": {
+          "h1": {
+            "rank": 900
+          },
+          "never_existed": {
+            "rank": 3
+          }
+        },
+        "lastActiveAt": 2083838400000
+      },
+      "expected": {
+        "identity": {
+          "name": "an extremely long player",
+          "playerClass": null,
+          "created": false
+        },
+        "progression": {
+          "level": 1,
+          "exp": 0,
+          "totalExp": 0,
+          "wave": 1,
+          "highestWave": 1,
+          "totalKills": 12,
+          "prestigeCount": 0,
+          "rebirthDamagePath": 0,
+          "rebirthEconomyPath": 0,
+          "rebirthSurvivalPath": 0,
+          "metaDamageLevel": 0,
+          "metaEconomyLevel": 0,
+          "metaSurvivalLevel": 0
+        },
+        "stats": {
+          "alloc": {
+            "strength": 0,
+            "vitality": 0,
+            "agility": 7,
+            "intelligence": 0,
+            "spirit": 0
+          },
+          "unspent": 0
+        },
+        "wallet": {
+          "gold": 0,
+          "totalGold": 10,
+          "diamonds": 0,
+          "heroShards": 0,
+          "bossTears": 0,
+          "essence": 0,
+          "rebirthCores": 0,
+          "equipmentScrap": 0,
+          "sparkTokens": 0
+        },
+        "roster": {
+          "heroes": [
+            {
+              "id": "h1",
+              "uid": "dup",
+              "rarity": "common",
+              "level": 999,
+              "rank": 10,
+              "teamBoost": 0.05,
+              "rebirthStatMult": 1
+            },
+            {
+              "id": "h7",
+              "uid": "m9",
+              "rarity": "common",
+              "level": 1,
+              "rank": 1,
+              "teamBoost": 0.065,
+              "rebirthStatMult": 20
+            }
+          ],
+          "activeUids": [
+            "dup",
+            "m9"
+          ],
+          "loadouts": [
+            [
+              "m9"
+            ],
+            [],
+            []
+          ],
+          "slotsUnlocked": 6,
+          "formationByUid": {},
+          "uniqueByHeroId": {
+            "h1": {
+              "rank": 10,
+              "equippedByUid": "dup"
+            }
+          }
+        },
+        "lastActiveAt": 1768478400000
+      }
+    },
+    {
+      "name": "empty",
+      "note": "An empty object, which is what a corrupt or truncated payload looks like.",
+      "payload": {},
+      "expected": {
+        "identity": {
+          "name": "",
+          "playerClass": null,
+          "created": false
+        },
+        "progression": {
+          "level": 1,
+          "exp": 0,
+          "totalExp": 0,
+          "wave": 1,
+          "highestWave": 1,
+          "totalKills": 0,
+          "prestigeCount": 0,
+          "rebirthDamagePath": 0,
+          "rebirthEconomyPath": 0,
+          "rebirthSurvivalPath": 0,
+          "metaDamageLevel": 0,
+          "metaEconomyLevel": 0,
+          "metaSurvivalLevel": 0
+        },
+        "stats": {
+          "alloc": {
+            "strength": 0,
+            "vitality": 0,
+            "agility": 0,
+            "intelligence": 0,
+            "spirit": 0
+          },
+          "unspent": 0
+        },
+        "wallet": {
+          "gold": 0,
+          "totalGold": 0,
+          "diamonds": 0,
+          "heroShards": 0,
+          "bossTears": 0,
+          "essence": 0,
+          "rebirthCores": 0,
+          "equipmentScrap": 0,
+          "sparkTokens": 0
+        },
+        "roster": {
+          "heroes": [],
+          "activeUids": [],
+          "loadouts": [
+            [],
+            [],
+            []
+          ],
+          "slotsUnlocked": 4,
+          "formationByUid": {},
+          "uniqueByHeroId": {}
+        },
+        "lastActiveAt": 1768478400000
+      }
+    }
+  ]
+}

@@ -59,19 +59,16 @@ export function badgeFor(destination: Destination, snapshot: SimulationSnapshot)
   return destination.badge?.(snapshot) ?? null;
 }
 
-export function visibleDestinations(
-  registry: readonly Destination[],
-  snapshot: SimulationSnapshot,
-): Destination[] {
-  return registry.filter((destination) => isAvailable(destination, snapshot));
+export function visibleDestinations(registry: readonly Destination[], snapshot: SimulationSnapshot): Destination[] {
+  return registry.filter(destination => isAvailable(destination, snapshot));
 }
 
 /** Registry order is preserved inside each group; empty groups are dropped. */
 export function groupDestinations(destinations: readonly Destination[]): GroupedDestinations[] {
-  return GROUP_ORDER.map((group) => ({
+  return GROUP_ORDER.map(group => ({
     group,
-    entries: destinations.filter((destination) => destination.group === group),
-  })).filter((section) => section.entries.length > 0);
+    entries: destinations.filter(destination => destination.group === group),
+  })).filter(section => section.entries.length > 0);
 }
 
 /** Numeric badges add up; a bare dot only survives if nothing counted. */
@@ -98,7 +95,7 @@ export function shelfLayout(
   pinnedIds: readonly string[],
 ): ShelfLayout {
   const visible = visibleDestinations(registry, snapshot);
-  const byId = new Map(visible.map((destination) => [destination.id, destination]));
+  const byId = new Map(visible.map(destination => [destination.id, destination]));
 
   const pinned: Destination[] = [];
   for (const id of pinnedIds) {
@@ -111,11 +108,11 @@ export function shelfLayout(
     if (!pinned.includes(destination)) pinned.push(destination);
   }
 
-  const overflow = visible.filter((destination) => !pinned.includes(destination));
+  const overflow = visible.filter(destination => !pinned.includes(destination));
   return {
     pinned,
     overflow,
-    overflowBadge: mergeBadges(overflow.map((destination) => badgeFor(destination, snapshot))),
+    overflowBadge: mergeBadges(overflow.map(destination => badgeFor(destination, snapshot))),
   };
 }
 
@@ -134,9 +131,7 @@ export function registryProblems(registry: readonly Destination[]): string[] {
     }
   }
   if (registry.length > 0 && registry.length < SHELF_SLOTS) {
-    problems.push(
-      `registry has ${registry.length} destinations, fewer than the ${SHELF_SLOTS} shelf slots`,
-    );
+    problems.push(`registry has ${registry.length} destinations, fewer than the ${SHELF_SLOTS} shelf slots`);
   }
   return problems;
 }

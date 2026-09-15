@@ -1,0 +1,132 @@
+{
+  "note": "Team synergy dps multipliers from the shipped implementation. Owned by __tests__/synergyFixture.test.ts.",
+  "generatedFrom": "src/useGameState.ts getDpsBreakdown",
+  "rows": [
+    {
+      "scenario": {
+        "name": "empty",
+        "classes": []
+      },
+      "synergyDps": 1
+    },
+    {
+      "scenario": {
+        "name": "lone warrior",
+        "classes": [
+          "warrior"
+        ]
+      },
+      "synergyDps": 1
+    },
+    {
+      "scenario": {
+        "name": "two vanguard",
+        "classes": [
+          "warrior",
+          "berserker"
+        ]
+      },
+      "synergyDps": 1
+    },
+    {
+      "scenario": {
+        "name": "spellshot pair",
+        "classes": [
+          "archer",
+          "mage"
+        ]
+      },
+      "synergyDps": 1.1
+    },
+    {
+      "scenario": {
+        "name": "archer alone is no link",
+        "classes": [
+          "archer"
+        ]
+      },
+      "synergyDps": 1
+    },
+    {
+      "scenario": {
+        "name": "iron mandala",
+        "classes": [
+          "warrior",
+          "monk"
+        ]
+      },
+      "synergyDps": 1
+    },
+    {
+      "scenario": {
+        "name": "four classes",
+        "classes": [
+          "warrior",
+          "archer",
+          "mage",
+          "monk"
+        ]
+      },
+      "synergyDps": 1.1880000000000002
+    },
+    {
+      "scenario": {
+        "name": "three classes is not a coalition",
+        "classes": [
+          "warrior",
+          "archer",
+          "mage"
+        ]
+      },
+      "synergyDps": 1.1
+    },
+    {
+      "scenario": {
+        "name": "all five classes",
+        "classes": [
+          "warrior",
+          "berserker",
+          "archer",
+          "mage",
+          "monk"
+        ]
+      },
+      "synergyDps": 1.1880000000000002
+    },
+    {
+      "scenario": {
+        "name": "mono trio",
+        "classes": [
+          "archer",
+          "archer",
+          "archer"
+        ]
+      },
+      "synergyDps": 1
+    },
+    {
+      "scenario": {
+        "name": "mono pair is too few",
+        "classes": [
+          "archer",
+          "archer"
+        ]
+      },
+      "synergyDps": 1
+    },
+    {
+      "scenario": {
+        "name": "stacked",
+        "classes": [
+          "warrior",
+          "berserker",
+          "archer",
+          "mage",
+          "monk",
+          "archer"
+        ]
+      },
+      "synergyDps": 1.1880000000000002
+    }
+  ]
+}

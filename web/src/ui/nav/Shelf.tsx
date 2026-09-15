@@ -31,13 +31,8 @@ export function Shelf({ registry, snapshot, pinnedIds = [], onSelect }: ShelfPro
 
   return (
     <nav className={styles.shelf} aria-label="Main">
-      {pinned.map((destination) => (
-        <button
-          key={destination.id}
-          type="button"
-          className={styles.slot}
-          onClick={() => onSelect?.(destination.id)}
-        >
+      {pinned.map(destination => (
+        <button key={destination.id} type="button" className={styles.slot} onClick={() => onSelect?.(destination.id)}>
           {destination.label}
           <BadgeMark badge={badgeFor(destination, snapshot)} />
         </button>

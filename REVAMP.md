@@ -158,7 +158,7 @@ Most of the value here is content and balance, and none of it is React-bound:
 - `gameConfig.ts` (4,639 lines) → `src/content/`: 66 heroes, 92 achievements, 7 acts, gear catalog, usable items, missions.
 - Damage and economy formulas from `useGameState.ts` → `engine/combat` and `engine/economy` as pure functions. **Same numbers**, pinned by a parity suite before any UI work.
 - `services/` (~6,000 lines of Firebase) → behind `ports/`, largely unchanged.
-- Saves. `SAVE_SCHEMA_VERSION` 2 → 3 with a migration; inactive accounts keep their progress.
+- Saves. `SAVE_SCHEMA_VERSION` 2 → 3 with a migration; inactive accounts keep their progress. Note that the shipped version marker is decorative — `sanitizeSaveData` reads it, logs it, and never consults it again, so every migration in there is driven by the shape of a field. The rewrite's reader is shape-driven for the same reason.
 - The hero ability system — already made castable on a real cooldown, and already the right shape for entity combat.
 
 Not carried over: `GameScreen.tsx` (4,190 lines), `GameScreen.styles.ts` (5,753), the eight `*TabContent` files, and React Native generally.
@@ -173,10 +173,26 @@ Vite + TS + Vitest, Evercast's ESLint/Prettier config, the five directories, and
 ### Phase 1 — Engine, headless *(~2 weeks)*
 Content and formulas into `content/` and `engine/`. No UI. Deliverable is a parity suite: 10,000 waves matching current balance within tolerance, and a v2→v3 save round-trip. Heroes become entities with their own timers and targets here. `break_eternity.js` goes in at this layer, once, before anything depends on number types.
 
-> **Offline constraint.** `simulateOfflineProgress` steps `advanceCombatStep` up to `OFFLINE_SIM_MAX_ITERATIONS = 300,000` times on resume. An entity sim cannot. `engine/` ships both: the live entity sim and a closed-form estimator, with divergence pinned by test. Evercast's `AwayClock` monotonic high-water mark is worth taking at the same time — SimplyIdle currently has no clock-tamper defence.
+> **Offline constraint — measured, and not what this section first claimed.** The concern was the 300,000 iteration cap on `simulateOfflineProgress`. Measuring it moved the problem somewhere else: the cap is rarely the binding constraint, and the expensive case is the *stalled* team. With nothing dying and nobody dying, the adaptive step collapses to its one second ceiling and an eight hour window becomes 28,800 full combat steps — **16.8s of blocking work on the load screen**, scaling linearly with the window. A maxed roster parked at wave one, which is what every prestige produces, hits this.
+>
+> `engine/` ships both paths, with divergence pinned by test. The estimator resolves whole rounds instead of ticks and skips repeats: within 10% of the shipped simulator in the steady state, and up to 4x off across a long climb, because every tenth wave is a boss at 5x HP that the shipped game clears with a burst spent on cue and a whole team's abilities landing together — 112x damage for the millisecond they overlap. A mean cannot spend a cooldown at the right moment. Closing that gap means modelling the cadence rather than its average, which is a combat design decision.
+>
+> Two things about offline progress that were not obvious from the code: it is a **sawtooth**, not a climb (a defeat retreats to the start of the current twenty-wave chapter), and a player can therefore **come back behind where they left** — 8 of 24 consecutive five minute windows did, worst by 18 waves. `APPLY_OFFLINE_PROGRESS` reports `Math.max(0, delta)`, so every one of those is shown as `+0 waves`.
+>
+> Evercast's `AwayClock` monotonic high-water mark went in alongside. SimplyIdle had no clock-tamper defence at all: it clamps the *stored* stamp against `now`, which does nothing about `now` itself moving.
 
 ### Phase 2 — The diorama *(~3 weeks)*
-Babylon scene, hero line, enemies, floating damage numbers, hit reactions, cast bars, boss telegraphs. Port `DeviceProfile` and `FrameGovernor` with it. Art starts as primitives — Evercast's companions are *"procedural placeholder art built from primitives at runtime"* with `modelKey` as the seam for a Blender pack later. Do the same; do not block the renderer on modelling 66 heroes.
+Babylon scene, hero line, enemies, floating damage numbers, hit reactions, cast bars, boss telegraphs. Port `DeviceProfile` and `FrameGovernor` with it. Art starts as primitives — Evercast's companions are *"procedural placeholder art built from primitives at runtime"* with `modelKey` as the seam for a Blender pack later. Do the same; do not block the renderer on modelling 65 heroes.
+
+> **Placeholders must be silhouette-matched, not capsules.**
+>
+> Every hero already has authored portrait art: **65 PNGs in `IMG/HeroIcon/`**, mapped 1:1 to hero ids by `src/heroPortraits.ts` (`h1` → `KaelIronheart.png`, and so on), plus a `HeroIcon.psd` source and per-hero `.mp4` clips in `IMG/HeroAnimate/`.
+>
+> Use them as reference. Kael Ironheart is armoured bulk with pauldrons and a kite shield; Lunara Frostweave is a hooded cloak and a staff on a slight frame. A capsule for both throws away identity that is already drawn and paid for, and it is identity the player is supposed to recognise on the battle line at a glance.
+>
+> So a placeholder is a small assembly of primitives whose **outline reads as that hero** at gameplay distance — bulk, stance, headgear and the weapon shape — not a single mesh. That is a constraint on Phase 2's placeholders, not a reason to delay them: it is cheap in primitives and it is what makes the diorama legible before any GLB exists.
+>
+> One caveat for whoever builds them: the portraits are **busts, chest-up**. They are reference for upper body, weapon, headgear and build; legs and full stance have to be extrapolated.
 
 ### Phase 3 — Shell and shelf *(~2 weeks)*
 Port the destination registry, shelf, rail and `SurfaceHost`. File all ~50 surfaces into the four groups. Battle becomes the persistent screen. Port the token sheet and the UI architecture test with it, so the surfaces are built under the constraints rather than retrofitted to them.
@@ -197,9 +213,10 @@ Retire the Expo app. Vercel points at the Vite build. Supabase migration afterwa
 | --- | --- |
 | Balance drift during the engine port | Parity suite before any UI work; now actually runs in CI |
 | Inactive accounts lose saves | v2→v3 migration + round-trip tests before cutover |
-| Offline sim can't step an entity model 300k times | Dual-path engine, divergence pinned |
+| Offline sim is too slow to run on a load screen (16.8s for an 8h window) | Dual-path engine, closed-form estimator, accuracy committed per scenario |
+| Dormant accounts lose data to a "corrected" save reader | Shipped bounds ported as-is; over-allocated stats and past-2^53 wallets kept, divergences pinned as tests |
 | Babylon is heavier than the current bundle | `DeviceProfile` tiers and the boot gate exist for exactly this; Evercast ships ~6MB of models behind one |
-| Art becomes the bottleneck | Primitives first, `modelKey` seam, GLBs later |
+| Art becomes the bottleneck | Silhouette-matched primitives first (see Phase 2), `modelKey` seam, GLBs later |
 | Rewrite stalls half-finished | Every phase ends runnable; the Expo app keeps shipping until Phase 5 |
 | The new structure rots the way this one did | Architecture tests from Phase 0, god-file guard included |
 

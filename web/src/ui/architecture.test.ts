@@ -65,7 +65,7 @@ describe('ui architecture', () => {
   });
 
   it('keeps every colour in the token sheet', () => {
-    const candidates = FILES.filter((file) => file.relativePath !== 'theme/tokens.css');
+    const candidates = FILES.filter(file => file.relativePath !== 'theme/tokens.css');
     // Hex, rgb()/rgba(), hsl()/hsla(). `var(--token)` is the only way to
     // colour anything else. The old styles carried ~400 inline hex literals.
     expect(offences(candidates, /#[0-9a-fA-F]{3,8}\b|\b(rgba?|hsla?)\s*\(/)).toEqual([]);
@@ -80,17 +80,15 @@ describe('ui architecture', () => {
   it('never lets a surface own a scroll container', () => {
     // Archetypes and shell chrome own scrolling; a surface describes data and
     // hands it over, which is what keeps two-axis scrolling impossible.
-    const candidates = FILES.filter((file) => within(file, 'surfaces'));
+    const candidates = FILES.filter(file => within(file, 'surfaces'));
     expect(offences(candidates, /overflow(-[xy])?\s*:\s*(auto|scroll)/)).toEqual([]);
   });
 
   it('never positions a surface by hardcoded pixels', () => {
     // Surfaces describe data; archetypes own geometry. Not preceded by a
     // hyphen, so `border-bottom: 1px solid` stays legal.
-    const candidates = FILES.filter((file) => within(file, 'surfaces'));
-    expect(offences(candidates, /(?<![\w-])(top|left|right|bottom)\s*:\s*-?\d+(\.\d+)?px/)).toEqual(
-      [],
-    );
+    const candidates = FILES.filter(file => within(file, 'surfaces'));
+    expect(offences(candidates, /(?<![\w-])(top|left|right|bottom)\s*:\s*-?\d+(\.\d+)?px/)).toEqual([]);
   });
 
   it('keeps the shelf at three slots forever', () => {
@@ -103,7 +101,7 @@ describe('ui architecture', () => {
   });
 
   it('never fetches a stylesheet asset from anywhere but this origin', () => {
-    const sheets = FILES.filter((file) => file.relativePath.endsWith('.css'));
+    const sheets = FILES.filter(file => file.relativePath.endsWith('.css'));
     expect(offences(sheets, /url\(\s*['"]?https?:/)).toEqual([]);
   });
 

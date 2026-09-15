@@ -1,0 +1,214 @@
+{
+  "note": "Progression damage multipliers from the shipped implementation. Owned by __tests__/progressionMultiplierFixture.test.ts.",
+  "generatedFrom": "src/useGameState.ts getDpsBreakdown",
+  "rows": [
+    {
+      "scenario": {
+        "name": "fresh",
+        "playerClass": "warrior",
+        "prestigeCount": 0,
+        "achievementCount": 0,
+        "metaDamageLevel": 0,
+        "rebirthDamagePath": 0,
+        "tacticsFacilityLevel": 0,
+        "vipLevel": 0,
+        "classMasteryXp": 0,
+        "classPassiveUnlocked": false,
+        "damageBuffPct": 0
+      },
+      "multipliers": {
+        "rebirthLegacy": 1,
+        "achievementLegacy": 1,
+        "metaDamage": 1,
+        "rebirthDamagePath": 1,
+        "tacticsFacility": 1,
+        "classPassive": 1,
+        "mastery": 1,
+        "vipDamage": 1,
+        "temporaryBuff": 1
+      }
+    },
+    {
+      "scenario": {
+        "name": "class passive unlocked",
+        "playerClass": "berserker",
+        "prestigeCount": 0,
+        "achievementCount": 0,
+        "metaDamageLevel": 0,
+        "rebirthDamagePath": 0,
+        "tacticsFacilityLevel": 0,
+        "vipLevel": 0,
+        "classMasteryXp": 0,
+        "classPassiveUnlocked": true,
+        "damageBuffPct": 0
+      },
+      "multipliers": {
+        "rebirthLegacy": 1,
+        "achievementLegacy": 1,
+        "metaDamage": 1,
+        "rebirthDamagePath": 1,
+        "tacticsFacility": 1,
+        "classPassive": 1.18,
+        "mastery": 1,
+        "vipDamage": 1,
+        "temporaryBuff": 1
+      }
+    },
+    {
+      "scenario": {
+        "name": "mage passive is a small dps gain",
+        "playerClass": "mage",
+        "prestigeCount": 0,
+        "achievementCount": 0,
+        "metaDamageLevel": 0,
+        "rebirthDamagePath": 0,
+        "tacticsFacilityLevel": 0,
+        "vipLevel": 0,
+        "classMasteryXp": 0,
+        "classPassiveUnlocked": true,
+        "damageBuffPct": 0
+      },
+      "multipliers": {
+        "rebirthLegacy": 1,
+        "achievementLegacy": 1,
+        "metaDamage": 1,
+        "rebirthDamagePath": 1,
+        "tacticsFacility": 1,
+        "classPassive": 1.06,
+        "mastery": 1,
+        "vipDamage": 1,
+        "temporaryBuff": 1
+      }
+    },
+    {
+      "scenario": {
+        "name": "three rebirths",
+        "playerClass": "warrior",
+        "prestigeCount": 3,
+        "achievementCount": 0,
+        "metaDamageLevel": 0,
+        "rebirthDamagePath": 0,
+        "tacticsFacilityLevel": 0,
+        "vipLevel": 0,
+        "classMasteryXp": 0,
+        "classPassiveUnlocked": false,
+        "damageBuffPct": 0
+      },
+      "multipliers": {
+        "rebirthLegacy": 3.375,
+        "achievementLegacy": 1,
+        "metaDamage": 1,
+        "rebirthDamagePath": 1,
+        "tacticsFacility": 1,
+        "classPassive": 1,
+        "mastery": 1,
+        "vipDamage": 1,
+        "temporaryBuff": 1
+      }
+    },
+    {
+      "scenario": {
+        "name": "achievements only",
+        "playerClass": "archer",
+        "prestigeCount": 0,
+        "achievementCount": 12,
+        "metaDamageLevel": 0,
+        "rebirthDamagePath": 0,
+        "tacticsFacilityLevel": 0,
+        "vipLevel": 0,
+        "classMasteryXp": 0,
+        "classPassiveUnlocked": false,
+        "damageBuffPct": 0
+      },
+      "multipliers": {
+        "rebirthLegacy": 1,
+        "achievementLegacy": 1.3599999999999999,
+        "metaDamage": 1,
+        "rebirthDamagePath": 1,
+        "tacticsFacility": 1,
+        "classPassive": 1,
+        "mastery": 1,
+        "vipDamage": 1,
+        "temporaryBuff": 1
+      }
+    },
+    {
+      "scenario": {
+        "name": "mastery below the cap",
+        "playerClass": "monk",
+        "prestigeCount": 0,
+        "achievementCount": 0,
+        "metaDamageLevel": 0,
+        "rebirthDamagePath": 0,
+        "tacticsFacilityLevel": 0,
+        "vipLevel": 0,
+        "classMasteryXp": 1500,
+        "classPassiveUnlocked": false,
+        "damageBuffPct": 0
+      },
+      "multipliers": {
+        "rebirthLegacy": 1,
+        "achievementLegacy": 1,
+        "metaDamage": 1,
+        "rebirthDamagePath": 1,
+        "tacticsFacility": 1,
+        "classPassive": 1,
+        "mastery": 1.15,
+        "vipDamage": 1,
+        "temporaryBuff": 1
+      }
+    },
+    {
+      "scenario": {
+        "name": "mastery past the cap",
+        "playerClass": "monk",
+        "prestigeCount": 0,
+        "achievementCount": 0,
+        "metaDamageLevel": 0,
+        "rebirthDamagePath": 0,
+        "tacticsFacilityLevel": 0,
+        "vipLevel": 0,
+        "classMasteryXp": 90000,
+        "classPassiveUnlocked": false,
+        "damageBuffPct": 0
+      },
+      "multipliers": {
+        "rebirthLegacy": 1,
+        "achievementLegacy": 1,
+        "metaDamage": 1,
+        "rebirthDamagePath": 1,
+        "tacticsFacility": 1,
+        "classPassive": 1,
+        "mastery": 1.4,
+        "vipDamage": 1,
+        "temporaryBuff": 1
+      }
+    },
+    {
+      "scenario": {
+        "name": "everything at once",
+        "playerClass": "mage",
+        "prestigeCount": 7,
+        "achievementCount": 40,
+        "metaDamageLevel": 25,
+        "rebirthDamagePath": 9,
+        "tacticsFacilityLevel": 30,
+        "vipLevel": 10,
+        "classMasteryXp": 4200,
+        "classPassiveUnlocked": true,
+        "damageBuffPct": 0.35
+      },
+      "multipliers": {
+        "rebirthLegacy": 17.0859375,
+        "achievementLegacy": 2.2,
+        "metaDamage": 2.25,
+        "rebirthDamagePath": 1.6300000000000001,
+        "tacticsFacility": 1.75,
+        "classPassive": 1.06,
+        "mastery": 1.4,
+        "vipDamage": 1.3,
+        "temporaryBuff": 1.35
+      }
+    }
+  ]
+}

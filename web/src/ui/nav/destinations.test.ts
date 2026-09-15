@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_SNAPSHOT, type SimulationSnapshot } from '../../engine/types';
+import { emptySnapshot, type SimulationSnapshot } from '../../engine/types';
 import {
   SHELF_SLOTS,
   groupDestinations,
@@ -9,7 +9,7 @@ import {
   type Destination,
 } from './destinations';
 
-const snapshot: SimulationSnapshot = EMPTY_SNAPSHOT;
+const snapshot: SimulationSnapshot = emptySnapshot();
 
 function make(id: string, overrides: Partial<Destination> = {}): Destination {
   return { id, group: 'power', label: id, archetype: 'ledger', ...overrides };
@@ -21,8 +21,8 @@ describe('shelf layout', () => {
 
     const { pinned, overflow } = shelfLayout(registry, snapshot, []);
 
-    expect(pinned.map((d) => d.id)).toEqual(['a', 'b', 'c']);
-    expect(overflow.map((d) => d.id)).toEqual(['d']);
+    expect(pinned.map(d => d.id)).toEqual(['a', 'b', 'c']);
+    expect(overflow.map(d => d.id)).toEqual(['d']);
   });
 
   it('honours pins and backfills the rest', () => {
@@ -30,8 +30,8 @@ describe('shelf layout', () => {
 
     const { pinned, overflow } = shelfLayout(registry, snapshot, ['d']);
 
-    expect(pinned.map((d) => d.id)).toEqual(['d', 'a', 'b']);
-    expect(overflow.map((d) => d.id)).toEqual(['c']);
+    expect(pinned.map(d => d.id)).toEqual(['d', 'a', 'b']);
+    expect(overflow.map(d => d.id)).toEqual(['c']);
   });
 
   it('ignores pins that are unknown or unavailable', () => {
@@ -39,7 +39,7 @@ describe('shelf layout', () => {
 
     const { pinned } = shelfLayout(registry, snapshot, ['ghost', 'hidden', 'c']);
 
-    expect(pinned.map((d) => d.id)).toEqual(['c', 'a', 'b']);
+    expect(pinned.map(d => d.id)).toEqual(['c', 'a', 'b']);
   });
 
   it('never overfills the shelf however many are pinned', () => {
@@ -51,13 +51,7 @@ describe('shelf layout', () => {
   });
 
   it('surfaces badges from behind More so nothing is lost back there', () => {
-    const registry = [
-      make('a'),
-      make('b'),
-      make('c'),
-      make('d', { badge: () => 2 }),
-      make('e', { badge: () => 3 }),
-    ];
+    const registry = [make('a'), make('b'), make('c'), make('d', { badge: () => 2 }), make('e', { badge: () => 3 })];
 
     const { overflowBadge } = shelfLayout(registry, snapshot, []);
 
@@ -87,11 +81,7 @@ describe('grouping', () => {
       make('codex', { group: 'record' }),
     ];
 
-    expect(groupDestinations(registry).map((section) => section.group)).toEqual([
-      'power',
-      'companion',
-      'record',
-    ]);
+    expect(groupDestinations(registry).map(section => section.group)).toEqual(['power', 'companion', 'record']);
   });
 });
 
