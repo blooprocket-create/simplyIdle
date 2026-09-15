@@ -1,6 +1,9 @@
 import Decimal from 'break_eternity.js';
 import { getMonsterAffixModifiers } from '../../content/affixes';
+import { CHAPTER_WAVES, chapterStartWave, retreatWave } from '../combat/chapters';
 import { getMonsterDamage, getMonsterExp, getMonsterGold, getMonsterMaxHp } from '../waves/curves';
+
+export { CHAPTER_WAVES, chapterStartWave, retreatWave };
 
 /**
  * Closed-form offline progress.
@@ -25,8 +28,6 @@ import { getMonsterDamage, getMonsterExp, getMonsterGold, getMonsterMaxHp } from
  * repeats exactly, so the estimator detects the repeat and multiplies.
  */
 
-/** Waves per chapter. A defeat retreats to the start of the current one. */
-export const CHAPTER_WAVES = 20;
 export const HERO_LEVEL_CAP = 999;
 
 /**
@@ -38,19 +39,6 @@ export const MAX_ROUNDS = 25_000;
 
 /** The shipped combat tick. No round resolves faster than one of these. */
 export const TICK_MS = 100;
-
-export function chapterStartWave(wave: number): number {
-  return Math.floor((Math.max(1, wave) - 1) / CHAPTER_WAVES) * CHAPTER_WAVES + 1;
-}
-
-/**
- * Where a defeat at `wave` leaves you. Standing on a chapter start when you
- * lose costs a further chapter, so the wave you retreat *from* matters.
- */
-export function retreatWave(wave: number): number {
-  const start = chapterStartWave(wave);
-  return wave === start && start > 1 ? Math.max(1, start - CHAPTER_WAVES) : start;
-}
 
 export interface OfflineConditions {
   /** Team damage per second with nothing on a timer running. */
