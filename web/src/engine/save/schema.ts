@@ -1,0 +1,139 @@
+import type { PlayerClass } from '../../content/classes';
+import type { Rarity } from '../../content/rarities';
+import type { FormationRole } from '../combat/formation';
+
+/**
+ * The v3 save.
+ *
+ * v2 is a flat bag of roughly 120 fields, most of which belong to menus this
+ * revamp has not decided the fate of yet. Typing all of them now would mean
+ * inventing a state shape ahead of the simulation that has to hold it, and
+ * then migrating a second time when the simulation disagrees.
+ *
+ * So v3 types the slice the engine can already act on — identity, progression,
+ * wallet, roster — and carries **everything else verbatim** in `legacy`. No
+ * field is dropped, no dormant account loses anything, and a later phase can
+ * claim a field out of `legacy` on its own schedule without a second migration
+ * event. `claimedLegacyKeys` records which keys the typed slice took, so that
+ * "what is left in legacy" is a question with an answer rather than a guess.
+ */
+
+export const SAVE_VERSION = 3;
+
+/** The version the shipped game writes. */
+export const LEGACY_SAVE_VERSION = 2;
+
+export interface StatBlock {
+  strength: number;
+  vitality: number;
+  agility: number;
+  intelligence: number;
+  spirit: number;
+}
+
+export const STAT_KEYS: readonly (keyof StatBlock)[] = ['strength', 'vitality', 'agility', 'intelligence', 'spirit'];
+
+export interface SavedHero {
+  /** Hero template id, e.g. `h1`. Several heroes may share one. */
+  id: string;
+  /** Unique instance id. The roster key, and what formations point at. */
+  uid: string;
+  rarity: Rarity;
+  level: number;
+  rank: number;
+  teamBoost: number;
+  rebirthStatMult: number;
+}
+
+export interface SavedUniqueGear {
+  rank: number;
+  /** The roster uid carrying the relic, or null when it sits in the armoury. */
+  equippedByUid: string | null;
+}
+
+export interface SaveV3 {
+  version: typeof SAVE_VERSION;
+
+  /**
+   * Monotonic high-water mark of when this save was last live, in ms.
+   * Not the same thing as v2's `lastActiveAt` — see `awayClock.ts`.
+   */
+  awayAtMs: number;
+
+  identity: {
+    name: string;
+    playerClass: PlayerClass | null;
+    created: boolean;
+  };
+
+  progression: {
+    level: number;
+    exp: number;
+    totalExp: number;
+    wave: number;
+    highestWave: number;
+    totalKills: number;
+    prestigeCount: number;
+    rebirthDamagePath: number;
+    rebirthEconomyPath: number;
+    rebirthSurvivalPath: number;
+    metaDamageLevel: number;
+    metaEconomyLevel: number;
+    metaSurvivalLevel: number;
+  };
+
+  stats: {
+    alloc: StatBlock;
+    unspent: number;
+  };
+
+  wallet: {
+    gold: number;
+    totalGold: number;
+    diamonds: number;
+    heroShards: number;
+    bossTears: number;
+    essence: number;
+    rebirthCores: number;
+    equipmentScrap: number;
+    sparkTokens: number;
+  };
+
+  roster: {
+    heroes: SavedHero[];
+    activeUids: string[];
+    /** Always three, padded with empties. Saved team presets. */
+    loadouts: string[][];
+    slotsUnlocked: number;
+    formationByUid: Record<string, FormationRole>;
+    uniqueByHeroId: Record<string, SavedUniqueGear>;
+  };
+
+  /** Every v2 key the typed slice above does not claim, exactly as stored. */
+  legacy: Record<string, unknown>;
+
+  /** Which v2 keys the typed slice consumed. Sorted, for a stable snapshot. */
+  claimedLegacyKeys: string[];
+}
+
+/** The two facts the migration needs about a hero template. */
+export interface SaveHeroTemplate {
+  /** Decides which formation roles the hero may legally hold. */
+  heroClass: PlayerClass;
+  /** Authored team boost before rarity; the lower bound on a stored boost. */
+  baseTeamBoost: number;
+}
+
+/** What the migration needs to know about content to validate a save against it. */
+export interface SaveContent {
+  /**
+   * Hero templates that still exist. Injected rather than imported so the
+   * engine stays free of the catalog, and so a test can migrate a save against
+   * a roster of three heroes instead of all sixty-five.
+   *
+   * A roster row whose template id is absent here is dropped, exactly as the
+   * shipped reader drops it — that is the mechanism by which a retired hero
+   * leaves old saves, so it has to keep working.
+   */
+  heroesById: ReadonlyMap<string, SaveHeroTemplate>;
+}

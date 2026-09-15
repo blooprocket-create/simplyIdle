@@ -30,3 +30,34 @@ export function getRankStatMultiplier(rank: number, rarity: Rarity): number {
   const acceleratedGrowth = Math.pow(r - 1, 1.22) * 0.018 * effectivePower;
   return Math.round((1 + additiveGrowth + acceleratedGrowth) * 10000) / 10000;
 }
+
+/**
+ * How much a rarity scales a hero's authored `baseTeamBoost`. Distinct from
+ * `RARITY_RANK_POWER`: this one is applied once when the hero is summoned and
+ * again as the lower bound when their save row is read back.
+ */
+export const RARITY_BOOST_MULTIPLIER: Record<Rarity, number> = {
+  common: 1.0,
+  uncommon: 1.15,
+  rare: 1.35,
+  epic: 1.6,
+  legendary: 1.95,
+  mythic: 2.35,
+  godly: 3.0,
+  transcendent: 3.55,
+};
+
+export const RARITY_IDS: readonly Rarity[] = [
+  'common',
+  'uncommon',
+  'rare',
+  'epic',
+  'legendary',
+  'mythic',
+  'godly',
+  'transcendent',
+];
+
+export function isRarity(value: unknown): value is Rarity {
+  return typeof value === 'string' && (RARITY_IDS as readonly string[]).includes(value);
+}

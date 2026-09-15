@@ -17,3 +17,15 @@ export function safeDivide(numerator: number, denominator: number, fallback = 0)
   const result = numerator / denominator;
   return Number.isFinite(result) ? result : fallback;
 }
+
+/**
+ * Four-decimal rounding, ported from `src/utils.ts`.
+ *
+ * Applied to hero team-boost and rebirth multipliers on both the summon path
+ * and the save-read path in the shipped game, which means the rounding is part
+ * of the stored value rather than a display concern: reading a save without it
+ * produces a hero that differs from the same hero re-summoned.
+ */
+export function roundTo4(value: number): number {
+  return Math.round(value * 10000) / 10000;
+}
