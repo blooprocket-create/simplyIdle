@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert, Platform, View, Text } from 'react-native';
-import { GameState, Stats, getUsableItemDescription } from '../../useGameState';
+import { GameState, Stats, getUsableItemDescription, type HeroActiveStatus } from '../../useGameState';
 import { PlayerClass, rarityConfig, type UsableItem } from '../../gameConfig';
 import { styles } from './BattleTabContent.styles';
 import { FeedbackPressable as Pressable } from '../../components/FeedbackPressable';
@@ -37,6 +37,9 @@ export interface BattleTabContentProps {
   buyPremiumCoolant: (itemId: 'coolant_mk1' | 'coolant_mk2', amount?: number) => void;
   applyUsableItem: (itemId: string, amount?: number | 'all') => void;
   setRebirthOpen: (open: boolean) => void;
+  heroActiveStatuses: HeroActiveStatus[];
+  castHeroActiveSkill: (uid: string) => void;
+  setAutoCastHeroActivesEnabled: (enabled: boolean) => void;
 }
 
 export const BattleTabContent = React.memo<BattleTabContentProps>(
@@ -60,8 +63,12 @@ export const BattleTabContent = React.memo<BattleTabContentProps>(
     buyPremiumCoolant,
     applyUsableItem,
     setRebirthOpen,
+    heroActiveStatuses,
+    castHeroActiveSkill,
+    setAutoCastHeroActivesEnabled,
   }) => {
     const hasTempo4Access = (state.vipLevel ?? 0) >= 1;
+    const autoCastEnabled = state.autoCastHeroActivesEnabled;
 
     const confirmUseAll = (item: BattleUsableItem, count: number) => {
       if (count <= 0) return;
@@ -107,6 +114,76 @@ export const BattleTabContent = React.memo<BattleTabContentProps>(
               </Pressable>
             )}
             <Text style={styles.sectionTitle}>⚔️ Battle Overview</Text>
+
+            <View style={styles.abilityBarCard}>
+              <View style={styles.abilityBarHeader}>
+                <Text style={styles.abilityBarTitle}>Hero Abilities</Text>
+                <Pressable
+                  style={[styles.abilityBarAutoBtn, autoCastEnabled && styles.abilityBarAutoBtnActive]}
+                  onPress={() => setAutoCastHeroActivesEnabled(!autoCastEnabled)}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: autoCastEnabled }}
+                  accessibilityLabel="Auto-cast hero abilities"
+                >
+                  <Text style={[styles.abilityBarAutoBtnText, autoCastEnabled && styles.abilityBarAutoBtnTextActive]}>
+                    AUTO {autoCastEnabled ? 'ON' : 'OFF'}
+                  </Text>
+                </Pressable>
+              </View>
+              <Text style={styles.abilityBarHint}>
+                {autoCastEnabled
+                  ? 'Abilities fire themselves the moment they come off cooldown.'
+                  : 'Abilities are yours to spend — tap one the moment it lights up.'}
+              </Text>
+              {heroActiveStatuses.length === 0 ? (
+                <Text style={styles.abilityBarEmpty}>No heroes on the active team yet.</Text>
+              ) : (
+                <View style={styles.abilityRow}>
+                  {heroActiveStatuses.map(status => {
+                    const remainingPct =
+                      status.totalCooldownMs > 0
+                        ? Math.max(0, Math.min(1, status.cooldownMs / status.totalCooldownMs))
+                        : 0;
+                    const castable = status.ready && !autoCastEnabled;
+
+                    return (
+                      <Pressable
+                        key={status.uid}
+                        style={[
+                          styles.abilityBtn,
+                          status.ready && styles.abilityBtnReady,
+                          autoCastEnabled && styles.abilityBtnAuto,
+                        ]}
+                        disabled={!castable}
+                        onPress={() => castHeroActiveSkill(status.uid)}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: !castable }}
+                        accessibilityLabel={`${status.heroName}: ${status.skillName}${
+                          status.ready ? ', ready' : `, ${(status.cooldownMs / 1000).toFixed(1)} seconds remaining`
+                        }`}
+                      >
+                        {remainingPct > 0 && (
+                          <View style={[styles.abilityCooldownFill, { width: `${remainingPct * 100}%` }]} />
+                        )}
+                        <Text style={styles.abilityBtnHero} numberOfLines={1}>
+                          {status.emoji} {status.heroName}
+                        </Text>
+                        <Text style={styles.abilityBtnSkill} numberOfLines={1}>
+                          {status.skillName}
+                        </Text>
+                        <Text style={[styles.abilityBtnState, !status.ready && styles.abilityBtnStateCooling]}>
+                          {status.ready
+                            ? autoCastEnabled
+                              ? 'AUTO'
+                              : 'READY'
+                            : `${(status.cooldownMs / 1000).toFixed(1)}s`}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
 
             <View style={styles.battleTempoCard}>
               <View style={styles.battleTempoHeader}>

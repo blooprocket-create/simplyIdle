@@ -118,7 +118,7 @@ describe('serialize → sanitizeSaveData round-trip', () => {
       ...DEFAULT_STATE,
       inventoryItemIds: ['inst_001'],
       equipmentInventory: {
-        'inst_001': {
+        inst_001: {
           id: 'inst_001',
           baseItemId: 'w_warrior_blade',
           name: 'Iron Vanguard Blade',

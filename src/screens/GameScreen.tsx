@@ -25,6 +25,7 @@ import {
   getDpsBreakdown,
   getEquipmentCraftCost,
   getFacilityUpgradeCost,
+  getHeroActiveStatuses,
   getHeroGoldLevelCost,
   getMaxHeatForLevel,
   useGameState,
@@ -338,6 +339,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setAutoSummonEnabled,
     setAutoSummonMode,
     setAutoBurstEnabled,
+    setAutoCastHeroActivesEnabled,
+    castHeroActiveSkill,
     setCombatTempo,
     setAutoTempoEnabled,
     setAutoTempoTarget,
@@ -572,6 +575,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const monsterHpPct = Math.max(0, Math.min(1, state.monsterHp / state.monsterMaxHp)) * 100;
   const teamHpPct = Math.max(0, Math.min(1, state.teamHp / state.teamMaxHp)) * 100;
   const activeTeamSet = useMemo(() => new Set(state.activeTeamHeroIds), [state.activeTeamHeroIds]);
+  const heroActiveStatuses = useMemo(() => getHeroActiveStatuses(state), [state]);
   const usableInventory = useMemo(
     () =>
       Object.entries(state.usableItemCounts)
@@ -2399,6 +2403,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 buyPremiumCoolant,
                 applyUsableItem,
                 setRebirthOpen: (open: boolean) => open && setActiveModal('rebirth'),
+                heroActiveStatuses,
+                castHeroActiveSkill,
+                setAutoCastHeroActivesEnabled,
               }}
             />
           </ErrorBoundary>
@@ -3564,6 +3571,26 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     <Text style={styles.settingsCycleBtnText}>{state.autoSummonMode.toUpperCase()}</Text>
                   </Pressable>
                 </View>
+              </View>
+
+              <View style={styles.settingsCard}>
+                <Text style={styles.settingsCardTitle}>Auto-Cast Hero Abilities</Text>
+                <View style={styles.settingsRowBetween}>
+                  <Text style={styles.settingsLabel}>Enabled</Text>
+                  <Pressable
+                    style={[
+                      styles.settingsToggleBtn,
+                      state.autoCastHeroActivesEnabled && styles.settingsToggleBtnActive,
+                    ]}
+                    onPress={() => setAutoCastHeroActivesEnabled(!state.autoCastHeroActivesEnabled)}
+                  >
+                    <Text style={styles.settingsToggleText}>{state.autoCastHeroActivesEnabled ? 'ON' : 'OFF'}</Text>
+                  </Pressable>
+                </View>
+                <Text style={styles.settingsHintText}>
+                  On, hero abilities fire themselves the moment they come off cooldown. Off, they wait on the battle
+                  screen for you to spend them.
+                </Text>
               </View>
 
               <View style={styles.settingsCard}>

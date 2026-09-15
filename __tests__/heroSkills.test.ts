@@ -12,7 +12,14 @@ import {
   type HeroUnit,
   type UniqueSkillType,
 } from '../src/gameConfig';
-import { DEFAULT_STATE, advanceCombatStep, getDpsBreakdown, type GameState } from '../src/useGameState';
+import {
+  DEFAULT_STATE,
+  advanceCombatStep,
+  getDpsBreakdown,
+  getHeroActiveStatuses,
+  reducer,
+  type GameState,
+} from '../src/useGameState';
 
 const TEST_ELAPSED_MS = 10_000;
 const TEST_MONSTER_MAX_HP = 100_000_000;
@@ -268,5 +275,86 @@ describe('hero skill wiring', () => {
     expect(uniqueBreakdown.multipliers.heroPassives).toBeCloseTo(baselineBreakdown.multipliers.heroPassives, 8);
     expect(uniqueBreakdown.multipliers.uniqueRelics).toBeCloseTo(getHeroUniqueCombatModifiers(hero.id, 1).dpsMult, 8);
     expect(uniqueBreakdown.totalMultiplier).toBeGreaterThan(baselineBreakdown.totalMultiplier);
+  });
+});
+
+describe('hero active casting', () => {
+  it('holds a ready ability instead of firing it when auto-cast is off', () => {
+    const hero = findHeroByArchetype('burst_volley');
+    const initial = buildCombatState(hero, { autoCastHeroActivesEnabled: false });
+
+    const next = advanceCombatStep(initial, TEST_ELAPSED_MS);
+
+    // Off cooldown and waiting on the player, so the monster took only auto-attack damage.
+    expect(next.heroActiveCdMs[hero.uid] ?? 0).toBe(0);
+    expect(next.combatLog.some(line => line.includes(getHeroActiveArchetypeInfo('burst_volley').name))).toBe(false);
+  });
+
+  it('fires the ability and starts its cooldown when the player casts it', () => {
+    const hero = findHeroByArchetype('burst_volley');
+    const initial = buildCombatState(hero, { autoCastHeroActivesEnabled: false });
+
+    const next = reducer(initial, { type: 'CAST_HERO_ACTIVE', uid: hero.uid });
+
+    expect(next.monsterHp).toBeLessThan(initial.monsterHp);
+    expect(next.heroActiveCdMs[hero.uid]).toBe(ACTIVE_SKILL_COOLDOWN_MS.burst_volley);
+    expectCombatLogToContain(next, getHeroActiveArchetypeInfo('burst_volley').name);
+  });
+
+  it('ignores a cast while the ability is still cooling down', () => {
+    const hero = findHeroByArchetype('burst_volley');
+    const initial = buildCombatState(hero, {
+      autoCastHeroActivesEnabled: false,
+      heroActiveCdMs: { [hero.uid]: 3_000 },
+    });
+
+    const next = reducer(initial, { type: 'CAST_HERO_ACTIVE', uid: hero.uid });
+
+    expect(next).toBe(initial);
+  });
+
+  it('ignores a cast for a hero who is not on the active team', () => {
+    const hero = findHeroByArchetype('burst_volley');
+    const initial = buildCombatState(hero, { autoCastHeroActivesEnabled: false, activeTeamHeroIds: [] });
+
+    const next = reducer(initial, { type: 'CAST_HERO_ACTIVE', uid: hero.uid });
+
+    expect(next).toBe(initial);
+  });
+
+  it('fires on cooldown alone once auto-cast is on, with no random gate', () => {
+    const hero = findHeroByArchetype('burst_volley');
+    const initial = buildCombatState(hero, { autoCastHeroActivesEnabled: true });
+
+    // Every run fires: readiness is now purely a function of the cooldown.
+    for (let run = 0; run < 25; run++) {
+      const next = advanceCombatStep(initial, 100);
+      expect(next.heroActiveCdMs[hero.uid]).toBe(ACTIVE_SKILL_COOLDOWN_MS.burst_volley);
+    }
+  });
+
+  it('reports readiness and cooldown for the active team in team order', () => {
+    const hero = findHeroByArchetype('mending_pulse');
+    const state = buildCombatState(hero, { heroActiveCdMs: { [hero.uid]: 3_000 } });
+
+    const [status] = getHeroActiveStatuses(state);
+
+    expect(status.uid).toBe(hero.uid);
+    expect(status.skillName).toBe(getHeroActiveArchetypeInfo('mending_pulse').name);
+    expect(status.cooldownMs).toBe(3_000);
+    expect(status.totalCooldownMs).toBe(ACTIVE_SKILL_COOLDOWN_MS.mending_pulse);
+    expect(status.ready).toBe(false);
+  });
+
+  it('names the unique weapon in the status once it is equipped', () => {
+    const hero = findHeroByUniqueSkill('execute');
+    const state = buildCombatState(hero, {
+      heroUniqueGearByHeroId: { [hero.id]: { rank: 1, equippedByUid: hero.uid } },
+    });
+
+    const [status] = getHeroActiveStatuses(state);
+
+    expect(status.skillName).toBe(getHeroUniqueWeaponName(hero.id));
+    expect(status.ready).toBe(true);
   });
 });

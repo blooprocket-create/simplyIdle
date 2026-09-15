@@ -26,6 +26,7 @@ export type SettingsAction =
   | { type: 'SET_AUTO_SUMMON_ENABLED'; enabled: boolean }
   | { type: 'SET_AUTO_SUMMON_MODE'; mode: 'single' | 'x10' }
   | { type: 'SET_AUTO_BURST_ENABLED'; enabled: boolean }
+  | { type: 'SET_AUTO_CAST_HERO_ACTIVES_ENABLED'; enabled: boolean }
   | { type: 'SET_COMBAT_TEMPO'; tempo: CombatTempo }
   | { type: 'SET_AUTO_TEMPO_ENABLED'; enabled: boolean }
   | { type: 'SET_AUTO_TEMPO_TARGET'; target: AutoTempoTarget }
@@ -46,6 +47,7 @@ export const SETTINGS_ACTION_TYPES = new Set<string>([
   'SET_AUTO_SUMMON_ENABLED',
   'SET_AUTO_SUMMON_MODE',
   'SET_AUTO_BURST_ENABLED',
+  'SET_AUTO_CAST_HERO_ACTIVES_ENABLED',
   'SET_COMBAT_TEMPO',
   'SET_AUTO_TEMPO_ENABLED',
   'SET_AUTO_TEMPO_TARGET',
@@ -161,6 +163,10 @@ export function settingsReducer(state: GameState, action: SettingsAction, ctx: S
 
     case 'SET_AUTO_BURST_ENABLED': {
       return { ...state, autoBurstEnabled: action.enabled };
+    }
+
+    case 'SET_AUTO_CAST_HERO_ACTIVES_ENABLED': {
+      return { ...state, autoCastHeroActivesEnabled: action.enabled };
     }
 
     case 'SET_COMBAT_TEMPO': {

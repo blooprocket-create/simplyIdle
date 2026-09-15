@@ -76,6 +76,101 @@ export const styles = StyleSheet.create({
   },
 
   // ── Tempo Card ───────────────────────────────────────────
+  abilityBarCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#5C6F87',
+    backgroundColor: '#172432',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    gap: 6,
+  },
+  abilityBarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  abilityBarTitle: {
+    fontSize: 11,
+    color: '#D9ECFF',
+    fontWeight: '700',
+  },
+  abilityBarHint: {
+    fontSize: 10,
+    color: '#95B4CF',
+  },
+  abilityBarAutoBtn: {
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#536B86',
+    backgroundColor: '#22364C',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+  },
+  abilityBarAutoBtnActive: {
+    borderColor: '#4FA3E3',
+    backgroundColor: '#1D3A54',
+  },
+  abilityBarAutoBtnText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#95B4CF',
+  },
+  abilityBarAutoBtnTextActive: {
+    color: '#D9ECFF',
+  },
+  abilityRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  abilityBtn: {
+    flexGrow: 1,
+    flexBasis: 96,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#536B86',
+    backgroundColor: '#22364C',
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+    overflow: 'hidden',
+  },
+  abilityBtnReady: {
+    borderColor: '#5FD38A',
+    backgroundColor: '#1C3B2E',
+  },
+  abilityBtnAuto: {
+    opacity: 0.75,
+  },
+  abilityCooldownFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: '#2E4A66',
+  },
+  abilityBtnHero: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#D9ECFF',
+  },
+  abilityBtnSkill: {
+    fontSize: 9,
+    color: '#95B4CF',
+  },
+  abilityBtnState: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#5FD38A',
+  },
+  abilityBtnStateCooling: {
+    color: '#8FA8C0',
+  },
+  abilityBarEmpty: {
+    fontSize: 10,
+    color: '#8FA8C0',
+    fontStyle: 'italic',
+  },
   battleTempoCard: {
     borderRadius: 8,
     borderWidth: 1,
