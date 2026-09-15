@@ -1,0 +1,64 @@
+.shelf {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  padding-block-end: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top, var(--scrim), transparent);
+}
+
+.slot {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.slot:hover {
+  border-color: var(--line-strong);
+}
+
+.slot:focus-visible {
+  outline: 2px solid var(--ready);
+  outline-offset: 2px;
+}
+
+.more {
+  border-style: dashed;
+}
+
+.badge {
+  position: absolute;
+  inset-block-start: var(--space-1);
+  inset-inline-end: var(--space-1);
+  min-width: 16px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+  background: var(--danger);
+  color: var(--ink);
+  font-size: 9px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.dot {
+  min-width: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-sm);
+}
