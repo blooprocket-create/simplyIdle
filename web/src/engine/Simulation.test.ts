@@ -2,6 +2,9 @@ import Decimal from 'break_eternity.js';
 import { describe, expect, it } from 'vitest';
 import { getAttackIntervalMs } from '../content/attackSpeeds';
 import { MAX_ATTACKS_PER_STEP } from './combat/attackTimer';
+import { chapterStartWave, retreatWave } from './combat/chapters';
+import { AWAY_THRESHOLD_MS } from './offline/awayCredit';
+import { estimateOffline, retreatWave as estimateRetreatWave } from './offline/estimate';
 import { Simulation } from './Simulation';
 import type { PlayerClass } from '../content/classes';
 import { createHeroEntity, nominalDps, startOffsetMs, type HeroEntity } from './entities/HeroEntity';
@@ -282,5 +285,205 @@ describe('the read model a renderer subscribes to', () => {
     expect(snapshot.totals.kills).toBeGreaterThan(0);
     // No stale id pointing at a corpse.
     expect(snapshot.heroes[0].targetId).toBe(snapshot.enemy?.id);
+  });
+});
+
+describe('the monster hits back', () => {
+  /*
+   * Both halves of a fight, because for one commit there was only one.
+   * Heroes got timers and targets before anything could hit them, so the live
+   * simulation could not lose: an underpowered roster climbed every wave
+   * forever while the offline estimator, modelling the same encounter,
+   * reported the sawtooth the game actually has. Caught in review.
+   */
+  const frail = () => ({
+    heroes: [hero('a', 50, 1_000)],
+    startWave: 60,
+    teamMaxHp: new Decimal(500),
+    incomingMult: 1,
+  });
+
+  it('takes damage from the wave the team is standing on', () => {
+    const sim = new Simulation({ ...frail(), incomingMult: 1 });
+    const before = sim.read().team.hp;
+    sim.advance(100);
+    expect(sim.read().team.hp.lt(before)).toBe(true);
+  });
+
+  it('wipes the team and retreats a chapter', () => {
+    const sim = new Simulation(frail());
+    run(sim, 60_000, 100);
+    const snapshot = sim.read();
+    expect(snapshot.totals.deaths).toBeGreaterThan(0);
+    // Wave 60 is inside the chapter that starts at 41.
+    expect(snapshot.wave).toBeLessThan(60);
+    expect(chapterStartWave(60)).toBe(41);
+  });
+
+  it('heals to full on a win and on a wipe, as shipped', () => {
+    const sim = new Simulation({
+      heroes: [hero('strong', 1e9, 200)],
+      startWave: 5,
+      teamMaxHp: new Decimal(1e6),
+      incomingMult: 1,
+    });
+    sim.advance(400);
+    const snapshot = sim.read();
+    expect(snapshot.totals.kills).toBeGreaterThan(0);
+    expect(snapshot.team.hp.eq(snapshot.team.maxHp)).toBe(true);
+  });
+
+  it('leaves the team alone when nothing can reach them', () => {
+    // incomingMult 0 is the default, and it must mean "no damage" rather than
+    // "damage of zero size applied every step".
+    const sim = new Simulation({ heroes: team(), startWave: 1, teamMaxHp: new Decimal(100) });
+    run(sim, 10_000, 100);
+    expect(sim.read().team.hp.eq(sim.read().team.maxHp)).toBe(true);
+    expect(sim.read().totals.deaths).toBe(0);
+  });
+
+  it('agrees with the offline estimator about whether a team survives', () => {
+    /*
+     * The finding, stated as a property. Given the same encounter, the live
+     * simulation and the estimator must reach the same verdict — a team that
+     * dies offline dies online. A live simulation that *could not* die, which
+     * is what review caught, fails the first case outright.
+     *
+     * Asserted away from the ceiling on purpose. A team sitting exactly at the
+     * wave it can just barely clear is decided by a few percent of climb rate,
+     * and the estimator does not model overkill, so it climbs about a tenth
+     * faster and can cross a death threshold the live loop stops short of.
+     * That gap is already measured and committed in the estimator's own
+     * accuracy table; pinning the verdict at the knife edge would be pinning
+     * that rounding, not this behaviour.
+     */
+    const verdicts: [string, number, number, number][] = [
+      // label, hero dps, wave, team hp
+      ['doomed', 50, 60, 500],
+      ['untouchable', 1e7, 30, 1e15],
+    ];
+
+    for (const [label, dps, startWave, teamHp] of verdicts) {
+      const live = new Simulation({
+        heroes: [hero('h', dps, 1_000)],
+        startWave,
+        teamMaxHp: new Decimal(teamHp),
+        incomingMult: 1,
+      });
+      run(live, 120_000, 100);
+
+      const offline = estimateOffline(startWave, 120_000, {
+        dps: new Decimal(dps),
+        sustainedDpsMult: 1,
+        dpsPerHeroLevel: new Decimal(0),
+        teamHpPerHeroLevel: new Decimal(0),
+        heroLevel: 1,
+        teamMaxHp: new Decimal(teamHp),
+        enemyHpMult: 1,
+        incomingMult: 1,
+        goldMult: 1,
+        expMult: 1,
+        tempo: 1,
+      });
+
+      expect({ label, diesLive: live.read().totals.deaths > 0 }).toEqual({
+        label,
+        diesLive: offline.deaths > 0,
+      });
+    }
+  });
+
+  it('matches the estimator exactly on a team with no way out', () => {
+    // Not just the verdict: the same kills, the same wipes, the same wave.
+    // Two models of one encounter, landing on the same square.
+    const live = new Simulation({
+      heroes: [hero('h', 50, 1_000)],
+      startWave: 60,
+      teamMaxHp: new Decimal(500),
+      incomingMult: 1,
+    });
+    run(live, 120_000, 100);
+
+    const offline = estimateOffline(60, 120_000, {
+      dps: new Decimal(50),
+      sustainedDpsMult: 1,
+      dpsPerHeroLevel: new Decimal(0),
+      teamHpPerHeroLevel: new Decimal(0),
+      heroLevel: 1,
+      teamMaxHp: new Decimal(500),
+      enemyHpMult: 1,
+      incomingMult: 1,
+      goldMult: 1,
+      expMult: 1,
+      tempo: 1,
+    });
+
+    expect({ kills: live.read().totals.kills, deaths: live.read().totals.deaths, wave: live.read().wave }).toEqual({
+      kills: offline.kills,
+      deaths: offline.deaths,
+      wave: offline.wave,
+    });
+  });
+});
+
+describe('time the tab spent hidden', () => {
+  it('is credited rather than dropped', () => {
+    /*
+     * The clamp discards swings a long step owes, and the comment beside it
+     * promised the estimator would credit that time — but nothing called the
+     * estimator, so a backgrounded tab simply lost every second. Caught in
+     * review; this is the assertion that the promise is now kept.
+     */
+    const options = {
+      heroes: [hero('h', 1e6, 700)],
+      startWave: 1,
+      teamMaxHp: new Decimal(1e6),
+      incomingMult: 1,
+    };
+
+    const dropped = new Simulation(options);
+    dropped.advance(AWAY_THRESHOLD_MS * 4);
+
+    const credited = new Simulation(options);
+    credited.creditAway(AWAY_THRESHOLD_MS * 4);
+
+    expect(credited.read().totals.kills).toBeGreaterThan(dropped.read().totals.kills);
+    expect(credited.read().wave).toBeGreaterThan(dropped.read().wave);
+  });
+
+  it('credits roughly what living through it would have', () => {
+    // Not exactly — the estimator averages where the live loop swings — but
+    // the same order of magnitude, or the bridge is not modelling the game.
+    const options = {
+      heroes: [hero('h', 1e5, 700)],
+      startWave: 1,
+      teamMaxHp: new Decimal(1e9),
+      incomingMult: 1,
+    };
+    const lived = new Simulation(options);
+    run(lived, 60_000, 100);
+
+    const away = new Simulation(options);
+    away.creditAway(60_000);
+
+    const ratio = away.read().totals.kills / Math.max(1, lived.read().totals.kills);
+    expect(ratio).toBeGreaterThan(0.5);
+    expect(ratio).toBeLessThan(2);
+  });
+
+  it('does nothing for a gap with no team to fight', () => {
+    const sim = new Simulation({ heroes: [], startWave: 10 });
+    sim.creditAway(60_000);
+    expect(sim.read().wave).toBe(10);
+    expect(sim.read().totals.kills).toBe(0);
+  });
+
+  it('shares the chapter rule with the estimator rather than copying it', () => {
+    // Two copies of "where does a wipe send you" is how the two paths drifted
+    // in the first place.
+    expect(retreatWave(121)).toBe(101);
+    expect(retreatWave(122)).toBe(121);
+    expect(estimateRetreatWave(121)).toBe(retreatWave(121));
+    expect(estimateRetreatWave(140)).toBe(retreatWave(140));
   });
 });

@@ -1,4 +1,5 @@
 import { Simulation, type SimulationOptions } from '../engine/Simulation';
+import { AWAY_THRESHOLD_MS } from '../engine/offline/awayCredit';
 import type { SimulationSnapshot } from '../engine/types';
 
 /**
@@ -42,7 +43,15 @@ export class GameLoop {
     this.lastFrameAt = performance.now();
     const step = () => {
       const now = performance.now();
-      this.simulation.advance(now - this.lastFrameAt);
+      const gap = now - this.lastFrameAt;
+      /*
+       * A frame that took five seconds is not a slow frame, it is a tab that
+       * was hidden. Handing that to `advance` would clamp it to twenty swings
+       * per hero and discard the rest, so the player would lose the time
+       * entirely; the estimator credits it as the sawtooth it actually was.
+       */
+      if (gap >= AWAY_THRESHOLD_MS) this.simulation.creditAway(gap);
+      else this.simulation.advance(gap);
       this.lastFrameAt = now;
       const snapshot = this.simulation.read();
       for (const listener of this.listeners) listener(snapshot);

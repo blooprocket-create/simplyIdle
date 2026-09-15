@@ -42,11 +42,15 @@ export interface SimulationSnapshot {
   wave: number;
   ticks: number;
   enemy: EnemyView | null;
+  /** The team's shared health bar. A wipe sends them back a chapter. */
+  team: { hp: Decimal; maxHp: Decimal };
   heroes: HeroView[];
   /** Hits from the last step only. Replaced, not accumulated. */
   hits: HitEvent[];
   totals: {
     kills: number;
+    /** Wipes. Each one costs a chapter. */
+    deaths: number;
     /** Damage that landed on something. */
     dealt: Decimal;
     /** Damage lost past the killing blow — the price of discrete attacks. */
@@ -66,8 +70,9 @@ export function emptySnapshot(): SimulationSnapshot {
     wave: 1,
     ticks: 0,
     enemy: null,
+    team: { hp: new Decimal(0), maxHp: new Decimal(0) },
     heroes: [],
     hits: [],
-    totals: { kills: 0, dealt: new Decimal(0), overkill: new Decimal(0) },
+    totals: { kills: 0, deaths: 0, dealt: new Decimal(0), overkill: new Decimal(0) },
   };
 }
