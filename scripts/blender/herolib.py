@@ -180,6 +180,101 @@ def painted(name, image, emit=0.22):
     return m
 
 
+def seg_dist(p, a, b):
+    """Distance from a point to a line segment."""
+    return _seg_dist(Vector(p), Vector(a), Vector(b))
+
+
+def garment(name, body, keep, material, offset=0.011, thick=0.009):
+    """A copy of the body, trimmed to a region and pushed out along normals.
+
+    Clothing built as a shell of the actual body fits it exactly. A shape
+    grown separately over the same joints only approximates it, and the
+    approximation is precisely where cloth ends up inside skin.
+    """
+    me = body.data.copy()
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(ob)
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.verts.ensure_lookup_table()
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not keep(v.co)], context='VERTS')
+    bm.to_mesh(me)
+    bm.free()
+    d = ob.modifiers.new('push', 'DISPLACE')
+    d.strength = offset
+    d.mid_level = 0.0
+    s = ob.modifiers.new('sol', 'SOLIDIFY')
+    s.thickness = thick
+    s.offset = 1
+    me.materials.clear()
+    me.materials.append(material)
+    return smooth(ob)
+
+
+def keep_back(name, loc, scale, material, cut=-0.32, thick=0.014, segs=(32, 20)):
+    """A cap over the back and sides of a head: a sphere with its face cut off.
+
+    Real hair volume, so the skull has a silhouette from every angle instead
+    of a bare dome, and so the painted face has somewhere to stop.
+    """
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.5, location=loc,
+                                         segments=segs[0], ring_count=segs[1])
+    o = bpy.context.object
+    o.name = name
+    o.scale = scale
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.y < cut], context='FACES')
+    bm.to_mesh(o.data)
+    bm.free()
+    s = o.modifiers.new('sol', 'SOLIDIFY')
+    s.thickness = thick
+    s.offset = 1
+    o.data.materials.append(material)
+    return smooth(o)
+
+
+def assign_faces(obj, material, test):
+    """Give polygons that pass `test(centre, normal)` their own material.
+
+    Lets one mesh carry skin, a painted face and hair without being cut into
+    separate objects — which matters when the mesh is a real body and cutting
+    it would break its topology.
+    """
+    me = obj.data
+    names = [m.name for m in me.materials]
+    if material.name not in names:
+        me.materials.append(material)
+        names.append(material.name)
+    slot = names.index(material.name)
+    for p in me.polygons:
+        if test(p.center, p.normal):
+            p.material_index = slot
+    return obj
+
+
+def front_faces_only(obj, back_material, cut=-0.22):
+    """Restrict the painted face to polygons that actually face the front.
+
+    The projection reads x and z, so it cannot tell the front of a skull from
+    the back: both get the same UVs, and the painting ends up mapped onto the
+    back of the head as a second face. Everything not clearly facing forward
+    gets a plain material instead.
+    """
+    me = obj.data
+    names = [m.name for m in me.materials]
+    if back_material.name not in names:
+        me.materials.append(back_material)
+        names.append(back_material.name)
+    back = names.index(back_material.name)
+    for p in me.polygons:
+        if p.normal.y > cut:
+            p.material_index = back
+    return obj
+
+
 def face_uvs(obj, origin, scale, loc, layer='face'):
     """Write the front projection into a UV layer, from world positions."""
     me = obj.data
@@ -543,7 +638,7 @@ def stage(fast=False, floor=True):
         bpy.context.object.data.materials.append(plain('floor', (0.013, 0.014, 0.016), 0.95))
     world = bpy.data.worlds.new('w')
     bpy.context.scene.world = world
-    world.node_tree.nodes['Background'].inputs['Color'].default_value = (0.024, 0.028, 0.038, 1)
+    world.node_tree.nodes['Background'].inputs['Color'].default_value = (0.046, 0.052, 0.068, 1)
     for loc, energy, size, colour in (
         ((-2.3, -2.5, 3.1), 300, 2.4, (0.92, 0.95, 1.00)),
         ((3.0, -1.6, 1.7), 55, 3.6, (0.46, 0.60, 1.00)),

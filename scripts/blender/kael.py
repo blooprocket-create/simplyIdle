@@ -36,7 +36,7 @@ SKIN  = H.plain('skin', (0.292, 0.162, 0.114), 0.54)
 GREEN = _worn('green', (0.030, 0.070, 0.028), (0.058, 0.110, 0.043), (0.74, 0.93), 0.0, 60.0, 0.15)
 LEATH = _worn('leather', (0.052, 0.030, 0.017), (0.088, 0.055, 0.030), (0.55, 0.85), 0.0, 44.0, 0.20)
 DARKL = _worn('darkleather', (0.017, 0.013, 0.010), (0.038, 0.027, 0.019), (0.55, 0.85), 0.0, 48.0, 0.20)
-STEEL = _worn('steel', (0.168, 0.162, 0.156), (0.112, 0.076, 0.048), (0.36, 0.82), 0.50, 38.0, 0.36)
+STEEL = _worn('steel', (0.074, 0.076, 0.081), (0.068, 0.045, 0.029), (0.40, 0.72), 0.82, 15.0, 0.13)
 WOOD  = _worn('wood', (0.058, 0.033, 0.017), (0.098, 0.060, 0.030), (0.62, 0.86), 0.0, 14.0, 0.35)
 HAIR  = H.plain('hair', (0.026, 0.021, 0.017), 0.92)
 DARK  = H.plain('dark', (0.014, 0.013, 0.012), 0.85)
@@ -64,15 +64,15 @@ def in_crop(ur, yr):
 HZ = 1.672
 SIDES = ((1, 'L'), (-1, 'R'))
 PELVIS, WAIST, CHEST, CLAV, NECK = 0.94, 1.11, 1.34, 1.474, 1.548
-SHO, ELB, WRI = 0.192, 0.290, 0.318
+SHO, ELB, WRI = 0.186, 0.286, 0.314
 
 
 def sho(s): return (s * SHO, 0.0, 1.456)
 def elb(s): return (s * ELB, 0.0, 1.190)
 def wri(s): return (s * WRI, -0.030, 0.955)
 def fist(s): return (s * WRI, -0.052, 0.832)
-def hip(s): return (s * 0.102, 0.0, 0.900)
-def kne(s): return (s * 0.122, 0.0, 0.510)
+def hip(s): return (s * 0.096, 0.0, 0.900)
+def kne(s): return (s * 0.118, 0.0, 0.510)
 def ank(s): return (s * 0.122, 0.0, 0.100)
 def toe(s): return (s * 0.122, -0.135, 0.042)
 
@@ -127,11 +127,14 @@ for s, t in SIDES:
     BODY_J[f'sho{t}'] = (sho(s), (0.080, 0.080))
     BODY_J[f'elb{t}'] = (elb(s), (0.058, 0.058))
     BODY_J[f'wri{t}'] = (wri(s), (0.042, 0.042))
-    BODY_J[f'hip{t}'] = (hip(s), (0.094, 0.094))
-    BODY_J[f'kne{t}'] = (kne(s), (0.068, 0.068))
-    BODY_J[f'ank{t}'] = (ank(s), (0.050, 0.050))
+    BODY_J[f'hip{t}'] = (hip(s), (0.092, 0.092))
+    BODY_J[f'thi{t}'] = (H.along(hip(s), kne(s), 0.34), (0.084, 0.086))
+    BODY_J[f'kne{t}'] = (kne(s), (0.062, 0.064))
+    BODY_J[f'cal{t}'] = (H.along(kne(s), ank(s), 0.32), (0.070, 0.074))
+    BODY_J[f'ank{t}'] = (ank(s), (0.046, 0.048))
     BODY_B += [('clav', f'sho{t}'), (f'sho{t}', f'elb{t}'), (f'elb{t}', f'wri{t}'),
-               ('pelvis', f'hip{t}'), (f'hip{t}', f'kne{t}'), (f'kne{t}', f'ank{t}')]
+               ('pelvis', f'hip{t}'), (f'hip{t}', f'thi{t}'), (f'thi{t}', f'kne{t}'),
+               (f'kne{t}', f'cal{t}'), (f'cal{t}', f'ank{t}')]
 part(H.skinned('body', BODY_J, BODY_B, SKIN), ALL_BONES)
 
 # Gloved fists. Bare hands read as pale lumps against everything else here.
@@ -150,7 +153,7 @@ GAMB_J = {
 GAMB_B = [('g_hem', 'g_waist'), ('g_waist', 'g_chest'), ('g_chest', 'g_clav')]
 for s, t in SIDES:
     GAMB_J[f'g_sho{t}'] = ((s * SHO, 0, 1.478), (0.126, 0.124))
-    GAMB_J[f'g_elb{t}'] = ((s * ELB, 0, 1.205), (0.074, 0.074))
+    GAMB_J[f'g_elb{t}'] = ((s * ELB, 0, 1.196), (0.086, 0.086))
     GAMB_B += [('g_clav', f'g_sho{t}'), (f'g_sho{t}', f'g_elb{t}')]
 part(H.skinned('gambeson', GAMB_J, GAMB_B, GREEN),
      ['chest', 'spine', 'hips', 'neck'] + [f'{b}.{t}' for _, t in SIDES
@@ -164,24 +167,32 @@ part(H.chain('skirt', [((0, 0, 1.020), (0.176, 0.150)),
 TROU_J = {'t_pelvis': ((0, 0, 0.90), (0.130, 0.110))}
 TROU_B = []
 for s, t in SIDES:
-    TROU_J[f't_hip{t}'] = ((s * 0.102, 0, 0.855), (0.112, 0.112))
-    TROU_J[f't_kne{t}'] = ((s * 0.122, 0, 0.520), (0.090, 0.090))
-    TROU_J[f't_ank{t}'] = ((s * 0.122, 0, 0.230), (0.074, 0.074))
-    TROU_B += [('t_pelvis', f't_hip{t}'), (f't_hip{t}', f't_kne{t}'), (f't_kne{t}', f't_ank{t}')]
+    TROU_J[f't_hip{t}'] = ((s * 0.096, 0, 0.862), (0.108, 0.108))
+    TROU_J[f't_thi{t}'] = ((s * 0.110, 0, 0.732), (0.100, 0.102))
+    TROU_J[f't_kne{t}'] = ((s * 0.118, 0, 0.520), (0.080, 0.082))
+    TROU_J[f't_cal{t}'] = ((s * 0.118, 0, 0.392), (0.088, 0.092))
+    TROU_J[f't_ank{t}'] = ((s * 0.118, 0, 0.230), (0.068, 0.070))
+    TROU_B += [('t_pelvis', f't_hip{t}'), (f't_hip{t}', f't_thi{t}'), (f't_thi{t}', f't_kne{t}'),
+               (f't_kne{t}', f't_cal{t}'), (f't_cal{t}', f't_ank{t}')]
 part(H.skinned('trousers', TROU_J, TROU_B, LEATH),
      ['hips'] + [f'{b}.{t}' for _, t in SIDES for b in ('thigh', 'shin')])
 
 for s, t in SIDES:
-    part(H.chain(f'boot{t}', [((s * 0.122, 0.005, 0.300), (0.092, 0.092)),
-                              ((s * 0.122, 0.000, 0.075), (0.082, 0.086)),
-                              ((s * 0.122, -0.075, 0.048), (0.072, 0.062)),
-                              ((s * 0.122, -0.135, 0.042), (0.058, 0.044))], DARKL),
+    part(H.chain(f'boot{t}', [((s * 0.118, 0.005, 0.300), (0.086, 0.088)),
+                              ((s * 0.118, 0.000, 0.075), (0.076, 0.082)),
+                              ((s * 0.118, -0.075, 0.048), (0.066, 0.060)),
+                              ((s * 0.118, -0.135, 0.042), (0.054, 0.042))], DARKL),
          [f'shin.{t}', f'foot.{t}'])
 
 # ── plate ─────────────────────────────────────────────────────────────────
-part(H.cone_shell('yoke', 0.196, 0.116, 0.118, (0, 0.008, 1.468), STEEL, squash=(1, 0.82, 1)), 'chest')
+part(H.cone_shell('yoke', 0.202, 0.146, 0.120, (0, 0.008, 1.470), STEEL, squash=(1, 0.84, 1)), 'chest')
 part(H.cone_shell('gorget', 0.098, 0.086, 0.062, (0, 0.006, 1.542), STEEL, squash=(1, 0.86, 1)), 'neck')
-part(H.ring('yokerim', (0, 0.008, 1.410), 0.196, 0.013, STEEL, squash=(1, 0.82, 1.3)), 'chest')
+part(H.ring('yokerim', (0, 0.008, 1.414), 0.202, 0.012, STEEL, squash=(1, 0.84, 1.3)), 'chest')
+part(H.ring('yokelame', (0, 0.008, 1.462), 0.176, 0.010, STEEL, squash=(1, 0.84, 1.3)), 'chest')
+# The reverse of the figure was a flat green slab. The bend sweeps toward +Y
+# from the front face, so a half turn about Z aims a plate at the back.
+part(H.plate('backplate', 0.480, 0.300, 0.017, 150, (0, 0.150, 1.330), (R(-3), 0, R(180)),
+             STEEL, cuts=14), 'chest')
 
 # One big riveted pectoral low on his left, as the portrait has, leaving the
 # centre and his other side in green.
@@ -201,26 +212,28 @@ def rivet(loc, bone, r=0.010):
 for x, z in ((-0.150, 1.492), (0.150, 1.492), (0.034, 1.382), (0.166, 1.390),
              (0.036, 1.196), (0.164, 1.204)):
     rivet((x, -0.172, z), 'chest')
+for x, z in ((-0.140, 1.442), (0.140, 1.442), (-0.140, 1.230), (0.140, 1.230)):
+    rivet((x, 0.192, z), 'chest')
 
 for s, t in SIDES:
     # Three lames cascading down the outside of the arm, each flaring a
     # little wider than the last — the portrait's shoulders are layered, not
     # a single dome.
     tilt = H.aim_rot(elb(s), sho(s))
-    for i, (at, rb, rt, dep) in enumerate(((-0.14, 0.168, 0.140, 0.098),
-                                           (0.18, 0.150, 0.132, 0.084),
-                                           (0.45, 0.132, 0.120, 0.074),
-                                           (0.68, 0.112, 0.104, 0.066))):
+    for i, (at, rb, rt, dep) in enumerate(((-0.12, 0.124, 0.108, 0.082),
+                                           (0.20, 0.118, 0.106, 0.072),
+                                           (0.48, 0.108, 0.098, 0.066),
+                                           (0.74, 0.094, 0.088, 0.058))):
         bone = f'shoulder.{t}' if i < 2 else f'upper_arm.{t}'
         part(H.cone_shell(f'lame{t}{i}', rb, rt, dep, H.along(sho(s), elb(s), at),
                           STEEL, thick=0.012, rot=tilt, squash=(1, 0.88, 1)), bone)
         p = H.along(sho(s), elb(s), at)
         rivet((p[0] + s * 0.052, -0.108, p[2] - 0.026), bone, 0.009)
     # Vambrace down the forearm.
-    part(H.chain(f'vamb{t}', [((s * (ELB + 0.004), -0.008, 1.146), (0.086, 0.086)),
-                              ((s * WRI, -0.026, 0.978), (0.068, 0.068))], STEEL),
+    part(H.chain(f'vamb{t}', [((s * (ELB + 0.004), -0.008, 1.176), (0.092, 0.092)),
+                              ((s * WRI, -0.026, 0.962), (0.070, 0.070))], STEEL),
          f'forearm.{t}')
-    part(H.ring(f'vambrim{t}', (s * (ELB + 0.004), -0.008, 1.150), 0.072, 0.011, STEEL,
+    part(H.ring(f'vambrim{t}', (s * (ELB + 0.004), -0.008, 1.178), 0.078, 0.011, STEEL,
                 rot=H.aim_rot(wri(s), elb(s))), f'forearm.{t}')
 
 # Two broad leather straps crossing the chest, with the square buckle where
@@ -249,15 +262,13 @@ HEAD = part(H.chain('head', [((0, 0.016, HZ + 0.110), (0.092, 0.100)),
                              ((0, -0.008, HZ - 0.037), (0.111, 0.121)),
                              ((0, -0.024, HZ - 0.104), (0.083, 0.098)),
                              ((0, -0.006, HZ - 0.158), (0.052, 0.062))], FACE, sub=3), 'head')
-# Hair only where a front projection has nothing to say: behind the skull.
-for s, t in SIDES:
-    part(H.chain(f'temple{t}', [((s * 0.074, -0.052, HZ + 0.074), (0.020, 0.020)),
-                                ((s * 0.090, 0.006, HZ + 0.050), (0.026, 0.026)),
-                                ((s * 0.096, 0.062, HZ - 0.006), (0.028, 0.028)),
-                                ((s * 0.088, 0.104, HZ - 0.060), (0.024, 0.024))], HAIR), 'head')
-part(H.chain('hair', [((0, 0.070, HZ + 0.082), (0.044, 0.034)),
-                      ((0, 0.116, HZ + 0.026), (0.046, 0.038)),
-                      ((0, 0.118, HZ - 0.036), (0.040, 0.034))], HAIR), 'head')
+# A cap over the crown, back and sides. A front projection has nothing to
+# say about any of them, and a bare dome with painted hair on one face is
+# what made the head read as a mask on a balloon.
+part(H.keep_back('hair', (0, 0.040, HZ + 0.012), (0.206, 0.224, 0.244), HAIR, cut=0.02,
+                 thick=0.010), 'head')
+part(H.keep_back('nape', (0, 0.050, HZ - 0.092), (0.172, 0.186, 0.128), HAIR, cut=0.14,
+                 thick=0.010), 'head')
 
 # ── kite shield, on the arm the portrait carries it ───────────────────────
 KITE = [(-0.215, 0.330), (0.215, 0.330), (0.232, 0.170), (0.215, -0.030),
@@ -302,6 +313,7 @@ part(H.slab('blade', BLADE, 0.015, STEEL, (GX, GY, 1.392), (0, 0, 0), bevel=0.00
 FROZEN = [(H.freeze(o), b) for o, b in PARTS]
 HEAD = next(o for o, _ in FROZEN if o.name.startswith('head'))
 H.face_uvs(HEAD, (0, 0, HZ), *FACE_FIT)
+H.front_faces_only(HEAD, HAIR, cut=0.08)
 
 ARM = H.build_rig('kael', DEFORM, CONTROLS, IK)
 for obj, bones in FROZEN:
