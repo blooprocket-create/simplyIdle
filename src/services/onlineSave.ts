@@ -159,6 +159,7 @@ export const SAVE_CHUNKS: Record<string, string[]> = {
     'autoSummonMode',
     'autoSummonReserveGold',
     'autoBurstEnabled',
+    'autoCastHeroActivesEnabled',
     'combatTempo',
     'autoTempoEnabled',
     'autoTempoTarget',

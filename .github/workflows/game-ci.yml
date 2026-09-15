@@ -3,12 +3,10 @@ name: Game CI
 on:
   pull_request:
     paths-ignore:
-      - 'wiki/**'
       - '*.md'
   push:
     branches: [main]
     paths-ignore:
-      - 'wiki/**'
       - '*.md'
 
 jobs:
@@ -35,6 +33,9 @@ jobs:
 
       - name: Format check
         run: npm run format:check
+
+      - name: Unit tests
+        run: npm test
 
   build-web:
     runs-on: ubuntu-latest

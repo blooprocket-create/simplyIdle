@@ -1,5 +1,4 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Constants from 'expo-constants';
 import {
   View,
   Text,
@@ -26,6 +25,7 @@ import {
   getDpsBreakdown,
   getEquipmentCraftCost,
   getFacilityUpgradeCost,
+  getHeroActiveStatuses,
   getHeroGoldLevelCost,
   getMaxHeatForLevel,
   useGameState,
@@ -212,7 +212,6 @@ export const ACH_BONUS_CAP_PCT = 75;
 const FEEDBACK_FORM_URL =
   'https://docs.google.com/forms/d/e/1FAIpQLSf6txIw9UL-F9kItXZfOfr9d0qA_XCvaNIsBUf_4NZ1HZpfrw/viewform?usp=publish-editor';
 const HAS_BETA_FEEDBACK_FORM = !FEEDBACK_FORM_URL.includes('replace-with-your-beta-form');
-const FALLBACK_WIKI_URL = 'https://simply-idle.vercel.app/wiki/';
 const GEAR_RARITY_POINTS: Record<string, number> = {
   common: 40,
   rare: 90,
@@ -241,27 +240,6 @@ function scoreEquipmentForClass(
   return statScore * 12 + (GEAR_RARITY_POINTS[item.rarity] ?? 0);
 }
 
-function resolveWikiUrl(): string {
-  if (Platform.OS === 'web') {
-    const webOrigin = globalThis?.location?.origin;
-    if (typeof webOrigin === 'string' && webOrigin.length > 0) {
-      return `${webOrigin.replace(/\/$/, '')}/wiki/`;
-    }
-  }
-
-  const expoExtra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra ?? {}) as {
-    wikiUrl?: string;
-    wikiUrlWeb?: string;
-  };
-  const preferred = Platform.OS === 'web' ? expoExtra.wikiUrlWeb : expoExtra.wikiUrl;
-  const fallback = expoExtra.wikiUrl ?? FALLBACK_WIKI_URL;
-  const resolved = (preferred ?? fallback ?? '').trim();
-  if (resolved.length > 0) {
-    return resolved;
-  }
-  return FALLBACK_WIKI_URL;
-}
-const HAS_WIKI_URL = !resolveWikiUrl().includes('replace-with-your-wiki-url');
 const VIP_LEVEL_THRESHOLDS = [0, 50, 150, 350, 700, 1500, 3000, 6500, 15000, 35000, 100000] as const;
 const GOLD_SHOP_OFFERS = [
   { id: 'exp_cache', name: 'Training Cache', desc: '+6 Training Scrolls', cost: 2200 },
@@ -361,6 +339,8 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
     setAutoSummonEnabled,
     setAutoSummonMode,
     setAutoBurstEnabled,
+    setAutoCastHeroActivesEnabled,
+    castHeroActiveSkill,
     setCombatTempo,
     setAutoTempoEnabled,
     setAutoTempoTarget,
@@ -595,6 +575,7 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
   const monsterHpPct = Math.max(0, Math.min(1, state.monsterHp / state.monsterMaxHp)) * 100;
   const teamHpPct = Math.max(0, Math.min(1, state.teamHp / state.teamMaxHp)) * 100;
   const activeTeamSet = useMemo(() => new Set(state.activeTeamHeroIds), [state.activeTeamHeroIds]);
+  const heroActiveStatuses = useMemo(() => getHeroActiveStatuses(state), [state]);
   const usableInventory = useMemo(
     () =>
       Object.entries(state.usableItemCounts)
@@ -2422,6 +2403,9 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 buyPremiumCoolant,
                 applyUsableItem,
                 setRebirthOpen: (open: boolean) => open && setActiveModal('rebirth'),
+                heroActiveStatuses,
+                castHeroActiveSkill,
+                setAutoCastHeroActivesEnabled,
               }}
             />
           </ErrorBoundary>
@@ -3415,58 +3399,6 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                 </Pressable>
               </View>
 
-              <View style={styles.settingsCard}>
-                <Text style={styles.settingsCardTitle}>Wiki & Guides</Text>
-                <Text style={styles.settingsLabel}>
-                  {HAS_WIKI_URL
-                    ? 'Open the official SimplyIdle wiki for guides, formulas, and system references.'
-                    : 'Wiki URL is not configured yet. Add a live wiki URL before enabling this action.'}
-                </Text>
-                <Pressable
-                  style={[styles.settingsCycleBtn, !HAS_WIKI_URL && styles.shopBuyBtnDisabled]}
-                  disabled={!HAS_WIKI_URL}
-                  onPress={() => {
-                    const wikiUrl = resolveWikiUrl();
-                    debugLog('settings', 'Open wiki', { wikiUrl });
-                    void trackEvent('wiki_link_opened', { source: 'settings', wikiUrl });
-                    void Linking.openURL(wikiUrl);
-                  }}
-                >
-                  <Text style={styles.settingsCycleBtnText}>
-                    {HAS_WIKI_URL ? 'Open Wiki Home' : 'Wiki Coming Soon'}
-                  </Text>
-                </Pressable>
-                {HAS_WIKI_URL && (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                    {[
-                      { label: '⚙️ Core Mechanics', path: 'core-mechanics' },
-                      { label: '🦸 Heroes', path: 'heroes' },
-                      { label: '🎒 Equipment', path: 'equipment' },
-                      { label: '📈 Strategy', path: 'strategy' },
-                      { label: '🏆 Seasons', path: 'seasons-leaderboard' },
-                      { label: '👥 Social', path: 'social' },
-                    ].map(link => (
-                      <Pressable
-                        key={link.path}
-                        style={{
-                          backgroundColor: '#1a2a3a',
-                          paddingHorizontal: 10,
-                          paddingVertical: 5,
-                          borderRadius: 6,
-                        }}
-                        onPress={() => {
-                          const url = `${resolveWikiUrl()}${link.path}`;
-                          void trackEvent('wiki_link_opened', { source: 'settings_quick', page: link.path });
-                          void Linking.openURL(url);
-                        }}
-                      >
-                        <Text style={{ color: '#8BB8E8', fontSize: 12 }}>{link.label}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
-              </View>
-
               {isAdmin && (
                 <View style={styles.settingsCard}>
                   <Text style={styles.settingsCardTitle}>Dev Mail Console</Text>
@@ -3639,6 +3571,26 @@ export default function GameScreen({ accountName, onLogout }: GameScreenProps) {
                     <Text style={styles.settingsCycleBtnText}>{state.autoSummonMode.toUpperCase()}</Text>
                   </Pressable>
                 </View>
+              </View>
+
+              <View style={styles.settingsCard}>
+                <Text style={styles.settingsCardTitle}>Auto-Cast Hero Abilities</Text>
+                <View style={styles.settingsRowBetween}>
+                  <Text style={styles.settingsLabel}>Enabled</Text>
+                  <Pressable
+                    style={[
+                      styles.settingsToggleBtn,
+                      state.autoCastHeroActivesEnabled && styles.settingsToggleBtnActive,
+                    ]}
+                    onPress={() => setAutoCastHeroActivesEnabled(!state.autoCastHeroActivesEnabled)}
+                  >
+                    <Text style={styles.settingsToggleText}>{state.autoCastHeroActivesEnabled ? 'ON' : 'OFF'}</Text>
+                  </Pressable>
+                </View>
+                <Text style={styles.settingsHintText}>
+                  On, hero abilities fire themselves the moment they come off cooldown. Off, they wait on the battle
+                  screen for you to spend them.
+                </Text>
               </View>
 
               <View style={styles.settingsCard}>

@@ -504,6 +504,7 @@ export interface GameState {
   autoSummonEnabled: boolean;
   autoSummonMode: 'single' | 'x10';
   autoBurstEnabled: boolean;
+  autoCastHeroActivesEnabled: boolean;
   combatTempo: CombatTempo;
   autoTempoEnabled: boolean;
   autoTempoTarget: AutoTempoTarget;
@@ -692,6 +693,7 @@ export const DEFAULT_STATE: GameState = {
   autoSummonEnabled: false,
   autoSummonMode: 'single',
   autoBurstEnabled: false,
+  autoCastHeroActivesEnabled: true,
   combatTempo: 1,
   autoTempoEnabled: false,
   autoTempoTarget: 2,
@@ -1723,6 +1725,206 @@ function maybeAutoSummonTick(state: GameState): GameState {
   return single ?? state;
 }
 
+/**
+ * Resolves one hero's active skill: applies its effect and reports the cooldown it
+ * should go on. Shared by the auto-cast tick and by a player-issued cast, so both
+ * paths produce identical results.
+ */
+function applyHeroActiveSkill(state: GameState, hero: HeroUnit): { state: GameState; cooldownMs: number } {
+  let nextState = state;
+  let cooldownMs = 0;
+
+  // Check if hero has unique weapon equipped → use unique skill instead of generic
+  const gearProgress = state.heroUniqueGearByHeroId[hero.id];
+  const hasUniqueEquipped = gearProgress && gearProgress.equippedByUid === hero.uid;
+  const uniqueSkill = hasUniqueEquipped ? getHeroUniqueSkillParams(hero.id, gearProgress.rank) : null;
+
+  if (uniqueSkill) {
+    // ── Unique weapon skill ──────────────────────────────────────────
+    const weaponName = getHeroUniqueWeaponName(hero.id);
+    const profile = uniqueSkill;
+
+    switch (profile.type) {
+      case 'shield_wall':
+        nextState = {
+          ...nextState,
+          damageReductionBuffPct: Math.max(nextState.damageReductionBuffPct, profile.power),
+          damageReductionBuffMs: Math.max(nextState.damageReductionBuffMs, profile.durationMs),
+        };
+        nextState = queueCombatLog(
+          nextState,
+          `${hero.emoji} ${hero.name} raised ${weaponName} — Shield Wall! (${Math.round(profile.power * 100)}% DR)`,
+        );
+        break;
+
+      case 'execute': {
+        const missingHp = nextState.monsterMaxHp - nextState.monsterHp;
+        const executeDmg = Math.ceil(missingHp * profile.power);
+        nextState = {
+          ...nextState,
+          monsterHp: Math.max(1, nextState.monsterHp - executeDmg),
+        };
+        nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} — Execute! ${executeDmg} dmg`);
+        break;
+      }
+
+      case 'rallying_cry': {
+        const heal = Math.ceil(nextState.teamMaxHp * profile.power);
+        nextState = {
+          ...nextState,
+          damageBuffPct: Math.max(nextState.damageBuffPct, profile.power),
+          damageBuffMs: Math.max(nextState.damageBuffMs, profile.durationMs),
+          teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + heal),
+        };
+        nextState = queueCombatLog(
+          nextState,
+          `${hero.emoji} ${hero.name} — Rallying Cry! +${Math.round(profile.power * 100)}% DPS & healed ${heal}`,
+        );
+        break;
+      }
+
+      case 'soul_drain': {
+        const drainDmg = Math.ceil(nextState.monsterMaxHp * profile.power);
+        const selfHeal = Math.ceil(nextState.teamMaxHp * profile.power * 0.5);
+        nextState = {
+          ...nextState,
+          monsterHp: Math.max(1, nextState.monsterHp - drainDmg),
+          teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + selfHeal),
+        };
+        nextState = queueCombatLog(
+          nextState,
+          `${hero.emoji} ${hero.name} — Soul Drain! ${drainDmg} dmg, healed ${selfHeal}`,
+        );
+        break;
+      }
+
+      case 'crit_storm': {
+        const hitDmg = Math.ceil(nextState.monsterMaxHp * profile.power);
+        const totalDmg = hitDmg * 5;
+        nextState = {
+          ...nextState,
+          monsterHp: Math.max(1, nextState.monsterHp - totalDmg),
+        };
+        nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} — Crit Storm! 5×${hitDmg} = ${totalDmg} dmg`);
+        break;
+      }
+
+      case 'mark_prey':
+        nextState = {
+          ...nextState,
+          damageBuffPct: Math.max(nextState.damageBuffPct, profile.power),
+          damageBuffMs: Math.max(nextState.damageBuffMs, profile.durationMs),
+        };
+        nextState = queueCombatLog(
+          nextState,
+          `${hero.emoji} ${hero.name} — Mark Prey! Enemy takes +${Math.round(profile.power * 100)}% dmg`,
+        );
+        break;
+
+      case 'chain_lightning': {
+        const burstDmg = Math.ceil(nextState.monsterMaxHp * profile.power);
+        nextState = {
+          ...nextState,
+          monsterHp: Math.max(1, nextState.monsterHp - burstDmg),
+          damageBuffPct: Math.max(nextState.damageBuffPct, profile.power * 0.6),
+          damageBuffMs: Math.max(nextState.damageBuffMs, profile.durationMs),
+        };
+        nextState = queueCombatLog(
+          nextState,
+          `${hero.emoji} ${hero.name} — Chain Lightning! ${burstDmg} burst + DPS up`,
+        );
+        break;
+      }
+
+      case 'barrier_pulse': {
+        const bHeal = Math.ceil(nextState.teamMaxHp * profile.power);
+        nextState = {
+          ...nextState,
+          teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + bHeal),
+          damageReductionBuffPct: Math.max(nextState.damageReductionBuffPct, profile.power * 0.5),
+          damageReductionBuffMs: Math.max(nextState.damageReductionBuffMs, profile.durationMs),
+        };
+        nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} — Barrier Pulse! +${bHeal} HP & shield`);
+        break;
+      }
+
+      case 'armor_shred':
+        nextState = {
+          ...nextState,
+          damageBuffPct: Math.max(nextState.damageBuffPct, profile.power),
+          damageBuffMs: Math.max(nextState.damageBuffMs, profile.durationMs),
+        };
+        nextState = queueCombatLog(
+          nextState,
+          `${hero.emoji} ${hero.name} — Armor Shred! Team DPS +${Math.round(profile.power * 100)}%`,
+        );
+        break;
+
+      case 'overcharge': {
+        const overDmg = Math.ceil(nextState.monsterMaxHp * profile.power);
+        nextState = {
+          ...nextState,
+          monsterHp: Math.max(1, nextState.monsterHp - overDmg),
+        };
+        nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} — Overcharge! ${overDmg} massive hit`);
+        break;
+      }
+    }
+
+    cooldownMs = profile.cooldownMs;
+  } else {
+    // ── Generic archetype skill (no unique weapon) ───────────────────
+    const archetype: HeroActiveSkillArchetypeId = hero.activeSkillArchetype;
+    const info = getHeroActiveArchetypeInfo(archetype);
+
+    if (archetype === 'frontline_ward') {
+      nextState = {
+        ...nextState,
+        damageReductionBuffPct: Math.max(nextState.damageReductionBuffPct, 0.2),
+        damageReductionBuffMs: Math.max(nextState.damageReductionBuffMs, 3500),
+      };
+      nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} cast ${info.name} (team guard up)`);
+    }
+
+    if (archetype === 'burst_volley') {
+      const burst = Math.ceil(nextState.monsterMaxHp * 0.08);
+      nextState = {
+        ...nextState,
+        monsterHp: Math.max(1, nextState.monsterHp - burst),
+      };
+      nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} used ${info.name} for ${burst} burst`);
+    }
+
+    if (archetype === 'battle_chant') {
+      nextState = {
+        ...nextState,
+        damageBuffPct: Math.max(nextState.damageBuffPct, 0.18),
+        damageBuffMs: Math.max(nextState.damageBuffMs, 4200),
+      };
+      nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} activated ${info.name} (+DPS)`);
+    }
+
+    if (archetype === 'mending_pulse') {
+      const healFrac = MENDING_PULSE_BASE_HEAL + hero.level * MENDING_PULSE_LEVEL_SCALE;
+      const heal = Math.ceil(nextState.teamMaxHp * Math.min(healFrac, 0.25));
+      nextState = {
+        ...nextState,
+        teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + heal),
+      };
+      nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} triggered ${info.name} (+${heal} HP)`);
+    }
+
+    cooldownMs = ACTIVE_SKILL_COOLDOWN_MS[archetype];
+  }
+
+  return { state: nextState, cooldownMs };
+}
+
+/**
+ * Advances every active hero's ability cooldown. A hero whose cooldown reaches zero
+ * fires immediately when auto-cast is on; otherwise the ability sits ready and waits
+ * for the player to spend it via CAST_HERO_ACTIVE.
+ */
 function tickHeroActives(state: GameState, elapsedMs: number): GameState {
   const team = new Set(state.activeTeamHeroIds);
   if (team.size === 0) return state;
@@ -1734,203 +1936,74 @@ function tickHeroActives(state: GameState, elapsedMs: number): GameState {
     if (!team.has(hero.uid)) continue;
     cooldowns[hero.uid] = Math.max(0, (cooldowns[hero.uid] ?? 0) - elapsedMs);
     if (cooldowns[hero.uid] > 0) continue;
+    if (!nextState.autoCastHeroActivesEnabled) continue;
 
-    const role = getFormationRoleForHero(hero);
-    const roleTriggerMult = role === 'back' ? 1.22 : role === 'mid' ? 1.05 : 0.92;
-    const triggerChance = Math.min(0.16, 0.015 + hero.level * 0.00012) * roleTriggerMult * (elapsedMs / 1000);
-    if (Math.random() > triggerChance) continue;
-
-    // Check if hero has unique weapon equipped → use unique skill instead of generic
-    const gearProgress = state.heroUniqueGearByHeroId[hero.id];
-    const hasUniqueEquipped = gearProgress && gearProgress.equippedByUid === hero.uid;
-    const uniqueSkill = hasUniqueEquipped ? getHeroUniqueSkillParams(hero.id, gearProgress.rank) : null;
-
-    if (uniqueSkill) {
-      // ── Unique weapon skill ──────────────────────────────────────────
-      const weaponName = getHeroUniqueWeaponName(hero.id);
-      const profile = uniqueSkill;
-
-      switch (profile.type) {
-        case 'shield_wall':
-          nextState = {
-            ...nextState,
-            damageReductionBuffPct: Math.max(nextState.damageReductionBuffPct, profile.power),
-            damageReductionBuffMs: Math.max(nextState.damageReductionBuffMs, profile.durationMs),
-          };
-          nextState = queueCombatLog(
-            nextState,
-            `${hero.emoji} ${hero.name} raised ${weaponName} — Shield Wall! (${Math.round(profile.power * 100)}% DR)`,
-          );
-          break;
-
-        case 'execute': {
-          const missingHp = nextState.monsterMaxHp - nextState.monsterHp;
-          const executeDmg = Math.ceil(missingHp * profile.power);
-          nextState = {
-            ...nextState,
-            monsterHp: Math.max(1, nextState.monsterHp - executeDmg),
-          };
-          nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} — Execute! ${executeDmg} dmg`);
-          break;
-        }
-
-        case 'rallying_cry': {
-          const heal = Math.ceil(nextState.teamMaxHp * profile.power);
-          nextState = {
-            ...nextState,
-            damageBuffPct: Math.max(nextState.damageBuffPct, profile.power),
-            damageBuffMs: Math.max(nextState.damageBuffMs, profile.durationMs),
-            teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + heal),
-          };
-          nextState = queueCombatLog(
-            nextState,
-            `${hero.emoji} ${hero.name} — Rallying Cry! +${Math.round(profile.power * 100)}% DPS & healed ${heal}`,
-          );
-          break;
-        }
-
-        case 'soul_drain': {
-          const drainDmg = Math.ceil(nextState.monsterMaxHp * profile.power);
-          const selfHeal = Math.ceil(nextState.teamMaxHp * profile.power * 0.5);
-          nextState = {
-            ...nextState,
-            monsterHp: Math.max(1, nextState.monsterHp - drainDmg),
-            teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + selfHeal),
-          };
-          nextState = queueCombatLog(
-            nextState,
-            `${hero.emoji} ${hero.name} — Soul Drain! ${drainDmg} dmg, healed ${selfHeal}`,
-          );
-          break;
-        }
-
-        case 'crit_storm': {
-          const hitDmg = Math.ceil(nextState.monsterMaxHp * profile.power);
-          const totalDmg = hitDmg * 5;
-          nextState = {
-            ...nextState,
-            monsterHp: Math.max(1, nextState.monsterHp - totalDmg),
-          };
-          nextState = queueCombatLog(
-            nextState,
-            `${hero.emoji} ${hero.name} — Crit Storm! 5×${hitDmg} = ${totalDmg} dmg`,
-          );
-          break;
-        }
-
-        case 'mark_prey':
-          nextState = {
-            ...nextState,
-            damageBuffPct: Math.max(nextState.damageBuffPct, profile.power),
-            damageBuffMs: Math.max(nextState.damageBuffMs, profile.durationMs),
-          };
-          nextState = queueCombatLog(
-            nextState,
-            `${hero.emoji} ${hero.name} — Mark Prey! Enemy takes +${Math.round(profile.power * 100)}% dmg`,
-          );
-          break;
-
-        case 'chain_lightning': {
-          const burstDmg = Math.ceil(nextState.monsterMaxHp * profile.power);
-          nextState = {
-            ...nextState,
-            monsterHp: Math.max(1, nextState.monsterHp - burstDmg),
-            damageBuffPct: Math.max(nextState.damageBuffPct, profile.power * 0.6),
-            damageBuffMs: Math.max(nextState.damageBuffMs, profile.durationMs),
-          };
-          nextState = queueCombatLog(
-            nextState,
-            `${hero.emoji} ${hero.name} — Chain Lightning! ${burstDmg} burst + DPS up`,
-          );
-          break;
-        }
-
-        case 'barrier_pulse': {
-          const bHeal = Math.ceil(nextState.teamMaxHp * profile.power);
-          nextState = {
-            ...nextState,
-            teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + bHeal),
-            damageReductionBuffPct: Math.max(nextState.damageReductionBuffPct, profile.power * 0.5),
-            damageReductionBuffMs: Math.max(nextState.damageReductionBuffMs, profile.durationMs),
-          };
-          nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} — Barrier Pulse! +${bHeal} HP & shield`);
-          break;
-        }
-
-        case 'armor_shred':
-          nextState = {
-            ...nextState,
-            damageBuffPct: Math.max(nextState.damageBuffPct, profile.power),
-            damageBuffMs: Math.max(nextState.damageBuffMs, profile.durationMs),
-          };
-          nextState = queueCombatLog(
-            nextState,
-            `${hero.emoji} ${hero.name} — Armor Shred! Team DPS +${Math.round(profile.power * 100)}%`,
-          );
-          break;
-
-        case 'overcharge': {
-          const overDmg = Math.ceil(nextState.monsterMaxHp * profile.power);
-          nextState = {
-            ...nextState,
-            monsterHp: Math.max(1, nextState.monsterHp - overDmg),
-          };
-          nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} — Overcharge! ${overDmg} massive hit`);
-          break;
-        }
-      }
-
-      cooldowns[hero.uid] = profile.cooldownMs;
-    } else {
-      // ── Generic archetype skill (no unique weapon) ───────────────────
-      const archetype: HeroActiveSkillArchetypeId = hero.activeSkillArchetype;
-      const info = getHeroActiveArchetypeInfo(archetype);
-
-      if (archetype === 'frontline_ward') {
-        nextState = {
-          ...nextState,
-          damageReductionBuffPct: Math.max(nextState.damageReductionBuffPct, 0.2),
-          damageReductionBuffMs: Math.max(nextState.damageReductionBuffMs, 3500),
-        };
-        nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} cast ${info.name} (team guard up)`);
-      }
-
-      if (archetype === 'burst_volley') {
-        const burst = Math.ceil(nextState.monsterMaxHp * 0.08);
-        nextState = {
-          ...nextState,
-          monsterHp: Math.max(1, nextState.monsterHp - burst),
-        };
-        nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} used ${info.name} for ${burst} burst`);
-      }
-
-      if (archetype === 'battle_chant') {
-        nextState = {
-          ...nextState,
-          damageBuffPct: Math.max(nextState.damageBuffPct, 0.18),
-          damageBuffMs: Math.max(nextState.damageBuffMs, 4200),
-        };
-        nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} activated ${info.name} (+DPS)`);
-      }
-
-      if (archetype === 'mending_pulse') {
-        const healFrac = MENDING_PULSE_BASE_HEAL + hero.level * MENDING_PULSE_LEVEL_SCALE;
-        const heal = Math.ceil(nextState.teamMaxHp * Math.min(healFrac, 0.25));
-        nextState = {
-          ...nextState,
-          teamHp: Math.min(nextState.teamMaxHp, nextState.teamHp + heal),
-        };
-        nextState = queueCombatLog(nextState, `${hero.emoji} ${hero.name} triggered ${info.name} (+${heal} HP)`);
-      }
-
-      cooldowns[hero.uid] = ACTIVE_SKILL_COOLDOWN_MS[archetype];
-    }
+    const fired = applyHeroActiveSkill(nextState, hero);
+    nextState = fired.state;
+    cooldowns[hero.uid] = fired.cooldownMs;
   }
 
   return {
     ...nextState,
     heroActiveCdMs: cooldowns,
   };
+}
+
+/** Player-issued cast. No-ops unless the hero is on the active team and off cooldown. */
+function castHeroActive(state: GameState, uid: string): GameState {
+  if (!state.activeTeamHeroIds.includes(uid)) return state;
+  if ((state.heroActiveCdMs[uid] ?? 0) > 0) return state;
+
+  const hero = state.heroRoster.find(candidate => candidate.uid === uid);
+  if (!hero) return state;
+
+  const fired = applyHeroActiveSkill(state, hero);
+  return {
+    ...fired.state,
+    heroActiveCdMs: { ...fired.state.heroActiveCdMs, [uid]: fired.cooldownMs },
+  };
+}
+
+export interface HeroActiveStatus {
+  uid: string;
+  heroName: string;
+  emoji: string;
+  skillName: string;
+  cooldownMs: number;
+  totalCooldownMs: number;
+  ready: boolean;
+}
+
+/**
+ * Per-hero ability readiness for the active team, in team order. Drives the battle
+ * ability bar; the cooldown is real state, not a display estimate.
+ */
+export function getHeroActiveStatuses(state: GameState): HeroActiveStatus[] {
+  const statuses: HeroActiveStatus[] = [];
+
+  for (const uid of state.activeTeamHeroIds) {
+    const hero = state.heroRoster.find(candidate => candidate.uid === uid);
+    if (!hero) continue;
+
+    const gearProgress = state.heroUniqueGearByHeroId[hero.id];
+    const hasUniqueEquipped = gearProgress && gearProgress.equippedByUid === hero.uid;
+    const uniqueSkill = hasUniqueEquipped ? getHeroUniqueSkillParams(hero.id, gearProgress.rank) : null;
+
+    const cooldownMs = Math.max(0, state.heroActiveCdMs[uid] ?? 0);
+    statuses.push({
+      uid,
+      heroName: hero.name,
+      emoji: hero.emoji,
+      skillName: uniqueSkill
+        ? getHeroUniqueWeaponName(hero.id)
+        : getHeroActiveArchetypeInfo(hero.activeSkillArchetype).name,
+      cooldownMs,
+      totalCooldownMs: uniqueSkill ? uniqueSkill.cooldownMs : ACTIVE_SKILL_COOLDOWN_MS[hero.activeSkillArchetype],
+      ready: cooldownMs <= 0,
+    });
+  }
+
+  return statuses;
 }
 
 function getTeamMaxHp(state: GameState): number {
@@ -3194,6 +3267,7 @@ export function sanitizeSaveData(payload: Partial<SaveData>) {
     autoSummonEnabled: clampBoolean(payload.autoSummonEnabled, false),
     autoSummonMode,
     autoBurstEnabled: clampBoolean(payload.autoBurstEnabled, false),
+    autoCastHeroActivesEnabled: clampBoolean(payload.autoCastHeroActivesEnabled, true),
     combatTempo: clampCombatTempoForVip(
       payload.combatTempo === 2 || payload.combatTempo === 4 ? payload.combatTempo : 1,
       {
@@ -4234,6 +4308,8 @@ type Action =
   | { type: 'SET_AUTO_SUMMON_ENABLED'; enabled: boolean }
   | { type: 'SET_AUTO_SUMMON_MODE'; mode: 'single' | 'x10' }
   | { type: 'SET_AUTO_BURST_ENABLED'; enabled: boolean }
+  | { type: 'SET_AUTO_CAST_HERO_ACTIVES_ENABLED'; enabled: boolean }
+  | { type: 'CAST_HERO_ACTIVE'; uid: string }
   | { type: 'SET_COMBAT_TEMPO'; tempo: CombatTempo }
   | { type: 'REBIRTH_HERO'; uid: string }
   | { type: 'SET_AUTO_TEMPO_ENABLED'; enabled: boolean }
@@ -4278,7 +4354,7 @@ type Action =
   | { type: 'COMPLETE_EXPEDITION'; expeditionId: string }
   | { type: 'LOAD'; payload: Partial<SaveData> };
 
-function reducer(state: GameState, action: Action): GameState {
+export function reducer(state: GameState, action: Action): GameState {
   state = sanitizeRuntimeEconomyState(state);
 
   // Delegate minigame actions to extracted slice
@@ -4391,6 +4467,10 @@ function reducer(state: GameState, action: Action): GameState {
 
     case 'BURST': {
       return applyBurst(state, action.hits);
+    }
+
+    case 'CAST_HERO_ACTIVE': {
+      return castHeroActive(state, action.uid);
     }
 
     // BUY_PARTY, BUY_SKILL handled by economyReducer
@@ -4611,6 +4691,7 @@ function reducer(state: GameState, action: Action): GameState {
           autoSummonEnabled: p.autoSummonEnabled,
           autoSummonMode: p.autoSummonMode,
           autoBurstEnabled: p.autoBurstEnabled,
+          autoCastHeroActivesEnabled: p.autoCastHeroActivesEnabled,
           combatTempo: clampCombatTempoForVip(p.combatTempo === 2 || p.combatTempo === 4 ? p.combatTempo : 1, p),
           autoTempoEnabled: p.autoTempoEnabled,
           autoTempoTarget: clampAutoTempoTargetForVip(p.autoTempoTarget === 4 ? 4 : 2, p),
@@ -4761,6 +4842,7 @@ export interface SaveData {
   autoSummonEnabled: boolean;
   autoSummonMode: 'single' | 'x10';
   autoBurstEnabled?: boolean;
+  autoCastHeroActivesEnabled?: boolean;
   combatTempo?: CombatTempo;
   autoTempoEnabled?: boolean;
   autoTempoTarget?: AutoTempoTarget;
@@ -4888,6 +4970,7 @@ export function serialize(state: GameState): SaveData {
     autoSummonEnabled: state.autoSummonEnabled,
     autoSummonMode: state.autoSummonMode,
     autoBurstEnabled: state.autoBurstEnabled,
+    autoCastHeroActivesEnabled: state.autoCastHeroActivesEnabled,
     combatTempo: state.combatTempo,
     autoTempoEnabled: state.autoTempoEnabled,
     autoTempoTarget: state.autoTempoTarget,
@@ -5556,6 +5639,11 @@ export function useGameState(saveSlot: string = 'default') {
     (enabled: boolean) => dispatch({ type: 'SET_AUTO_BURST_ENABLED', enabled }),
     [dispatch],
   );
+  const setAutoCastHeroActivesEnabled = useCallback(
+    (enabled: boolean) => dispatch({ type: 'SET_AUTO_CAST_HERO_ACTIVES_ENABLED', enabled }),
+    [dispatch],
+  );
+  const castHeroActiveSkill = useCallback((uid: string) => dispatch({ type: 'CAST_HERO_ACTIVE', uid }), [dispatch]);
   const setCombatTempo = useCallback((tempo: CombatTempo) => dispatch({ type: 'SET_COMBAT_TEMPO', tempo }), [dispatch]);
   const rebirthHero = useCallback((uid: string) => dispatch({ type: 'REBIRTH_HERO', uid }), [dispatch]);
   const setAutoTempoEnabled = useCallback(
@@ -5860,6 +5948,8 @@ export function useGameState(saveSlot: string = 'default') {
     setAutoSummonEnabled,
     setAutoSummonMode,
     setAutoBurstEnabled,
+    setAutoCastHeroActivesEnabled,
+    castHeroActiveSkill,
     setCombatTempo,
     rebirthHero,
     setAutoTempoEnabled,

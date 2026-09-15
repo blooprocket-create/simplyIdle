@@ -6,15 +6,21 @@
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" }
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin-allow-popups"
+        }
       ]
     }
   ],
   "rewrites": [
-    { "source": "/wiki", "destination": "/wiki/index.html" },
-    { "source": "/wiki/", "destination": "/wiki/index.html" },
-    { "source": "/wiki/:path*", "destination": "/wiki/:path*" },
-    { "source": "/", "destination": "/index.html" },
-    { "source": "/:path((?!.*\\..*).*)", "destination": "/index.html" }
+    {
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/:path((?!.*\\..*).*)",
+      "destination": "/index.html"
+    }
   ]
 }

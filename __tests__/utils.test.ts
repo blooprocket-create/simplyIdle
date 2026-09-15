@@ -37,7 +37,7 @@ describe('fmt', () => {
 
   it('handles NaN and Infinity', () => {
     expect(fmt(NaN)).toBe('0');
-    expect(fmt(Infinity)).toBe('∞');   // Infinity renders as ∞
+    expect(fmt(Infinity)).toBe('∞'); // Infinity renders as ∞
     expect(fmt(-Infinity)).toBe('0'); // -Infinity is still treated as invalid
   });
 

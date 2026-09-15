@@ -89,7 +89,7 @@ describe('getClassPassive', () => {
 
   it('each class has distinct passive', () => {
     const names = new Set(
-      (['warrior', 'berserker', 'archer', 'mage', 'monk'] as const).map(c => getClassPassive(c).name)
+      (['warrior', 'berserker', 'archer', 'mage', 'monk'] as const).map(c => getClassPassive(c).name),
     );
     expect(names.size).toBe(5);
   });
