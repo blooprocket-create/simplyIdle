@@ -20,6 +20,8 @@ import type { DeviceProfile } from '../device/DeviceProfile';
 
 export interface Stage {
   camera: ArcRotateCamera;
+  /** Re-applies whatever the current quality tier asks for. */
+  applyQuality(shadows: boolean): void;
   dispose(): void;
 }
 
@@ -79,6 +81,10 @@ export function buildStage(scene: Scene, profile: DeviceProfile): Stage {
 
   return {
     camera,
+    applyQuality: (shadows: boolean) => {
+      key.intensity = shadows ? 1.1 : 1.3;
+      ground.receiveShadows = shadows;
+    },
     dispose: () => {
       ground.dispose();
       groundMaterial.dispose();

@@ -57,9 +57,25 @@ export class DamageNumbers {
 
   constructor(
     private readonly scene: Scene,
-    private readonly capacity: number,
+    private capacity: number,
     private readonly style: DamageNumberStyle = DEFAULT_STYLE,
   ) {}
+
+  /**
+   * Changes the budget when the quality tier moves. Slots above the new cap
+   * are released rather than merely ignored — a device that just told us it
+   * is struggling should not keep paying for textures it will never show.
+   */
+  setCapacity(capacity: number): void {
+    this.capacity = capacity;
+    while (this.slots.length > capacity) {
+      const slot = this.slots.pop();
+      if (!slot) break;
+      slot.mesh.dispose();
+      slot.material.dispose();
+      slot.texture.dispose();
+    }
+  }
 
   spawn(amount: Decimal, at: Vector3, killing = false): void {
     const slot = this.take();

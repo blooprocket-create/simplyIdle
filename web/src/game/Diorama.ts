@@ -6,11 +6,18 @@ import { Scene } from '@babylonjs/core/scene';
 import type { SimulationSnapshot } from '../engine/types';
 import { ActorPool, type ActorRequest } from './actors/ActorPool';
 import { ModelLoader } from './actors/ModelLoader';
-import { detectCapabilities, profileFor, type DeviceProfile } from './device/DeviceProfile';
+import {
+  detectCapabilities,
+  profileFor,
+  qualityFor,
+  type DeviceProfile,
+  type QualityTier,
+} from './device/DeviceProfile';
 import { FrameGovernor } from './device/FrameGovernor';
 import { isBossWave } from '../content/monsters';
 import { CastBars } from './fx/CastBars';
 import { DamageNumbers } from './fx/DamageNumbers';
+import { HealthBars } from './fx/HealthBars';
 import { REACTION_MS, hitFlash, hitRecoil, telegraphPulse } from './fx/reactions';
 import { layOutEnemy, layOutHeroes, type Placement } from './layout/battleLine';
 import { EMPTY_CAST, type Cast } from './models/cast';
@@ -50,8 +57,10 @@ export class Diorama {
   private readonly governor: FrameGovernor;
   private readonly damage: DamageNumbers;
   private readonly bars: CastBars;
+  private readonly health: HealthBars;
   /** Time since the enemy was last struck. Starts spent, so nothing flashes. */
   private sinceHitMs = REACTION_MS;
+  private appliedTier: QualityTier;
   readonly profile: DeviceProfile;
 
   private cast: Cast = EMPTY_CAST;
@@ -71,6 +80,8 @@ export class Diorama {
     this.actors = new ActorPool(this.loader);
     this.damage = new DamageNumbers(this.scene, this.profile.maxDamageNumbers);
     this.bars = new CastBars(this.scene);
+    this.health = new HealthBars(this.scene);
+    this.appliedTier = this.profile.tier;
   }
 
   /** Which keys the pack could not supply, for a debug overlay or a report. */
@@ -102,6 +113,7 @@ export class Diorama {
     }
 
     const decision = this.governor.frame(snapshot.elapsedMs);
+    if (decision.tier !== this.appliedTier) this.applyTier(decision.tier);
 
     // Before the draw decision, not after. A snapshot carries only the hits
     // from its own step, so a skipped frame would drop those numbers on the
@@ -109,12 +121,32 @@ export class Diorama {
     this.spawnHits(snapshot);
     this.damage.update(decision.stepMs);
     this.sinceHitMs = snapshot.hits.length > 0 ? 0 : this.sinceHitMs + decision.stepMs;
+    this.health.tick(snapshot.totals.deaths, decision.stepMs);
     if (!decision.draw) return;
 
     this.actors.place(this.placements);
+    this.health.draw(snapshot.enemy, snapshot.team);
     this.bars.update(this.placements, new Map(snapshot.heroes.map(hero => [hero.uid, hero.swingProgress])));
     this.drawEnemy(snapshot);
     this.scene.render();
+  }
+
+  /**
+   * Spends the governor's decision.
+   *
+   * Without this the governor was half a component: it paced frames, decided
+   * under load that it wanted a cheaper tier, and then nothing read the
+   * answer. Giving up fidelity is the other half of holding a frame rate, and
+   * it only counts once something acts on it.
+   */
+  private applyTier(tier: QualityTier): void {
+    this.appliedTier = tier;
+    const quality = qualityFor(tier);
+    // Never above what the display can show, which the device profile already
+    // clamped to the pixel ratio when it was built.
+    this.engine.setHardwareScalingLevel(1 / Math.min(quality.renderScale, this.profile.renderScale));
+    this.stage.applyQuality(quality.shadows && this.profile.shadows);
+    this.damage.setCapacity(quality.maxDamageNumbers);
   }
 
   /**
@@ -185,6 +217,7 @@ export class Diorama {
   }
 
   dispose(): void {
+    this.health.dispose();
     this.bars.dispose();
     this.damage.dispose();
     this.actors.dispose();

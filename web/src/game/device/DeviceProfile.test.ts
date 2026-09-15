@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  QUALITY_TIERS,
   detectCapabilities,
   profileFor,
+  qualityFor,
   scoreCapabilities,
   tierFor,
   type CapabilitySource,
@@ -74,6 +76,34 @@ describe('device profile', () => {
       touch: true,
       reducedMotion: true,
     });
+  });
+
+  it('makes every tier cost less than the one above it', () => {
+    // Dropping a tier has to actually buy something back. If two tiers asked
+    // for the same work the governor could decide it was struggling, give up
+    // fidelity, and change nothing about the frame it was trying to save.
+    const [low, medium, high] = QUALITY_TIERS.map(qualityFor);
+    expect(low.renderScale).toBeLessThan(medium.renderScale);
+    expect(medium.renderScale).toBeLessThan(high.renderScale);
+    expect(low.maxDamageNumbers).toBeLessThan(medium.maxDamageNumbers);
+    expect(medium.maxDamageNumbers).toBeLessThan(high.maxDamageNumbers);
+    expect(low.maxActors).toBeLessThan(high.maxActors);
+    expect(low.shadows).toBe(false);
+  });
+
+  it('hands out a copy of a tier rather than the tier itself', () => {
+    // A caller that adjusted one of these in place would change what every
+    // future device of that tier receives.
+    const first = qualityFor('high');
+    first.maxDamageNumbers = 1;
+    expect(qualityFor('high').maxDamageNumbers).toBeGreaterThan(1);
+  });
+
+  it('describes a usable profile for every tier', () => {
+    for (const tier of QUALITY_TIERS) {
+      expect(qualityFor(tier).targetFps, tier).toBeGreaterThan(0);
+      expect(qualityFor(tier).maxActors, tier).toBeGreaterThan(0);
+    }
   });
 
   it('survives a platform that reports nothing', () => {

@@ -55,7 +55,10 @@ export interface DeviceProfile {
 /** Enough fragments that fill rate, not geometry, becomes the limit. */
 export const HEAVY_PIXEL_BUDGET = 2_600_000;
 
-const PROFILES: Record<QualityTier, Omit<DeviceProfile, 'tier' | 'reducedMotion'>> = {
+/** Everything a tier decides. The governor hands these back as it adapts. */
+export type QualitySettings = Omit<DeviceProfile, 'tier' | 'reducedMotion'>;
+
+const PROFILES: Record<QualityTier, QualitySettings> = {
   low: { renderScale: 1, maxActors: 10, maxDamageNumbers: 12, shadows: false, targetFps: 30 },
   medium: { renderScale: 1.25, maxActors: 16, maxDamageNumbers: 24, shadows: false, targetFps: 60 },
   high: { renderScale: 1.5, maxActors: 24, maxDamageNumbers: 40, shadows: true, targetFps: 60 },
@@ -76,6 +79,18 @@ export function scoreCapabilities(caps: DeviceCapabilities): number {
     score -= 1;
   }
   return score;
+}
+
+/**
+ * The settings a tier asks for, independent of the device that chose it.
+ *
+ * Exported because the governor changes tier at runtime and something has to
+ * be able to ask what the new one means. Copied rather than handed out by
+ * reference: a caller that adjusted one of these in place would change what
+ * every future device of that tier receives.
+ */
+export function qualityFor(tier: QualityTier): QualitySettings {
+  return { ...PROFILES[tier] };
 }
 
 export function tierFor(caps: DeviceCapabilities): QualityTier {
