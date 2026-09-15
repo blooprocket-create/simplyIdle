@@ -60,7 +60,7 @@ const DIORAMA_MAX_LINES = 300;
  * device tiers are decisions, not drawing, and a decision that can only be
  * exercised inside a GL context is a decision nobody tests.
  */
-const HEADLESS_DIRECTORIES = ['device/', 'models/'];
+const HEADLESS_DIRECTORIES = ['device/', 'layout/', 'models/'];
 
 describe('game architecture', () => {
   it('has files to check', () => {
