@@ -1,0 +1,43 @@
+/*
+ * The only file in src/ui allowed to contain a colour, a radius or a spacing
+ * value. src/ui/architecture.test.ts fails the build otherwise.
+ *
+ * Phase 0 placeholders lifted from the current game's HUD so the scaffold is
+ * recognisably SimplyIdle; Phase 2 replaces them with values sampled from the
+ * biome the renderer actually draws.
+ */
+
+:root {
+  /* Surfaces */
+  --bg: #0b1620;
+  --panel: #142230;
+  --raised: #1d3142;
+  --line: rgba(190, 202, 217, 0.14);
+  --line-strong: rgba(190, 202, 217, 0.3);
+  --scrim: rgba(11, 22, 32, 0.72);
+
+  /* Ink */
+  --ink: #d9ecff;
+  --ink-mid: #b4c8dc;
+  --ink-low: #95b4cf;
+  --ink-dim: #8098ae;
+
+  /* Meaning. This set is closed: a feature may not add to it. */
+  --gold: #e0b45c;
+  --shards: #a98cff;
+  --hp-you: #5fd38a;
+  --hp-foe: #cb6c52;
+  --ready: #5fd38a;
+  --danger: #ee3333;
+
+  /* Type */
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Geometry */
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+}

@@ -1,152 +1,210 @@
 # SimplyIdle — Revamp Plan
 
-The core of this game is good. The problem is that it's wearing the wrong clothes: an Expo/React Native app whose combat is one arithmetic expression, wrapped in ~50 menus because menus are the only surface that accepts input.
+The core of this game is good. The problem is that combat is one arithmetic expression, so there is nothing to look at, so ~50 menus became the entire experience.
 
-This plan ports it onto the stack used everywhere else in this account, and rebuilds the architecture around a real combat simulation — reusing the package decomposition already proven in **WayfinderIsle**.
+**Evercast already solved this.** Same genre, same author, shipped: a 2.5D incremental game where the fight is a Babylon diorama, the HUD is four buttons, and every menu in the game lives one tap behind one of them. This plan merges that approach into SimplyIdle rather than inventing one.
 
-**Status:** plan. Nothing below is implemented yet. Docs and wiki were cleared to start from a clean slate.
+The goal, in the shortest form: **keep the million menus, stop making them the game.**
+
+**Status:** plan. Nothing below is implemented yet.
 
 ---
 
-## 1. Why port
+## 1. What Evercast already proves
 
-| | WayfinderIsle | autofighter | simplyIdle (today) |
-| --- | --- | --- | --- |
-| Build | Vite 8 + pnpm + turbo | Vite 8 | Expo / Metro / npm |
-| Language | TS 5.9, project refs | TS 5.9 | TS 5.9 |
-| Render | Three.js | **Phaser 3** | react-native-web |
-| UI | React 19 | — | React Native |
-| Backend | Supabase + Colyseus | — | Firebase |
-| Tests | Vitest | — | Jest |
+Read from `blooprocket-create/evercast` @ `7e88c44`.
 
-simplyIdle shares the language and nothing else. Every habit, script and mental model from the other projects stops at its door.
+### The navigation answer
 
-The decisive part isn't the tooling though — it's that **WayfinderIsle already contains the architecture this game needs**:
+`src/ui/nav/destinations.ts`:
 
-```
-packages/
-  combat-engine    economy-engine   skill-engine    simulation
-  game-core        game-renderer    game-ui         game-content
-  math             shared           telemetry       validation
+```ts
+/**
+ * The shelf holds this many destinations plus one More slot, forever. It is a
+ * fixed cost no matter how large the game gets; growth goes to the rail.
+ */
+export const SHELF_SLOTS = 3;
 ```
 
-Pure engine packages, with renderer and UI layered on top. simplyIdle's central defect is that it has no combat engine at all — `advanceCombatStep` subtracts `dps × dt` from a single scalar inside a 5,900-line React hook. Porting isn't inventing a structure. It's adopting the one that already works next door.
+Three pinned buttons plus **More**, and that never changes. Every other surface lives in the rail behind More, filed into four closed groups (`power`, `companion`, `world`, `record`) and five closed archetypes (`dashboard`, `ledger`, `graph`, `detail`, `moment`):
 
-## 2. Decisions taken
+> Adding a sixth is a deliberate design decision, not something a feature does on its way past.
+
+Badges from everything behind More merge upward (`mergeBadges`) so nothing gets lost back there, and `available(snapshot)` hides a destination until the engine says it exists.
+
+**This is the whole fix for SimplyIdle's 8 tabs + 17 sub-tabs + 15 modals.** The menus don't get deleted — they get filed. Navigation cost becomes constant.
+
+### The architecture answer
+
+```
+src/content   authored enemies, zones, gear, spell-tree data
+src/engine    deterministic state/rules — may not import React, Babylon or browser APIs
+src/ui        React presentation, and presentation-only geometry
+src/game      Babylon rendering, animation, VFX — reacts to snapshots, never decides outcomes
+src/app       browser lifecycle, persistence, offline catch-up
+```
+
+And the rules are **enforced as tests**, not documented and forgotten. `src/engine/architecture.test.ts`:
+
+```ts
+expect(source, file).not.toMatch(/from ['"]react/);
+expect(source, file).not.toMatch(/@babylonjs/);
+expect(source, file).not.toMatch(/\bdocument\./);
+expect(source, file).not.toMatch(/\bwindow\./);
+expect(source, file).not.toMatch(/\blocalStorage\b/);
+```
+
+```ts
+it('keeps EvercastSimulation as a coordinator instead of a god file', () => {
+  expect(source.split('\n').length).toBeLessThan(300);
+});
+```
+
+`EvercastSimulation.ts` is **293 lines**. SimplyIdle's `useGameState.ts` is **5,901**. That test is the difference, and it is three lines long.
+
+`src/ui/architecture.test.ts` does the same for presentation: every colour must come from the token sheet, no surface owns a scroll container, no surface is positioned by hardcoded pixels, no grid track count is hardcoded, `SHELF_SLOTS` stays 3, the archetype and group sets stay closed.
+
+### The scale of the files
+
+| | Evercast | SimplyIdle |
+| --- | --- | --- |
+| Largest file | 970 lines | 5,901 lines |
+| Files | 292 | ~90 |
+| Total lines | ~44,000 | ~54,000 |
+
+Similar size games. Evercast spreads it across small files behind enforced seams; SimplyIdle concentrates it in four enormous ones.
+
+### Everything else worth taking
+
+- **`break_eternity.js`.** Evercast displays `4.55e53` gold without blinking. SimplyIdle caps at `SAFE_INTEGER_CAP = Number.MAX_VALUE` and uses raw JS numbers — a genre-standard ceiling problem, already solved next door.
+- **Companions are real combatants.** *"They swing on their own timers, soak the blows aimed at the mage, and can be knocked out for the rest of an encounter."* That is precisely what SimplyIdle's 66 heroes need to become instead of addends summed into one `dps` scalar.
+- **`useSnapshotSelector`.** Selector-based subscription — a component reads `s.gold.display`, not the world. This is the Phase 0 fix, already built.
+- **`DeviceProfile` + `FrameGovernor`.** *"The problem on a handheld is heat rather than frame rate."* Tiered budgets plus resolution scaling from measured frame times. An idle game runs for hours; this is not optional.
+- **The boot gate.** Title, loading and first-run onboarding as one screen — and the button that opens it is also the gesture browsers require before audio can play, *"which an idle game otherwise never collects."*
+- **Derived onboarding.** One hint at a time, each a question about live state, each retiring because the player did the thing rather than because a flag recorded a view. SimplyIdle has `seenHintIds` — a flag list.
+- **`SaveGuards`.** Every field bounded on the way in, so no save can produce a state the simulation could not have reached. SimplyIdle's `sanitizeSaveData` is the same instinct; Evercast's is the more complete version.
+- **The art pipeline.** `art/` holds Blender sources; `public/models/` holds built GLBs with a manifest. 39 environment props, an articulated cast, five animation clips. SimplyIdle renders monsters as emoji.
+
+---
+
+## 2. Decisions
 
 | Decision | Choice | Why |
 | --- | --- | --- |
-| Renderer | **Phaser 3 + React 19 UI** | Matches `autofighter`. Phaser owns the combat canvas; React owns HUD and menus over it. |
-| Platform | **Web first**, native wrapper later | Vite → Vercel, as today. Capacitor stays an option, not a constraint. |
-| Backend | **Keep Firebase**, behind a port interface | Live player data survives. Supabase swap becomes a later, separate pass. |
-| Docs | **Cleared**, including `wiki/` | This file is the only design doc. Wiki build stripped from `build:web`, Vercel rewrites and CI. |
+| Renderer | **Babylon.js + React 19** | Matches Evercast, whose visuals are the target. See the reversal below. |
+| Build | Vite + TypeScript, Vitest | Matches Evercast and `autofighter` |
+| Platform | Web first on Vercel | Native wrapping stays open via Capacitor |
+| Backend | **Keep Firebase**, behind a port interface | Inactive accounts still hold real saves |
+| Numbers | **`break_eternity.js`** | Removes the `Number.MAX_VALUE` ceiling |
+| Docs | This file only | |
+
+### Reversing the Phaser recommendation
+
+An earlier version of this plan said Phaser 3, reasoning from `autofighter`. **That was the wrong comparison.** `autofighter` is a 2D sprite game; Evercast is an incremental game with a persistent 3D diorama, which is the shape SimplyIdle is trying to become — and it is the one whose look is actually wanted here. Taking Babylon also inherits the shader work (`Atmosphere`, `WorldBackdrop`, `WorldHorizon`), the framing rules, the device tiering, and the Blender→GLB pipeline. Phaser inherits none of that.
+
+### On the backend
+
+The earlier plan justified keeping Firebase with *"live player data survives."* There are no *active* players, but there are **inactive accounts holding real saves**, so that reason holds in weaker form — and the scope argument is independent and stronger: a Supabase migration on top of a combat rewrite is two risky projects at once. Firebase stays behind `ports/`, and the swap is a separate pass.
+
+Note that Evercast is **serverless with no accounts** — three `localStorage` keys, `connect-src 'self'`. SimplyIdle has Firebase, accounts, guilds, chat and leaderboards, so its save and privacy model cannot be copied wholesale. `SaveGuards`' field-bounding is portable; the architecture around it is not.
+
+---
 
 ## 3. Target shape
 
+Mirroring Evercast's layout, because it is proven and because two projects sharing one structure is worth more than either having a bespoke one.
+
 ```
 simplyidle/
-├─ apps/
-│  └─ client/              Vite + React 19 shell, mounts Phaser + UI
-├─ packages/
-│  ├─ game-core/           tick loop, state container, save/load, selectors
-│  ├─ combat-engine/       entities, targeting, abilities, damage resolution
-│  ├─ economy-engine/      gold/exp/gacha/gear, all currency math
-│  ├─ progression-engine/  levels, rebirth, meta upgrades, achievements
-│  ├─ game-content/        heroes, gear, acts, monsters, skills (data only)
-│  ├─ game-renderer/       Phaser 3 scenes, sprites, effects
-│  ├─ game-ui/             React components, HUD, overlays
-│  ├─ ports/               service interfaces + Firebase adapter
-│  ├─ math/                formatting, curves, safe arithmetic
-│  └─ shared/              types shared across packages
-└─ pnpm-workspace.yaml     + turbo.json, vitest, eslint, prettier
+├─ src/
+│  ├─ content/      heroes, gear, acts, monsters, skills — authored data only
+│  ├─ engine/       deterministic rules; no React, no Babylon, no browser APIs
+│  │  ├─ combat/    entities, targeting, abilities, damage resolution
+│  │  ├─ economy/   gold, exp, gacha, gear
+│  │  ├─ progression/ levels, rebirth, meta, achievements
+│  │  ├─ roster/    heroes as combatants
+│  │  ├─ offline/   closed-form catch-up
+│  │  ├─ save/      codec, guards, migration
+│  │  └─ snapshot/  the read model the UI and renderer subscribe to
+│  ├─ ui/           React: HUD, shelf, rail, surfaces, theme tokens
+│  ├─ game/         Babylon: scene, actors, vfx, world, audio
+│  ├─ app/          lifecycle, persistence, away clock
+│  └─ ports/        service interfaces + Firebase adapter
 ```
 
-Dependency rule, enforced by lint: **engines never import renderer or UI.** `combat-engine` must be runnable in a bare Node test with no DOM. That single constraint is what makes the sim testable, the offline simulation trivial, and a future server-authoritative mode possible.
+Enforced from day one by `src/engine/architecture.test.ts` and `src/ui/architecture.test.ts`, ported from Evercast — including the god-file line guard, which is the single cheapest defence against how this codebase got here.
 
-### The state split
+### The navigation, concretely
 
-The current design spreads a ~120-field `GameState` object ten times a second and hands it to all eight tabs, which are wrapped in `React.memo` with no comparator — so every tab re-renders 10×/sec whether visible or not. That is why the UI can only afford text and progress bars.
+SimplyIdle's ~50 destinations filed into Evercast's model:
 
-After the port:
+| Group | Destinations |
+| --- | --- |
+| `power` | Character/Stats, Equipment, Skills, Rebirth |
+| `companion` | Roster, Party/Formation, Summon |
+| `world` | Campaign, Operations, Expeditions, Dungeons, Events |
+| `record` | Achievements, Missions, Codex, Leaderboard, Settings |
 
-- **`CombatState`** — hot. ~15 fields: entities, HP, cooldowns, timers, buffs. Ticks at 30 Hz inside the engine, never through React. Phaser reads it directly each frame.
-- **`MetaState`** — cold. Roster, inventory, currencies, unlocks. Changes on player action only. React subscribes via selectors, so a gold change re-renders the gold chip and nothing else.
+Shelf: **3 pinned + More.** Battle is not in the list — the battle *is* the screen. Surfaces open as overlays over a running fight, exactly as Evercast's summon reveal does while the combat log keeps printing underneath.
 
-React stops being the game loop and goes back to being the UI.
+`Stats` stops being a destination and becomes tooltips. `Achievements`' five sub-tabs become one `ledger` surface with an objectives ticker in the HUD.
 
-## 4. What carries over
+---
 
-Most of the value in this repo is content and balance, and all of it survives the port — it's plain TypeScript data with no React in it:
+## 4. What carries over from SimplyIdle
 
-- `gameConfig.ts` (4,639 lines) → split into `game-content/` modules: 66 heroes, 92 achievements, 7 acts, the gear catalog, usable items, mission goals.
-- The damage/economy formulas in `useGameState.ts` → lifted into `combat-engine` and `economy-engine` as pure functions. **Same numbers.** A parity test pins new-vs-old DPS across a wave sweep so balance doesn't silently drift.
-- `services/` (~6,000 lines of Firebase: guild, chat, leaderboard, friends, DMs, presence, cloud save) → moves behind `ports/` largely unchanged.
-- Save format. `SAVE_SCHEMA_VERSION` goes to 3 with a migration from 2; existing players keep their progress.
+Most of the value here is content and balance, and none of it is React-bound:
 
-What does **not** carry over: `GameScreen.tsx` (4,190 lines), `GameScreen.styles.ts` (5,753 lines), the eight `*TabContent` files, and the React Native surface generally. That's the part being replaced, and it's the right part.
+- `gameConfig.ts` (4,639 lines) → `src/content/`: 66 heroes, 92 achievements, 7 acts, gear catalog, usable items, missions.
+- Damage and economy formulas from `useGameState.ts` → `engine/combat` and `engine/economy` as pure functions. **Same numbers**, pinned by a parity suite before any UI work.
+- `services/` (~6,000 lines of Firebase) → behind `ports/`, largely unchanged.
+- Saves. `SAVE_SCHEMA_VERSION` 2 → 3 with a migration; inactive accounts keep their progress.
+- The hero ability system — already made castable on a real cooldown, and already the right shape for entity combat.
+
+Not carried over: `GameScreen.tsx` (4,190 lines), `GameScreen.styles.ts` (5,753), the eight `*TabContent` files, and React Native generally.
+
+---
 
 ## 5. Phases
 
-Each phase ends somewhere runnable. No phase is a big-bang cutover.
-
 ### Phase 0 — Scaffold *(~3 days)*
+Vite + TS + Vitest, Evercast's ESLint/Prettier config, the five directories, and **both `architecture.test.ts` files ported and passing on an empty tree**. Babylon renders a placeholder scene. The rules exist before the code does.
 
-pnpm workspace, turbo, Vite, Vitest, ESLint/Prettier mirroring WayfinderIsle's config. Empty packages with the dependency rule enforced. `apps/client` renders "hello" with a Phaser canvas mounted. CI green on the new layout.
+### Phase 1 — Engine, headless *(~2 weeks)*
+Content and formulas into `content/` and `engine/`. No UI. Deliverable is a parity suite: 10,000 waves matching current balance within tolerance, and a v2→v3 save round-trip. Heroes become entities with their own timers and targets here. `break_eternity.js` goes in at this layer, once, before anything depends on number types.
 
-### Phase 1 — Engines, headless *(~1.5 weeks)*
+> **Offline constraint.** `simulateOfflineProgress` steps `advanceCombatStep` up to `OFFLINE_SIM_MAX_ITERATIONS = 300,000` times on resume. An entity sim cannot. `engine/` ships both: the live entity sim and a closed-form estimator, with divergence pinned by test. Evercast's `AwayClock` monotonic high-water mark is worth taking at the same time — SimplyIdle currently has no clock-tamper defence.
 
-Port content and formulas into `game-content`, `combat-engine`, `economy-engine`, `progression-engine`. **No UI.** The deliverable is a test suite: a headless sim runs 10,000 waves and matches current balance within tolerance. Save migration v2→v3 round-trips.
+### Phase 2 — The diorama *(~3 weeks)*
+Babylon scene, hero line, enemies, floating damage numbers, hit reactions, cast bars, boss telegraphs. Port `DeviceProfile` and `FrameGovernor` with it. Art starts as primitives — Evercast's companions are *"procedural placeholder art built from primitives at runtime"* with `modelKey` as the seam for a Blender pack later. Do the same; do not block the renderer on modelling 66 heroes.
 
-This is where the combat model actually changes: heroes stop being addends in `getDps` and become entities with their own attack timers, targets and ability casts. Same aggregate output, now with structure a renderer can draw.
+### Phase 3 — Shell and shelf *(~2 weeks)*
+Port the destination registry, shelf, rail and `SurfaceHost`. File all ~50 surfaces into the four groups. Battle becomes the persistent screen. Port the token sheet and the UI architecture test with it, so the surfaces are built under the constraints rather than retrofitted to them.
 
-> **Offline constraint.** `simulateOfflineProgress` currently steps `advanceCombatStep` up to `OFFLINE_SIM_MAX_ITERATIONS = 300,000` times on resume. An entity sim can't be stepped 300k times on app open. `combat-engine` therefore ships two paths: the live entity sim, and a closed-form estimator (essentially today's scalar math) for offline catch-up. A test pins the divergence between them.
-
-### Phase 2 — The fight, rendered *(~2 weeks)*
-
-Phaser scene: hero line, enemy, attack animations, **floating damage numbers, hit reactions, crits that read as crits, cast bars, boss approach telegraphs.** React HUD over the top for HP, wave, currencies.
-
-First point where it stops looking like a spreadsheet.
-
-### Phase 3 — Verbs *(~2 weeks)*
-
-Give the player something to do:
-
-- **Castable hero actives.** Today `tickHeroActives` fires 66 heroes' authored abilities — Shield Wall, Execute, Rallying Cry, Soul Drain — on a `Math.random()` roll per tick, and reports them as a line of text in a combat log. Replace the roll with a real cooldown on the existing `heroActiveCdMs`, surface it on the portrait, let the player fire it. **The content is already written; it just needs a button.**
-- **BURST as a timing window** rather than a charge-and-spend button.
-- **Bosses hand-played** — 30–60s encounters, one mechanic per act.
-- **Automation as an earned reward.** The nine `auto*` flags currently make the game play itself from the start. Each should be unlocked by demonstrating the manual version. Automation you earned is a power fantasy; automation on by default is the game deleting itself.
-- **Wipes become a decision** — hold the line or retreat, not a silent teleport.
-
-### Phase 4 — Navigation collapse *(~1.5 weeks)*
-
-~50 destinations → 4. The battle is the app, always on screen, never a tab. Everything else is an overlay over the live fight.
-
-- **Battle** — the app itself
-- **Team** — heroes, formation, gear (absorbs Heroes + Equipment + 8 sub-tabs)
-- **World** — campaign, operations, expeditions (absorbs Warroom + Operations + Progress)
-- **Social** — already self-contained
-
-`Stats` is deleted outright: it is a pure readout, and its content becomes tooltips. `Achievements` (5 sub-tabs, 92 entries) becomes an objectives ticker that surfaces the *next* one inline.
-
-Governing rule: **nothing gets a screen unless the player makes a decision there.** Readouts get a tooltip.
+### Phase 4 — Verbs *(~2 weeks)*
+Bosses hand-played, one mechanic per act. BURST as a timing window. Automation as an earned reward rather than a default — the nine `auto*` flags currently let the game play itself from the start. Wipes become a decision instead of a silent teleport to the chapter start.
 
 ### Phase 5 — Cutover *(~1 week)*
+Retire the Expo app. Vercel points at the Vite build. Supabase migration afterwards, separately, if wanted.
 
-Retire the Expo app. Vercel points at the Vite build. Then, separately and unhurriedly: the Supabase migration behind `ports/`.
+**Rough total: 10–11 weeks.** Phases 2 and 3 are where it stops being a menu simulator.
 
-**Rough total: 9–10 weeks.** Phases 2 and 3 are where it stops being a menu simulator; everything before them is groundwork, everything after is consolidation.
+---
 
 ## 6. Risks
 
 | Risk | Handling |
 | --- | --- |
-| Balance drift during the engine port | Parity test suite, wave-sweep, before any UI work |
-| Losing live players' saves | v2→v3 migration + round-trip tests before cutover |
-| Offline sim can't run an entity model 300k steps | Dual-path engine: live sim + closed-form estimator, divergence pinned |
-| Rewrite stalls half-finished | Every phase ends runnable; old app keeps shipping until Phase 5 |
-| Native store presence lost | Web-first is a deliberate call; Capacitor remains available |
-| Firebase and Supabase both half-wired | Backend explicitly out of scope until after cutover |
+| Balance drift during the engine port | Parity suite before any UI work; now actually runs in CI |
+| Inactive accounts lose saves | v2→v3 migration + round-trip tests before cutover |
+| Offline sim can't step an entity model 300k times | Dual-path engine, divergence pinned |
+| Babylon is heavier than the current bundle | `DeviceProfile` tiers and the boot gate exist for exactly this; Evercast ships ~6MB of models behind one |
+| Art becomes the bottleneck | Primitives first, `modelKey` seam, GLBs later |
+| Rewrite stalls half-finished | Every phase ends runnable; the Expo app keeps shipping until Phase 5 |
+| The new structure rots the way this one did | Architecture tests from Phase 0, god-file guard included |
+
+---
 
 ## 7. Start here
 
-The cheapest proof that this plan is worth 9 weeks is **Phase 3's castable hero actives** — the abilities, the cooldown field and the effects all exist today. Swap the dice roll for a cooldown, put a button on the portrait. It's small, it's reversible, and it demonstrates the single biggest gap between what this game contains and what it lets you do.
+**Phase 0**, and specifically the two `architecture.test.ts` files. They are the cheapest thing on this list and the only one that prevents a repeat: SimplyIdle did not arrive at a 5,901-line hook by decision, it arrived there because nothing said no.

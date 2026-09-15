@@ -3,5 +3,10 @@
   "compilerOptions": {
     "strict": true,
     "allowImportingTsExtensions": true
-  }
+  },
+  "exclude": [
+    "web",
+    "dist",
+    "node_modules"
+  ]
 }
