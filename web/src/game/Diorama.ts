@@ -29,14 +29,7 @@ export class Diorama {
     this.scene = new Scene(this.engine);
     this.scene.clearColor = new Color4(0.043, 0.086, 0.125, 1);
 
-    const camera = new ArcRotateCamera(
-      'camera',
-      -Math.PI / 2.2,
-      Math.PI / 2.6,
-      14,
-      new Vector3(0, 1, 0),
-      this.scene,
-    );
+    const camera = new ArcRotateCamera('camera', -Math.PI / 2.2, Math.PI / 2.6, 14, new Vector3(0, 1, 0), this.scene);
     camera.attachControl(canvas, false);
 
     const key = new HemisphericLight('key', new Vector3(0.4, 1, -0.3), this.scene);

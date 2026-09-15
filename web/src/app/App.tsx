@@ -22,7 +22,7 @@ export function App() {
     const diorama = new Diorama(canvas);
     const loop = new GameLoop();
 
-    const unsubscribe = loop.subscribe((next) => {
+    const unsubscribe = loop.subscribe(next => {
       diorama.render(next);
       setSnapshot(next);
     });

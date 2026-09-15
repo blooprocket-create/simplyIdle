@@ -15,15 +15,13 @@ import { join } from 'node:path';
 const ENGINE_ROOT = join(process.cwd(), 'src', 'engine');
 
 function collectFiles(directory: string): string[] {
-  return readdirSync(directory).flatMap((entry) => {
+  return readdirSync(directory).flatMap(entry => {
     const path = join(directory, entry);
     return statSync(path).isDirectory() ? collectFiles(path) : [path];
   });
 }
 
-const ENGINE_FILES = collectFiles(ENGINE_ROOT).filter(
-  (file) => file.endsWith('.ts') && !file.endsWith('.test.ts'),
-);
+const ENGINE_FILES = collectFiles(ENGINE_ROOT).filter(file => file.endsWith('.ts') && !file.endsWith('.test.ts'));
 
 /** Cap on the coordinator. Rules belong in subsystems, not here. */
 const COORDINATOR_MAX_LINES = 300;
@@ -58,7 +56,7 @@ describe('engine dependency boundary', () => {
     // Heroes, gear and acts are data in `src/content`. An engine that also
     // owns the catalog is how gameConfig.ts and useGameState.ts grew into each
     // other in the first place.
-    const combined = ENGINE_FILES.map((file) => readFileSync(file, 'utf8')).join('\n');
+    const combined = ENGINE_FILES.map(file => readFileSync(file, 'utf8')).join('\n');
     expect(combined).not.toMatch(/export const HERO_POOL\s*=/);
     expect(combined).not.toMatch(/export const EQUIPMENT_CATALOG\s*=/);
     expect(combined).not.toMatch(/export const ACHIEVEMENTS\s*=/);
