@@ -8,7 +8,10 @@ import { ActorPool, type ActorRequest } from './actors/ActorPool';
 import { ModelLoader } from './actors/ModelLoader';
 import { detectCapabilities, profileFor, type DeviceProfile } from './device/DeviceProfile';
 import { FrameGovernor } from './device/FrameGovernor';
+import { isBossWave } from '../content/monsters';
+import { CastBars } from './fx/CastBars';
 import { DamageNumbers } from './fx/DamageNumbers';
+import { REACTION_MS, hitFlash, hitRecoil, telegraphPulse } from './fx/reactions';
 import { layOutEnemy, layOutHeroes, type Placement } from './layout/battleLine';
 import { EMPTY_CAST, type Cast } from './models/cast';
 import { EMPTY_MANIFEST, monsterModelKey, type ModelManifest } from './models/manifest';
@@ -46,6 +49,9 @@ export class Diorama {
   private readonly actors: ActorPool;
   private readonly governor: FrameGovernor;
   private readonly damage: DamageNumbers;
+  private readonly bars: CastBars;
+  /** Time since the enemy was last struck. Starts spent, so nothing flashes. */
+  private sinceHitMs = REACTION_MS;
   readonly profile: DeviceProfile;
 
   private cast: Cast = EMPTY_CAST;
@@ -64,6 +70,7 @@ export class Diorama {
     this.loader = new ModelLoader(this.scene, options.manifest ?? EMPTY_MANIFEST);
     this.actors = new ActorPool(this.loader);
     this.damage = new DamageNumbers(this.scene, this.profile.maxDamageNumbers);
+    this.bars = new CastBars(this.scene);
   }
 
   /** Which keys the pack could not supply, for a debug overlay or a report. */
@@ -82,6 +89,7 @@ export class Diorama {
   setCast(cast: Cast): void {
     this.cast = cast;
     this.placements = layOutHeroes(cast);
+    this.bars.sync(cast.map(member => member.uid));
     this.syncActors();
   }
 
@@ -100,16 +108,40 @@ export class Diorama {
     // floor — and skipped frames are exactly when the fight is busiest.
     this.spawnHits(snapshot);
     this.damage.update(decision.stepMs);
+    this.sinceHitMs = snapshot.hits.length > 0 ? 0 : this.sinceHitMs + decision.stepMs;
     if (!decision.draw) return;
 
     this.actors.place(this.placements);
-    const enemy = this.actors.get(ENEMY_SLOT);
-    if (enemy) {
-      const placement = layOutEnemy();
-      enemy.root.position.set(placement.x, placement.y, placement.z);
-      enemy.root.rotation.y = placement.yaw;
-    }
+    this.bars.update(this.placements, new Map(snapshot.heroes.map(hero => [hero.uid, hero.swingProgress])));
+    this.drawEnemy(snapshot);
     this.scene.render();
+  }
+
+  /**
+   * The enemy, reacting. A struck actor gives ground and flashes; a boss
+   * breathes so the wave reads as different before it has done anything.
+   *
+   * The flash is `renderOverlay` rather than a material edit, because the
+   * model comes from a pack and nothing here should be reaching into
+   * somebody else's shader to tint it.
+   */
+  private drawEnemy(snapshot: SimulationSnapshot): void {
+    const enemy = this.actors.get(ENEMY_SLOT);
+    if (!enemy) return;
+    const placement = layOutEnemy();
+    const boss = snapshot.enemy !== null && isBossWave(snapshot.enemy.wave);
+
+    enemy.root.position.set(placement.x + hitRecoil(this.sinceHitMs), placement.y, placement.z);
+    enemy.root.rotation.y = placement.yaw;
+    enemy.root.scaling.setAll(boss ? 1.35 : 1);
+
+    const flash = hitFlash(this.sinceHitMs);
+    const pulse = boss ? telegraphPulse(snapshot.elapsedMs) * 0.28 : 0;
+    for (const mesh of enemy.root.getChildMeshes()) {
+      mesh.renderOverlay = flash > 0.01 || pulse > 0.01;
+      mesh.overlayColor = flash >= pulse ? HIT_FLASH_COLOUR : BOSS_TELEGRAPH_COLOUR;
+      mesh.overlayAlpha = Math.max(flash * 0.55, pulse);
+    }
   }
 
   private spawnHits(snapshot: SimulationSnapshot): void {
@@ -153,6 +185,7 @@ export class Diorama {
   }
 
   dispose(): void {
+    this.bars.dispose();
     this.damage.dispose();
     this.actors.dispose();
     this.loader.dispose();
@@ -164,6 +197,9 @@ export class Diorama {
 
 /** The enemy occupies one slot, whatever is standing in it this wave. */
 export const ENEMY_SLOT = 'enemy';
+
+const HIT_FLASH_COLOUR = new Color3(1, 0.94, 0.82);
+const BOSS_TELEGRAPH_COLOUR = new Color3(0.86, 0.22, 0.24);
 
 /**
  * A stable 0..1 from a uid, so a given hero's numbers always appear in the
