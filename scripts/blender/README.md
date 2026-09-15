@@ -13,7 +13,16 @@ python scripts/blender/kael.py --export           # also write the GLB
 ```
 
 Output lands in `.render/`, or wherever `HERO_OUT` points. `herolib.py` holds
-the shared vocabulary; `kael.py` is the first hero written against it.
+the shared vocabulary; `kael.py` is the first hero written against it, and
+`shen.py` is the first built on the base mesh.
+
+```
+python scripts/blender/shen.py                    # full body, bust, portrait framing
+python scripts/blender/shen.py --fast --head      # the face, seconds per look
+python scripts/blender/shen.py --apose            # bind pose, no staff stance
+python scripts/blender/shen.py --export           # also write the GLB
+HERO=shen python scripts/blender/turnaround.py    # front, 3/4, side, back, top
+```
 
 ## How a hero is put together
 
@@ -84,6 +93,52 @@ glTF also carries no node graph, so the procedural weathering does not
 export. Each material seeds its Base Color socket with the midpoint of its
 ramp, which makes the GLB a plausible flat version rather than default grey;
 baking the noise to textures is still open.
+
+## Shen Dawnfist, on the base mesh
+
+`shen.py` is the second hero and the first on `basemesh.py`: the MakeHuman
+hm08 body (CC0), with its 125 joint markers as the skeleton. What changed
+from building over assembled primitives:
+
+- **Garments are shells of the body.** The tunic, robe, sash, trousers,
+  leg wraps, shoes, hand wraps and patches are all `garment()` copies of the
+  body trimmed to a region and pushed out along its normals, so cloth cannot
+  sit inside skin and a hem cut at a height lands on the mesh's own edge
+  loops. Torso regions are bounded in x as well as z: at the A-pose the
+  hands hang level with the waist, and a sash that swept them up stayed
+  behind when the arms moved. Loose cloth is the same shell thickened
+  radially with `bulk()`; torn edges are `fray()`.
+- **The face is fitted to the mesh's eyes.** One number — how much of the
+  painting spans the interpupillary distance — scales the whole projection,
+  and the chin, ears and hairline land where the base mesh has them. The
+  crop is `feather()`ed into the skin colour at its margin, which is what
+  lets the painted region run round the jaw and meet plain skin without a
+  seam; before that the boundary was a stair-step of polygons at the cheek.
+- **Fists.** The base mesh's hands are open. `make_fist()` bends every
+  vertex past the knuckle line round a circle whose radius is the finger
+  length over the fold angle, thumb excepted, and the hand wrap is a shell
+  of the result.
+- **A head.** The base is eight and a half heads tall; the painting gives
+  him a head. Scaled 1.10 about the neck base, joints included.
+- **The stance is the rig working.** Both hand IK targets are put on the
+  staff with `place()`, which takes a world position rather than a location
+  in the bone's own rest frame, and the arms follow. The elbow pole angle
+  was found by sweeping it and reading the elbow off: the two sides roll
+  differently and need 135° and 0° for mirrored pole targets. The staff is
+  built where it ends up and bound to the left hand, so it is first taken
+  back through that hand's pose (`pose_delta()`); a prop built at its
+  target and bound to a posed bone gets the pose applied twice.
+- **Hair is a cap plus tufts.** A smooth cap is a helmet however it is
+  coloured. The cap's front edge is frayed, and short strands lie along it
+  leaning down and back, with sideburns in front of the ears. The painting
+  carries the fringe across the forehead.
+
+`renders/shen.jpg` is the painting beside the front, three-quarter and head
+renders, which is the comparison every change here was judged against.
+
+Materials are sampled off the painting in linear light. Every material sets
+`use_nodes`, which a material made through the data API does not do on its
+own; without it every helper here dereferenced a `node_tree` that was None.
 
 ## Diagnostics
 

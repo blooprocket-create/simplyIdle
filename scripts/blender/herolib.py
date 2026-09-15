@@ -49,8 +49,19 @@ def smooth(o, auto=None):
 
 # ── materials ─────────────────────────────────────────────────────────────
 
-def plain(name, rgb, rough=0.6, metal=0.0):
+def _material(name):
+    """A node-based material.
+
+    `use_nodes` is off on a material made through the data API, so without
+    this every helper below dereferences a `node_tree` that is None.
+    """
     m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    return m
+
+
+def plain(name, rgb, rough=0.6, metal=0.0):
+    m = _material(name)
     b = m.node_tree.nodes['Principled BSDF']
     b.inputs['Base Color'].default_value = (*rgb, 1)
     b.inputs['Roughness'].default_value = rough
@@ -70,7 +81,7 @@ def worn(name, base, accent, rough=(0.30, 0.78), metal=1.0, scale=11.0, bump=0.2
     every mesh, and a large smooth one like a cuirass can land wholly on the
     rust side of the ramp and come out looking like bare skin.
     """
-    m = bpy.data.materials.new(name)
+    m = _material(name)
     nt = m.node_tree
     b = nt.nodes['Principled BSDF']
     # glTF cannot carry a node graph, so the socket default is what an
@@ -149,6 +160,35 @@ def crop_image(image, u0, u1, ytop0, ytop1, name=None):
     return new
 
 
+def feather(image, centre, radii, width, fill):
+    """Fade the outside of an ellipse in an image towards one colour.
+
+    A painted face has hair and background around it, and every polygon
+    that samples past the face edge would wear them. Blending the margin
+    into the skin colour lets the painted region run around the jaw and
+    cheeks and meet the plain skin without a seam. `fill` is given in the
+    image's own encoding.
+    """
+    import numpy as np
+    w, h = image.size
+    buf = np.empty(w * h * 4, dtype=np.float32)
+    image.pixels.foreach_get(buf)
+    px = buf.reshape(h, w, 4)
+    v, u = np.mgrid[0:h, 0:w]
+    r = np.sqrt((((u + 0.5) / w - centre[0]) / radii[0]) ** 2
+                + (((v + 0.5) / h - centre[1]) / radii[1]) ** 2)
+    k = np.clip((r - 1.0) / width, 0.0, 1.0)[..., None]
+    px[..., :3] = px[..., :3] * (1 - k) + np.asarray(fill, dtype=np.float32) * k
+    image.pixels.foreach_set(px.reshape(-1))
+    image.update()
+    return image
+
+
+def srgb(c):
+    """Encode a linear colour the way an 8-bit painting stores it."""
+    return tuple(12.92 * x if x <= 0.0031308 else 1.055 * x ** (1 / 2.4) - 0.055 for x in c)
+
+
 def painted(name, image, emit=0.22):
     """The painted portrait, read through the mesh's own UVs.
 
@@ -161,7 +201,7 @@ def painted(name, image, emit=0.22):
     face the moment the head is posed, and cannot be exported. Baked into a
     UV layer it is rigid to the mesh and survives both.
     """
-    m = bpy.data.materials.new(name)
+    m = _material(name)
     nt = m.node_tree
     b = nt.nodes['Principled BSDF']
     b.inputs['Roughness'].default_value = 0.62
@@ -532,6 +572,68 @@ def ring(name, loc, major, minor, material, rot=(0, 0, 0), squash=(1, 1, 1)):
     return smooth(o)
 
 
+def rod(name, a, b, r0, r1, material, verts=24, cap=True):
+    """A tapered cylinder from a to b — a staff, a strap, a rope tail."""
+    a, b = Vector(a), Vector(b)
+    d = b - a
+    bpy.ops.mesh.primitive_cone_add(radius1=r0, radius2=r1, depth=d.length, vertices=verts,
+                                    end_fill_type='NGON' if cap else 'NOTHING',
+                                    location=(a + b) / 2)
+    o = bpy.context.object
+    o.name = name
+    o.rotation_euler = aim_rot(a, b)
+    o.data.materials.append(material)
+    return smooth(o, 40)
+
+
+def fray(obj, pick, amount, seed=1, axis=(0, 0, 1)):
+    """Roughen an edge: jitter the picked vertices along an axis.
+
+    A hem cut straight through a mesh reads as a machine edge. Torn cloth
+    is not straight, and neither is a cuff that has been dragged through a
+    siege; a little seeded noise on the rim is the difference.
+    """
+    import random
+    rng = random.Random(seed)
+    ax = Vector(axis).normalized()
+    me = obj.data
+    for v in me.vertices:
+        if pick(v.co):
+            v.co += ax * (rng.uniform(-amount, amount))
+    me.update()
+    return obj
+
+
+def loop_points(controls, n):
+    """`n` points at even spacing around a closed Catmull-Rom spline.
+
+    For laying beads on a string: the controls say where the string goes,
+    and the beads want equal gaps, which the raw spline parameter does not give.
+    """
+    pts = [Vector(c) for c in controls]
+    m = len(pts)
+    dense = []
+    for i in range(m):
+        p0, p1, p2, p3 = pts[i - 1], pts[i], pts[(i + 1) % m], pts[(i + 2) % m]
+        for k in range(24):
+            t = k / 24
+            t2, t3 = t * t, t * t * t
+            dense.append(0.5 * ((2 * p1) + (-p0 + p2) * t
+                                + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2
+                                + (-p0 + 3 * p1 - 3 * p2 + p3) * t3))
+    seglen = [(dense[(i + 1) % len(dense)] - dense[i]).length for i in range(len(dense))]
+    total = sum(seglen)
+    out, want, acc, i = [], 0.0, 0.0, 0
+    while len(out) < n:
+        while acc + seglen[i] < want:
+            acc += seglen[i]
+            i = (i + 1) % len(dense)
+        f = 0.0 if seglen[i] < 1e-9 else (want - acc) / seglen[i]
+        out.append(dense[i].lerp(dense[(i + 1) % len(dense)], f))
+        want += total / n
+    return out
+
+
 def along(a, b, t):
     """A point t of the way from a to b, for laying lames down a limb."""
     return tuple(a[i] + (b[i] - a[i]) * t for i in range(3))
@@ -602,6 +704,34 @@ def build_rig(name, deform, controls, ik):
             c.pole_angle = R(angle)
     bpy.ops.object.mode_set(mode='OBJECT')
     return obj
+
+
+def place(arm, name, at):
+    """Move a control bone so its head sits at a world position.
+
+    A pose bone's `location` is in its own rest frame, which is the wrong
+    space to think about a hand on a staff in. This sets the pose matrix
+    directly and keeps the bone's rest orientation.
+    """
+    from mathutils import Matrix
+    pb = arm.pose.bones[name]
+    rest = pb.bone.matrix_local
+    pb.matrix = Matrix.Translation(arm.matrix_world.inverted() @ Vector(at)
+                                   - rest.translation) @ rest
+    bpy.context.view_layer.update()
+    return pb
+
+
+def pose_delta(arm, name):
+    """The transform a bone has been posed through: rest → pose, world space.
+
+    A prop that is built where it should *end up* and bound to a bone gets
+    that bone's pose applied on top, and lands somewhere else. Building it at
+    `delta.inverted() @ target` instead puts it in the bone's rest frame, so
+    it arrives at the target once the pose is on.
+    """
+    pb = arm.pose.bones[name]
+    return arm.matrix_world @ pb.matrix @ pb.bone.matrix_local.inverted() @ arm.matrix_world.inverted()
 
 
 def _seg_dist(p, a, b):
@@ -704,6 +834,7 @@ def stage(fast=False, floor=True):
         bpy.context.object.name = 'floor'
         bpy.context.object.data.materials.append(plain('floor', (0.013, 0.014, 0.016), 0.95))
     world = bpy.data.worlds.new('w')
+    world.use_nodes = True
     bpy.context.scene.world = world
     world.node_tree.nodes['Background'].inputs['Color'].default_value = (0.046, 0.052, 0.068, 1)
     for loc, energy, size, colour in (
