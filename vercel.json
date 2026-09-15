@@ -23,8 +23,8 @@
       "destination": "/next/index.html"
     },
     {
-      "source": "/next/:path*",
-      "destination": "/next/:path*"
+      "source": "/next/:path((?!.*\\..*).*)",
+      "destination": "/next/index.html"
     },
     {
       "source": "/",
