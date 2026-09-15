@@ -1,6 +1,17 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
-import { HERO_POOL, getMonsterMaxHp, type HeroUnit, type PlayerClass, type Rarity } from '../src/gameConfig';
+import {
+  HERO_LEVEL_CAP,
+  HERO_POOL,
+  getMonsterAffixes,
+  getMonsterDamage,
+  getMonsterExp,
+  getMonsterGold,
+  getMonsterMaxHp,
+  type HeroUnit,
+  type PlayerClass,
+  type Rarity,
+} from '../src/gameConfig';
 import { DEFAULT_STATE, advanceCombatStep, getDpsBreakdown, reducer, type GameState } from '../src/useGameState';
 
 /**
@@ -103,14 +114,18 @@ function settle(target: GameState): GameState {
   };
 
   let working = lowered;
+  let resolved = false;
   for (let step = 0; step < 5_000; step += 1) {
     working = advanceCombatStep(working, 100);
     // A kill or a defeat both end a round, and both publish the derived pair.
-    if (working.totalKills > lowered.totalKills || working.wave < lowered.wave) break;
+    if (working.totalKills > lowered.totalKills || working.wave < lowered.wave) {
+      resolved = true;
+      break;
+    }
   }
-  if (working.teamMaxHp === lowered.teamMaxHp) {
-    throw new Error(`scenario never resolved a round, so its team HP is still the default`);
-  }
+  // Tracked rather than inferred from the HP having moved: settling an already
+  // settled state is a no-op, and inferring would call that a failure.
+  if (!resolved) throw new Error('scenario never resolved a round, so its team HP is still the default');
 
   return { ...target, teamHp: working.teamMaxHp, teamMaxHp: working.teamMaxHp };
 }
@@ -226,6 +241,87 @@ function ceilingWave(): number {
 }
 
 /**
+ * Strip everything that fires on a timer, so a measurement reads the curve
+ * rather than whatever happened to go off inside the slice.
+ *
+ * This matters more than it sounds. The first attempt measured the enemy HP
+ * multiplier straight off a live state and got 0.12, which would mean monsters
+ * carry an eighth of their curve HP. What had actually happened is that every
+ * hero active skill came off cooldown at once and multiplied damage by 112x
+ * for that slice. Averaged over a cooldown cycle the same skills are worth
+ * 1.00x, 1.14x and 1.11x across these scenarios — so the burst is real, brief,
+ * and ruinous to measure through.
+ */
+function quiet(source: GameState): GameState {
+  return {
+    ...source,
+    autoCastHeroActivesEnabled: false,
+    heroActiveCdMs: {},
+    damageBuffMs: 0,
+    damageBuffPct: 0,
+    damageReductionBuffMs: 0,
+    damageReductionBuffPct: 0,
+    combatHeat: 0,
+    autoBurstEnabled: false,
+    burstCharge: 0,
+    autoUsePotionEnabled: false,
+    autoSummonEnabled: false,
+    autoTempoEnabled: false,
+    combatTempo: 1,
+  };
+}
+
+/**
+ * How much team HP rises per hero level.
+ *
+ * The mirror of `dpsPerHeroLevel`, and just as load-bearing: hero vitality is
+ * affine in level too, so every kill raises the team's HP bar as well as its
+ * damage. An estimator that grows damage but holds HP fixed has the team dying
+ * at a wave it comfortably survives — the first version of this fixture did
+ * exactly that, and reported forty-four deaths for a run that had none.
+ *
+ * `getTeamMaxHp` is private, so the slope is read by settling the same roster
+ * one level apart and differencing what the engine publishes.
+ *
+ * Both sides are measured a level above the scenario. `settle` lowers active
+ * heroes by one so the resolving kill lands them where asked, and that
+ * lowering clamps at level one — so measuring a level-one roster against a
+ * level-two one settles both to level two and reports a slope of zero. HP is
+ * affine in level, so shifting the pair up by one costs nothing and removes
+ * the clamp.
+ */
+function measureTeamHpPerHeroLevel(target: GameState): number {
+  const activeUids = new Set(target.activeTeamHeroIds);
+  const active = target.heroRoster.filter(entry => activeUids.has(entry.uid));
+  if (active.length === 0 || active.every(entry => entry.level + 2 > HERO_LEVEL_CAP)) return 0;
+
+  const shifted = (by: number): GameState => ({
+    ...target,
+    heroRoster: target.heroRoster.map(entry =>
+      activeUids.has(entry.uid) ? { ...entry, level: Math.min(HERO_LEVEL_CAP, entry.level + by) } : entry,
+    ),
+  });
+
+  return settle(shifted(2)).teamMaxHp - settle(shifted(1)).teamMaxHp;
+}
+
+/**
+ * How much faster the team actually kills with its timed abilities running.
+ * Measured as a kill-rate ratio over two minutes rather than derived, because
+ * the abilities are a cadence rather than a multiplier.
+ */
+function measureSustainedDpsMult(source: GameState): number {
+  const run = (start: GameState) => {
+    let working = start;
+    for (let step = 0; step < 1_200; step += 1) working = advanceCombatStep(working, 100);
+    return working.totalKills - start.totalKills;
+  };
+  const off = run(quiet(source));
+  const on = run({ ...quiet(source), autoCastHeroActivesEnabled: true });
+  return off > 0 ? on / off : 1;
+}
+
+/**
  * The inputs a closed-form estimator needs, measured off the shipped code
  * rather than recomputed from it.
  *
@@ -234,8 +330,30 @@ function ceilingWave(): number {
  * multiplier chain inside `killMonster`. Incoming damage is measured the same
  * way: step a known slice and read how much team HP moved.
  */
-function measureInputs(source: GameState) {
+function measureInputs(live: GameState) {
+  const source = quiet(live);
   const breakdown = getDpsBreakdown(source);
+
+  /*
+   * Hero damage is affine in hero level — `(base + level * growth)` all the
+   * way down — and every kill grants every active hero one level. So team DPS
+   * rises by a fixed amount per kill, and that slope is the whole of the
+   * feedback loop an estimator has to model. Measured by bumping the roster
+   * one level rather than re-deriving it from the stat pipeline.
+   *
+   * The bump respects `HERO_LEVEL_CAP`, because `killMonster` does. Without
+   * that, a roster already at 999 reports a healthy slope — `getDpsBreakdown`
+   * will happily price a level-1000 hero — and an estimator built on it would
+   * have the deep game accelerating when it is actually flat.
+   */
+  const activeUids = new Set(source.activeTeamHeroIds);
+  const bumped = getDpsBreakdown({
+    ...source,
+    heroRoster: source.heroRoster.map(entry =>
+      activeUids.has(entry.uid) && entry.level < HERO_LEVEL_CAP ? { ...entry, level: entry.level + 1 } : entry,
+    ),
+  });
+  const dpsPerHeroLevel = bumped.finalDps - breakdown.finalDps;
 
   // Step until exactly one kill lands, then read what it paid.
   let working = source;
@@ -248,14 +366,68 @@ function measureInputs(source: GameState) {
 
   // Incoming damage needs a slice with no kill in it, or the heal-to-full at
   // the end of the round shows up as negative damage.
-  const sliceMs = killed ? Math.max(1, Math.min(100, Math.floor(elapsedToKill / 4))) : 100;
-  const stepped = advanceCombatStep(source, sliceMs);
-  const clean = stepped.totalKills === source.totalKills && stepped.wave === source.wave;
+  /*
+   * The slice has to be short enough that no kill lands inside it, or the
+   * heal-to-full at the end of the round reads as negative damage and the HP
+   * drop reads as a whole monster. A maxed roster at wave one kills in
+   * microseconds, so the slice shrinks until the round is still in progress.
+   */
+  let sliceMs = 10;
+  let stepped = advanceCombatStep(source, sliceMs);
+  let clean = stepped.totalKills === source.totalKills && stepped.wave === source.wave;
+  for (let attempt = 0; attempt < 12 && !clean; attempt += 1) {
+    sliceMs /= 10;
+    stepped = advanceCombatStep(source, sliceMs);
+    clean = stepped.totalKills === source.totalKills && stepped.wave === source.wave;
+  }
   const incomingDmgPerSec = clean ? ((source.teamHp - stepped.teamHp) * 1000) / sliceMs : null;
 
+  /*
+   * The estimator needs the enemy HP and damage multipliers — affixes crossed
+   * with the weekly event, crossed on the damage side with the whole mitigation
+   * chain. None of those functions are exported, and re-deriving them would
+   * mean porting the mitigation pipeline before the estimator can exist.
+   *
+   * Collapsing each chain into one measured scalar is both simpler and more
+   * honest: one clean slice moves monster HP by `dps * slice / hpMult`, so the
+   * multiplier falls straight out of the drop, and the damage multiplier falls
+   * out of the incoming rate the same way. What the estimator consumes is one
+   * number per side, which is also all it can use.
+   */
+  const hpDrop = clean ? source.monsterHp - stepped.monsterHp : 0;
+  /*
+   * Affixes cycle per wave, so they are divided back out here and applied per
+   * wave by the estimator instead. What is left is the part that really is
+   * constant across a window: the weekly event on the enemy HP side, the whole
+   * mitigation chain on the damage side.
+   */
+  const affix = getMonsterAffixes(source.wave).reduce(
+    (total, entry) => ({
+      hp: total.hp * entry.enemyHpMultiplier,
+      dmg: total.dmg * entry.enemyDamageMultiplier,
+      gold: total.gold * entry.goldMultiplier,
+      exp: total.exp * entry.expMultiplier,
+    }),
+    { hp: 1, dmg: 1, gold: 1, exp: 1 },
+  );
+  const enemyHpMult = hpDrop > 0 ? (breakdown.finalDps * (sliceMs / 1000)) / hpDrop / affix.hp : null;
+  const incomingMult =
+    incomingDmgPerSec === null ? null : incomingDmgPerSec / getMonsterDamage(source.wave) / affix.dmg;
+  const goldMult = killed ? (working.gold - source.gold) / getMonsterGold(source.wave) / affix.gold : null;
+  const expMult = killed ? (working.totalExp - source.totalExp) / getMonsterExp(source.wave) / affix.exp : null;
+
   return {
+    enemyHpMult,
+    incomingMult,
+    goldMult,
+    expMult,
+    sustainedDpsMult: measureSustainedDpsMult(live),
+    teamHpPerHeroLevel: measureTeamHpPerHeroLevel(live),
     wave: source.wave,
     finalDps: breakdown.finalDps,
+    dpsPerHeroLevel,
+    heroLevel: source.heroRoster.find(entry => activeUids.has(entry.uid))?.level ?? 0,
+    activeHeroCount: source.heroRoster.filter(entry => activeUids.has(entry.uid)).length,
     teamHp: source.teamHp,
     teamMaxHp: source.teamMaxHp,
     monsterMaxHp: getMonsterMaxHp(source.wave),
@@ -340,6 +512,32 @@ describe('offline progress fixture', () => {
       expect({ name: entry.name, dps: entry.inputs.finalDps > 0 }).toEqual({ name: entry.name, dps: true });
       expect({ name: entry.name, gold: entry.inputs.goldPerKill }).not.toEqual({ name: entry.name, gold: null });
     }
+  });
+
+  it('confirms team dps rises by a fixed amount per kill', () => {
+    // The linear model the estimator is built on. Checked by stepping three
+    // levels rather than assumed from reading the stat code: if hero damage
+    // ever stops being affine in level, the estimator's feedback loop is
+    // wrong and this is where it shows.
+    const climbing = scenario('climbing');
+    expect(climbing.inputs.dpsPerHeroLevel).toBeGreaterThan(0);
+
+    const capped = scenario('at-ceiling');
+    // A roster already at the level cap gains nothing per kill, which is what
+    // makes the deep-game sawtooth a repeating cycle an estimator can skip.
+    expect(capped.inputs.heroLevel).toBe(HERO_LEVEL_CAP);
+    expect(capped.inputs.dpsPerHeroLevel).toBe(0);
+    // Below the cap the slope is a real fraction of current dps, so the
+    // feedback is not something an estimator can round away.
+    expect(scenario('fresh').inputs.dpsPerHeroLevel / scenario('fresh').inputs.finalDps).toBeGreaterThan(0.01);
+  });
+
+  it('confirms team HP rises per kill as well as damage', () => {
+    // Both halves of the feedback loop, or the estimator kills the team off at
+    // a wave it survives.
+    expect(scenario('fresh').inputs.teamHpPerHeroLevel).toBeGreaterThan(0);
+    expect(scenario('climbing').inputs.teamHpPerHeroLevel).toBeGreaterThan(0);
+    expect(scenario('at-ceiling').inputs.teamHpPerHeroLevel).toBe(0);
   });
 
   it('shows offline progress is a sawtooth, not a climb', () => {
