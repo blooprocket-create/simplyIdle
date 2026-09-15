@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Diorama } from '../game/Diorama';
 import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
+import { demoCast, demoHeroes } from './demoRoster';
 import { GameLoop } from './GameLoop';
 import { Shelf } from '../ui/nav/Shelf';
 import { PHASE_0_REGISTRY } from '../ui/nav/registry';
@@ -20,7 +21,8 @@ export function App() {
     if (!canvas) return;
 
     const diorama = new Diorama(canvas);
-    const loop = new GameLoop();
+    diorama.setCast(demoCast());
+    const loop = new GameLoop({ heroes: demoHeroes() });
 
     const unsubscribe = loop.subscribe(next => {
       diorama.render(next);
@@ -44,7 +46,7 @@ export function App() {
       <canvas ref={canvasRef} className={styles.stage} />
       <header className={styles.status}>
         <span className={styles.brand}>SIMPLYIDLE</span>
-        <span className={styles.phase}>Phase 0 scaffold</span>
+        <span className={styles.phase}>Phase 2 diorama</span>
         <span className={styles.clock}>{(snapshot.elapsedMs / 1000).toFixed(1)}s</span>
       </header>
       <Shelf registry={PHASE_0_REGISTRY} snapshot={snapshot} />

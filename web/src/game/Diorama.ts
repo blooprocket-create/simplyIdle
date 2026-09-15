@@ -1,79 +1,126 @@
-import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera';
-import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { Engine } from '@babylonjs/core/Engines/engine';
+import { Color3 } from '@babylonjs/core/Maths/math.color';
 import { Scene } from '@babylonjs/core/scene';
-import { Color3, Color4, Vector3 } from '@babylonjs/core/Maths/math';
-import { CreateBox } from '@babylonjs/core/Meshes/Builders/boxBuilder';
-import { CreateGround } from '@babylonjs/core/Meshes/Builders/groundBuilder';
-import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
+
 import type { SimulationSnapshot } from '../engine/types';
+import { ActorPool, type ActorRequest } from './actors/ActorPool';
+import { ModelLoader } from './actors/ModelLoader';
+import { detectCapabilities, profileFor, type DeviceProfile } from './device/DeviceProfile';
+import { FrameGovernor } from './device/FrameGovernor';
+import { layOutEnemy, layOutHeroes, type Placement } from './layout/battleLine';
+import { EMPTY_CAST, type Cast } from './models/cast';
+import { EMPTY_MANIFEST, monsterModelKey, type ModelManifest } from './models/manifest';
+import { buildStage, type Stage } from './scene/stage';
 
 /**
- * Phase 0 placeholder. It exists to prove the seam, not to look like anything:
- * a ground plane, a light, and one box per side of a fight that does not exist
- * yet.
+ * Draws the fight.
  *
- * When Phase 2 replaces these boxes, the hero placeholders do NOT become
- * capsules. Every hero has authored portrait art — 65 PNGs in `IMG/HeroIcon/`,
- * mapped 1:1 to hero ids by `src/heroPortraits.ts` — and a placeholder is a
- * small assembly of primitives whose outline reads as that hero at gameplay
- * distance: bulk, stance, headgear, weapon shape. Kael Ironheart is armoured
- * bulk with pauldrons and a kite shield; Lunara Frostweave is a hooded cloak
- * and a staff on a slight frame, and the player should be able to tell them
- * apart on the battle line before a single GLB exists. The portraits are busts,
- * chest-up, so legs and stance have to be extrapolated. See REVAMP.md, Phase 2.
+ * Two inputs, on purpose. A cast, when the roster changes: who is here, what
+ * rank they hold, what model to draw them as. A snapshot, every frame: what
+ * they are doing. Identity does not belong in a per-frame message.
  *
- * The rule it establishes is the one that matters — `render` takes a snapshot
- * and draws it. It never decides an outcome, and nothing here is allowed to
- * call back into the simulation. Phase 2 replaces the boxes; the signature
- * stays.
+ * The rule from Phase 0 is unchanged and is the one that matters — `render`
+ * takes a snapshot and draws it. It never decides an outcome, and nothing
+ * here calls back into the simulation.
  */
+
+const RANK_TINTS: Record<string, Color3> = {
+  front: new Color3(0.44, 0.5, 0.58),
+  mid: new Color3(0.38, 0.46, 0.56),
+  back: new Color3(0.34, 0.42, 0.54),
+};
+
+export interface DioramaOptions {
+  manifest?: ModelManifest;
+  /** Overrides capability detection; a test or a debug switch supplies it. */
+  profile?: DeviceProfile;
+}
+
 export class Diorama {
   private readonly engine: Engine;
   private readonly scene: Scene;
-  private readonly hero: ReturnType<typeof CreateBox>;
-  private readonly foe: ReturnType<typeof CreateBox>;
+  private readonly stage: Stage;
+  private readonly loader: ModelLoader;
+  private readonly actors: ActorPool;
+  private readonly governor: FrameGovernor;
+  readonly profile: DeviceProfile;
 
-  constructor(canvas: HTMLCanvasElement) {
+  private cast: Cast = EMPTY_CAST;
+  private placements = new Map<string, Placement>();
+  private enemyId: string | null = null;
+
+  constructor(canvas: HTMLCanvasElement, options: DioramaOptions = {}) {
     this.engine = new Engine(canvas, true, { preserveDrawingBuffer: false, stencil: false });
     this.scene = new Scene(this.engine);
-    this.scene.clearColor = new Color4(0.043, 0.086, 0.125, 1);
 
-    const camera = new ArcRotateCamera('camera', -Math.PI / 2.2, Math.PI / 2.6, 14, new Vector3(0, 1, 0), this.scene);
-    camera.attachControl(canvas, false);
+    this.profile = options.profile ?? profileFor(detectCapabilities(globalThis as never));
+    this.engine.setHardwareScalingLevel(1 / this.profile.renderScale);
+    this.governor = new FrameGovernor(this.profile);
 
-    const key = new HemisphericLight('key', new Vector3(0.4, 1, -0.3), this.scene);
-    key.intensity = 0.9;
-
-    const groundMaterial = new StandardMaterial('ground', this.scene);
-    groundMaterial.diffuseColor = new Color3(0.13, 0.22, 0.18);
-    groundMaterial.specularColor = Color3.Black();
-    const ground = CreateGround('ground', { width: 40, height: 14 }, this.scene);
-    ground.material = groundMaterial;
-
-    this.hero = this.makeActor('hero', new Color3(0.37, 0.83, 0.54), -3);
-    this.foe = this.makeActor('foe', new Color3(0.8, 0.42, 0.32), 3);
-
-    this.engine.runRenderLoop(() => this.scene.render());
+    this.stage = buildStage(this.scene, this.profile);
+    this.loader = new ModelLoader(this.scene, options.manifest ?? EMPTY_MANIFEST);
+    this.actors = new ActorPool(this.loader);
   }
 
-  private makeActor(name: string, colour: Color3, x: number) {
-    const material = new StandardMaterial(`${name}-material`, this.scene);
-    material.diffuseColor = colour;
-    material.specularColor = Color3.Black();
-    const box = CreateBox(name, { width: 1, height: 2, depth: 1 }, this.scene);
-    box.material = material;
-    box.position = new Vector3(x, 1, 0);
-    return box;
+  /** Which keys the pack could not supply, for a debug overlay or a report. */
+  get fallbacks(): ReadonlyMap<string, 'missing' | 'failed'> {
+    return this.loader.report.fallbacks;
+  }
+
+  /**
+   * Swaps the pack without rebuilding the scene. Anything already on the
+   * field keeps its current model until the cast changes.
+   */
+  setManifest(manifest: ModelManifest): void {
+    this.loader.setManifest(manifest);
+  }
+
+  setCast(cast: Cast): void {
+    this.cast = cast;
+    this.placements = layOutHeroes(cast);
+    this.syncActors();
   }
 
   /** Draws the snapshot. Reads only; never writes back into the simulation. */
   render(snapshot: SimulationSnapshot): void {
-    // Standing in for real actor state: both sides bob so it is visible at a
-    // glance that the engine clock is reaching the renderer.
-    const phase = snapshot.elapsedMs / 1000;
-    this.hero.position.y = 1 + Math.sin(phase * 2) * 0.08;
-    this.foe.position.y = 1 + Math.sin(phase * 2 + Math.PI) * 0.08;
+    const enemyId = snapshot.enemy?.id ?? null;
+    if (enemyId !== this.enemyId) {
+      this.enemyId = enemyId;
+      this.syncActors();
+    }
+
+    const decision = this.governor.frame(snapshot.elapsedMs);
+    if (!decision.draw) return;
+
+    this.actors.place(this.placements);
+    const enemy = this.actors.get(ENEMY_SLOT);
+    if (enemy) {
+      const placement = layOutEnemy();
+      enemy.root.position.set(placement.x, placement.y, placement.z);
+      enemy.root.rotation.y = placement.yaw;
+    }
+    this.scene.render();
+  }
+
+  private syncActors(): void {
+    const requests: ActorRequest[] = this.cast.map(member => ({
+      id: member.uid,
+      modelKey: member.modelKey,
+      name: member.uid,
+      tint: RANK_TINTS[member.role],
+    }));
+    if (this.enemyId) {
+      requests.push({
+        // One slot rather than one actor per wave: the enemy is replaced a
+        // thousand times a session and each replacement would otherwise
+        // rebuild a model that has not changed.
+        id: ENEMY_SLOT,
+        modelKey: monsterModelKey(this.enemyId),
+        name: 'enemy',
+        tint: new Color3(0.62, 0.34, 0.28),
+      });
+    }
+    this.actors.sync(requests);
   }
 
   resize(): void {
@@ -81,8 +128,13 @@ export class Diorama {
   }
 
   dispose(): void {
-    this.engine.stopRenderLoop();
+    this.actors.dispose();
+    this.loader.dispose();
+    this.stage.dispose();
     this.scene.dispose();
     this.engine.dispose();
   }
 }
+
+/** The enemy occupies one slot, whatever is standing in it this wave. */
+export const ENEMY_SLOT = 'enemy';
