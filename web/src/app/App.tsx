@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Diorama } from '../game/Diorama';
-import { EMPTY_SNAPSHOT, type SimulationSnapshot } from '../engine/types';
+import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
 import { GameLoop } from './GameLoop';
 import { Shelf } from '../ui/nav/Shelf';
 import { PHASE_0_REGISTRY } from '../ui/nav/registry';
@@ -13,7 +13,7 @@ import styles from './App.module.css';
  */
 export function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [snapshot, setSnapshot] = useState<SimulationSnapshot>(EMPTY_SNAPSHOT);
+  const [snapshot, setSnapshot] = useState<SimulationSnapshot>(() => emptySnapshot());
 
   useEffect(() => {
     const canvas = canvasRef.current;

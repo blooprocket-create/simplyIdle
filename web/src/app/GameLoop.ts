@@ -1,4 +1,4 @@
-import { Simulation } from '../engine/Simulation';
+import { Simulation, type SimulationOptions } from '../engine/Simulation';
 import type { SimulationSnapshot } from '../engine/types';
 
 /**
@@ -13,10 +13,19 @@ import type { SimulationSnapshot } from '../engine/types';
 export type SnapshotListener = (snapshot: SimulationSnapshot) => void;
 
 export class GameLoop {
-  private readonly simulation = new Simulation();
+  private readonly simulation: Simulation;
   private readonly listeners = new Set<SnapshotListener>();
   private frame: number | null = null;
   private lastFrameAt = 0;
+
+  /**
+   * The roster comes in from outside. The loop builds no heroes of its own —
+   * they are assembled from content and the save by the caller, which is what
+   * keeps the clock ignorant of the catalogue.
+   */
+  constructor(options: SimulationOptions = { heroes: [] }) {
+    this.simulation = new Simulation(options);
+  }
 
   subscribe(listener: SnapshotListener): () => void {
     this.listeners.add(listener);

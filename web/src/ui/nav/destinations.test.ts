@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_SNAPSHOT, type SimulationSnapshot } from '../../engine/types';
+import { emptySnapshot, type SimulationSnapshot } from '../../engine/types';
 import {
   SHELF_SLOTS,
   groupDestinations,
@@ -9,7 +9,7 @@ import {
   type Destination,
 } from './destinations';
 
-const snapshot: SimulationSnapshot = EMPTY_SNAPSHOT;
+const snapshot: SimulationSnapshot = emptySnapshot();
 
 function make(id: string, overrides: Partial<Destination> = {}): Destination {
   return { id, group: 'power', label: id, archetype: 'ledger', ...overrides };
