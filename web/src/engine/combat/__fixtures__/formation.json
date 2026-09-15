@@ -1,0 +1,159 @@
+{
+  "note": "Formation and team-boost multipliers from the shipped implementation. Owned by __tests__/formationFixture.test.ts.",
+  "generatedFrom": "src/useGameState.ts getDpsBreakdown",
+  "rows": [
+    {
+      "scenario": {
+        "name": "empty team",
+        "classes": []
+      },
+      "formationDps": 1,
+      "teamBoost": 1,
+      "teamBoostValues": []
+    },
+    {
+      "scenario": {
+        "name": "one warrior",
+        "classes": [
+          "warrior"
+        ]
+      },
+      "formationDps": 1,
+      "teamBoost": 1.0975,
+      "teamBoostValues": [
+        0.0975
+      ]
+    },
+    {
+      "scenario": {
+        "name": "one mage",
+        "classes": [
+          "mage"
+        ]
+      },
+      "formationDps": 1.03,
+      "teamBoost": 1.12675,
+      "teamBoostValues": [
+        0.12675
+      ]
+    },
+    {
+      "scenario": {
+        "name": "one archer",
+        "classes": [
+          "archer"
+        ]
+      },
+      "formationDps": 1.092,
+      "teamBoost": 1.10725,
+      "teamBoostValues": [
+        0.10725
+      ]
+    },
+    {
+      "scenario": {
+        "name": "one monk",
+        "classes": [
+          "monk"
+        ]
+      },
+      "formationDps": 1,
+      "teamBoost": 1.10725,
+      "teamBoostValues": [
+        0.10725
+      ]
+    },
+    {
+      "scenario": {
+        "name": "three warriors hits the front cap",
+        "classes": [
+          "warrior",
+          "warrior",
+          "warrior"
+        ]
+      },
+      "formationDps": 1,
+      "teamBoost": 1.30225,
+      "teamBoostValues": [
+        0.0975,
+        0.10725,
+        0.0975
+      ]
+    },
+    {
+      "scenario": {
+        "name": "three archers hits the back cap",
+        "classes": [
+          "archer",
+          "archer",
+          "archer"
+        ]
+      },
+      "formationDps": 1.1924640000000002,
+      "teamBoost": 1.3315000000000001,
+      "teamBoostValues": [
+        0.10725,
+        0.11699999999999999,
+        0.10725
+      ]
+    },
+    {
+      "scenario": {
+        "name": "balanced line",
+        "classes": [
+          "warrior",
+          "monk",
+          "mage",
+          "archer"
+        ]
+      },
+      "formationDps": 1.1247600000000002,
+      "teamBoost": 1.4699499999999999,
+      "teamBoostValues": [
+        0.0975,
+        0.11699999999999999,
+        0.1365,
+        0.11895
+      ]
+    },
+    {
+      "scenario": {
+        "name": "full six",
+        "classes": [
+          "warrior",
+          "berserker",
+          "monk",
+          "mage",
+          "archer",
+          "archer"
+        ]
+      },
+      "formationDps": 1.2282379200000002,
+      "teamBoost": 1.68055,
+      "teamBoostValues": [
+        0.0975,
+        0.0975,
+        0.11699999999999999,
+        0.13845,
+        0.1131,
+        0.11699999999999999
+      ]
+    },
+    {
+      "scenario": {
+        "name": "monk stored as mid — shipped code ignores it",
+        "classes": [
+          "monk"
+        ],
+        "storedRoles": {
+          "0": "mid"
+        }
+      },
+      "formationDps": 1,
+      "teamBoost": 1.10725,
+      "teamBoostValues": [
+        0.10725
+      ]
+    }
+  ]
+}
