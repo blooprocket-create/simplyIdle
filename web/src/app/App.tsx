@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Diorama } from '../game/Diorama';
+import { detectCapabilities, profileFor } from '../game/device/DeviceProfile';
 import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
 import { demoCast, demoHeroes, demoProfile } from './demoRoster';
 import { GameLoop } from './GameLoop';
@@ -31,6 +32,16 @@ export function App() {
   // whole reason it is a separate read model from the snapshot.
   const cast = useMemo(() => demoCast(), []);
   const profile = useMemo(() => demoProfile(), []);
+  /*
+   * Detected once and shared with the renderer, rather than detected again
+   * inside it. Two detections could disagree — `matchMedia` is live, and a
+   * Settings screen reporting a different tier than the one actually being
+   * drawn would be worse than no Settings screen.
+   */
+  const device = useMemo(() => {
+    const capabilities = detectCapabilities(globalThis as never);
+    return { capabilities, profile: profileFor(capabilities) };
+  }, []);
   const { pinnedIds, toggle } = usePinned(knownIds);
 
   const select = (id: string) => {
@@ -46,7 +57,7 @@ export function App() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const diorama = new Diorama(canvas);
+    const diorama = new Diorama(canvas, { profile: device.profile });
     diorama.setCast(cast);
     const loop = new GameLoop({ heroes: demoHeroes() });
 
@@ -65,7 +76,7 @@ export function App() {
       loop.stop();
       diorama.dispose();
     };
-  }, [cast]);
+  }, [cast, device.profile]);
 
   return (
     <div className={styles.root}>
@@ -81,6 +92,7 @@ export function App() {
         snapshot={snapshot}
         profile={profile}
         cast={cast}
+        device={device}
         onDismiss={() => setOpenId(null)}
       />
       {railOpen && (

@@ -1,3 +1,4 @@
+import type { DeviceCapabilities, DeviceProfile } from '../../game/device/DeviceProfile';
 import type { SimulationSnapshot } from '../../engine/types';
 import type { Cast } from '../../game/models/cast';
 import type { Destination } from '../nav/destinations';
@@ -19,4 +20,6 @@ export interface SurfaceProps {
   profile: PlayerProfile;
   /** Who is on the field, as the renderer sees them. */
   cast: Cast;
+  /** What the renderer decided this device can do, and what it saw. */
+  device: { profile: DeviceProfile; capabilities: DeviceCapabilities };
 }
