@@ -42,8 +42,25 @@ export function heroModelKey(heroId: string): ModelKey {
   return `hero/${heroId}`;
 }
 
-export function monsterModelKey(monsterId: string): ModelKey {
-  return `monster/${monsterId}`;
+/**
+ * Keyed by who the monster is, not by which wave it turned up on.
+ *
+ * `spawnEnemy` ids an encounter `w1`, `w2`, `w3`… — fine for the simulation,
+ * which only needs to tell one encounter from the next, and wrong for a model
+ * pack: it would ask for `monster/w1`, `monster/w2` and an unbounded set
+ * beyond, so a Goblin met on wave two and wave twelve would never share the
+ * one authored Goblin. The content name is the identity.
+ */
+export function monsterModelKey(monsterName: string): ModelKey {
+  return `monster/${slug(monsterName)}`;
+}
+
+function slug(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 export interface ResolvedAsset {
@@ -65,6 +82,21 @@ export interface ResolvedPlaceholder {
 export type Resolved = ResolvedAsset | ResolvedPlaceholder;
 
 const DEGREES_TO_RADIANS = Math.PI / 180;
+
+/**
+ * The first key the pack can actually supply.
+ *
+ * A boss is `"<Name> King"`, so it asks for `monster/orc-king` and settles for
+ * `monster/orc`. A pack that has bothered to author a distinct king gets used;
+ * one that has not still draws an Orc rather than a placeholder.
+ */
+export function resolveFirst(manifest: ModelManifest, keys: readonly ModelKey[]): Resolved {
+  for (const key of keys) {
+    const found = resolve(manifest, key);
+    if (found.kind === 'asset') return found;
+  }
+  return { kind: 'placeholder', key: keys[keys.length - 1] ?? '' };
+}
 
 export function resolve(manifest: ModelManifest, key: ModelKey): Resolved {
   const entry = manifest.models[key];

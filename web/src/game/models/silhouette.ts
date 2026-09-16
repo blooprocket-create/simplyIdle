@@ -168,17 +168,51 @@ const MONSTER_BASE: Silhouette = {
 };
 
 /**
- * A monster's look. `getMonsterForWave` names a boss `"<Name> King"`, so the
- * crown is derived from the name rather than passed separately — there is one
- * source of truth for what a boss is and it is already in `content`.
+ * The monster a boss is a crowned version of, or the name unchanged.
+ *
+ * `getMonsterForWave` names a boss `"<Name> King"`. That convention is read in
+ * two places — the crown on the silhouette and the model key a boss falls back
+ * to — so it is spelled out once, here, rather than in both.
+ */
+export function baseMonsterName(name: string): string {
+  return name.endsWith(BOSS_SUFFIX) ? name.slice(0, -BOSS_SUFFIX.length) : name;
+}
+
+const BOSS_SUFFIX = ' King';
+
+/**
+ * A monster's look. The crown is derived from the name rather than passed
+ * separately — there is one source of truth for what a boss is and it is
+ * already in `content`.
  */
 export function monsterSilhouette(name: string): Silhouette {
-  const crowned = name.endsWith(' King');
-  const base = crowned ? name.slice(0, -' King'.length) : name;
+  const base = baseMonsterName(name);
+  const crowned = base !== name;
   const override = MONSTER_SILHOUETTE[base] ?? {};
   const silhouette = { ...MONSTER_BASE, ...override };
   if (!crowned) return silhouette;
   return { ...silhouette, headgear: 'crown', height: silhouette.height * 1.15 };
+}
+
+/**
+ * A compact, stable identity for a silhouette.
+ *
+ * The actor pool needs to know whether the thing it already built is still
+ * the thing being asked for. Comparing the object by reference says no every
+ * frame; not comparing it at all says yes forever, which is how one slot kept
+ * showing wave one's monster for the rest of the run.
+ */
+export function silhouetteKey(silhouette: Silhouette): string {
+  return [
+    silhouette.build,
+    silhouette.height,
+    silhouette.headgear,
+    silhouette.weapon,
+    silhouette.cloak ? 'cloak' : 'bare',
+    silhouette.palette.primary.join(','),
+    silhouette.palette.secondary.join(','),
+    silhouette.palette.accent.join(','),
+  ].join('|');
 }
 
 /** Every monster the pool can produce, for a coverage check. */

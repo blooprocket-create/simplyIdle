@@ -18,11 +18,10 @@ import { getMonsterForWave, isBossWave } from '../content/monsters';
 import { CastBars } from './fx/CastBars';
 import { DamageNumbers } from './fx/DamageNumbers';
 import { HealthBars } from './fx/HealthBars';
-import { REACTION_MS, hitFlash, hitRecoil, telegraphPulse } from './fx/reactions';
+import { REACTION_MS, hitFlash, recoilOffset, telegraphStrength } from './fx/reactions';
 import { layOutEnemy, layOutHeroes, type Placement } from './layout/battleLine';
-import { EMPTY_CAST, type Cast } from './models/cast';
-import { EMPTY_MANIFEST, monsterModelKey, type ModelManifest } from './models/manifest';
-import { monsterSilhouette } from './models/silhouette';
+import { EMPTY_CAST, monsterAppearance, type Cast } from './models/cast';
+import { EMPTY_MANIFEST, type ModelManifest } from './models/manifest';
 import { buildStage, type Stage } from './scene/stage';
 
 /**
@@ -74,7 +73,7 @@ export class Diorama {
     this.stage = buildStage(this.scene, this.profile);
     this.loader = new ModelLoader(this.scene, options.manifest ?? EMPTY_MANIFEST);
     this.actors = new ActorPool(this.loader);
-    this.damage = new DamageNumbers(this.scene, this.profile.maxDamageNumbers);
+    this.damage = new DamageNumbers(this.scene, this.profile.maxDamageNumbers, undefined, this.profile.reducedMotion);
     this.bars = new CastBars(this.scene);
     this.health = new HealthBars(this.scene);
     this.appliedTier = this.profile.tier;
@@ -160,12 +159,15 @@ export class Diorama {
     const placement = layOutEnemy();
     const boss = snapshot.enemy !== null && isBossWave(snapshot.enemy.wave);
 
-    enemy.root.position.set(placement.x + hitRecoil(this.sinceHitMs), placement.y, placement.z);
+    const still = this.profile.reducedMotion;
+    enemy.root.position.set(placement.x + recoilOffset(this.sinceHitMs, still), placement.y, placement.z);
     enemy.root.rotation.y = placement.yaw;
     enemy.root.scaling.setAll(boss ? 1.35 : 1);
 
+    // The flash is brightness rather than movement, so it survives reduced
+    // motion unchanged; the telegraph holds still instead of breathing.
     const flash = hitFlash(this.sinceHitMs);
-    const pulse = boss ? telegraphPulse(snapshot.elapsedMs) * 0.28 : 0;
+    const pulse = boss ? telegraphStrength(snapshot.elapsedMs, still) : 0;
     for (const mesh of enemy.root.getChildMeshes()) {
       mesh.renderOverlay = flash > 0.01 || pulse > 0.01;
       mesh.overlayColor = flash >= pulse ? HIT_FLASH_COLOUR : BOSS_TELEGRAPH_COLOUR;
@@ -191,22 +193,22 @@ export class Diorama {
   private syncActors(): void {
     const requests: ActorRequest[] = this.cast.map(member => ({
       id: member.uid,
-      modelKey: member.modelKey,
+      modelKeys: [member.modelKey],
       name: member.uid,
       silhouette: member.silhouette,
     }));
     if (this.enemyId) {
+      // The wave names the monster and content decides what that looks
+      // like, so the renderer asks rather than deciding for itself.
+      const enemy = monsterAppearance(getMonsterForWave(this.enemyWave).name);
       requests.push({
         // One slot rather than one actor per wave: the enemy is replaced a
         // thousand times a session and each replacement would otherwise
         // rebuild a model that has not changed.
         id: ENEMY_SLOT,
-        modelKey: monsterModelKey(this.enemyId),
+        modelKeys: enemy.modelKeys,
         name: 'enemy',
-        // The wave names the monster, and the name says whether it is
-        // crowned, so the enemy's look comes from content rather than from
-        // anything the renderer decides for itself.
-        silhouette: monsterSilhouette(getMonsterForWave(this.enemyWave).name),
+        silhouette: enemy.silhouette,
       });
     }
     this.actors.sync(requests);

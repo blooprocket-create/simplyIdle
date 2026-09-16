@@ -1,6 +1,6 @@
 import type { Placement } from '../layout/battleLine';
 import type { ModelKey } from '../models/manifest';
-import type { Silhouette } from '../models/silhouette';
+import { silhouetteKey, type Silhouette } from '../models/silhouette';
 import type { LoadedActor, ModelLoader } from './ModelLoader';
 
 /**
@@ -14,21 +14,36 @@ import type { LoadedActor, ModelLoader } from './ModelLoader';
 
 export interface ActorRequest {
   id: string;
-  modelKey: ModelKey;
+  /** Tried in order; the first the pack can supply wins. */
+  modelKeys: readonly ModelKey[];
   name: string;
   silhouette: Silhouette;
 }
 
+/**
+ * What an actor was built from.
+ *
+ * A slot holds one actor and the thing standing in it changes — the enemy
+ * slot is a different monster every wave. Comparing the request by id alone
+ * says "already have one" forever, which is how one slot kept showing wave
+ * one's monster for the rest of the run.
+ */
+export function requestSignature(request: ActorRequest): string {
+  return `${request.modelKeys.join('>')}|${silhouetteKey(request.silhouette)}`;
+}
+
 export class ActorPool {
-  private readonly actors = new Map<string, LoadedActor>();
-  private readonly pending = new Set<string>();
+  private readonly actors = new Map<string, { actor: LoadedActor; signature: string }>();
+  private readonly pending = new Map<string, string>();
   /** The ids the last `sync` asked for, so a late arrival can be checked. */
   private wanted = new Set<string>();
+  /** And what each was asked to be, so a late arrival can be checked against it. */
+  private signatures = new Map<string, string>();
 
   constructor(private readonly loader: ModelLoader) {}
 
   get(id: string): LoadedActor | undefined {
-    return this.actors.get(id);
+    return this.actors.get(id)?.actor;
   }
 
   get size(): number {
@@ -43,46 +58,53 @@ export class ActorPool {
   sync(requests: readonly ActorRequest[]): void {
     const wanted = new Set(requests.map(request => request.id));
     this.wanted = wanted;
-    for (const [id, actor] of this.actors) {
-      if (wanted.has(id)) continue;
-      actor.dispose();
+    const signatures = new Map(requests.map(request => [request.id, requestSignature(request)]));
+    this.signatures = signatures;
+    for (const [id, held] of this.actors) {
+      // Gone, or the same slot now holds something else.
+      if (wanted.has(id) && signatures.get(id) === held.signature) continue;
+      held.actor.dispose();
       this.actors.delete(id);
     }
     for (const request of requests) {
-      if (this.actors.has(request.id) || this.pending.has(request.id)) continue;
-      this.pending.add(request.id);
+      const signature = requestSignature(request);
+      if (this.actors.has(request.id)) continue;
+      if (this.pending.get(request.id) === signature) continue;
+      this.pending.set(request.id, signature);
       void this.loader
-        .acquire(request.modelKey, request.name, request.silhouette)
+        .acquire(request.modelKeys, request.name, request.silhouette)
         .then(actor => {
-          this.pending.delete(request.id);
-          // The roster can change while a model is in flight; if this id is
-          // no longer wanted by the time it lands, throw it away rather than
-          // adding a hero who has already left.
-          if (!this.wanted.has(request.id)) {
+          if (this.pending.get(request.id) === signature) this.pending.delete(request.id);
+          // The roster can change while a model is in flight. If this id is no
+          // longer wanted, or the slot has moved on to something else since,
+          // throw the result away rather than showing a monster two waves old.
+          if (!this.wanted.has(request.id) || this.signatures.get(request.id) !== signature) {
             actor.dispose();
             return;
           }
-          this.actors.set(request.id, actor);
+          this.actors.get(request.id)?.actor.dispose();
+          this.actors.set(request.id, { actor, signature });
         })
         .catch(() => {
-          this.pending.delete(request.id);
+          if (this.pending.get(request.id) === signature) this.pending.delete(request.id);
         });
     }
   }
 
   place(placements: Map<string, Placement>): void {
     for (const [id, placement] of placements) {
-      const actor = this.actors.get(id);
-      if (!actor) continue;
-      actor.root.position.set(placement.x, placement.y, placement.z);
-      actor.root.rotation.y = placement.yaw;
+      const held = this.actors.get(id);
+      if (!held) continue;
+      held.actor.root.position.set(placement.x, placement.y, placement.z);
+      held.actor.root.rotation.y = placement.yaw;
     }
   }
 
   dispose(): void {
-    for (const actor of this.actors.values()) actor.dispose();
+    for (const held of this.actors.values()) held.actor.dispose();
     this.actors.clear();
     this.pending.clear();
     this.wanted.clear();
+    this.signatures.clear();
   }
 }

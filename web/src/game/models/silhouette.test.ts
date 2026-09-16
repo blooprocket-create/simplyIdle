@@ -5,7 +5,9 @@ import {
   CLASS_SILHOUETTE,
   HERO_SILHOUETTE,
   MONSTER_NAMES,
+  baseMonsterName,
   heroesOnClassDefault,
+  silhouetteKey,
   monsterSilhouette,
   silhouetteFor,
 } from './silhouette';
@@ -83,6 +85,33 @@ describe('silhouettes', () => {
     expect(king.headgear).toBe('crown');
     expect(king.height).toBeGreaterThan(orc.height);
     expect(king.build).toBe(orc.build);
+  });
+
+  it('gives different-looking things different keys', () => {
+    // The actor pool compares these to decide whether what it already built
+    // is still what is being asked for. A key that collided would leave one
+    // slot showing a monster two waves old.
+    const seen = new Set(MONSTER_NAMES.map(name => silhouetteKey(monsterSilhouette(name))));
+    expect(seen.size).toBe(MONSTER_NAMES.length);
+    expect(silhouetteKey(monsterSilhouette('Orc'))).not.toBe(silhouetteKey(monsterSilhouette('Orc King')));
+    for (const playerClass of CLASSES) {
+      expect(silhouetteKey(CLASS_SILHOUETTE[playerClass])).toBeTruthy();
+    }
+  });
+
+  it('gives the same silhouette the same key every time', () => {
+    expect(silhouetteKey(monsterSilhouette('Troll'))).toBe(silhouetteKey(monsterSilhouette('Troll')));
+  });
+
+  it('reads a boss name as a crowned version of the monster it comes from', () => {
+    // One place spells out the `"<Name> King"` convention; the crown on the
+    // silhouette and the model key a boss falls back to both read it here.
+    expect(baseMonsterName('Orc King')).toBe('Orc');
+    expect(baseMonsterName('Ancient Dragon King')).toBe('Ancient Dragon');
+    // A monster that is not a boss is its own base.
+    expect(baseMonsterName('Orc')).toBe('Orc');
+    // And "King" alone is a name, not a suffix — there is no monster left.
+    expect(baseMonsterName('King')).toBe('King');
   });
 
   it('still produces something for a monster it has never heard of', () => {
