@@ -4,6 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>SimplyIdle</title>
+    <!--
+      The site root serves this build since the Phase 5 swap, so the social
+      preview the origin used to carry has to come with it. It lived only in
+      the Expo shell, patched in by `scripts/patch-web.mjs` after its export;
+      moving that shell to /legacy took the preview with it and left the root
+      with none, so a shared link rendered as a bare URL.
+    -->
+    <meta name="description" content="Idle RPG / incremental auto-battler. Build your roster, push deeper waves, and rebirth stronger." />
+    <link rel="canonical" href="https://simply-idle.vercel.app/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Simply Idle" />
+    <meta property="og:description" content="Idle RPG / incremental auto-battler. Build your roster, push deeper waves, and rebirth stronger." />
+    <meta property="og:url" content="https://simply-idle.vercel.app/" />
+    <meta property="og:image" content="https://simply-idle.vercel.app/social-preview.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Simply Idle" />
+    <meta name="twitter:description" content="Idle RPG / incremental auto-battler. Build your roster, push deeper waves, and rebirth stronger." />
+    <meta name="twitter:image" content="https://simply-idle.vercel.app/social-preview.jpg" />
   </head>
   <body>
     <div id="root"></div>

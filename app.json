@@ -39,6 +39,9 @@
     },
     "plugins": [
       "expo-web-browser"
-    ]
+    ],
+    "experiments": {
+      "baseUrl": "/legacy"
+    }
   }
 }

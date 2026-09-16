@@ -203,7 +203,13 @@ Port the destination registry, shelf, rail and `SurfaceHost`. File all ~50 surfa
 Bosses hand-played, one mechanic per act. BURST as a timing window. Automation as an earned reward rather than a default — the nine `auto*` flags currently let the game play itself from the start. Wipes become a decision instead of a silent teleport to the chapter start.
 
 ### Phase 5 — Cutover *(~1 week)*
-Retire the Expo app. Vercel points at the Vite build. Firebase stays — see *On the backend*; there is no migration pass.
+Vercel points at the Vite build: the rewrite takes the site root and the Expo app moves to `/legacy`. Firebase stays — see *On the backend*; there is no migration pass.
+
+**"Retire the Expo app" was the wrong instruction and is withdrawn.** Expo does two jobs here and only one of them is the cutover. It builds the web bundle served at `/`, and it is also the *entire* native path — `eas.json` carries four EAS profiles including `build:android:apk`, and `app.json` declares android, ios and web. Deleting it to swap a web route would have thrown away APK and iOS shipping as collateral for a four-word plan line. The swap needs no file in `src/` deleted, so none is.
+
+The Expo app also stays *on the web*, not just in the repo. There are inactive accounts holding real saves, those saves live behind Firebase, and the rewrite reads local storage only — so until `ports/SavePort` has a Firebase adapter, `/legacy` is the only route by which those players reach their own game. Removing it is a decision that waits on that adapter, not on this phase.
+
+What the new stack does *not* have is a native path of its own: it is Vite and Babylon, so an APK of the rewrite means a WebView wrapper and a real question about WebGL performance on mid-range Android. That is separate work and no part of this phase. Meanwhile the Expo app's native builds are untouched and keep working.
 
 **Rough total: 10–11 weeks.** Phases 2 and 3 are where it stops being a menu simulator.
 
