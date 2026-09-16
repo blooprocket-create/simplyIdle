@@ -69,13 +69,13 @@ export function App() {
   const automation = useAutomation(earned);
 
   /*
-   * The one place a preference reaches the simulation. Kept in its own effect
-   * rather than folded into the loop's setup: the loop is built once and this
-   * changes whenever the player toggles it or earns the unlock mid-fight.
+   * Read as a boolean rather than carried as a Set. `active` is rebuilt from
+   * `earned`, `earned` is memoised on the snapshot, and the snapshot is a
+   * fresh object every published frame — so an effect keyed on the Set ran
+   * sixty times a second to deliver an answer that changes twice a session.
    */
-  useEffect(() => {
-    loopRef.current?.setAutoBurst(automation.active.has('burst'));
-  }, [automation.active]);
+  const autoBurst = automation.active.has('burst');
+  const autoBurstRef = useRef(autoBurst);
 
   const select = (id: string) => {
     if (id === 'more') {
@@ -92,7 +92,12 @@ export function App() {
 
     const diorama = new Diorama(canvas, { profile: device.profile });
     diorama.setCast(cast);
-    const loop = new GameLoop({ heroes: demoHeroes(), ...demoSimulationOptions() });
+    /*
+     * Seeded from the ref rather than the value, so a toggle does not belong
+     * in this effect's deps — it would tear down the diorama and restart the
+     * fight from wave one every time the player flipped a switch.
+     */
+    const loop = new GameLoop({ heroes: demoHeroes(), ...demoSimulationOptions(), autoBurst: autoBurstRef.current });
     loopRef.current = loop;
 
     const unsubscribe = loop.subscribe(next => {
@@ -113,6 +118,17 @@ export function App() {
     };
   }, [cast, device.profile]);
 
+  /*
+   * The one place a preference reaches the simulation, and deliberately below
+   * the effect that builds the loop: React runs effects in declaration order,
+   * so above it this fired against a null ref on mount and the player's saved
+   * choice was dropped until they toggled something.
+   */
+  useEffect(() => {
+    autoBurstRef.current = autoBurst;
+    loopRef.current?.setAutoBurst(autoBurst);
+  }, [autoBurst]);
+
   return (
     <div className={styles.root}>
       <canvas ref={canvasRef} className={styles.stage} />
@@ -122,18 +138,6 @@ export function App() {
         <span className={styles.clock}>{(snapshot.elapsedMs / 1000).toFixed(1)}s</span>
       </header>
       <Ticker snapshot={snapshot} profile={profile} />
-      {open === null && (
-        <div className={styles.verbs}>
-          {snapshot.wipe !== null && (
-            <WipeOffer
-              offer={snapshot.wipe}
-              onRally={() => loopRef.current?.decideWipe('rally')}
-              onDismiss={() => loopRef.current?.decideWipe('retreat')}
-            />
-          )}
-          <BurstControl burst={snapshot.burst} onSpend={() => loopRef.current?.spendBurst()} />
-        </div>
-      )}
       <SurfaceHost
         destination={open}
         snapshot={snapshot}
@@ -154,6 +158,31 @@ export function App() {
           onDismiss={() => setRailOpen(false)}
         />
       )}
+      {/*
+        Last, so it paints over the surface and the rail. There is not one
+        `z-index` in the tree — paint order is DOM order — and both halves of
+        that are pinned by `ui/architecture.test.ts`.
+
+        A wipe offer has to survive an open surface. It stands eight seconds
+        and then lapses in silence, so one raised while the player was reading
+        Heroes expired unseen and the retreat stood unanswered: most of the way
+        back to the silent teleport this phase exists to end.
+
+        BURST does not need the same and is gated on the surface being closed.
+        A lapsed window keeps its charge and re-arms, so a player who is
+        reading loses the peak and nothing else — where a pulsing control over
+        the thing they opened would cost them the reading.
+      */}
+      <div className={styles.verbs}>
+        {snapshot.wipe !== null && (
+          <WipeOffer
+            offer={snapshot.wipe}
+            onRally={() => loopRef.current?.decideWipe('rally')}
+            onDismiss={() => loopRef.current?.decideWipe('retreat')}
+          />
+        )}
+        {open === null && <BurstControl burst={snapshot.burst} onSpend={() => loopRef.current?.spendBurst()} />}
+      </div>
       <Shelf registry={REGISTRY} snapshot={snapshot} pinnedIds={pinnedIds} onSelect={select} />
     </div>
   );

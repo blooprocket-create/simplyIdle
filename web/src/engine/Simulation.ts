@@ -155,6 +155,9 @@ export class Simulation {
     this.elapsedMs += credit.msCredited;
     this.kills += credit.kills;
     this.deaths += credit.deaths;
+    // Charged after the clock moves, so the window that opens is open *now*
+    // rather than at a moment that already passed while the tab was hidden.
+    this.burst.creditAway(credit.kills, this.elapsedMs);
     this.enemy = spawnEnemy(credit.wave, this.enemyHpMult);
     this.vitals = fullHealth(this.vitals.maxHp);
     this.hits = [];

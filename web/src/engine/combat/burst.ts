@@ -75,6 +75,26 @@ export function chargeAfterKill(state: BurstState, event: { boss: boolean; nowMs
   return { charge, windowOpenedAtMs: charge >= BURST_COST ? event.nowMs : null };
 }
 
+/**
+ * Charge for a stretch the player was not present for.
+ *
+ * The offline estimator returns a kill count and nothing about which of those
+ * kills were bosses, so every one of them credits at the ordinary rate. That
+ * under-pays a climb that crossed a boss wave, which is the honest direction
+ * to be wrong in: the alternative is guessing how many of the credited kills
+ * wore a crown, and a meter built on a guess is worse than one built low.
+ *
+ * The clamp does the rest of the work. Charge caps at `BURST_COST`, so eight
+ * hours away and eight minutes away both return the player to exactly one
+ * waiting window — there is no bank of them to detonate on arrival.
+ */
+export function chargeAfterAwayKills(state: BurstState, event: { kills: number; nowMs: number }): BurstState {
+  if (!Number.isFinite(event.kills) || event.kills <= 0) return state;
+  const charge = Math.min(BURST_COST, state.charge + Math.floor(event.kills) * BURST_KILL_CHARGE);
+  if (state.windowOpenedAtMs !== null) return { ...state, charge };
+  return { charge, windowOpenedAtMs: charge >= BURST_COST ? event.nowMs : null };
+}
+
 export function isWindowOpen(state: BurstState, nowMs: number): boolean {
   if (state.windowOpenedAtMs === null || state.charge < BURST_COST) return false;
   const held = nowMs - state.windowOpenedAtMs;

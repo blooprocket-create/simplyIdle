@@ -191,6 +191,43 @@ describe('ui architecture', () => {
     expect(offences(sheets, /url\(\s*['"]?https?:/)).toEqual([]);
   });
 
+  it('leaves paint order to the DOM, which is what the rule below relies on', () => {
+    /*
+     * Not a style preference. The shell has no stacking contexts at all, so
+     * "renders later" and "paints on top" are the same statement — and the
+     * next rule reasons purely about source order. One `z-index` anywhere
+     * would make that reasoning silently wrong rather than loudly wrong.
+     */
+    const sheets = [...FILES, ...collect(join(process.cwd(), 'src', 'app'))].filter(file => file.path.endsWith('.css'));
+    expect(sheets.length).toBeGreaterThan(0);
+    expect(offences(sheets, /z-index/)).toEqual([]);
+  });
+
+  it('keeps the wipe offer reachable while a surface or the rail is open', () => {
+    /*
+     * A wipe offer stands for eight seconds and then lapses in silence. The
+     * shell rendered it before `SurfaceHost` and before `Rail` and gated it
+     * on nothing being open, so an offer raised while the player was reading
+     * Heroes expired unseen and the retreat stood unanswered — which is most
+     * of what Phase 4 replaced when it stopped wipes being a silent teleport.
+     *
+     * BURST is deliberately not held to this: a lapsed window keeps its
+     * charge and re-arms, so reading costs the peak and nothing more.
+     */
+    const shell = readFileSync(join(process.cwd(), 'src', 'app', 'App.tsx'), 'utf8');
+    const lines = codeOnly(shell).split('\n');
+    const at = (needle: string) => lines.findIndex(line => line.includes(needle));
+
+    const offer = at('<WipeOffer');
+    expect(offer, 'App.tsx no longer renders <WipeOffer').toBeGreaterThan(-1);
+    expect(at('<SurfaceHost'), 'the offer must paint over an open surface').toBeLessThan(offer);
+    expect(at('<Rail'), 'the offer must paint over an open rail').toBeLessThan(offer);
+
+    // Nothing may gate it on the fight being the only thing on screen.
+    const gatesAbove = lines.slice(0, offer).filter(line => line.includes('open === null'));
+    expect(gatesAbove).toEqual([]);
+  });
+
   it('never reaches into the renderer', () => {
     // React owns the HUD and the surfaces; Babylon owns the diorama. A
     // component importing the renderer directly is how the two stop being

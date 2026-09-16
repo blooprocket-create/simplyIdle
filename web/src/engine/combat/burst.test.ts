@@ -9,6 +9,7 @@ import {
   PEAK_MULTIPLIER,
   burstQuality,
   burstMultiplier,
+  chargeAfterAwayKills,
   chargeAfterKill,
   peakBand,
   emptyBurst,
@@ -199,5 +200,57 @@ describe('a window nobody answered', () => {
     const early = lapse(full, 1_000 + BURST_WINDOW_MS / 2, { automated: true });
     expect(early.fired).toBe(false);
     expect(early.state).toEqual(full);
+  });
+});
+
+describe('charge for time the player was away', () => {
+  it('charges the meter at all, which the offline path did not', () => {
+    /*
+     * `creditAway` credited kills, deaths and the wave and left the meter
+     * untouched, so an hour in a background tab returned the player a longer
+     * climb and an empty BURST. The one reward the verb pays was the one
+     * thing the bridge dropped.
+     */
+    const after = chargeAfterAwayKills(emptyBurst(), { kills: 4, nowMs: 1_000 });
+    expect(after.charge).toBe(4 * BURST_KILL_CHARGE);
+  });
+
+  it('pays the same as living through those kills', () => {
+    let lived = emptyBurst();
+    for (let kill = 0; kill < 9; kill += 1) lived = chargeAfterKill(lived, { boss: false, nowMs: 1_000 });
+    const away = chargeAfterAwayKills(emptyBurst(), { kills: 9, nowMs: 1_000 });
+    expect(away.charge).toBe(lived.charge);
+  });
+
+  it('opens one window and only one, however long the player was gone', () => {
+    // The clamp is what makes this safe: an overnight absence cannot be
+    // banked into a queue of windows to detonate on arrival.
+    const brief = chargeAfterAwayKills(emptyBurst(), { kills: BURST_COST, nowMs: 5_000 });
+    const overnight = chargeAfterAwayKills(emptyBurst(), { kills: 400_000, nowMs: 5_000 });
+    expect(overnight.charge).toBe(BURST_COST);
+    expect(overnight).toEqual(brief);
+    expect(isWindowOpen(overnight, 5_000)).toBe(true);
+  });
+
+  it('opens that window at the moment the player returned', () => {
+    // Opening it at a timestamp that passed while the tab was hidden would
+    // hand the player a window that had already lapsed.
+    const after = chargeAfterAwayKills(emptyBurst(), { kills: BURST_COST, nowMs: 90_000 });
+    expect(after.windowOpenedAtMs).toBe(90_000);
+  });
+
+  it('leaves a window already open where it is', () => {
+    // Same rule as a live kill: nothing slides the peak out from under a
+    // press in progress, and a returning player may be mid-window.
+    const open: BurstState = { charge: BURST_COST, windowOpenedAtMs: 1_000 };
+    const after = chargeAfterAwayKills(open, { kills: 30, nowMs: 90_000 });
+    expect(after.windowOpenedAtMs).toBe(1_000);
+  });
+
+  it('does nothing for a gap that credited no kills', () => {
+    const empty = emptyBurst();
+    expect(chargeAfterAwayKills(empty, { kills: 0, nowMs: 1_000 })).toEqual(empty);
+    expect(chargeAfterAwayKills(empty, { kills: -3, nowMs: 1_000 })).toEqual(empty);
+    expect(chargeAfterAwayKills(empty, { kills: Number.NaN, nowMs: 1_000 })).toEqual(empty);
   });
 });

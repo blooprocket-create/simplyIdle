@@ -1,6 +1,14 @@
 import type { BurstView } from '../types';
 import { burstView } from '../views';
-import { chargeAfterKill, emptyBurst, lapse, spend, type BurstQuality, type BurstState } from './burst';
+import {
+  chargeAfterAwayKills,
+  chargeAfterKill,
+  emptyBurst,
+  lapse,
+  spend,
+  type BurstQuality,
+  type BurstState,
+} from './burst';
 
 /**
  * The BURST meter, as a thing that owns its own rules.
@@ -40,6 +48,18 @@ export class BurstMeter {
 
   charge(boss: boolean, nowMs: number): void {
     this.state = chargeAfterKill(this.state, { boss, nowMs });
+  }
+
+  /**
+   * Charge for kills the offline estimator credited.
+   *
+   * Separate from `charge` because it is not a stream of kill events — the
+   * estimate is a count, arriving all at once — and because walking a loop of
+   * them would be thousands of iterations to reach a meter that clamps at
+   * fifteen. The player comes back to a window, not a backlog.
+   */
+  creditAway(kills: number, nowMs: number): void {
+    this.state = chargeAfterAwayKills(this.state, { kills, nowMs });
   }
 
   /** The player pressed. Null when there was no window to press into. */

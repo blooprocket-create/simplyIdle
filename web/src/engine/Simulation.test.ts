@@ -471,6 +471,38 @@ describe('time the tab spent hidden', () => {
     expect(ratio).toBeLessThan(2);
   });
 
+  it('returns the player to a charged BURST instead of an empty one', () => {
+    /*
+     * The offline bridge credited kills, deaths and the wave and left the
+     * meter alone, so the player who backgrounded the tab came back to a
+     * longer climb and nothing to spend — while the player who sat and
+     * watched the same kills land came back with a window waiting.
+     */
+    const options = {
+      heroes: [hero('h', 1e6, 700)],
+      startWave: 1,
+      teamMaxHp: new Decimal(1e6),
+      incomingMult: 1,
+    };
+    const sim = new Simulation(options);
+    expect(sim.read().burst.charge).toBe(0);
+
+    sim.creditAway(60_000);
+
+    expect(sim.read().totals.kills).toBeGreaterThan(0);
+    expect(sim.read().burst.charge).toBe(sim.read().burst.cost);
+    // Open, not merely full: a window timestamped while the tab was hidden
+    // would arrive already lapsed and the player would have nothing to press.
+    expect(sim.read().burst.windowOpen).toBe(true);
+  });
+
+  it('charges nothing for a gap that credited no kills', () => {
+    const sim = new Simulation({ heroes: [], startWave: 10 });
+    sim.creditAway(60_000);
+    expect(sim.read().burst.charge).toBe(0);
+    expect(sim.read().burst.windowOpen).toBe(false);
+  });
+
   it('does nothing for a gap with no team to fight', () => {
     const sim = new Simulation({ heroes: [], startWave: 10 });
     sim.creditAway(60_000);
