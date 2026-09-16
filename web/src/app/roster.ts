@@ -7,7 +7,7 @@ import { getIntendedFormationRole } from '../engine/combat/formation';
 import { ACTIVE_TEAM_SIZE } from '../engine/save/migrate';
 import type { SavedHero, SaveV3 } from '../engine/save/schema';
 import { createHeroEntity, type HeroEntity } from '../engine/entities/HeroEntity';
-import type { Cast } from '../game/models/cast';
+import type { Cast, CastMember } from '../game/models/cast';
 import { heroModelKey } from '../game/models/manifest';
 import { silhouetteFor } from '../game/models/silhouette';
 import { profileFromSave, type PlayerProfile } from '../ui/profile/playerProfile';
@@ -50,7 +50,10 @@ function activeRows(save: SaveV3): SavedHero[] {
 
 export function rosterFromSave(save: SaveV3): LoadedRoster {
   const heroes: HeroEntity[] = [];
-  const cast: Cast = [];
+  // `Cast` is `readonly CastMember[]` on purpose — nothing downstream may
+  // mutate the roster it was handed — so it is built here and widened to
+  // that on the way out rather than pushed into.
+  const cast: CastMember[] = [];
 
   for (const row of activeRows(save)) {
     const template = getHeroTemplate(row.id);
