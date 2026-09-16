@@ -13,6 +13,17 @@ import type { SimulationSnapshot } from '../engine/types';
  */
 export type SnapshotListener = (snapshot: SimulationSnapshot) => void;
 
+export interface GameLoopOptions extends SimulationOptions {
+  /**
+   * Time the player was away, already capped and thresholded by
+   * `readAwayClock`. Credited once, before anything subscribes, so the first
+   * snapshot a subscriber sees is the one that already includes it — a
+   * player who returns to eleven waves of progress should not watch it
+   * arrive a frame after the screen paints.
+   */
+  awayMs?: number;
+}
+
 export class GameLoop {
   private readonly simulation: Simulation;
   private readonly listeners = new Set<SnapshotListener>();
@@ -24,8 +35,9 @@ export class GameLoop {
    * they are assembled from content and the save by the caller, which is what
    * keeps the clock ignorant of the catalogue.
    */
-  constructor(options: SimulationOptions = { heroes: [] }) {
+  constructor(options: GameLoopOptions = { heroes: [] }) {
     this.simulation = new Simulation(options);
+    if (options.awayMs !== undefined && options.awayMs > 0) this.simulation.creditAway(options.awayMs);
   }
 
   subscribe(listener: SnapshotListener): () => void {

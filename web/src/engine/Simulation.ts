@@ -11,6 +11,7 @@ import { applyIncoming, fullHealth, type TeamVitals } from './combat/survival';
 import { scheduleSwings } from './combat/swingSchedule';
 import { nominalDps, type HeroEntity } from './entities/HeroEntity';
 import { creditAwayTime } from './offline/awayCredit';
+import type { RunProgress } from './save/runProgress';
 import { emptySnapshot, type HitEvent, type SimulationSnapshot } from './types';
 
 /**
@@ -33,6 +34,11 @@ export interface SimulationOptions {
   autoBurst?: boolean;
   heroes: readonly HeroEntity[];
   startWave?: number;
+  /**
+   * A run being continued rather than begun. Takes precedence over
+   * `startWave`: a resumed run already knows where it is.
+   */
+  resume?: RunProgress;
   /** Weekly event and other non-affix enemy HP scaling. */
   enemyHpMult?: number;
   /** Full team health. The team returns to this on a kill and on a wipe. */
@@ -62,7 +68,13 @@ export class Simulation {
     this.burst = new BurstMeter(options.autoBurst ?? false);
     this.enemyHpMult = options.enemyHpMult ?? 1;
     this.incomingMult = options.incomingMult ?? 0;
-    this.enemy = spawnEnemy(options.startWave ?? 1, this.enemyHpMult);
+    const resume = options.resume;
+    this.kills = resume?.kills ?? 0;
+    this.deaths = resume?.deaths ?? 0;
+    this.enemy = spawnEnemy(resume?.wave ?? options.startWave ?? 1, this.enemyHpMult);
+    // Banked charge comes back at the sim clock's origin, so a player who
+    // reloads on a full meter gets the window they had rather than a wait.
+    if (resume !== undefined) this.burst.gain(resume.burstCharge, this.elapsedMs);
     this.vitals = fullHealth(options.teamMaxHp ?? new Decimal(100));
     this.heroes = options.heroes.map(hero => ({ ...hero, targetId: this.enemy.id }));
     // Armed here rather than on the first step: `GameLoop.subscribe` publishes

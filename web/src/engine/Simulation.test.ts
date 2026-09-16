@@ -807,3 +807,45 @@ describe('the boss mechanic, as the simulation runs it', () => {
     expect(answered.read().burst.charge).toBeGreaterThan(0);
   });
 });
+
+describe('a run picked up where it was left', () => {
+  const stored = { wave: 63, kills: 412, deaths: 7, burstCharge: 15, awayAtMs: 0 };
+
+  it('starts where the run stopped, with what it had banked', () => {
+    /*
+     * The gap this closes. The shell kept nothing at all, so a refresh threw
+     * away the climb, the meter and every boss streak — and a verb you
+     * cannot carry across a reload is a verb nobody will practise.
+     */
+    const sim = new Simulation({ heroes: team(), resume: stored });
+    const read = sim.read();
+    expect(read.wave).toBe(63);
+    expect(read.totals.kills).toBe(412);
+    expect(read.totals.deaths).toBe(7);
+    expect(read.burst.charge).toBe(15);
+  });
+
+  it('hands back the window the player had, not a wait for it', () => {
+    // Reloading on a full meter and being made to earn it again would make
+    // reloading a punishment.
+    expect(new Simulation({ heroes: team(), resume: stored }).read().burst.windowOpen).toBe(true);
+  });
+
+  it('wins over `startWave`, because a resumed run already knows where it is', () => {
+    expect(new Simulation({ heroes: team(), startWave: 1, resume: stored }).read().wave).toBe(63);
+  });
+
+  it('changes nothing at all when there is no run to resume', () => {
+    const fresh = new Simulation({ heroes: team(), startWave: 9 }).read();
+    expect(fresh.wave).toBe(9);
+    expect(fresh.totals.kills).toBe(0);
+    expect(fresh.burst.charge).toBe(0);
+  });
+
+  it("arms the resumed wave's boss mechanic, not the one it started on", () => {
+    // `BossFight` is armed in the constructor from the wave it is handed, so
+    // resuming onto a boss must arrive with that boss's mechanic live.
+    const onBoss = new Simulation({ heroes: team(), resume: { ...stored, wave: 30 } });
+    expect(onBoss.read().boss?.name).toBe(bossMechanicForWave(30).name);
+  });
+});

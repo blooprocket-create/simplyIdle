@@ -4,6 +4,8 @@ import { detectCapabilities, profileFor } from '../game/device/DeviceProfile';
 import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
 import { demoCast, demoHeroes, demoProfile, demoSimulationOptions } from './demoRoster';
 import { GameLoop } from './GameLoop';
+import { loadRun, RunSaver } from './runStore';
+import { browserStore } from '../ui/prefs/store';
 import { Rail } from '../ui/nav/Rail';
 import { Shelf } from '../ui/nav/Shelf';
 import { REGISTRY } from '../ui/nav/registry';
@@ -93,25 +95,56 @@ export function App() {
 
     const diorama = new Diorama(canvas, { profile: device.profile });
     diorama.setCast(cast);
+
+    /*
+     * The run, and how long the player was gone.
+     *
+     * Read here rather than at mount, and deliberately: `loadRun` restamps
+     * the mark as it reads, so if this effect ever runs twice — a device
+     * profile change, a development double-invoke — the second read finds a
+     * fresh mark and credits nothing, instead of handing out the same
+     * absence again.
+     */
+    const store = browserStore();
+    const restored = loadRun(store, Date.now());
+    const saver = new RunSaver(store);
     /*
      * Seeded from the ref rather than the value, so a toggle does not belong
      * in this effect's deps — it would tear down the diorama and restart the
      * fight from wave one every time the player flipped a switch.
      */
-    const loop = new GameLoop({ heroes: demoHeroes(), ...demoSimulationOptions(), autoBurst: autoBurstRef.current });
+    const loop = new GameLoop({
+      heroes: demoHeroes(),
+      ...demoSimulationOptions(),
+      autoBurst: autoBurstRef.current,
+      resume: restored.resume ?? undefined,
+      awayMs: restored.awayMs,
+    });
     loopRef.current = loop;
 
     const unsubscribe = loop.subscribe(next => {
       diorama.render(next);
       setSnapshot(next);
+      saver.tick(next, Date.now());
     });
     loop.start();
 
     const onResize = () => diorama.resize();
     window.addEventListener('resize', onResize);
 
+    /*
+     * `pagehide` rather than `beforeunload`: on iOS a backgrounded tab is
+     * frozen and may never unload at all, so `beforeunload` is the one event
+     * that does not fire for the players most likely to be away long enough
+     * for the away credit to matter.
+     */
+    const onHide = () => saver.flush(loop.read(), Date.now());
+    window.addEventListener('pagehide', onHide);
+
     return () => {
+      window.removeEventListener('pagehide', onHide);
       window.removeEventListener('resize', onResize);
+      saver.flush(loop.read(), Date.now());
       unsubscribe();
       loop.stop();
       loopRef.current = null;
