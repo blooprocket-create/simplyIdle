@@ -94,6 +94,18 @@ export const BOSS_MECHANICS: readonly BossMechanic[] = [
 ];
 
 /**
+ * The mechanic an act runs, by act id.
+ *
+ * The direct lookup, for anything that already knows which act it means. A
+ * surface asking `bossMechanicForWave(act.bossWave)` instead would be
+ * correct only because every act's boss wave happens to fall inside its own
+ * range, which is true of the shipped data and not a rule anything enforces.
+ */
+export function bossMechanicForAct(actId: number): BossMechanic {
+  return BOSS_MECHANICS.find(mechanic => mechanic.actId === actId) ?? BOSS_MECHANICS[BOSS_MECHANICS.length - 1];
+}
+
+/**
  * The mechanic a boss on this wave runs.
  *
  * Keyed off the act rather than the wave, so the open-ended sixth act keeps
@@ -101,8 +113,7 @@ export const BOSS_MECHANICS: readonly BossMechanic[] = [
  * waves after 60 and the campaign does not stop there.
  */
 export function bossMechanicForWave(wave: number): BossMechanic {
-  const act = getActForWave(wave);
-  return BOSS_MECHANICS.find(mechanic => mechanic.actId === act.id) ?? BOSS_MECHANICS[BOSS_MECHANICS.length - 1];
+  return bossMechanicForAct(getActForWave(wave).id);
 }
 
 /** The act a mechanic belongs to, for anything that lists them together. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ACTS } from './acts';
-import { BOSS_MECHANICS, actForMechanic, bossMechanicForWave } from './bossMechanics';
+import { BOSS_MECHANICS, actForMechanic, bossMechanicForAct, bossMechanicForWave } from './bossMechanics';
 import { isBossWave } from './monsters';
 
 describe('one mechanic per act', () => {
@@ -85,5 +85,25 @@ describe('which mechanic a boss runs', () => {
       expect(isBossWave(wave)).toBe(true);
       expect(bossMechanicForWave(wave).actId, `wave ${wave}`).toBe(6);
     }
+  });
+});
+
+describe('looking a mechanic up by act', () => {
+  it('gives each act its own', () => {
+    for (const act of ACTS) {
+      expect(bossMechanicForAct(act.id).actId, `act ${act.id}`).toBe(act.id);
+    }
+  });
+
+  it('agrees with the wave lookup on every act boss', () => {
+    // The two are different questions — "what does act 3 do" and "what does
+    // the thing on wave 30 do" — and they must never answer differently.
+    for (const act of ACTS) {
+      expect(bossMechanicForWave(act.bossWave)).toEqual(bossMechanicForAct(act.id));
+    }
+  });
+
+  it('falls back to the open-ended act rather than throwing on an unknown id', () => {
+    expect(bossMechanicForAct(99).actId).toBe(BOSS_MECHANICS[BOSS_MECHANICS.length - 1].actId);
   });
 });

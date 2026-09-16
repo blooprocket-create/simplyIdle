@@ -1,5 +1,5 @@
 import { getActForWave } from '../../content/acts';
-import { bossMechanicForWave } from '../../content/bossMechanics';
+import { bossMechanicForAct } from '../../content/bossMechanics';
 import { getMonsterForWave, isBossWave } from '../../content/monsters';
 import { CHAPTER_WAVES, chapterStartWave } from '../../engine/combat/chapters';
 import { barFraction } from '../../game/fx/ratio';
@@ -51,7 +51,7 @@ export function CampaignSurface({ snapshot }: SurfaceProps) {
    * flavour and lives in the Codex; the tell is the thing to act on, and
    * this is the screen for acting.
    */
-  const mechanic = bossMechanicForWave(act.bossWave);
+  const mechanic = bossMechanicForAct(act.id);
   const teamPercent = Math.round(barFraction(snapshot.team.hp, snapshot.team.maxHp) * 100);
 
   return (
