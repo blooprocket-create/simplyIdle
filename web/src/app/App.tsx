@@ -75,7 +75,7 @@ export function App() {
         <span className={styles.phase}>Phase 3 shell</span>
         <span className={styles.clock}>{(snapshot.elapsedMs / 1000).toFixed(1)}s</span>
       </header>
-      <Ticker snapshot={snapshot} />
+      <Ticker snapshot={snapshot} profile={profile} />
       <SurfaceHost
         destination={open}
         snapshot={snapshot}

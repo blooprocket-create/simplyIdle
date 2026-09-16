@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import { REGISTRY } from '../nav/registry';
+import { AchievementsSurface } from './AchievementsSurface';
 import { CampaignSurface } from './CampaignSurface';
 import { CharacterSurface } from './CharacterSurface';
 import { CodexSurface } from './CodexSurface';
@@ -20,6 +21,7 @@ import type { SurfaceProps } from './SurfaceProps';
  * registry says where a thing is filed, this says what it draws.
  */
 export const SURFACES: Partial<Record<string, ComponentType<SurfaceProps>>> = {
+  achievements: AchievementsSurface,
   character: CharacterSurface,
   party: PartySurface,
   campaign: CampaignSurface,

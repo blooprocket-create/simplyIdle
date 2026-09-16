@@ -74,9 +74,14 @@
   color: var(--ink);
   font-size: 13px;
   font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /*
+   * Wraps rather than truncating. A card grid is narrow on a phone, and a
+   * name clipped to "Godborne …" is a name the player cannot look up; two
+   * short lines cost a few pixels and stay readable. Uneven card heights in
+   * a grid are the cheaper problem.
+   */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .cardBadge {
