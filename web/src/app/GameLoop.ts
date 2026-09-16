@@ -38,6 +38,22 @@ export class GameLoop {
     return this.simulation.read();
   }
 
+  /**
+   * The player pressed BURST.
+   *
+   * Publishes immediately rather than waiting for the next frame: the press
+   * is the player's own input and the HUD showing it a frame late is the
+   * difference between a verb that feels answered and one that feels ignored.
+   */
+  spendBurst(): ReturnType<Simulation['spendBurst']> {
+    const result = this.simulation.spendBurst();
+    if (result.spent) {
+      const snapshot = this.simulation.read();
+      for (const listener of this.listeners) listener(snapshot);
+    }
+    return result;
+  }
+
   start(): void {
     if (this.frame !== null) return;
     this.lastFrameAt = performance.now();

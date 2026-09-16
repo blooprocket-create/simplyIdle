@@ -7,6 +7,7 @@ import { GameLoop } from './GameLoop';
 import { Rail } from '../ui/nav/Rail';
 import { Shelf } from '../ui/nav/Shelf';
 import { REGISTRY } from '../ui/nav/registry';
+import { BurstControl } from '../ui/burst/BurstControl';
 import { Ticker } from '../ui/objectives/Ticker';
 import { usePinned } from '../ui/prefs/usePinned';
 import { SurfaceHost } from '../ui/shell/SurfaceHost';
@@ -25,6 +26,9 @@ export function App() {
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(() => emptySnapshot());
   const [openId, setOpenId] = useState<string | null>(null);
   const [railOpen, setRailOpen] = useState(false);
+  // The loop is held so the one player-driven verb can reach the simulation.
+  // Nothing else in the shell writes to it.
+  const loopRef = useRef<GameLoop | null>(null);
 
   const open = useMemo(() => REGISTRY.find(destination => destination.id === openId) ?? null, [openId]);
   const knownIds = useMemo(() => new Set(REGISTRY.map(destination => destination.id)), []);
@@ -60,6 +64,7 @@ export function App() {
     const diorama = new Diorama(canvas, { profile: device.profile });
     diorama.setCast(cast);
     const loop = new GameLoop({ heroes: demoHeroes() });
+    loopRef.current = loop;
 
     const unsubscribe = loop.subscribe(next => {
       diorama.render(next);
@@ -74,6 +79,7 @@ export function App() {
       window.removeEventListener('resize', onResize);
       unsubscribe();
       loop.stop();
+      loopRef.current = null;
       diorama.dispose();
     };
   }, [cast, device.profile]);
@@ -87,6 +93,7 @@ export function App() {
         <span className={styles.clock}>{(snapshot.elapsedMs / 1000).toFixed(1)}s</span>
       </header>
       <Ticker snapshot={snapshot} profile={profile} />
+      {open === null && <BurstControl burst={snapshot.burst} onSpend={() => loopRef.current?.spendBurst()} />}
       <SurfaceHost
         destination={open}
         snapshot={snapshot}

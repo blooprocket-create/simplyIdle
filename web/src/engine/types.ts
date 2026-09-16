@@ -1,4 +1,5 @@
 import Decimal from 'break_eternity.js';
+import { BURST_COST, type BurstQuality } from './combat/burst';
 
 /**
  * The read model the UI and renderer subscribe to. Everything outside
@@ -35,6 +36,28 @@ export interface EnemyView {
   maxHp: Decimal;
 }
 
+/**
+ * BURST, as the HUD needs to draw it.
+ *
+ * Every field is derived rather than stored: the window is a function of how
+ * long it has been open, so the snapshot reports where the sweep is *now*
+ * rather than asking the HUD to run its own clock alongside the simulation's.
+ */
+export interface BurstView {
+  /** 0 to `cost`. */
+  charge: number;
+  cost: number;
+  /** The meter is full. The window may still have lapsed. */
+  ready: boolean;
+  windowOpen: boolean;
+  /** 0 to 1 across the window, for the sweep. */
+  progress: number;
+  /** What a press right now would be worth, in a word. */
+  quality: BurstQuality;
+  /** Where the peak sits, as fractions of the window, so the HUD can mark it. */
+  peak: { start: number; end: number };
+}
+
 export interface SimulationSnapshot {
   /** Wall-clock ms the simulation has advanced since the run began. */
   elapsedMs: number;
@@ -47,6 +70,7 @@ export interface SimulationSnapshot {
   heroes: HeroView[];
   /** Hits from the last step only. Replaced, not accumulated. */
   hits: HitEvent[];
+  burst: BurstView;
   totals: {
     kills: number;
     /** Wipes. Each one costs a chapter. */
@@ -73,6 +97,15 @@ export function emptySnapshot(): SimulationSnapshot {
     team: { hp: new Decimal(0), maxHp: new Decimal(0) },
     heroes: [],
     hits: [],
+    burst: {
+      charge: 0,
+      cost: BURST_COST,
+      ready: false,
+      windowOpen: false,
+      progress: 0,
+      quality: 'missed',
+      peak: { start: 0, end: 0 },
+    },
     totals: { kills: 0, deaths: 0, dealt: new Decimal(0), overkill: new Decimal(0) },
   };
 }

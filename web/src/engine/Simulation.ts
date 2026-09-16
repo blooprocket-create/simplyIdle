@@ -1,6 +1,20 @@
 import Decimal from 'break_eternity.js';
 import { advanceAttackTimer, swingProgress } from './combat/attackTimer';
+import { isBossWave } from '../content/monsters';
 import { retreatWave } from './combat/chapters';
+import {
+  BURST_COST,
+  BURST_HIT_UID,
+  burstQuality,
+  chargeAfterKill,
+  emptyBurst,
+  isWindowOpen,
+  lapse,
+  peakBand,
+  spend,
+  windowProgress,
+  type BurstState,
+} from './combat/burst';
 import { applyHit, spawnEnemy, type Enemy } from './combat/encounter';
 import { applyIncoming, fullHealth, type TeamVitals } from './combat/survival';
 import { nominalDps, type HeroEntity } from './entities/HeroEntity';
@@ -17,6 +31,14 @@ import { emptySnapshot, type HitEvent, type SimulationSnapshot } from './types';
  */
 
 export interface SimulationOptions {
+  /**
+   * Whether a lapsed BURST window fires itself at the floor multiplier.
+   *
+   * Off by default, which is the Phase 4 change: the shipped game let a
+   * player switch this on from the settings tab in their first minute, so
+   * the verb was optional from the moment it existed.
+   */
+  autoBurst?: boolean;
   heroes: readonly HeroEntity[];
   startWave?: number;
   /** Weekly event and other non-affix enemy HP scaling. */
@@ -46,8 +68,11 @@ export class Simulation {
   private dealt = new Decimal(0);
   private overkill = new Decimal(0);
   private hits: HitEvent[] = [];
+  private burst: BurstState = emptyBurst();
+  private readonly autoBurst: boolean;
 
   constructor(options: SimulationOptions = { heroes: [] }) {
+    this.autoBurst = options.autoBurst ?? false;
     this.enemyHpMult = options.enemyHpMult ?? 1;
     this.incomingMult = options.incomingMult ?? 0;
     this.enemy = spawnEnemy(options.startWave ?? 1, this.enemyHpMult);
@@ -83,11 +108,63 @@ export class Simulation {
 
     for (const swing of this.scheduleSwings(elapsedMs)) this.resolve(swing);
 
+    // A window that closed with nobody pressing. Unautomated this only
+    // reopens it; automated it fires at the floor, which is what the unlock
+    // buys and all it buys.
+    const lapsed = lapse(this.burst, this.elapsedMs, { automated: this.autoBurst });
+    this.burst = lapsed.state;
+    if (lapsed.fired) this.detonate(lapsed.multiplier, lapsed.seconds);
+
     // Retarget after the step so a hero whose target died is pointed at
     // whatever replaced it rather than holding a stale id into the next frame.
     this.heroes = this.heroes.map(hero =>
       hero.targetId === this.enemy.id ? hero : { ...hero, targetId: this.enemy.id },
     );
+  }
+
+  /**
+   * The player pressed BURST.
+   *
+   * Takes no time argument: the simulation owns the clock, and a caller
+   * passing its own would be timing the window against a different one.
+   */
+  spendBurst(): { spent: boolean; multiplier: number; quality: ReturnType<typeof burstQuality> } {
+    const result = spend(this.burst, this.elapsedMs);
+    this.burst = result.state;
+    if (result.spent) this.detonate(result.multiplier, result.seconds);
+    return { spent: result.spent, multiplier: result.multiplier, quality: result.quality };
+  }
+
+  /**
+   * A burst landing: seconds of the team's damage, multiplied.
+   *
+   * Routed through the same `applyHit` an ordinary swing uses, so it kills,
+   * overkills and chains waves exactly as a swing does — and so the kill it
+   * lands charges the *next* burst, which is correct: the meter is already
+   * empty by the time this runs.
+   */
+  private detonate(multiplier: number, seconds: number): void {
+    const damage = this.teamDps().mul(seconds).mul(multiplier);
+    if (damage.lte(0)) return;
+    const result = applyHit(this.enemy, damage);
+    this.enemy = result.enemy;
+    this.dealt = this.dealt.add(result.dealt);
+    this.overkill = this.overkill.add(result.overkill);
+    this.hits.push({
+      // Not a hero's swing, so it carries a reserved uid rather than
+      // borrowing one — the renderer places numbers by hashing this, and a
+      // borrowed uid would stack the burst on top of that hero's own hit.
+      heroUid: BURST_HIT_UID,
+      dealt: result.dealt,
+      overkill: result.overkill,
+      killed: result.killed,
+      atMs: 0,
+    });
+    if (!result.killed) return;
+    this.kills += 1;
+    this.burst = chargeAfterKill(this.burst, { boss: isBossWave(this.enemy.wave), nowMs: this.elapsedMs });
+    this.enemy = spawnEnemy(this.enemy.wave + 1, this.enemyHpMult);
+    this.vitals = fullHealth(this.vitals.maxHp);
   }
 
   /**
@@ -164,6 +241,10 @@ export class Simulation {
 
     if (!result.killed) return;
     this.kills += 1;
+    // Charged from the wave that just died, not the one replacing it: a boss
+    // is worth three, and reading the wave after the respawn would credit the
+    // wrong encounter.
+    this.burst = chargeAfterKill(this.burst, { boss: isBossWave(this.enemy.wave), nowMs: this.elapsedMs });
     this.enemy = spawnEnemy(this.enemy.wave + 1, this.enemyHpMult);
     // The shipped game heals the team to full on a win, and so does the
     // estimator's round model. Matching it keeps the sawtooth the same shape.
@@ -193,6 +274,17 @@ export class Simulation {
         targetId: hero.targetId,
       })),
       hits: this.hits,
+      burst: {
+        charge: this.burst.charge,
+        cost: BURST_COST,
+        ready: this.burst.charge >= BURST_COST,
+        windowOpen: isWindowOpen(this.burst, this.elapsedMs),
+        progress:
+          this.burst.windowOpenedAtMs === null ? 0 : windowProgress(this.elapsedMs - this.burst.windowOpenedAtMs),
+        quality:
+          this.burst.windowOpenedAtMs === null ? 'missed' : burstQuality(this.elapsedMs - this.burst.windowOpenedAtMs),
+        peak: peakBand(),
+      },
       totals: { kills: this.kills, deaths: this.deaths, dealt: this.dealt, overkill: this.overkill },
     };
   }

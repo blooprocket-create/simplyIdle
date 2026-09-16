@@ -487,3 +487,106 @@ describe('time the tab spent hidden', () => {
     expect(estimateRetreatWave(140)).toBe(retreatWave(140));
   });
 });
+
+describe('BURST, as the simulation runs it', () => {
+  /** Runs until the meter is full, so the window is open to press into. */
+  function charged(options?: { autoBurst?: boolean }): Simulation {
+    const sim = new Simulation({ heroes: team(), ...options });
+    for (let step = 0; step < 4_000 && sim.read().burst.charge < sim.read().burst.cost; step += 1) {
+      sim.advance(16);
+    }
+    return sim;
+  }
+
+  it('fills from kills and opens a window', () => {
+    const sim = charged();
+    const snapshot = sim.read();
+    expect(snapshot.burst.charge).toBe(snapshot.burst.cost);
+    expect(snapshot.burst.ready).toBe(true);
+    expect(snapshot.burst.windowOpen).toBe(true);
+    expect(snapshot.burst.peak.end).toBeGreaterThan(snapshot.burst.peak.start);
+  });
+
+  it('is not ready before anything has died', () => {
+    const fresh = new Simulation({ heroes: team() });
+    expect(fresh.read().burst.charge).toBe(0);
+    expect(fresh.read().burst.windowOpen).toBe(false);
+    expect(fresh.spendBurst().spent).toBe(false);
+  });
+
+  it('deals damage when spent, and empties the meter', () => {
+    const sim = charged();
+    const before = sim.read();
+    const result = sim.spendBurst();
+    expect(result.spent).toBe(true);
+    const after = sim.read();
+    expect(after.burst.charge).toBeLessThan(before.burst.cost);
+    // Either it hurt the enemy or it killed it and moved the wave on.
+    const progressed = after.wave > before.wave || after.totals.dealt.gt(before.totals.dealt);
+    expect(progressed).toBe(true);
+  });
+
+  it('attributes its damage to nobody on the battle line', () => {
+    // The renderer places floating numbers by hashing the uid; borrowing a
+    // hero's would stack the burst exactly on top of that hero's own hit.
+    const sim = charged();
+    sim.spendBurst();
+    const burstHits = sim.read().hits.filter(hit => hit.heroUid === 'burst');
+    expect(burstHits.length).toBeGreaterThan(0);
+    for (const hero of team()) {
+      expect(burstHits.some(hit => hit.heroUid === hero.uid)).toBe(false);
+    }
+  });
+
+  it('refuses a second press in the same window', () => {
+    const sim = charged();
+    expect(sim.spendBurst().spent).toBe(true);
+    expect(sim.spendBurst().spent).toBe(false);
+  });
+
+  it('keeps the charge when a window lapses unautomated', () => {
+    // An idle player is never worse off than one who is not playing at all.
+    const sim = charged();
+    const cost = sim.read().burst.cost;
+    for (let step = 0; step < 400; step += 1) sim.advance(16);
+    expect(sim.read().burst.charge).toBe(cost);
+  });
+
+  it('spends itself at the floor once automation is unlocked', () => {
+    const manual = charged();
+    const auto = charged({ autoBurst: true });
+    // Let both sit through more than a window without a press.
+    for (let step = 0; step < 400; step += 1) {
+      manual.advance(16);
+      auto.advance(16);
+    }
+    // The automated one has fired at some point and emptied its meter; the
+    // manual one has not.
+    expect(manual.read().burst.charge).toBe(manual.read().burst.cost);
+    expect(auto.read().totals.dealt.gt(manual.read().totals.dealt)).toBe(true);
+  });
+
+  it('pays more for a press at the peak than for one the instant it opens', () => {
+    const early = charged();
+    const late = charged();
+    const earlyResult = early.spendBurst();
+    // Advance the late one into the peak band before pressing.
+    const peak = late.read().burst.peak;
+    const target = ((peak.start + peak.end) / 2) * 2_400;
+    for (let waited = 0; waited < target; waited += 16) late.advance(16);
+    const lateResult = late.spendBurst();
+
+    expect(earlyResult.spent && lateResult.spent).toBe(true);
+    expect(lateResult.multiplier).toBeGreaterThan(earlyResult.multiplier);
+    expect(lateResult.quality).toBe('perfect');
+  });
+
+  it('reports a sweep the HUD can draw, that advances with the clock', () => {
+    const sim = charged();
+    const first = sim.read().burst.progress;
+    sim.advance(400);
+    const second = sim.read().burst.progress;
+    expect(second).toBeGreaterThan(first);
+    expect(second).toBeLessThanOrEqual(1);
+  });
+});
