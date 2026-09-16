@@ -60,6 +60,16 @@ export class GameLoop {
     return decided;
   }
 
+  /** The player answered a boss tell. Publishes for the same reason. */
+  answerTell(): boolean {
+    const answered = this.simulation.answerTell();
+    if (answered) {
+      const snapshot = this.simulation.read();
+      for (const listener of this.listeners) listener(snapshot);
+    }
+    return answered;
+  }
+
   spendBurst(): ReturnType<Simulation['spendBurst']> {
     const result = this.simulation.spendBurst();
     if (result.spent) {

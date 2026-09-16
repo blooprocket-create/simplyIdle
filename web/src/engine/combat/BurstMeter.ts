@@ -3,6 +3,7 @@ import { burstView } from '../views';
 import {
   chargeAfterAwayKills,
   chargeAfterKill,
+  chargeBy,
   emptyBurst,
   lapse,
   spend,
@@ -60,6 +61,11 @@ export class BurstMeter {
    */
   creditAway(kills: number, nowMs: number): void {
     this.state = chargeAfterAwayKills(this.state, { kills, nowMs });
+  }
+
+  /** Charge earned without a kill — currently, answering a boss tell. */
+  gain(charge: number, nowMs: number): void {
+    this.state = chargeBy(this.state, { charge, nowMs });
   }
 
   /** The player pressed. Null when there was no window to press into. */

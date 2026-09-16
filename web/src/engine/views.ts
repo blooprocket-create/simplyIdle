@@ -1,6 +1,8 @@
 import { BURST_COST, burstQuality, isWindowOpen, peakBand, windowProgress, type BurstState } from './combat/burst';
+import { chipFor, isTellOpen, tellProgress, untilNextTell, type TellState } from './combat/bossTells';
 import { WIPE_DECISION_MS, remainingMs, type PendingWipe } from './combat/wipe';
-import type { BurstView, WipeView } from './types';
+import type { BossMechanic } from '../content/bossMechanics';
+import type { BossView, BurstView, WipeView } from './types';
 
 /**
  * Turning the fight's internal state into what a HUD reads.
@@ -37,5 +39,19 @@ export function wipeView(pending: PendingWipe | null, nowMs: number): WipeView |
     rallyHealth: pending.rallyHealth,
     remainingMs: left,
     urgency: 1 - left / WIPE_DECISION_MS,
+  };
+}
+
+export function bossView(state: TellState, mechanic: BossMechanic, nowMs: number): BossView {
+  return {
+    name: mechanic.name,
+    tell: mechanic.tell,
+    open: isTellOpen(state, mechanic, nowMs),
+    progress: tellProgress(state, mechanic, nowMs),
+    streak: state.streak,
+    // What the *next* answer is worth, so the HUD can show a chain paying off
+    // rather than only reporting a count nobody can price.
+    chipSeconds: chipFor(mechanic, state.streak),
+    nextInMs: untilNextTell(state, nowMs),
   };
 }

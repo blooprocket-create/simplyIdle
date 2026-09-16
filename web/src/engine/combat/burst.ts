@@ -90,7 +90,21 @@ export function chargeAfterKill(state: BurstState, event: { boss: boolean; nowMs
  */
 export function chargeAfterAwayKills(state: BurstState, event: { kills: number; nowMs: number }): BurstState {
   if (!Number.isFinite(event.kills) || event.kills <= 0) return state;
-  const charge = Math.min(BURST_COST, state.charge + Math.floor(event.kills) * BURST_KILL_CHARGE);
+  return chargeBy(state, { charge: Math.floor(event.kills) * BURST_KILL_CHARGE, nowMs: event.nowMs });
+}
+
+/**
+ * Charge from something that is not a kill.
+ *
+ * Offline credit arrives as a count rather than a stream of events, and a
+ * boss tell pays charge for answering rather than for killing anything. Both
+ * want the same three rules a kill gets — clamp at the cost, open a window on
+ * filling it, and never slide a window that is already open — so both go
+ * through here rather than reimplementing them.
+ */
+export function chargeBy(state: BurstState, event: { charge: number; nowMs: number }): BurstState {
+  if (!Number.isFinite(event.charge) || event.charge <= 0) return state;
+  const charge = Math.min(BURST_COST, state.charge + event.charge);
   if (state.windowOpenedAtMs !== null) return { ...state, charge };
   return { charge, windowOpenedAtMs: charge >= BURST_COST ? event.nowMs : null };
 }
@@ -202,6 +216,16 @@ export function lapse(state: BurstState, nowMs: number, options: { automated: bo
     seconds: BURST_SECONDS,
   };
 }
+
+/**
+ * The uid a boss tell's chip is attributed to.
+ *
+ * Its own, not the burst's, for the same reason the burst has one: two
+ * sources hashing to the same id would stack their floating numbers on top of
+ * each other, and a tell answered during an open burst window is exactly when
+ * both land at once.
+ */
+export const TELL_HIT_UID = 'boss-tell';
 
 /**
  * The uid a burst's damage is attributed to.

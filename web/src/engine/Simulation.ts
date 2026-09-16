@@ -1,12 +1,14 @@
 import Decimal from 'break_eternity.js';
-import { advanceAttackTimer, swingProgress } from './combat/attackTimer';
+import { swingProgress } from './combat/attackTimer';
 import { isBossWave } from '../content/monsters';
 
+import { BossFight } from './combat/BossFight';
 import { RallyOffers } from './combat/RallyOffers';
-import { BURST_HIT_UID, type BurstQuality } from './combat/burst';
+import { BURST_HIT_UID, TELL_HIT_UID, type BurstQuality } from './combat/burst';
 import { BurstMeter } from './combat/BurstMeter';
 import { applyHit, spawnEnemy, type Enemy } from './combat/encounter';
 import { applyIncoming, fullHealth, type TeamVitals } from './combat/survival';
+import { scheduleSwings } from './combat/swingSchedule';
 import { nominalDps, type HeroEntity } from './entities/HeroEntity';
 import { creditAwayTime } from './offline/awayCredit';
 import { emptySnapshot, type HitEvent, type SimulationSnapshot } from './types';
@@ -39,12 +41,6 @@ export interface SimulationOptions {
   incomingMult?: number;
 }
 
-/** One hero's swing, placed on the step's timeline. */
-interface ScheduledSwing {
-  hero: HeroEntity;
-  atMs: number;
-}
-
 export class Simulation {
   private heroes: HeroEntity[];
   private enemy: Enemy;
@@ -60,6 +56,7 @@ export class Simulation {
   private hits: HitEvent[] = [];
   private readonly burst: BurstMeter;
   private readonly rally = new RallyOffers();
+  private readonly boss = new BossFight();
 
   constructor(options: SimulationOptions = { heroes: [] }) {
     this.burst = new BurstMeter(options.autoBurst ?? false);
@@ -68,6 +65,10 @@ export class Simulation {
     this.enemy = spawnEnemy(options.startWave ?? 1, this.enemyHpMult);
     this.vitals = fullHealth(options.teamMaxHp ?? new Decimal(100));
     this.heroes = options.heroes.map(hero => ({ ...hero, targetId: this.enemy.id }));
+    // Armed here rather than on the first step: `GameLoop.subscribe` publishes
+    // a snapshot before any frame has run, and a player who reloads standing
+    // on a boss would otherwise be told there was no mechanic to answer.
+    this.boss.tick(this.enemy.wave, this.elapsedMs);
   }
 
   /** Advances the simulation by `elapsedMs`. Pure with respect to the clock. */
@@ -79,6 +80,9 @@ export class Simulation {
     this.hits = [];
 
     this.rally.tick(this.elapsedMs);
+    // Opens and closes the act's tell. It never damages anything, which is
+    // what keeps an unwatched boss fight the fight the estimator models.
+    this.boss.tick(this.enemy.wave, this.elapsedMs);
 
     /*
      * The monster hits back first, then the swings land.
@@ -98,7 +102,9 @@ export class Simulation {
     this.vitals = survival.vitals;
     if (survival.died) this.wipe();
 
-    for (const swing of this.scheduleSwings(elapsedMs)) this.resolve(swing);
+    const step = scheduleSwings(this.heroes, elapsedMs);
+    this.heroes = step.heroes;
+    for (const swing of step.swings) this.land(swing.hero.damagePerHit, swing.hero.uid, swing.atMs);
 
     // A window that closed with nobody pressing; see `BurstMeter`.
     const fired = this.burst.tick(this.elapsedMs);
@@ -120,6 +126,22 @@ export class Simulation {
   /** Whether a lapsed BURST window fires itself. Earned, and then chosen. */
   setAutoBurst(on: boolean): void {
     this.burst.setAutomated(on);
+  }
+
+  /**
+   * The player answered the boss's tell.
+   *
+   * Pays in both currencies on purpose: charge, because a boss is one enemy
+   * and the kill-fed meter would otherwise starve exactly where the fight
+   * needs it; and a chip, because an answer the player can see landing is
+   * what makes the mechanic a verb rather than a chore.
+   */
+  answerTell(): boolean {
+    const payoff = this.boss.answer(this.elapsedMs);
+    if (payoff === null) return false;
+    this.burst.gain(payoff.charge, this.elapsedMs);
+    this.detonate(1, payoff.chipSeconds, TELL_HIT_UID);
+    return true;
   }
 
   spendBurst(): { spent: boolean; multiplier: number; quality: BurstQuality } {
@@ -169,34 +191,6 @@ export class Simulation {
   }
 
   /**
-   * Every swing due this step, in the order it happens.
-   *
-   * Sorted by time rather than walked hero by hero. Hero order would let the
-   * first hero in the array spend all its swings before the second acts, so it
-   * would land every killing blow and absorb every scrap of overkill — an
-   * artefact of array position, visible on screen as one hero always finishing
-   * the monster.
-   */
-  private scheduleSwings(elapsedMs: number): ScheduledSwing[] {
-    const swings: ScheduledSwing[] = [];
-
-    this.heroes = this.heroes.map(hero => {
-      const step = advanceAttackTimer(hero.timer, elapsedMs);
-      const first = hero.timer.intervalMs - hero.timer.bankedMs;
-      for (let index = 0; index < step.attacks; index += 1) {
-        swings.push({ hero, atMs: first + index * hero.timer.intervalMs });
-      }
-      return { ...hero, timer: step.timer };
-    });
-
-    return swings.sort((left, right) => left.atMs - right.atMs);
-  }
-
-  private resolve(swing: ScheduledSwing): void {
-    this.land(swing.hero.damagePerHit, swing.hero.uid, swing.atMs);
-  }
-
-  /**
    * A burst landing: seconds of the team's damage, multiplied.
    *
    * Goes through the same path an ordinary swing does, so it kills, overkills
@@ -204,13 +198,13 @@ export class Simulation {
    * *next* burst, which is right: the meter is already empty by the time this
    * runs.
    */
-  private detonate(multiplier: number, seconds: number): void {
+  private detonate(multiplier: number, seconds: number, uid: string = BURST_HIT_UID): void {
     const damage = this.teamDps().mul(seconds).mul(multiplier);
     if (damage.lte(0)) return;
     // Not a hero's swing, so it carries a reserved uid rather than borrowing
     // one: the renderer places floating numbers by hashing this, and a
     // borrowed uid would stack the burst on top of that hero's own hit.
-    this.land(damage, BURST_HIT_UID, 0);
+    this.land(damage, uid, 0);
   }
 
   /**
@@ -279,6 +273,7 @@ export class Simulation {
       hits: this.hits,
       burst: this.burst.view(this.elapsedMs),
       wipe: this.rally.view(this.elapsedMs),
+      boss: this.boss.view(this.elapsedMs),
       totals: { kills: this.kills, deaths: this.deaths, dealt: this.dealt, overkill: this.overkill },
     };
   }

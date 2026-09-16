@@ -2,7 +2,9 @@ import Decimal from 'break_eternity.js';
 import { describe, expect, it } from 'vitest';
 import { getAttackIntervalMs } from '../content/attackSpeeds';
 import { MAX_ATTACKS_PER_STEP } from './combat/attackTimer';
+import { TELL_HIT_UID } from './combat/burst';
 import { chapterStartWave, retreatWave } from './combat/chapters';
+import { bossMechanicForWave } from '../content/bossMechanics';
 import { AWAY_THRESHOLD_MS } from './offline/awayCredit';
 import { estimateOffline, retreatWave as estimateRetreatWave } from './offline/estimate';
 import { Simulation } from './Simulation';
@@ -721,5 +723,87 @@ describe('a wipe, as an offer rather than a teleport', () => {
       expect(second.urgency).toBeGreaterThan(first.urgency);
       expect(second.urgency).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+describe('the boss mechanic, as the simulation runs it', () => {
+  /** Slow enough that a boss lives long past its first tell. */
+  function atBoss(wave = 10): Simulation {
+    return new Simulation({ heroes: [hero('h', 1, 700)], startWave: wave });
+  }
+
+  it('reports the mechanic on a boss wave and nothing on the others', () => {
+    expect(atBoss(10).read().boss?.name).toBe(bossMechanicForWave(10).name);
+    expect(atBoss(50).read().boss?.name).toBe(bossMechanicForWave(50).name);
+    expect(new Simulation({ heroes: [hero('h', 1, 700)], startWave: 11 }).read().boss).toBeNull();
+  });
+
+  it('never damages anything on its own, however long nobody answers', () => {
+    /*
+     * This is the load-bearing one. The offline estimator models a fight
+     * with nobody in the chair, and the parity suite pins the two against
+     * each other — so the moment an unanswered tell moves the fight, the
+     * live game and the estimate are describing different campaigns. It is
+     * also the idle-game rule BURST already follows: missing costs the
+     * opportunity, never the meter.
+     */
+    const sim = new Simulation({ heroes: team(), startWave: 9 });
+    const seen: string[] = [];
+    for (let step = 0; step < 4_000; step += 1) {
+      sim.advance(16);
+      for (const hit of sim.read().hits) seen.push(hit.heroUid);
+    }
+    expect(sim.read().wave, 'the run has to actually cross a boss').toBeGreaterThan(20);
+    expect(seen).not.toContain(TELL_HIT_UID);
+  });
+
+  it('pays charge and damage for an answer inside the window', () => {
+    const sim = atBoss(10);
+    const mechanic = bossMechanicForWave(10);
+    const before = sim.read();
+    // Far enough in for the first tell to be open, well short of its close.
+    run(sim, mechanic.cadenceMs + 100, 50);
+    expect(sim.read().boss?.open).toBe(true);
+
+    expect(sim.answerTell()).toBe(true);
+    const after = sim.read();
+    expect(after.burst.charge).toBe(before.burst.charge + mechanic.charge);
+    expect(after.totals.dealt.gt(before.totals.dealt)).toBe(true);
+    expect(after.hits.some(hit => hit.heroUid === TELL_HIT_UID)).toBe(true);
+    expect(after.boss?.open).toBe(false);
+  });
+
+  it('does nothing for a press between tells', () => {
+    const sim = atBoss(10);
+    run(sim, 500, 50);
+    expect(sim.read().boss?.open).toBe(false);
+    const before = sim.read().totals.dealt;
+    expect(sim.answerTell()).toBe(false);
+    expect(sim.read().totals.dealt.eq(before)).toBe(true);
+  });
+
+  it('does nothing for a press off a boss wave', () => {
+    const sim = new Simulation({ heroes: [hero('h', 1, 700)], startWave: 11 });
+    run(sim, 10_000, 50);
+    expect(sim.answerTell()).toBe(false);
+    expect(sim.read().boss).toBeNull();
+  });
+
+  it('feeds the meter a boss fight would otherwise starve', () => {
+    /*
+     * The whole reason the mechanic exists. BURST charges on kills; a boss
+     * is one enemy, so without this the meter does not move for the length
+     * of the hardest fight in the act.
+     */
+    const answered = atBoss(10);
+    const watched = atBoss(10);
+    const mechanic = bossMechanicForWave(10);
+    for (let cycle = 1; cycle <= 5; cycle += 1) {
+      run(answered, mechanic.cadenceMs, 50);
+      run(watched, mechanic.cadenceMs, 50);
+      answered.answerTell();
+    }
+    expect(watched.read().burst.charge).toBe(0);
+    expect(answered.read().burst.charge).toBeGreaterThan(0);
   });
 });

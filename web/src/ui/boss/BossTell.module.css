@@ -1,0 +1,77 @@
+/*
+ * Sits with the other verbs, above BURST: it is the transient one, and the
+ * one that only exists for the length of a boss fight.
+ */
+.tell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--scrim);
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 11px;
+  text-align: start;
+}
+
+/* Only pressable while a tell is open; see the component's note. */
+.tell:not(.open) {
+  pointer-events: none;
+}
+
+.open {
+  border-color: var(--danger);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.open:focus-visible {
+  outline: 2px solid var(--ready);
+  outline-offset: 2px;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.name {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.streak {
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.now {
+  margin-inline-start: auto;
+  color: var(--danger);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.line {
+  color: var(--ink-dim);
+}
+
+.window {
+  width: 100%;
+  height: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--line);
+  overflow: hidden;
+}
+
+.remaining {
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--danger);
+}

@@ -7,6 +7,7 @@ import { GameLoop } from './GameLoop';
 import { Rail } from '../ui/nav/Rail';
 import { Shelf } from '../ui/nav/Shelf';
 import { REGISTRY } from '../ui/nav/registry';
+import { BossTell } from '../ui/boss/BossTell';
 import { BurstControl } from '../ui/burst/BurstControl';
 import { WipeOffer } from '../ui/wipe/WipeOffer';
 import { Ticker } from '../ui/objectives/Ticker';
@@ -180,6 +181,9 @@ export function App() {
             onRally={() => loopRef.current?.decideWipe('rally')}
             onDismiss={() => loopRef.current?.decideWipe('retreat')}
           />
+        )}
+        {open === null && snapshot.boss !== null && (
+          <BossTell boss={snapshot.boss} onAnswer={() => loopRef.current?.answerTell()} />
         )}
         {open === null && <BurstControl burst={snapshot.burst} onSpend={() => loopRef.current?.spendBurst()} />}
       </div>
