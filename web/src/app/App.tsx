@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Diorama } from '../game/Diorama';
 import { detectCapabilities, profileFor } from '../game/device/DeviceProfile';
 import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
-import { demoCast, demoHeroes, demoProfile, demoSimulationOptions } from './demoRoster';
+import { demoSimulationOptions, startingRoster } from './demoRoster';
+import { rosterFromSave } from './roster';
+import { loadSave } from './saveStore';
 import { GameLoop } from './GameLoop';
 import { loadRun, RunSaver } from './runStore';
 import { browserStore } from '../ui/prefs/store';
@@ -41,8 +43,25 @@ export function App() {
   const knownIds = useMemo(() => new Set(REGISTRY.map(destination => destination.id)), []);
   // Built once: the profile is what does *not* change per frame, which is the
   // whole reason it is a separate read model from the snapshot.
-  const cast = useMemo(() => demoCast(), []);
-  const profile = useMemo(() => demoProfile(), []);
+  /*
+   * The player's team, from their save when they have one.
+   *
+   * Read once, because none of it changes per frame — which is the whole
+   * reason it is a separate read model from the snapshot. A player with no
+   * save gets the starting team instead; both branches return the same
+   * shape, so nothing downstream knows which it got.
+   *
+   * A lazy `useState` rather than a `useMemo`, because reading a save and
+   * reading a clock are both impure and `useMemo` is allowed to re-run or
+   * throw its result away. This runs exactly once, which is also what makes
+   * it safe in the loop effect's dependencies below.
+   */
+  const [roster] = useState(() => {
+    const save = loadSave(browserStore(), Date.now());
+    return save === null ? startingRoster() : rosterFromSave(save);
+  });
+  const cast = roster.cast;
+  const profile = roster.profile;
   /*
    * Detected once and shared with the renderer, rather than detected again
    * inside it. Two detections could disagree — `matchMedia` is live, and a
@@ -114,7 +133,7 @@ export function App() {
      * fight from wave one every time the player flipped a switch.
      */
     const loop = new GameLoop({
-      heroes: demoHeroes(),
+      heroes: roster.heroes,
       ...demoSimulationOptions(),
       autoBurst: autoBurstRef.current,
       resume: restored.resume ?? undefined,
@@ -150,7 +169,7 @@ export function App() {
       loopRef.current = null;
       diorama.dispose();
     };
-  }, [cast, device.profile]);
+  }, [cast, device.profile, roster]);
 
   /*
    * The one place a preference reaches the simulation, and deliberately below

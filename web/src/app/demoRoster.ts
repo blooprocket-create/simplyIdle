@@ -9,15 +9,20 @@ import { silhouetteFor } from '../game/models/silhouette';
 import type { Cast } from '../game/models/cast';
 import { emptyProfile, rosterOrder, type PlayerProfile, type RosterEntry } from '../ui/profile/playerProfile';
 import { HERO_POOL, getHeroTemplate } from '../content/heroes';
+import type { LoadedRoster } from './roster';
 
 /**
- * A team and a player to look at until there is a save to load them from.
+ * The team a player starts on, and what they see before they have a save.
  *
- * Scaffolding, and labelled as such: Phase 3 builds the roster from the
- * player's save and this goes away. It exists because a renderer with nothing
- * in it cannot be judged, and because the shape it produces — heroes for the
- * simulation and a matching cast for the diorama, from one source — is the
- * shape the real loader has to produce too.
+ * This was scaffolding — "a team and a player to look at until there is a
+ * save to load them from" — and `saveStore.ts` is now that somewhere, so the
+ * shell reaches for this only when there is no save at all. What is left is
+ * not a placeholder but an answer the cutover owed anyway: what does someone
+ * who has never played see?
+ *
+ * The shape it produces — heroes for the simulation and a matching cast for
+ * the diorama, from one source — is the shape `rosterFromSave` produces too,
+ * which is why the shell can take either without knowing which it got.
  */
 
 /**
@@ -167,4 +172,21 @@ const DEMO_RARITY = ['legendary', 'epic', 'rare', 'mythic', 'uncommon', 'common'
  */
 export function demoSimulationOptions(): { teamMaxHp: Decimal; incomingMult: number } {
   return { teamMaxHp: new Decimal(2_000), incomingMult: 1 };
+}
+
+/**
+ * The team a player with no save starts on.
+ *
+ * This file was written as scaffolding — "a team and a player to look at
+ * until there is a save to load them from" — and `saveStore.ts` is now that
+ * somewhere. What is left is not scaffolding but the answer to a real
+ * question the cutover has to answer anyway: what does someone who has never
+ * played see? One of each class and a spare, taken from the catalogue,
+ * derived rather than authored, and identical on every load.
+ *
+ * Bundled into the same shape `rosterFromSave` returns, so the shell asks
+ * one question and does not care which branch answered it.
+ */
+export function startingRoster(): LoadedRoster {
+  return { heroes: demoHeroes(), cast: demoCast(), profile: demoProfile() };
 }
