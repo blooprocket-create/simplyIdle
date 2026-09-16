@@ -1,4 +1,4 @@
-import { chapterStartWave } from './chapters';
+import { retreatWave } from './chapters';
 
 /**
  * A wipe, as a decision.
@@ -49,7 +49,18 @@ export function openWipe(wave: number, nowMs: number): PendingWipe {
     wave,
     // Never below the first wave: a retreat onto wave zero would respawn the
     // team into an encounter that does not exist.
-    retreatTo: Math.max(1, chapterStartWave(wave)),
+    /*
+     * `retreatWave`, not `chapterStartWave`. They differ on exactly one case
+     * and it is the one that matters: a team that falls *on* a chapter start
+     * has to lose the chapter before it, because `chapterStartWave(21)` is
+     * 21 — so retreating there put the team back on the wave that just
+     * killed them, healed to full, at no cost, forever.
+     *
+     * The offline estimator has always used `retreatWave`. Live used the
+     * other one, so the two described different games at every twentieth
+     * wave, which is the divergence this module was extracted to close.
+     */
+    retreatTo: Math.max(1, retreatWave(wave)),
     rallyHealth: RALLY_HEALTH_FRACTION,
     openedAtMs: nowMs,
   };

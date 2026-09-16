@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { chapterStartWave } from './chapters';
+import { CHAPTER_WAVES, chapterStartWave, retreatWave } from './chapters';
+import { retreatWave as estimateRetreatWave } from '../offline/estimate';
 import { RALLY_HEALTH_FRACTION, WIPE_DECISION_MS, hasLapsed, openWipe, remainingMs, resolveWipe } from './wipe';
 
 describe('a wipe, as a decision', () => {
@@ -70,5 +71,56 @@ describe('a wipe, as a decision', () => {
     // into an encounter that does not exist.
     const pending = openWipe(3, 0);
     expect(resolveWipe(pending, 'retreat').wave).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('a wipe on a chapter start', () => {
+  it('costs the chapter before it, instead of landing where it fell', () => {
+    /*
+     * Found in review, and the worst kind of wrong: `chapterStartWave(21)`
+     * is 21, so a team that fell on a chapter start was retreated onto the
+     * wave that had just killed them — healed to full, having lost nothing,
+     * able to die there forever. The death cost less than nothing; it was a
+     * free heal on a wall the team could not pass.
+     */
+    for (const wave of [21, 41, 61, 101]) {
+      expect(openWipe(wave, 0).retreatTo, `wipe on ${wave}`).toBe(wave - CHAPTER_WAVES);
+    }
+  });
+
+  it('never leaves the team on the wave that killed them', () => {
+    // The general statement of the same thing, across four chapters.
+    for (let wave = 2; wave <= 80; wave += 1) {
+      expect(openWipe(wave, 0).retreatTo, `wipe on ${wave}`).toBeLessThan(wave);
+    }
+  });
+
+  it('still bottoms out at the first wave', () => {
+    // A retreat onto wave zero would respawn into an encounter that does
+    // not exist, and wave 1 has no chapter behind it to lose.
+    expect(openWipe(1, 0).retreatTo).toBe(1);
+    expect(openWipe(21, 0).retreatTo).toBe(1);
+  });
+
+  it('agrees with the offline estimator on every wave, not just most', () => {
+    /*
+     * The assertion that was missing. There *was* a test that the two
+     * chapter helpers agree with each other — and they did, because they are
+     * the same function imported twice. What nothing checked was that the
+     * live wipe path calls the right one of them, so the two paths disagreed
+     * at every twentieth wave with a green suite.
+     */
+    for (let wave = 1; wave <= 200; wave += 1) {
+      expect(openWipe(wave, 0).retreatTo, `wave ${wave}`).toBe(Math.max(1, estimateRetreatWave(wave)));
+    }
+  });
+
+  it('is the one case the two chapter rules differ on', () => {
+    // Stated so the fix cannot be "undone as a simplification" later.
+    const differ = [];
+    for (let wave = 1; wave <= 200; wave += 1) {
+      if (chapterStartWave(wave) !== retreatWave(wave)) differ.push(wave);
+    }
+    expect(differ).toEqual([21, 41, 61, 81, 101, 121, 141, 161, 181]);
   });
 });
