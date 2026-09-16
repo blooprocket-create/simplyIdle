@@ -2,6 +2,9 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ARCHETYPES, GROUP_ORDER, SHELF_SLOTS } from './nav/destinations';
+import { REGISTRY } from './nav/registry';
+import { ARCHETYPE_LAYOUT } from './shell/archetypes';
+import { SURFACES } from './surfaces/registry';
 
 /**
  * The presentation rules, as regexes over source text. Ported from evercast,
@@ -48,13 +51,35 @@ function collect(directory: string): SourceFile[] {
 const FILES = collect(UI_ROOT);
 const within = (file: SourceFile, folder: string) => file.relativePath.startsWith(`${folder}/`);
 
+/**
+ * Source with its comments blanked out.
+ *
+ * A rule has to let its own explanation say the forbidden thing, or it pushes
+ * that explanation out of the file to stay green — which is how a constraint
+ * ends up enforced but unexplained. `src/game/architecture.test.ts` has the
+ * same helper for the same reason.
+ *
+ * It differs from that one in blanking comment lines rather than removing
+ * them: this suite reports `file:line`, and dropping lines would make every
+ * reported number point somewhere else.
+ */
+function codeOnly(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, block => block.replace(/[^\n]/g, ' '))
+    .split('\n')
+    .map(line => (line.trim().startsWith('//') ? '' : line))
+    .join('\n');
+}
+
 /** Reports `file:line` for each match so a failure names the offender. */
 function offences(files: SourceFile[], pattern: RegExp): string[] {
   const found: string[] = [];
   for (const file of files) {
-    file.text.split('\n').forEach((line, index) => {
-      if (pattern.test(line)) found.push(`${file.relativePath}:${index + 1} ${line.trim()}`);
-    });
+    codeOnly(file.text)
+      .split('\n')
+      .forEach((line, index) => {
+        if (pattern.test(line)) found.push(`${file.relativePath}:${index + 1} ${line.trim()}`);
+      });
   }
   return found;
 }
@@ -62,6 +87,30 @@ function offences(files: SourceFile[], pattern: RegExp): string[] {
 describe('ui architecture', () => {
   it('has files to check', () => {
     expect(FILES.length).toBeGreaterThan(0);
+  });
+
+  it('strips comments without moving the lines it reports', () => {
+    // Without this the helper could quietly start returning nothing, or
+    // blank lines it should not, and every rule below would pass for the
+    // wrong reason or name the wrong line.
+    const stripped = codeOnly(
+      [
+        '/* A block comment mentioning #ff0000 and repeat(4, 1fr). */',
+        '// A line comment mentioning rgba(0,0,0,0.5).',
+        '.real { color: #abcdef; }',
+        '/* A block',
+        '   that spans lines and says overflow: auto; */',
+        '.after { top: 4px; }',
+      ].join('\n'),
+    );
+    expect(stripped).toContain('.real { color: #abcdef; }');
+    expect(stripped).not.toContain('#ff0000');
+    expect(stripped).not.toContain('repeat(4');
+    expect(stripped).not.toContain('rgba(');
+    expect(stripped).not.toContain('overflow: auto');
+    // Six lines in, six lines out, so `file:line` still means something.
+    expect(stripped.split('\n')).toHaveLength(6);
+    expect(stripped.split('\n')[5]).toContain('.after');
   });
 
   it('keeps every colour in the token sheet', () => {
@@ -98,6 +147,43 @@ describe('ui architecture', () => {
   it('keeps the archetype and group sets closed', () => {
     expect([...ARCHETYPES]).toEqual(['dashboard', 'ledger', 'graph', 'detail', 'moment']);
     expect([...GROUP_ORDER]).toEqual(['power', 'companion', 'world', 'record']);
+  });
+
+  it('files a surface that renders a list under an archetype that scrolls', () => {
+    /*
+     * A `dashboard` and a `graph` are sized to the panel and do not scroll —
+     * "a few big numbers and their controls. No list". So a surface that
+     * renders a card grid in one has content nobody can reach: it runs off
+     * the bottom and the shelf covers it.
+     *
+     * This is checkable from the source, which is the only reason it is
+     * checked here: the Party surface shipped 383px below the fold and only
+     * a screenshot found it. A rule that reads the file finds it every time.
+     */
+    for (const destination of REGISTRY) {
+      const component = SURFACES[destination.id];
+      if (component === undefined) continue;
+      const file = FILES.find(candidate => candidate.relativePath === `surfaces/${component.name}.tsx`);
+      expect(file, `${destination.id} -> surfaces/${component.name}.tsx`).toBeDefined();
+      if (!file) continue;
+      const rendersAList = /<Cards>/.test(codeOnly(file.text));
+      if (!rendersAList) continue;
+      expect(
+        ARCHETYPE_LAYOUT[destination.archetype].scroll,
+        `${destination.id} renders a card grid as a ${destination.archetype}`,
+      ).toBe('block');
+    }
+  });
+
+  it('actually finds the surface files it claims to check', () => {
+    // The rule above skips anything it cannot resolve, so without this it
+    // would pass in full the day the file naming convention changes.
+    const resolved = REGISTRY.filter(destination => {
+      const component = SURFACES[destination.id];
+      return component !== undefined && FILES.some(f => f.relativePath === `surfaces/${component.name}.tsx`);
+    });
+    expect(resolved.length).toBe(Object.keys(SURFACES).length);
+    expect(resolved.length).toBeGreaterThanOrEqual(5);
   });
 
   it('never fetches a stylesheet asset from anywhere but this origin', () => {

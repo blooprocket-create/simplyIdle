@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Diorama } from '../game/Diorama';
 import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
-import { demoCast, demoHeroes } from './demoRoster';
+import { demoCast, demoHeroes, demoProfile } from './demoRoster';
 import { GameLoop } from './GameLoop';
 import { Rail } from '../ui/nav/Rail';
 import { Shelf } from '../ui/nav/Shelf';
@@ -27,6 +27,10 @@ export function App() {
 
   const open = useMemo(() => REGISTRY.find(destination => destination.id === openId) ?? null, [openId]);
   const knownIds = useMemo(() => new Set(REGISTRY.map(destination => destination.id)), []);
+  // Built once: the profile is what does *not* change per frame, which is the
+  // whole reason it is a separate read model from the snapshot.
+  const cast = useMemo(() => demoCast(), []);
+  const profile = useMemo(() => demoProfile(), []);
   const { pinnedIds, toggle } = usePinned(knownIds);
 
   const select = (id: string) => {
@@ -43,7 +47,7 @@ export function App() {
     if (!canvas) return;
 
     const diorama = new Diorama(canvas);
-    diorama.setCast(demoCast());
+    diorama.setCast(cast);
     const loop = new GameLoop({ heroes: demoHeroes() });
 
     const unsubscribe = loop.subscribe(next => {
@@ -61,7 +65,7 @@ export function App() {
       loop.stop();
       diorama.dispose();
     };
-  }, []);
+  }, [cast]);
 
   return (
     <div className={styles.root}>
@@ -72,7 +76,13 @@ export function App() {
         <span className={styles.clock}>{(snapshot.elapsedMs / 1000).toFixed(1)}s</span>
       </header>
       <Ticker snapshot={snapshot} />
-      <SurfaceHost destination={open} onDismiss={() => setOpenId(null)} />
+      <SurfaceHost
+        destination={open}
+        snapshot={snapshot}
+        profile={profile}
+        cast={cast}
+        onDismiss={() => setOpenId(null)}
+      />
       {railOpen && (
         <Rail
           registry={REGISTRY}

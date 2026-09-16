@@ -1,0 +1,37 @@
+import type { ComponentType } from 'react';
+import { REGISTRY } from '../nav/registry';
+import { CampaignSurface } from './CampaignSurface';
+import { CharacterSurface } from './CharacterSurface';
+import { CodexSurface } from './CodexSurface';
+import { PartySurface } from './PartySurface';
+import { RosterSurface } from './RosterSurface';
+import type { SurfaceProps } from './SurfaceProps';
+
+/**
+ * Which destination shows which surface.
+ *
+ * Deliberately partial. A destination with no entry here falls back to the
+ * placeholder, which is the honest state for the ones no phase has built yet —
+ * the alternative is eighteen files of invented content, which would make the
+ * shell look finished while telling the player nothing.
+ *
+ * "Adding a feature is one registry entry and nothing else" is the claim the
+ * whole structure rests on. This is the second half of that entry: the nav
+ * registry says where a thing is filed, this says what it draws.
+ */
+export const SURFACES: Partial<Record<string, ComponentType<SurfaceProps>>> = {
+  character: CharacterSurface,
+  party: PartySurface,
+  campaign: CampaignSurface,
+  roster: RosterSurface,
+  codex: CodexSurface,
+};
+
+export function surfaceFor(id: string): ComponentType<SurfaceProps> | undefined {
+  return SURFACES[id];
+}
+
+/** Destinations still on the placeholder, so the gap is countable. */
+export function unbuiltDestinations(): string[] {
+  return REGISTRY.filter(destination => SURFACES[destination.id] === undefined).map(destination => destination.id);
+}

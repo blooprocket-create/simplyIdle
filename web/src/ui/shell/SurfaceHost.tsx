@@ -1,5 +1,11 @@
+import { createElement } from 'react';
+
+import type { SimulationSnapshot } from '../../engine/types';
+import type { Cast } from '../../game/models/cast';
 import type { Destination } from '../nav/destinations';
+import type { PlayerProfile } from '../profile/playerProfile';
 import { PlaceholderSurface } from '../surfaces/PlaceholderSurface';
+import { surfaceFor } from '../surfaces/registry';
 import { ARCHETYPE_LAYOUT } from './archetypes';
 import styles from './SurfaceHost.module.css';
 
@@ -17,13 +23,24 @@ import styles from './SurfaceHost.module.css';
 
 interface SurfaceHostProps {
   destination: Destination | null;
+  snapshot: SimulationSnapshot;
+  profile: PlayerProfile;
+  cast: Cast;
   onDismiss: () => void;
-  children?: React.ReactNode;
 }
 
-export function SurfaceHost({ destination, onDismiss, children }: SurfaceHostProps) {
+export function SurfaceHost({ destination, snapshot, profile, cast, onDismiss }: SurfaceHostProps) {
   if (!destination) return null;
   const layout = ARCHETYPE_LAYOUT[destination.archetype];
+  // A destination with no surface yet falls back to the placeholder. Deciding
+  // that here means an unbuilt destination looks the same everywhere, rather
+  // than each surface having to fake its own empty state.
+  //
+  // Built with `createElement` rather than as `<Surface />`: a capitalized
+  // local holding a component is indistinguishable, to the linter, from a
+  // component being *defined* during render — which would remount its whole
+  // subtree every frame the snapshot changes.
+  const surface = surfaceFor(destination.id);
 
   return (
     <div className={layout.dims ? `${styles.host} ${styles.dimmed}` : styles.host}>
@@ -44,7 +61,13 @@ export function SurfaceHost({ destination, onDismiss, children }: SurfaceHostPro
             Close
           </button>
         </header>
-        <div className={styles.body}>{children ?? <PlaceholderSurface destination={destination} />}</div>
+        <div className={styles.body}>
+          {surface === undefined ? (
+            <PlaceholderSurface destination={destination} />
+          ) : (
+            createElement(surface, { destination, snapshot, profile, cast })
+          )}
+        </div>
       </section>
     </div>
   );

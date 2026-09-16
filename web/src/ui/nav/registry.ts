@@ -43,7 +43,11 @@ export const REGISTRY: readonly Destination[] = [
 
   // Companion — who fights alongside them.
   { id: 'roster', group: 'companion', label: 'Roster', archetype: 'ledger' },
-  { id: 'party', group: 'companion', label: 'Party', archetype: 'dashboard' },
+  // A ledger, not a dashboard: it lists the team, and a dashboard is "a few
+  // big numbers and their controls. No list, so nothing to scroll". Filed as
+  // a dashboard first, which put 383px of cards below a panel that cannot
+  // scroll — the archetype table was right and the filing was wrong.
+  { id: 'party', group: 'companion', label: 'Party', archetype: 'ledger' },
   { id: 'summon', group: 'companion', label: 'Summon', archetype: 'moment' },
 
   // World — where they fight.
