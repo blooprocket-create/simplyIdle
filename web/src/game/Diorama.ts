@@ -216,6 +216,9 @@ export class Diorama {
 
   resize(): void {
     this.engine.resize();
+    // The shot depends on the viewport's shape, so a rotated phone needs the
+    // camera moved and not just the buffer resized.
+    this.stage.reframe();
   }
 
   dispose(): void {

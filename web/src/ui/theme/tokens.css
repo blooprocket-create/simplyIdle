@@ -48,4 +48,11 @@
    * on top of a surface and hiding it.
    */
   --shelf-height: 62px;
+
+  /*
+   * The status bar's height, for the same reason: anything that sits under
+   * it — the objectives ticker, for one — has to know where it ends rather
+   * than guess and be half-covered on a device with a notch.
+   */
+  --status-height: calc(38px + env(safe-area-inset-top, 0px));
 }

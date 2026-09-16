@@ -34,6 +34,21 @@ export const RANK_SPACING = 1.5;
 
 export const ENEMY_POSITION = { x: 3.2, y: 0, z: 0 } as const;
 
+/**
+ * The health bars, as geometry rather than as drawing.
+ *
+ * A bar is billboarded, so it presents its full width to the camera whatever
+ * angle the shot is at and reaches further across the screen than the actor
+ * under it. The camera has to know that to frame the fight, and the camera
+ * cannot import the renderer, so the numbers live out here with the
+ * positions they are derived from.
+ */
+export const ENEMY_BAR = { width: 2.0, height: 0.16, above: 2.9 } as const;
+export const TEAM_BAR = { width: 3.2, height: 0.18, above: 3.0 } as const;
+
+/** Where the team's shared bar hangs: over the middle of the formation. */
+export const TEAM_BAR_X = (RANK_X.back + RANK_X.front) / 2;
+
 export function facing(from: { x: number; z: number }, to: { x: number; z: number }): number {
   return Math.atan2(to.x - from.x, to.z - from.z);
 }

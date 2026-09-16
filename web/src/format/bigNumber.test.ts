@@ -1,6 +1,6 @@
 import Decimal from 'break_eternity.js';
 import { describe, expect, it } from 'vitest';
-import { SUFFIXES, formatDamage } from './formatDamage';
+import { SUFFIXES, formatDamage } from './bigNumber';
 
 const d = (value: string | number) => new Decimal(value);
 

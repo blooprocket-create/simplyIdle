@@ -5,7 +5,9 @@ import { demoCast, demoHeroes } from './demoRoster';
 import { GameLoop } from './GameLoop';
 import { Rail } from '../ui/nav/Rail';
 import { Shelf } from '../ui/nav/Shelf';
-import { DEFAULT_PINNED, REGISTRY } from '../ui/nav/registry';
+import { REGISTRY } from '../ui/nav/registry';
+import { Ticker } from '../ui/objectives/Ticker';
+import { usePinned } from '../ui/prefs/usePinned';
 import { SurfaceHost } from '../ui/shell/SurfaceHost';
 import styles from './App.module.css';
 
@@ -24,6 +26,8 @@ export function App() {
   const [railOpen, setRailOpen] = useState(false);
 
   const open = useMemo(() => REGISTRY.find(destination => destination.id === openId) ?? null, [openId]);
+  const knownIds = useMemo(() => new Set(REGISTRY.map(destination => destination.id)), []);
+  const { pinnedIds, toggle } = usePinned(knownIds);
 
   const select = (id: string) => {
     if (id === 'more') {
@@ -67,11 +71,19 @@ export function App() {
         <span className={styles.phase}>Phase 3 shell</span>
         <span className={styles.clock}>{(snapshot.elapsedMs / 1000).toFixed(1)}s</span>
       </header>
+      <Ticker snapshot={snapshot} />
       <SurfaceHost destination={open} onDismiss={() => setOpenId(null)} />
       {railOpen && (
-        <Rail registry={REGISTRY} snapshot={snapshot} onSelect={select} onDismiss={() => setRailOpen(false)} />
+        <Rail
+          registry={REGISTRY}
+          snapshot={snapshot}
+          pinnedIds={pinnedIds}
+          onSelect={select}
+          onTogglePin={toggle}
+          onDismiss={() => setRailOpen(false)}
+        />
       )}
-      <Shelf registry={REGISTRY} snapshot={snapshot} pinnedIds={DEFAULT_PINNED} onSelect={select} />
+      <Shelf registry={REGISTRY} snapshot={snapshot} pinnedIds={pinnedIds} onSelect={select} />
     </div>
   );
 }

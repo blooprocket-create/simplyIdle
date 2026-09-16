@@ -1,7 +1,12 @@
 import Decimal from 'break_eternity.js';
 
 /**
- * Damage, short enough to read as it flies past.
+ * A big number, short enough to read as it flies past.
+ *
+ * Lives outside both `game` and `ui` because both spell numbers, and the
+ * damage flying off an enemy and the same figure counted in the HUD have to
+ * agree. One of them reading `1.23K` while the other reads `1230` is the kind
+ * of inconsistency nobody files a bug about and everybody notices.
  *
  * The suffixes are the shipped game's, deliberately — a player who knows what
  * `4.20Qa` means should not have to relearn it because the engine underneath
