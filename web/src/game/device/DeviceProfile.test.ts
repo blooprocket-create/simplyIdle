@@ -115,3 +115,38 @@ describe('device profile', () => {
     expect(() => profileFor(detected)).not.toThrow();
   });
 });
+
+/**
+ * The Settings surface tells the player "3 or more is high, 1 or more is
+ * medium". That sentence lives in a component and the thresholds live here,
+ * so they can drift. This is the test that notices.
+ */
+describe('the tier thresholds Settings quotes', () => {
+  const caps = (score: Partial<DeviceCapabilities>): DeviceCapabilities => ({
+    pixelRatio: 1,
+    longestEdgePx: 800,
+    touch: false,
+    reducedMotion: false,
+    ...score,
+  });
+
+  it('turns 3 into high and 2 into medium', () => {
+    const three = caps({ memoryGb: 8, cores: 4 });
+    expect(scoreCapabilities(three)).toBe(3);
+    expect(tierFor(three)).toBe('high');
+
+    const two = caps({ memoryGb: 4, cores: 4 });
+    expect(scoreCapabilities(two)).toBe(2);
+    expect(tierFor(two)).toBe('medium');
+  });
+
+  it('turns 1 into medium and 0 into low', () => {
+    const one = caps({ memoryGb: 4 });
+    expect(scoreCapabilities(one)).toBe(1);
+    expect(tierFor(one)).toBe('medium');
+
+    const zero = caps({});
+    expect(scoreCapabilities(zero)).toBe(0);
+    expect(tierFor(zero)).toBe('low');
+  });
+});

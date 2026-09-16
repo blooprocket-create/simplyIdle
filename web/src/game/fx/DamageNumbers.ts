@@ -7,7 +7,7 @@ import { CreatePlane } from '@babylonjs/core/Meshes/Builders/planeBuilder';
 import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import type { Scene } from '@babylonjs/core/scene';
 
-import { formatDamage } from './formatDamage';
+import { formatDamage } from '../../format/bigNumber';
 import { riseOffset } from './reactions';
 
 /**

@@ -1,0 +1,92 @@
+.host {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-block-end: calc(var(--shelf-height) + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+}
+
+.dimmed {
+  background: var(--scrim);
+}
+
+.surface {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-block-start: 1px solid var(--line-strong);
+  border-start-start-radius: var(--radius-md);
+  border-start-end-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+/* A panel sits over the fight; a sheet takes the screen. */
+.panel {
+  max-height: 46%;
+}
+
+.sheet {
+  max-height: 82%;
+}
+
+/* Exactly one axis, and the archetype owns it — never the surface. */
+.scrolls {
+  overflow-y: auto;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.kind {
+  color: var(--ink-dim);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.close {
+  margin-inline-start: auto;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--raised);
+  color: var(--ink-mid);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--ready);
+  outline-offset: 2px;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  /*
+   * Sections are stacked by the host, not spaced by themselves: a surface
+   * that set its own outer margins would be a surface deciding geometry,
+   * and two adjacent surfaces would disagree about the gap between them.
+   */
+  gap: var(--space-4);
+  color: var(--ink-low);
+  font-size: 13px;
+  line-height: 1.5;
+}

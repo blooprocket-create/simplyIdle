@@ -1,5 +1,7 @@
 .shelf {
   position: absolute;
+  min-height: var(--shelf-height);
+  box-sizing: border-box;
   inset-inline: 0;
   inset-block-end: 0;
   display: flex;

@@ -1,0 +1,132 @@
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.rail {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: calc(var(--shelf-height) + env(safe-area-inset-bottom, 0px));
+  max-height: 62%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-start-start-radius: var(--radius-md);
+  border-start-end-radius: var(--radius-md);
+  border-block-start: 1px solid var(--line-strong);
+  background: var(--panel);
+  overflow-y: auto;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.heading {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.entries {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: var(--space-2);
+}
+
+.entry {
+  /* Named because the badge has to be positioned clear of it. */
+  --pin-width: 34px;
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.entry:hover {
+  border-color: var(--line-strong);
+}
+
+.entry:focus-within {
+  outline: 2px solid var(--ready);
+  outline-offset: 2px;
+}
+
+.go {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-3) var(--space-2);
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  /* Or a long label runs under the star instead of ending in an ellipsis. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/*
+ * The star is the only control in the rail that does not navigate, so it is
+ * given a wide enough target to be hit deliberately and never by accident on
+ * the way to the label.
+ */
+.pin {
+  flex: 0 0 auto;
+  width: var(--pin-width);
+  border: 0;
+  border-inline-start: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pin:hover {
+  color: var(--ink);
+}
+
+.pinned {
+  color: var(--gold);
+}
+
+.go:focus-visible,
+.pin:focus-visible {
+  outline: 2px solid var(--ready);
+  outline-offset: -2px;
+}
+
+.badge {
+  position: absolute;
+  inset-block-start: var(--space-1);
+  /* Clear of the pin, which owns the end of the row. */
+  inset-inline-end: calc(var(--pin-width) + var(--space-1));
+  min-width: 16px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+  background: var(--danger);
+  color: var(--ink);
+  font-size: 9px;
+  line-height: 16px;
+  text-align: center;
+}

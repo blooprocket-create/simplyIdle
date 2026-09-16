@@ -8,6 +8,7 @@ import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import type { Scene } from '@babylonjs/core/scene';
 
 import { ENEMY_POSITION, RANK_X } from '../layout/battleLine';
+import { framingAngle, framingRadius } from '../layout/framing';
 import type { DeviceProfile } from '../device/DeviceProfile';
 
 /**
@@ -22,6 +23,8 @@ export interface Stage {
   camera: ArcRotateCamera;
   /** Re-applies whatever the current quality tier asks for. */
   applyQuality(shadows: boolean): void;
+  /** Re-frames for the viewport's current shape. Call after a resize. */
+  reframe(): void;
   dispose(): void;
 }
 
@@ -35,14 +38,6 @@ export const FRAMING_MARGIN = 2.4;
  */
 export const GROUND_DEPTH = 48;
 
-/**
- * Swung off the axis on purpose. Everyone faces along the line, so a camera
- * placed square to it sees the whole cast in pure profile and every actor
- * reads as a post. A little under twenty degrees puts the heroes in three
- * quarter view without turning the enemy's back to the player.
- */
-export const VIEW_ANGLE = 0.3;
-
 export function buildStage(scene: Scene, profile: DeviceProfile): Stage {
   scene.clearColor = new Color4(0.043, 0.086, 0.125, 1);
 
@@ -51,17 +46,24 @@ export function buildStage(scene: Scene, profile: DeviceProfile): Stage {
   const centre = (left + right) / 2;
   const span = right - left + FRAMING_MARGIN * 2;
 
-  const camera = new ArcRotateCamera(
-    'camera',
-    -Math.PI / 2 + VIEW_ANGLE,
-    Math.PI / 2.7,
-    span * 0.98,
-    new Vector3(centre, 1.0, 0),
-    scene,
-  );
-  camera.lowerRadiusLimit = span * 0.6;
-  camera.upperRadiusLimit = span * 2;
+  const camera = new ArcRotateCamera('camera', 0, Math.PI / 2.7, span, new Vector3(centre, 1.0, 0), scene);
   camera.minZ = 0.5;
+
+  /**
+   * Both the swing and the distance come from the viewport's shape, so the
+   * same scene frames on a phone held upright and on an ultrawide monitor.
+   * Re-run on resize: an orientation change is the case this exists for.
+   */
+  const reframe = () => {
+    const aspect = scene.getEngine().getAspectRatio(camera);
+    camera.alpha = -Math.PI / 2 + framingAngle(aspect);
+    camera.radius = framingRadius({ target: camera.target, beta: camera.beta, fov: camera.fov, aspect });
+    // Set after the radius, or Babylon clamps this frame's value to the
+    // limits left over from the last shape of the window.
+    camera.lowerRadiusLimit = camera.radius;
+    camera.upperRadiusLimit = camera.radius;
+  };
+  reframe();
 
   const fill = new HemisphericLight('fill', new Vector3(0.2, 1, -0.4), scene);
   fill.intensity = 0.55;
@@ -81,6 +83,7 @@ export function buildStage(scene: Scene, profile: DeviceProfile): Stage {
 
   return {
     camera,
+    reframe,
     applyQuality: (shadows: boolean) => {
       key.intensity = shadows ? 1.1 : 1.3;
       ground.receiveShadows = shadows;

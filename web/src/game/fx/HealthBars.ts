@@ -2,7 +2,7 @@ import type Decimal from 'break_eternity.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color';
 import type { Scene } from '@babylonjs/core/scene';
 
-import { ENEMY_POSITION, RANK_X } from '../layout/battleLine';
+import { ENEMY_BAR, ENEMY_POSITION, TEAM_BAR, TEAM_BAR_X } from '../layout/battleLine';
 import { createBar, type Bar } from './bars';
 import { barFraction } from './ratio';
 
@@ -14,9 +14,6 @@ import { barFraction } from './ratio';
  * chapter happened with nothing on screen to mark it. The engine has carried
  * `enemy.hp`, `team.hp` and a death count all along; this reads them.
  */
-
-const ENEMY_BAR = { width: 2.0, height: 0.16, above: 2.9 };
-const TEAM_BAR = { width: 3.2, height: 0.18, above: 3.0 };
 
 const ENEMY_FILL = new Color3(0.78, 0.28, 0.26);
 const TEAM_FILL = new Color3(0.36, 0.76, 0.48);
@@ -37,7 +34,7 @@ export class HealthBars {
     this.team = createBar(scene, 'team-health', TEAM_BAR.width, TEAM_BAR.height, TEAM_FILL);
     // Centred over the line rather than over any one hero: the health is the
     // team's, and hanging it above one of them would read as that hero's.
-    this.team.setPosition((RANK_X.back + RANK_X.front) / 2, TEAM_BAR.above, 0);
+    this.team.setPosition(TEAM_BAR_X, TEAM_BAR.above, 0);
     this.enemy.setPosition(ENEMY_POSITION.x, ENEMY_BAR.above, ENEMY_POSITION.z);
   }
 

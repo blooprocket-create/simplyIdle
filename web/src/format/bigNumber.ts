@@ -1,7 +1,12 @@
 import Decimal from 'break_eternity.js';
 
 /**
- * Damage, short enough to read as it flies past.
+ * A big number, short enough to read as it flies past.
+ *
+ * Lives outside both `game` and `ui` because both spell numbers, and the
+ * damage flying off an enemy and the same figure counted in the HUD have to
+ * agree. One of them reading `1.23K` while the other reads `1230` is the kind
+ * of inconsistency nobody files a bug about and everybody notices.
  *
  * The suffixes are the shipped game's, deliberately — a player who knows what
  * `4.20Qa` means should not have to relearn it because the engine underneath
@@ -25,7 +30,14 @@ const EXPONENT_CEILING = new Decimal('1e15');
 
 const THOUSAND = new Decimal(1000);
 
-export function formatDamage(value: Decimal): string {
+/**
+ * Accepts a plain number as well as a `Decimal`, because not everything that
+ * needs spelling is a damage figure. A wallet is stored as a number and can
+ * still hold more than 2^53 — one of the save fixtures does — so the caller
+ * that has one should not have to know to wrap it first.
+ */
+export function formatDamage(input: Decimal | number): string {
+  const value = typeof input === 'number' ? new Decimal(input) : input;
   if (value.isNan()) return '0';
   const negative = value.lt(0);
   const magnitude = negative ? value.neg() : value;

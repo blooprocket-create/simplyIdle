@@ -1,0 +1,57 @@
+/*
+ * Sits under the status bar and over the diorama. Deliberately quiet: it is
+ * the thing you notice having filled, not a thing you watch fill.
+ */
+.ticker {
+  position: absolute;
+  inset-inline-start: var(--space-3);
+  inset-block-start: calc(var(--status-height) + var(--space-2));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 168px;
+  /* Wide enough for a full objective line on a phone held upright. */
+  max-width: min(320px, calc(100% - var(--space-3) * 2));
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--scrim);
+  pointer-events: none;
+}
+
+.line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  justify-content: space-between;
+}
+
+.label {
+  color: var(--ink-mid);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail {
+  flex: 0 0 auto;
+  color: var(--ink-dim);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.track {
+  height: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--line);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--gold);
+}

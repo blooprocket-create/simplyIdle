@@ -1,6 +1,6 @@
 import Decimal from 'break_eternity.js';
 import { describe, expect, it } from 'vitest';
-import { SUFFIXES, formatDamage } from './formatDamage';
+import { SUFFIXES, formatDamage } from './bigNumber';
 
 const d = (value: string | number) => new Decimal(value);
 
@@ -83,5 +83,33 @@ describe('damage formatting', () => {
       const shown = formatDamage(Decimal.pow(10, tier * 3));
       expect(shown, `1e${tier * 3}`).not.toContain('undefined');
     }
+  });
+});
+
+describe('spelling a plain number', () => {
+  it('reads a number the same way it reads the Decimal of it', () => {
+    for (const value of [0, 7, 999, 1000, 1_234_567, 1e21, 1e100]) {
+      expect(formatDamage(value), String(value)).toBe(formatDamage(new Decimal(value)));
+    }
+  });
+
+  it('handles a wallet past what an integer can hold exactly', () => {
+    // `wallet-past-2-53` in the save fixtures is exactly this case, stored as
+    // a float. It has to come out as a figure rather than as `9.007e15`.
+    // Written as an expression rather than a literal: `9_007_199_254_740_993`
+    // cannot be represented, so a literal would quietly be a different number
+    // than the one on the page. This is the float the save actually holds.
+    const past = Number.MAX_SAFE_INTEGER * 4;
+    expect(formatDamage(past)).toBe(formatDamage(new Decimal(past)));
+    expect(formatDamage(past)).not.toContain('e+');
+  });
+
+  it('does not throw on the numbers JSON cannot hold', () => {
+    expect(formatDamage(Number.NaN)).toBe('0');
+    expect(() => formatDamage(Number.POSITIVE_INFINITY)).not.toThrow();
+    // Keeps the sign, and spells the magnitude however the Decimal path does
+    // — asserting a literal here would just be re-stating the formatter's
+    // small-number rule in a second place, where it could drift.
+    expect(formatDamage(-5)).toBe(`-${formatDamage(5)}`);
   });
 });
