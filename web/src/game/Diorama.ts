@@ -1,79 +1,217 @@
-import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera';
-import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { Engine } from '@babylonjs/core/Engines/engine';
+import { Color3 } from '@babylonjs/core/Maths/math.color';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Scene } from '@babylonjs/core/scene';
-import { Color3, Color4, Vector3 } from '@babylonjs/core/Maths/math';
-import { CreateBox } from '@babylonjs/core/Meshes/Builders/boxBuilder';
-import { CreateGround } from '@babylonjs/core/Meshes/Builders/groundBuilder';
-import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
+
 import type { SimulationSnapshot } from '../engine/types';
+import { ActorPool, type ActorRequest } from './actors/ActorPool';
+import { ModelLoader } from './actors/ModelLoader';
+import {
+  detectCapabilities,
+  profileFor,
+  qualityFor,
+  type DeviceProfile,
+  type QualityTier,
+} from './device/DeviceProfile';
+import { FrameGovernor } from './device/FrameGovernor';
+import { getMonsterForWave, isBossWave } from '../content/monsters';
+import { CastBars } from './fx/CastBars';
+import { DamageNumbers } from './fx/DamageNumbers';
+import { HealthBars } from './fx/HealthBars';
+import { REACTION_MS, hitFlash, recoilOffset, telegraphStrength } from './fx/reactions';
+import { layOutEnemy, layOutHeroes, type Placement } from './layout/battleLine';
+import { EMPTY_CAST, monsterAppearance, type Cast } from './models/cast';
+import { EMPTY_MANIFEST, type ModelManifest } from './models/manifest';
+import { buildStage, type Stage } from './scene/stage';
 
 /**
- * Phase 0 placeholder. It exists to prove the seam, not to look like anything:
- * a ground plane, a light, and one box per side of a fight that does not exist
- * yet.
+ * Draws the fight.
  *
- * When Phase 2 replaces these boxes, the hero placeholders do NOT become
- * capsules. Every hero has authored portrait art — 65 PNGs in `IMG/HeroIcon/`,
- * mapped 1:1 to hero ids by `src/heroPortraits.ts` — and a placeholder is a
- * small assembly of primitives whose outline reads as that hero at gameplay
- * distance: bulk, stance, headgear, weapon shape. Kael Ironheart is armoured
- * bulk with pauldrons and a kite shield; Lunara Frostweave is a hooded cloak
- * and a staff on a slight frame, and the player should be able to tell them
- * apart on the battle line before a single GLB exists. The portraits are busts,
- * chest-up, so legs and stance have to be extrapolated. See REVAMP.md, Phase 2.
+ * Two inputs, on purpose. A cast, when the roster changes: who is here, what
+ * rank they hold, what model to draw them as. A snapshot, every frame: what
+ * they are doing. Identity does not belong in a per-frame message.
  *
- * The rule it establishes is the one that matters — `render` takes a snapshot
- * and draws it. It never decides an outcome, and nothing here is allowed to
- * call back into the simulation. Phase 2 replaces the boxes; the signature
- * stays.
+ * The rule from Phase 0 is unchanged and is the one that matters — `render`
+ * takes a snapshot and draws it. It never decides an outcome, and nothing
+ * here calls back into the simulation.
  */
+
+export interface DioramaOptions {
+  manifest?: ModelManifest;
+  /** Overrides capability detection; a test or a debug switch supplies it. */
+  profile?: DeviceProfile;
+}
+
 export class Diorama {
   private readonly engine: Engine;
   private readonly scene: Scene;
-  private readonly hero: ReturnType<typeof CreateBox>;
-  private readonly foe: ReturnType<typeof CreateBox>;
+  private readonly stage: Stage;
+  private readonly loader: ModelLoader;
+  private readonly actors: ActorPool;
+  private readonly governor: FrameGovernor;
+  private readonly damage: DamageNumbers;
+  private readonly bars: CastBars;
+  private readonly health: HealthBars;
+  /** Time since the enemy was last struck. Starts spent, so nothing flashes. */
+  private sinceHitMs = REACTION_MS;
+  private appliedTier: QualityTier;
+  readonly profile: DeviceProfile;
 
-  constructor(canvas: HTMLCanvasElement) {
+  private cast: Cast = EMPTY_CAST;
+  private placements = new Map<string, Placement>();
+  private enemyId: string | null = null;
+  private enemyWave = 1;
+
+  constructor(canvas: HTMLCanvasElement, options: DioramaOptions = {}) {
     this.engine = new Engine(canvas, true, { preserveDrawingBuffer: false, stencil: false });
     this.scene = new Scene(this.engine);
-    this.scene.clearColor = new Color4(0.043, 0.086, 0.125, 1);
 
-    const camera = new ArcRotateCamera('camera', -Math.PI / 2.2, Math.PI / 2.6, 14, new Vector3(0, 1, 0), this.scene);
-    camera.attachControl(canvas, false);
+    this.profile = options.profile ?? profileFor(detectCapabilities(globalThis as never));
+    this.engine.setHardwareScalingLevel(1 / this.profile.renderScale);
+    this.governor = new FrameGovernor(this.profile);
 
-    const key = new HemisphericLight('key', new Vector3(0.4, 1, -0.3), this.scene);
-    key.intensity = 0.9;
-
-    const groundMaterial = new StandardMaterial('ground', this.scene);
-    groundMaterial.diffuseColor = new Color3(0.13, 0.22, 0.18);
-    groundMaterial.specularColor = Color3.Black();
-    const ground = CreateGround('ground', { width: 40, height: 14 }, this.scene);
-    ground.material = groundMaterial;
-
-    this.hero = this.makeActor('hero', new Color3(0.37, 0.83, 0.54), -3);
-    this.foe = this.makeActor('foe', new Color3(0.8, 0.42, 0.32), 3);
-
-    this.engine.runRenderLoop(() => this.scene.render());
+    this.stage = buildStage(this.scene, this.profile);
+    this.loader = new ModelLoader(this.scene, options.manifest ?? EMPTY_MANIFEST);
+    this.actors = new ActorPool(this.loader);
+    this.damage = new DamageNumbers(this.scene, this.profile.maxDamageNumbers, undefined, this.profile.reducedMotion);
+    this.bars = new CastBars(this.scene);
+    this.health = new HealthBars(this.scene);
+    this.appliedTier = this.profile.tier;
   }
 
-  private makeActor(name: string, colour: Color3, x: number) {
-    const material = new StandardMaterial(`${name}-material`, this.scene);
-    material.diffuseColor = colour;
-    material.specularColor = Color3.Black();
-    const box = CreateBox(name, { width: 1, height: 2, depth: 1 }, this.scene);
-    box.material = material;
-    box.position = new Vector3(x, 1, 0);
-    return box;
+  /** Which keys the pack could not supply, for a debug overlay or a report. */
+  get fallbacks(): ReadonlyMap<string, 'missing' | 'failed'> {
+    return this.loader.report.fallbacks;
+  }
+
+  /**
+   * Swaps the pack without rebuilding the scene. Anything already on the
+   * field keeps its current model until the cast changes.
+   */
+  setManifest(manifest: ModelManifest): void {
+    this.loader.setManifest(manifest);
+  }
+
+  setCast(cast: Cast): void {
+    this.cast = cast;
+    this.placements = layOutHeroes(cast);
+    this.bars.sync(cast.map(member => member.uid));
+    this.syncActors();
   }
 
   /** Draws the snapshot. Reads only; never writes back into the simulation. */
   render(snapshot: SimulationSnapshot): void {
-    // Standing in for real actor state: both sides bob so it is visible at a
-    // glance that the engine clock is reaching the renderer.
-    const phase = snapshot.elapsedMs / 1000;
-    this.hero.position.y = 1 + Math.sin(phase * 2) * 0.08;
-    this.foe.position.y = 1 + Math.sin(phase * 2 + Math.PI) * 0.08;
+    const enemyId = snapshot.enemy?.id ?? null;
+    if (enemyId !== this.enemyId) {
+      this.enemyId = enemyId;
+      this.enemyWave = snapshot.enemy?.wave ?? this.enemyWave;
+      this.syncActors();
+    }
+
+    const decision = this.governor.frame(snapshot.elapsedMs);
+    if (decision.tier !== this.appliedTier) this.applyTier(decision.tier);
+
+    // Before the draw decision, not after. A snapshot carries only the hits
+    // from its own step, so a skipped frame would drop those numbers on the
+    // floor — and skipped frames are exactly when the fight is busiest.
+    this.spawnHits(snapshot);
+    this.damage.update(decision.stepMs);
+    this.sinceHitMs = snapshot.hits.length > 0 ? 0 : this.sinceHitMs + decision.stepMs;
+    this.health.tick(snapshot.totals.deaths, decision.stepMs);
+    if (!decision.draw) return;
+
+    this.actors.place(this.placements);
+    this.health.draw(snapshot.enemy, snapshot.team);
+    this.bars.update(this.placements, new Map(snapshot.heroes.map(hero => [hero.uid, hero.swingProgress])));
+    this.drawEnemy(snapshot);
+    this.scene.render();
+  }
+
+  /**
+   * Spends the governor's decision.
+   *
+   * Without this the governor was half a component: it paced frames, decided
+   * under load that it wanted a cheaper tier, and then nothing read the
+   * answer. Giving up fidelity is the other half of holding a frame rate, and
+   * it only counts once something acts on it.
+   */
+  private applyTier(tier: QualityTier): void {
+    this.appliedTier = tier;
+    const quality = qualityFor(tier);
+    // Never above what the display can show, which the device profile already
+    // clamped to the pixel ratio when it was built.
+    this.engine.setHardwareScalingLevel(1 / Math.min(quality.renderScale, this.profile.renderScale));
+    this.stage.applyQuality(quality.shadows && this.profile.shadows);
+    this.damage.setCapacity(quality.maxDamageNumbers);
+  }
+
+  /**
+   * The enemy, reacting. A struck actor gives ground and flashes; a boss
+   * breathes so the wave reads as different before it has done anything.
+   *
+   * The flash is `renderOverlay` rather than a material edit, because the
+   * model comes from a pack and nothing here should be reaching into
+   * somebody else's shader to tint it.
+   */
+  private drawEnemy(snapshot: SimulationSnapshot): void {
+    const enemy = this.actors.get(ENEMY_SLOT);
+    if (!enemy) return;
+    const placement = layOutEnemy();
+    const boss = snapshot.enemy !== null && isBossWave(snapshot.enemy.wave);
+
+    const still = this.profile.reducedMotion;
+    enemy.root.position.set(placement.x + recoilOffset(this.sinceHitMs, still), placement.y, placement.z);
+    enemy.root.rotation.y = placement.yaw;
+    enemy.root.scaling.setAll(boss ? 1.35 : 1);
+
+    // The flash is brightness rather than movement, so it survives reduced
+    // motion unchanged; the telegraph holds still instead of breathing.
+    const flash = hitFlash(this.sinceHitMs);
+    const pulse = boss ? telegraphStrength(snapshot.elapsedMs, still) : 0;
+    for (const mesh of enemy.root.getChildMeshes()) {
+      mesh.renderOverlay = flash > 0.01 || pulse > 0.01;
+      mesh.overlayColor = flash >= pulse ? HIT_FLASH_COLOUR : BOSS_TELEGRAPH_COLOUR;
+      mesh.overlayAlpha = Math.max(flash * 0.55, pulse);
+    }
+  }
+
+  private spawnHits(snapshot: SimulationSnapshot): void {
+    if (snapshot.hits.length === 0) return;
+    const enemy = layOutEnemy();
+    for (const hit of snapshot.hits) {
+      // Spread along the line the hit came from, so simultaneous swings do
+      // not stack into one unreadable smear.
+      const jitter = (hashUnit(hit.heroUid) - 0.5) * 2;
+      this.damage.spawn(
+        hit.dealt,
+        new Vector3(enemy.x + jitter * 0.35, 1.5 + jitter * 0.25, enemy.z + jitter * 0.9),
+        hit.killed,
+      );
+    }
+  }
+
+  private syncActors(): void {
+    const requests: ActorRequest[] = this.cast.map(member => ({
+      id: member.uid,
+      modelKeys: [member.modelKey],
+      name: member.uid,
+      silhouette: member.silhouette,
+    }));
+    if (this.enemyId) {
+      // The wave names the monster and content decides what that looks
+      // like, so the renderer asks rather than deciding for itself.
+      const enemy = monsterAppearance(getMonsterForWave(this.enemyWave).name);
+      requests.push({
+        // One slot rather than one actor per wave: the enemy is replaced a
+        // thousand times a session and each replacement would otherwise
+        // rebuild a model that has not changed.
+        id: ENEMY_SLOT,
+        modelKeys: enemy.modelKeys,
+        name: 'enemy',
+        silhouette: enemy.silhouette,
+      });
+    }
+    this.actors.sync(requests);
   }
 
   resize(): void {
@@ -81,8 +219,30 @@ export class Diorama {
   }
 
   dispose(): void {
-    this.engine.stopRenderLoop();
+    this.health.dispose();
+    this.bars.dispose();
+    this.damage.dispose();
+    this.actors.dispose();
+    this.loader.dispose();
+    this.stage.dispose();
     this.scene.dispose();
     this.engine.dispose();
   }
+}
+
+/** The enemy occupies one slot, whatever is standing in it this wave. */
+export const ENEMY_SLOT = 'enemy';
+
+const HIT_FLASH_COLOUR = new Color3(1, 0.94, 0.82);
+const BOSS_TELEGRAPH_COLOUR = new Color3(0.86, 0.22, 0.24);
+
+/**
+ * A stable 0..1 from a uid, so a given hero's numbers always appear in the
+ * same place. Random jitter would make the same swing land somewhere new
+ * every time, which reads as noise rather than as that hero hitting.
+ */
+function hashUnit(uid: string): number {
+  let hash = 0;
+  for (let index = 0; index < uid.length; index += 1) hash = (hash * 31 + uid.charCodeAt(index)) & 0xffff;
+  return hash / 0x10000;
 }
