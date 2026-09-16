@@ -22,4 +22,6 @@ export interface SurfaceProps {
   cast: Cast;
   /** What the renderer decided this device can do, and what it saw. */
   device: { profile: DeviceProfile; capabilities: DeviceCapabilities };
+  /** The destinations the player has pinned to the shelf, in their order. */
+  pinnedIds: readonly string[];
 }

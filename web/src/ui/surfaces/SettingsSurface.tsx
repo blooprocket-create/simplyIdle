@@ -18,9 +18,12 @@ import { Empty, Row, Rows, Section, Tag } from './parts/parts';
  * phone" — which, for a renderer that silently drops a tier when frames get
  * long, is a question with no other answer.
  */
-export function SettingsSurface({ device, snapshot, profile }: SurfaceProps) {
+export function SettingsSurface({ device, snapshot, profile, pinnedIds }: SurfaceProps) {
   const { profile: quality, capabilities } = device;
-  const pinned = shelfLayout(REGISTRY, snapshot, []).pinned;
+  // The player's own pins, not the registry's defaults. Passing an empty
+  // preference here made this section report what a new player would see
+  // rather than what is on the shelf behind it.
+  const pinned = shelfLayout(REGISTRY, snapshot, pinnedIds).pinned;
 
   return (
     <>
