@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { AUTOMATIONS } from '../content/automation';
 import { ARCHETYPES, GROUP_ORDER, SHELF_SLOTS } from './nav/destinations';
 import { REGISTRY } from './nav/registry';
 import { ARCHETYPE_LAYOUT } from './shell/archetypes';
@@ -226,6 +227,56 @@ describe('ui architecture', () => {
     // Nothing may gate it on the fight being the only thing on screen.
     const gatesAbove = lines.slice(0, offer).filter(line => line.includes('open === null'));
     expect(gatesAbove).toEqual([]);
+  });
+
+  it('lets no automation reach the simulation except through the gate that earns it', () => {
+    /*
+     * Phase 4's thesis, made structural rather than merely true today.
+     *
+     * The shipped game's nine `auto*` flags were plain settings toggles with
+     * no gate on any of them, and the fault was the *absent* gate rather than
+     * the default any of them shipped with. An absence that is only an
+     * absence comes back the first time someone wires the next automation
+     * straight from a switch, and the policy this phase built would still be
+     * sitting there, correct and bypassed.
+     *
+     * `loopRef` is declared and used only in `App.tsx` — nothing else in the
+     * tree holds the loop — so reading that one file covers every path by
+     * which anything at all reaches the running simulation.
+     */
+    const shell = codeOnly(readFileSync(join(process.cwd(), 'src', 'app', 'App.tsx'), 'utf8'));
+    const lower = (name: string) => name.charAt(0).toLowerCase() + name.slice(1);
+
+    const wired = [...shell.matchAll(/\.setAuto([A-Z]\w*)\(/g)].map(match => lower(match[1])).sort();
+    const gated = [...shell.matchAll(/automation\.active\.has\('([^']+)'\)/g)].map(match => match[1]).sort();
+    const available = AUTOMATIONS.filter(entry => entry.available)
+      .map(entry => entry.id)
+      .sort();
+
+    expect(wired.length, 'the shell wires no automation at all').toBeGreaterThan(0);
+    // Wired but ungated is the shipped fault coming back. Gated but unwired
+    // is a switch that promises something nothing delivers.
+    expect(wired, 'every automation the shell wires must read from `active`').toEqual(gated);
+    // And the catalogue cannot claim an automation this build does not
+    // honour, nor honour one it does not admit to having.
+    expect(wired, 'what is marked available must be exactly what is wired').toEqual(available);
+  });
+
+  it('lets the player read an act mechanic outside the fight that uses it', () => {
+    /*
+     * The gap this closes. For a while nothing but the fight itself imported
+     * the mechanics, so the only way to learn what an act's boss does was to
+     * meet it mid-fight inside a window under a second and a half — and a
+     * thing you can only discover while it is happening is not something you
+     * can be good at, which is the whole of "hand-played".
+     *
+     * Campaign names it, because that is the screen a player opens to decide
+     * whether to push on. The Codex carries all six with what each one asks,
+     * because it is a ledger and can hold a list.
+     */
+    const surfaces = FILES.filter(file => within(file, 'surfaces'));
+    const readers = surfaces.filter(file => /bossMechanics/.test(codeOnly(file.text))).map(f => f.relativePath);
+    expect(readers.sort()).toEqual(['surfaces/CampaignSurface.tsx', 'surfaces/CodexSurface.tsx']);
   });
 
   it('never reaches into the renderer', () => {
