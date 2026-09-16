@@ -58,6 +58,25 @@ export interface BurstView {
   peak: { start: number; end: number };
 }
 
+/**
+ * A wipe waiting to be answered.
+ *
+ * Present only while the team is down and the player has not said what to do.
+ * The fight does not advance while this is set — there is nobody left to
+ * swing — so a HUD showing it is not covering a running battle.
+ */
+export interface WipeView {
+  /** The wave they fell on, and where a rally holds. */
+  wave: number;
+  /** Where a retreat puts them. */
+  retreatTo: number;
+  /** Health a rally comes back on, as a fraction of maximum. */
+  rallyHealth: number;
+  remainingMs: number;
+  /** 0 to 1 of the decision window spent, for a countdown ring. */
+  urgency: number;
+}
+
 export interface SimulationSnapshot {
   /** Wall-clock ms the simulation has advanced since the run began. */
   elapsedMs: number;
@@ -71,6 +90,8 @@ export interface SimulationSnapshot {
   /** Hits from the last step only. Replaced, not accumulated. */
   hits: HitEvent[];
   burst: BurstView;
+  /** Null unless the team is down and waiting on an answer. */
+  wipe: WipeView | null;
   totals: {
     kills: number;
     /** Wipes. Each one costs a chapter. */
@@ -106,6 +127,7 @@ export function emptySnapshot(): SimulationSnapshot {
       quality: 'missed',
       peak: { start: 0, end: 0 },
     },
+    wipe: null,
     totals: { kills: 0, deaths: 0, dealt: new Decimal(0), overkill: new Decimal(0) },
   };
 }

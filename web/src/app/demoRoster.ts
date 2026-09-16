@@ -149,3 +149,22 @@ export function demoProfile(): PlayerProfile {
 
 /** Enough spread to show the roster's rarity tones actually differ. */
 const DEMO_RARITY = ['legendary', 'epic', 'rare', 'mythic', 'uncommon', 'common'] as const;
+
+/**
+ * What the demo hands the loop, beyond the heroes.
+ *
+ * `incomingMult` defaults to zero in `Simulation`, which is right for a test
+ * that wants to isolate damage dealt — and wrong for the app, where it made
+ * the team literally invulnerable: they stalled out around wave 59 and sat
+ * there forever, never dying, so the wipe offer could not be reached at all.
+ * A shell demonstrating a game with no failure state is demonstrating the
+ * wrong game.
+ *
+ * The health is a flat number rather than anything derived, because nothing
+ * derives it yet — vitality reaches the simulation when the save does. It is
+ * chosen so the demo climbs into the forties and then starts losing, which is
+ * the sawtooth the whole offline model is built around.
+ */
+export function demoSimulationOptions(): { teamMaxHp: Decimal; incomingMult: number } {
+  return { teamMaxHp: new Decimal(2_000), incomingMult: 1 };
+}

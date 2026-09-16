@@ -1,20 +1,10 @@
 import Decimal from 'break_eternity.js';
 import { advanceAttackTimer, swingProgress } from './combat/attackTimer';
 import { isBossWave } from '../content/monsters';
-import { retreatWave } from './combat/chapters';
-import {
-  BURST_COST,
-  BURST_HIT_UID,
-  burstQuality,
-  chargeAfterKill,
-  emptyBurst,
-  isWindowOpen,
-  lapse,
-  peakBand,
-  spend,
-  windowProgress,
-  type BurstState,
-} from './combat/burst';
+import { wipeView } from './views';
+import { hasLapsed, openWipe, resolveWipe, type PendingWipe, type WipeChoice } from './combat/wipe';
+import { BURST_HIT_UID, type BurstQuality } from './combat/burst';
+import { BurstMeter } from './combat/BurstMeter';
 import { applyHit, spawnEnemy, type Enemy } from './combat/encounter';
 import { applyIncoming, fullHealth, type TeamVitals } from './combat/survival';
 import { nominalDps, type HeroEntity } from './entities/HeroEntity';
@@ -68,11 +58,11 @@ export class Simulation {
   private dealt = new Decimal(0);
   private overkill = new Decimal(0);
   private hits: HitEvent[] = [];
-  private burst: BurstState = emptyBurst();
-  private readonly autoBurst: boolean;
+  private readonly burst: BurstMeter;
+  private pendingWipe: PendingWipe | null = null;
 
   constructor(options: SimulationOptions = { heroes: [] }) {
-    this.autoBurst = options.autoBurst ?? false;
+    this.burst = new BurstMeter(options.autoBurst ?? false);
     this.enemyHpMult = options.enemyHpMult ?? 1;
     this.incomingMult = options.incomingMult ?? 0;
     this.enemy = spawnEnemy(options.startWave ?? 1, this.enemyHpMult);
@@ -87,6 +77,10 @@ export class Simulation {
     this.elapsedMs += elapsedMs;
     this.ticks += 1;
     this.hits = [];
+
+    // An offer the player did not take. The retreat already happened when
+    // they fell; this only closes the window on rallying back.
+    if (this.pendingWipe !== null && hasLapsed(this.pendingWipe, this.elapsedMs)) this.pendingWipe = null;
 
     /*
      * The monster hits back first, then the swings land.
@@ -108,12 +102,9 @@ export class Simulation {
 
     for (const swing of this.scheduleSwings(elapsedMs)) this.resolve(swing);
 
-    // A window that closed with nobody pressing. Unautomated this only
-    // reopens it; automated it fires at the floor, which is what the unlock
-    // buys and all it buys.
-    const lapsed = lapse(this.burst, this.elapsedMs, { automated: this.autoBurst });
-    this.burst = lapsed.state;
-    if (lapsed.fired) this.detonate(lapsed.multiplier, lapsed.seconds);
+    // A window that closed with nobody pressing; see `BurstMeter`.
+    const fired = this.burst.tick(this.elapsedMs);
+    if (fired) this.detonate(fired.multiplier, fired.seconds);
 
     // Retarget after the step so a hero whose target died is pointed at
     // whatever replaced it rather than holding a stale id into the next frame.
@@ -128,43 +119,10 @@ export class Simulation {
    * Takes no time argument: the simulation owns the clock, and a caller
    * passing its own would be timing the window against a different one.
    */
-  spendBurst(): { spent: boolean; multiplier: number; quality: ReturnType<typeof burstQuality> } {
-    const result = spend(this.burst, this.elapsedMs);
-    this.burst = result.state;
-    if (result.spent) this.detonate(result.multiplier, result.seconds);
-    return { spent: result.spent, multiplier: result.multiplier, quality: result.quality };
-  }
-
-  /**
-   * A burst landing: seconds of the team's damage, multiplied.
-   *
-   * Routed through the same `applyHit` an ordinary swing uses, so it kills,
-   * overkills and chains waves exactly as a swing does — and so the kill it
-   * lands charges the *next* burst, which is correct: the meter is already
-   * empty by the time this runs.
-   */
-  private detonate(multiplier: number, seconds: number): void {
-    const damage = this.teamDps().mul(seconds).mul(multiplier);
-    if (damage.lte(0)) return;
-    const result = applyHit(this.enemy, damage);
-    this.enemy = result.enemy;
-    this.dealt = this.dealt.add(result.dealt);
-    this.overkill = this.overkill.add(result.overkill);
-    this.hits.push({
-      // Not a hero's swing, so it carries a reserved uid rather than
-      // borrowing one — the renderer places numbers by hashing this, and a
-      // borrowed uid would stack the burst on top of that hero's own hit.
-      heroUid: BURST_HIT_UID,
-      dealt: result.dealt,
-      overkill: result.overkill,
-      killed: result.killed,
-      atMs: 0,
-    });
-    if (!result.killed) return;
-    this.kills += 1;
-    this.burst = chargeAfterKill(this.burst, { boss: isBossWave(this.enemy.wave), nowMs: this.elapsedMs });
-    this.enemy = spawnEnemy(this.enemy.wave + 1, this.enemyHpMult);
-    this.vitals = fullHealth(this.vitals.maxHp);
+  spendBurst(): { spent: boolean; multiplier: number; quality: BurstQuality } {
+    const { payload, quality } = this.burst.spend(this.elapsedMs);
+    if (payload) this.detonate(payload.multiplier, payload.seconds);
+    return { spent: payload !== null, multiplier: payload?.multiplier ?? 1, quality };
   }
 
   /**
@@ -177,6 +135,9 @@ export class Simulation {
    * would have put them, rather than to a free climb or to nothing at all.
    */
   creditAway(elapsedMs: number): void {
+    // An offer nobody was present for. The retreat it followed has already
+    // been applied, so this only drops the window.
+    this.pendingWipe = null;
     const credit = creditAwayTime(
       {
         wave: this.enemy.wave,
@@ -227,35 +188,88 @@ export class Simulation {
   }
 
   private resolve(swing: ScheduledSwing): void {
-    const result = applyHit(this.enemy, swing.hero.damagePerHit);
+    this.land(swing.hero.damagePerHit, swing.hero.uid, swing.atMs);
+  }
+
+  /**
+   * A burst landing: seconds of the team's damage, multiplied.
+   *
+   * Goes through the same path an ordinary swing does, so it kills, overkills
+   * and chains waves identically — and so the kill it lands charges the
+   * *next* burst, which is right: the meter is already empty by the time this
+   * runs.
+   */
+  private detonate(multiplier: number, seconds: number): void {
+    const damage = this.teamDps().mul(seconds).mul(multiplier);
+    if (damage.lte(0)) return;
+    // Not a hero's swing, so it carries a reserved uid rather than borrowing
+    // one: the renderer places floating numbers by hashing this, and a
+    // borrowed uid would stack the burst on top of that hero's own hit.
+    this.land(damage, BURST_HIT_UID, 0);
+  }
+
+  /**
+   * Damage arriving at the enemy, from whatever threw it.
+   *
+   * Shared by swings and bursts so a kill is bookkept once. Two copies of
+   * "did that kill it" is how a burst ends up charging the meter it just
+   * spent, or healing the team twice.
+   */
+  private land(damage: Decimal, heroUid: string, atMs: number): void {
+    const result = applyHit(this.enemy, damage);
     this.enemy = result.enemy;
     this.dealt = this.dealt.add(result.dealt);
     this.overkill = this.overkill.add(result.overkill);
-    this.hits.push({
-      heroUid: swing.hero.uid,
-      dealt: result.dealt,
-      overkill: result.overkill,
-      killed: result.killed,
-      atMs: swing.atMs,
-    });
+    this.hits.push({ heroUid, dealt: result.dealt, overkill: result.overkill, killed: result.killed, atMs });
 
     if (!result.killed) return;
     this.kills += 1;
     // Charged from the wave that just died, not the one replacing it: a boss
-    // is worth three, and reading the wave after the respawn would credit the
-    // wrong encounter.
-    this.burst = chargeAfterKill(this.burst, { boss: isBossWave(this.enemy.wave), nowMs: this.elapsedMs });
+    // is worth three, and reading after the respawn credits the wrong fight.
+    this.burst.charge(isBossWave(this.enemy.wave), this.elapsedMs);
     this.enemy = spawnEnemy(this.enemy.wave + 1, this.enemyHpMult);
     // The shipped game heals the team to full on a win, and so does the
     // estimator's round model. Matching it keeps the sawtooth the same shape.
     this.vitals = fullHealth(this.vitals.maxHp);
   }
 
-  /** A wipe: back to the start of the chapter, healed, and counted. */
+  /**
+   * A wipe. Counted, and then put to the player.
+   *
+   * The shipped game teleported the team to their chapter start without a
+   * word, so twenty waves of progress could vanish with nothing to see. Now
+   * the fight stops and waits — for eight seconds, after which it does what
+   * the shipped game always did.
+   */
   private wipe(): void {
     this.deaths += 1;
-    this.enemy = spawnEnemy(retreatWave(this.enemy.wave), this.enemyHpMult);
+    const pending = openWipe(this.enemy.wave, this.elapsedMs);
+    // The retreat is applied now, not when the offer closes: pausing the
+    // fight to ask cost an idle player eight seconds per wipe and put the
+    // live simulation out of step with the offline estimator.
+    this.enemy = spawnEnemy(pending.retreatTo, this.enemyHpMult);
     this.vitals = fullHealth(this.vitals.maxHp);
+    this.pendingWipe = pending;
+  }
+
+  /**
+   * The player answered, or the clock did.
+   *
+   * `retreatWave` is still what a retreat uses — via `openWipe` — so the
+   * sawtooth the offline estimator models stays the same shape for anyone
+   * who does not answer.
+   */
+  decideWipe(choice: Exclude<WipeChoice, 'lapsed'>): boolean {
+    const pending = this.pendingWipe;
+    if (pending === null) return false;
+    this.pendingWipe = null;
+    // Retreating is what already happened, so answering "retreat" only
+    // dismisses the offer. Rallying is the one that moves anything.
+    if (choice === 'retreat') return true;
+    const outcome = resolveWipe(pending, choice);
+    this.enemy = spawnEnemy(outcome.wave, this.enemyHpMult);
+    this.vitals = { ...fullHealth(this.vitals.maxHp), hp: this.vitals.maxHp.mul(outcome.healthFraction) };
+    return true;
   }
 
   /** The current read model. Callers must treat it as immutable. */
@@ -274,17 +288,8 @@ export class Simulation {
         targetId: hero.targetId,
       })),
       hits: this.hits,
-      burst: {
-        charge: this.burst.charge,
-        cost: BURST_COST,
-        ready: this.burst.charge >= BURST_COST,
-        windowOpen: isWindowOpen(this.burst, this.elapsedMs),
-        progress:
-          this.burst.windowOpenedAtMs === null ? 0 : windowProgress(this.elapsedMs - this.burst.windowOpenedAtMs),
-        quality:
-          this.burst.windowOpenedAtMs === null ? 'missed' : burstQuality(this.elapsedMs - this.burst.windowOpenedAtMs),
-        peak: peakBand(),
-      },
+      burst: this.burst.view(this.elapsedMs),
+      wipe: wipeView(this.pendingWipe, this.elapsedMs),
       totals: { kills: this.kills, deaths: this.deaths, dealt: this.dealt, overkill: this.overkill },
     };
   }

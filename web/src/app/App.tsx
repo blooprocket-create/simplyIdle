@@ -2,12 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Diorama } from '../game/Diorama';
 import { detectCapabilities, profileFor } from '../game/device/DeviceProfile';
 import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
-import { demoCast, demoHeroes, demoProfile } from './demoRoster';
+import { demoCast, demoHeroes, demoProfile, demoSimulationOptions } from './demoRoster';
 import { GameLoop } from './GameLoop';
 import { Rail } from '../ui/nav/Rail';
 import { Shelf } from '../ui/nav/Shelf';
 import { REGISTRY } from '../ui/nav/registry';
 import { BurstControl } from '../ui/burst/BurstControl';
+import { WipeOffer } from '../ui/wipe/WipeOffer';
 import { Ticker } from '../ui/objectives/Ticker';
 import { usePinned } from '../ui/prefs/usePinned';
 import { SurfaceHost } from '../ui/shell/SurfaceHost';
@@ -63,7 +64,7 @@ export function App() {
 
     const diorama = new Diorama(canvas, { profile: device.profile });
     diorama.setCast(cast);
-    const loop = new GameLoop({ heroes: demoHeroes() });
+    const loop = new GameLoop({ heroes: demoHeroes(), ...demoSimulationOptions() });
     loopRef.current = loop;
 
     const unsubscribe = loop.subscribe(next => {
@@ -93,7 +94,18 @@ export function App() {
         <span className={styles.clock}>{(snapshot.elapsedMs / 1000).toFixed(1)}s</span>
       </header>
       <Ticker snapshot={snapshot} profile={profile} />
-      {open === null && <BurstControl burst={snapshot.burst} onSpend={() => loopRef.current?.spendBurst()} />}
+      {open === null && (
+        <div className={styles.verbs}>
+          {snapshot.wipe !== null && (
+            <WipeOffer
+              offer={snapshot.wipe}
+              onRally={() => loopRef.current?.decideWipe('rally')}
+              onDismiss={() => loopRef.current?.decideWipe('retreat')}
+            />
+          )}
+          <BurstControl burst={snapshot.burst} onSpend={() => loopRef.current?.spendBurst()} />
+        </div>
+      )}
       <SurfaceHost
         destination={open}
         snapshot={snapshot}

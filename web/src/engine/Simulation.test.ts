@@ -590,3 +590,104 @@ describe('BURST, as the simulation runs it', () => {
     expect(second).toBeLessThanOrEqual(1);
   });
 });
+
+describe('a wipe, as an offer rather than a teleport', () => {
+  /** A team that cannot survive its wave. */
+  function doomed(): Simulation {
+    return new Simulation({
+      heroes: [hero('h', 50, 1_000)],
+      startWave: 60,
+      teamMaxHp: new Decimal(500),
+      incomingMult: 1,
+    });
+  }
+
+  function untilWipe(sim: Simulation, steps = 4_000): boolean {
+    for (let step = 0; step < steps; step += 1) {
+      sim.advance(100);
+      if (sim.read().wipe !== null) return true;
+    }
+    return false;
+  }
+
+  it('retreats immediately, and offers a rally afterwards', () => {
+    // The retreat is the shipped behaviour and happens without asking; the
+    // offer is the new part. Pausing to ask instead cost an idle player
+    // eight seconds a wipe and put the live sim out of step with the
+    // estimator, which the parity test caught.
+    const sim = doomed();
+    expect(untilWipe(sim)).toBe(true);
+    const snapshot = sim.read();
+    expect(snapshot.wipe).not.toBeNull();
+    expect(snapshot.totals.deaths).toBeGreaterThan(0);
+    // Already moved back, rather than sitting on the wave they fell on.
+    expect(snapshot.wave).toBe(snapshot.wipe?.retreatTo);
+    expect(snapshot.wave).toBeLessThan(snapshot.wipe?.wave ?? 0);
+  });
+
+  it('keeps fighting while the offer stands', () => {
+    // The fight is not paused: a prompt that stopped the battle would be the
+    // exact thing the shell exists to prevent.
+    const sim = doomed();
+    expect(untilWipe(sim)).toBe(true);
+    const before = sim.read().ticks;
+    sim.advance(100);
+    expect(sim.read().ticks).toBeGreaterThan(before);
+  });
+
+  it('holds the wave they fell on, at a price, when the rally is taken', () => {
+    const sim = doomed();
+    expect(untilWipe(sim)).toBe(true);
+    const offer = sim.read().wipe;
+    expect(offer).not.toBeNull();
+    if (!offer) return;
+
+    expect(sim.decideWipe('rally')).toBe(true);
+    const after = sim.read();
+    expect(after.wave).toBe(offer.wave);
+    expect(after.wipe).toBeNull();
+    // Back on their feet, but not on full health.
+    expect(after.team.hp.lt(after.team.maxHp)).toBe(true);
+    expect(after.team.hp.gt(0)).toBe(true);
+  });
+
+  it('only dismisses the offer when the retreat is accepted', () => {
+    const sim = doomed();
+    expect(untilWipe(sim)).toBe(true);
+    const wave = sim.read().wave;
+    expect(sim.decideWipe('retreat')).toBe(true);
+    expect(sim.read().wipe).toBeNull();
+    expect(sim.read().wave).toBe(wave);
+  });
+
+  it('refuses a decision when nothing is being offered', () => {
+    const sim = new Simulation({ heroes: team() });
+    expect(sim.decideWipe('rally')).toBe(false);
+    expect(sim.read().wipe).toBeNull();
+  });
+
+  it('lets the offer lapse, leaving the retreat standing', () => {
+    const sim = doomed();
+    expect(untilWipe(sim)).toBe(true);
+    const wave = sim.read().wave;
+    for (let step = 0; step < 200; step += 1) sim.advance(100);
+    // The offer is gone and nothing undid the retreat. A later wipe may have
+    // opened a fresh one, which is fine; what must not happen is a rally the
+    // player never asked for.
+    const after = sim.read();
+    if (after.wipe === null) expect(after.wave).toBeLessThanOrEqual(wave + 1);
+  });
+
+  it('counts down so the HUD can show the offer expiring', () => {
+    const sim = doomed();
+    expect(untilWipe(sim)).toBe(true);
+    const first = sim.read().wipe;
+    sim.advance(1_000);
+    const second = sim.read().wipe;
+    if (first && second) {
+      expect(second.remainingMs).toBeLessThan(first.remainingMs);
+      expect(second.urgency).toBeGreaterThan(first.urgency);
+      expect(second.urgency).toBeLessThanOrEqual(1);
+    }
+  });
+});
