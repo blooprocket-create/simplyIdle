@@ -1,0 +1,82 @@
+/*
+ * Sits directly above the shelf, so the thumb that reaches for a destination
+ * is already near the one verb that is time-sensitive.
+ */
+.control {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 180px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--scrim);
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+/* Not pressable until it is worth pressing; see the component's note. */
+.control:not(.armed) {
+  pointer-events: none;
+}
+
+.armed {
+  border-color: var(--gold);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.armed:focus-visible {
+  outline: 2px solid var(--ready);
+  outline-offset: 2px;
+}
+
+.charge,
+.window {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--line);
+  overflow: hidden;
+}
+
+.chargeFill {
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--ink-dim);
+}
+
+.chargeLabel {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The peak: where the payout is highest, marked so it can be aimed at. */
+.band {
+  position: absolute;
+  inset-block: 0;
+  background: var(--gold);
+  opacity: 0.55;
+}
+
+/* The playhead. A hairline, because "about here" is not the same as "here". */
+.sweep {
+  position: absolute;
+  inset-block: 0;
+  width: 2px;
+  background: var(--ink);
+}
+
+.label {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.quality {
+  color: var(--gold);
+}

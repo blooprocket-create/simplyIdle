@@ -1,3 +1,4 @@
+import type { AutomationId } from '../../content/automation';
 import type { DeviceCapabilities, DeviceProfile } from '../../game/device/DeviceProfile';
 import type { SimulationSnapshot } from '../../engine/types';
 import type { Cast } from '../../game/models/cast';
@@ -24,4 +25,10 @@ export interface SurfaceProps {
   device: { profile: DeviceProfile; capabilities: DeviceCapabilities };
   /** The destinations the player has pinned to the shelf, in their order. */
   pinnedIds: readonly string[];
+  /** Earned automations, which of them are running, and how to change that. */
+  automation: {
+    active: ReadonlySet<AutomationId>;
+    enabled: readonly AutomationId[];
+    toggle: (id: AutomationId) => void;
+  };
 }

@@ -1,4 +1,5 @@
 import Decimal from 'break_eternity.js';
+import { BURST_COST, type BurstQuality } from './combat/burst';
 
 /**
  * The read model the UI and renderer subscribe to. Everything outside
@@ -35,6 +36,72 @@ export interface EnemyView {
   maxHp: Decimal;
 }
 
+/**
+ * BURST, as the HUD needs to draw it.
+ *
+ * Every field is derived rather than stored: the window is a function of how
+ * long it has been open, so the snapshot reports where the sweep is *now*
+ * rather than asking the HUD to run its own clock alongside the simulation's.
+ */
+export interface BurstView {
+  /** 0 to `cost`. */
+  charge: number;
+  cost: number;
+  /** The meter is full. The window may still have lapsed. */
+  ready: boolean;
+  windowOpen: boolean;
+  /** 0 to 1 across the window, for the sweep. */
+  progress: number;
+  /** What a press right now would be worth, in a word. */
+  quality: BurstQuality;
+  /** Where the peak sits, as fractions of the window, so the HUD can mark it. */
+  peak: { start: number; end: number };
+}
+
+/**
+ * The boss's mechanic, while the team is on a boss wave. Null otherwise.
+ *
+ * Present on every frame of a boss fight rather than only while a tell is
+ * open, so the HUD can show what the act asks of the player *before* it asks
+ * — a telegraph the player only meets at the instant they have to answer it
+ * is not a telegraph.
+ */
+export interface BossView {
+  /** The act's name for this mechanic. */
+  name: string;
+  /** One line of what the boss is doing, in the act's voice. */
+  tell: string;
+  /** True only while an answer would land. */
+  open: boolean;
+  /** 0 to 1 across the open window, for the sweep. */
+  progress: number;
+  /** Consecutive answers. Zero unless the act's mechanic chains. */
+  streak: number;
+  /** Seconds of team damage the next answer would chip off. */
+  chipSeconds: number;
+  /** Ms until the next tell. Zero while one is open. */
+  nextInMs: number;
+}
+
+/**
+ * A wipe waiting to be answered.
+ *
+ * Present only while the team is down and the player has not said what to do.
+ * The fight does not advance while this is set — there is nobody left to
+ * swing — so a HUD showing it is not covering a running battle.
+ */
+export interface WipeView {
+  /** The wave they fell on, and where a rally holds. */
+  wave: number;
+  /** Where a retreat puts them. */
+  retreatTo: number;
+  /** Health a rally comes back on, as a fraction of maximum. */
+  rallyHealth: number;
+  remainingMs: number;
+  /** 0 to 1 of the decision window spent, for a countdown ring. */
+  urgency: number;
+}
+
 export interface SimulationSnapshot {
   /** Wall-clock ms the simulation has advanced since the run began. */
   elapsedMs: number;
@@ -47,6 +114,11 @@ export interface SimulationSnapshot {
   heroes: HeroView[];
   /** Hits from the last step only. Replaced, not accumulated. */
   hits: HitEvent[];
+  burst: BurstView;
+  /** Null unless the team is down and waiting on an answer. */
+  wipe: WipeView | null;
+  /** Null unless the fight is on a boss wave. */
+  boss: BossView | null;
   totals: {
     kills: number;
     /** Wipes. Each one costs a chapter. */
@@ -73,6 +145,17 @@ export function emptySnapshot(): SimulationSnapshot {
     team: { hp: new Decimal(0), maxHp: new Decimal(0) },
     heroes: [],
     hits: [],
+    burst: {
+      charge: 0,
+      cost: BURST_COST,
+      ready: false,
+      windowOpen: false,
+      progress: 0,
+      quality: 'missed',
+      peak: { start: 0, end: 0 },
+    },
+    wipe: null,
+    boss: null,
     totals: { kills: 0, deaths: 0, dealt: new Decimal(0), overkill: new Decimal(0) },
   };
 }

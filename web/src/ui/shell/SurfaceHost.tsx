@@ -1,5 +1,6 @@
 import { createElement } from 'react';
 
+import type { SurfaceProps } from '../surfaces/SurfaceProps';
 import type { SimulationSnapshot } from '../../engine/types';
 import type { DeviceCapabilities, DeviceProfile } from '../../game/device/DeviceProfile';
 import type { Cast } from '../../game/models/cast';
@@ -29,10 +30,20 @@ interface SurfaceHostProps {
   cast: Cast;
   device: { profile: DeviceProfile; capabilities: DeviceCapabilities };
   pinnedIds: readonly string[];
+  automation: SurfaceProps['automation'];
   onDismiss: () => void;
 }
 
-export function SurfaceHost({ destination, snapshot, profile, cast, device, pinnedIds, onDismiss }: SurfaceHostProps) {
+export function SurfaceHost({
+  destination,
+  snapshot,
+  profile,
+  cast,
+  device,
+  pinnedIds,
+  automation,
+  onDismiss,
+}: SurfaceHostProps) {
   if (!destination) return null;
   const layout = ARCHETYPE_LAYOUT[destination.archetype];
   // A destination with no surface yet falls back to the placeholder. Deciding
@@ -68,7 +79,7 @@ export function SurfaceHost({ destination, snapshot, profile, cast, device, pinn
           {surface === undefined ? (
             <PlaceholderSurface destination={destination} />
           ) : (
-            createElement(surface, { destination, snapshot, profile, cast, device, pinnedIds })
+            createElement(surface, { destination, snapshot, profile, cast, device, pinnedIds, automation })
           )}
         </div>
       </section>

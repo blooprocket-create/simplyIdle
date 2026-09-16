@@ -1,4 +1,5 @@
 import { ACTS } from '../../content/acts';
+import { bossMechanicForAct } from '../../content/bossMechanics';
 import { HERO_POOL, HERO_TEMPLATE_COUNT, heroClassesInPool } from '../../content/heroes';
 import { MONSTER_POOL, firstWaveFor, isBossWave, poolEntryForWave } from '../../content/monsters';
 import { CLASS_COPY } from '../copy/classes';
@@ -73,6 +74,7 @@ export function CodexSurface({ snapshot, profile }: SurfaceProps) {
           {ACTS.map(act => {
             const cleared = reached > (act.endWave ?? Number.POSITIVE_INFINITY);
             const here = reached >= act.startWave && !cleared;
+            const mechanic = bossMechanicForAct(act.id);
             return (
               <Card
                 key={act.id}
@@ -80,7 +82,9 @@ export function CodexSurface({ snapshot, profile }: SurfaceProps) {
                 badge={act.endWave === null ? `${act.startWave}+` : `${act.startWave}–${act.endWave}`}
               >
                 <span>{act.theme}</span>
+                <span>{mechanic.tell}</span>
                 <span>
+                  <Tag tone="warn">{mechanic.name}</Tag>
                   {cleared && <Tag tone="good">Cleared</Tag>}
                   {here && <Tag tone="gold">Here</Tag>}
                   {!cleared && !here && <Tag>Ahead</Tag>}

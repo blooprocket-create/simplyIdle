@@ -45,3 +45,8 @@ simplyidle-43c81-firebase-adminsdk-fbsvc-5dc5b32aa7.json
 
 # Local Firestore rules draft
 firestore.rules
+
+# Throwaway browser-driving scripts. These are written, run and deleted while
+# checking a change in a real browser; one was committed by a `git add -A`
+# and then churned through five commits before anybody noticed.
+shot*.mjs

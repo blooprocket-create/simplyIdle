@@ -1,4 +1,5 @@
 import { getActForWave } from '../../content/acts';
+import { bossMechanicForAct } from '../../content/bossMechanics';
 import { getMonsterForWave, isBossWave } from '../../content/monsters';
 import { CHAPTER_WAVES, chapterStartWave } from '../../engine/combat/chapters';
 import { barFraction } from '../../game/fx/ratio';
@@ -36,6 +37,21 @@ export function CampaignSurface({ snapshot }: SurfaceProps) {
   // this is the thing actually at stake in the next fight.
   const throughChapter = (wave - start) / CHAPTER_WAVES;
   const monster = getMonsterForWave(wave);
+  /*
+   * What this act's boss will ask for. Named here rather than only in the
+   * fight: the mechanic's window is under a second and a half, so a player
+   * meeting it for the first time mid-swing has no chance to prepare for it.
+   * This is the screen they open to decide whether to push on, which makes it
+   * the screen that owes them what pushing on involves.
+   *
+   * It costs no height. A dashboard is sized to the panel and does not
+   * scroll, and adding a fifth row for this clipped the last line by five
+   * pixels on desktop — so the mechanic's name joins a hint that was already
+   * there, and its tell takes the line the act's theme had. The theme is
+   * flavour and lives in the Codex; the tell is the thing to act on, and
+   * this is the screen for acting.
+   */
+  const mechanic = bossMechanicForAct(act.id);
   const teamPercent = Math.round(barFraction(snapshot.team.hp, snapshot.team.maxHp) * 100);
 
   return (
@@ -47,7 +63,7 @@ export function CampaignSurface({ snapshot }: SurfaceProps) {
         <Row label="Facing">
           {monster.emoji} {monster.name}
         </Row>
-        <Row label="Act boss" hint={unlockHint(act.unlock)}>
+        <Row label="Act boss" hint={`${mechanic.name} · ${unlockHint(act.unlock)}`}>
           Wave {act.bossWave}
         </Row>
         <Row label="Enemy health" hint={`Team at ${teamPercent}%`}>
@@ -57,7 +73,7 @@ export function CampaignSurface({ snapshot }: SurfaceProps) {
         </Row>
       </Rows>
       <Meter fraction={throughChapter} tone="gold" label="Progress through this chapter" />
-      <Empty>{act.theme}</Empty>
+      <Empty>{mechanic.tell}</Empty>
     </Section>
   );
 }

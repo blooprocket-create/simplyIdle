@@ -28,8 +28,28 @@ export function browserStore(): PreferenceStore {
     const storage = globalThis.localStorage;
     if (!storage) return NULL_STORE;
     return {
-      read: key => storage.getItem(key),
-      write: (key, value) => storage.setItem(key, value),
+      /*
+       * Guarded per call, not only at construction. The comment above says
+       * both ends are total and only the construction was — `setItem` throws
+       * on its own when a quota is exhausted mid-write, and reaching for a
+       * key can throw after site data is revoked partway through a session.
+       * A preference that cannot be saved is a preference not saved; it is
+       * never a reason for the game to stop.
+       */
+      read: key => {
+        try {
+          return storage.getItem(key);
+        } catch {
+          return null;
+        }
+      },
+      write: (key, value) => {
+        try {
+          storage.setItem(key, value);
+        } catch {
+          /* Full, blocked, or revoked. Nothing to do and nothing to say. */
+        }
+      },
     };
   } catch {
     return NULL_STORE;

@@ -9,15 +9,20 @@ import { silhouetteFor } from '../game/models/silhouette';
 import type { Cast } from '../game/models/cast';
 import { emptyProfile, rosterOrder, type PlayerProfile, type RosterEntry } from '../ui/profile/playerProfile';
 import { HERO_POOL, getHeroTemplate } from '../content/heroes';
+import type { LoadedRoster } from './roster';
 
 /**
- * A team and a player to look at until there is a save to load them from.
+ * The team a player starts on, and what they see before they have a save.
  *
- * Scaffolding, and labelled as such: Phase 3 builds the roster from the
- * player's save and this goes away. It exists because a renderer with nothing
- * in it cannot be judged, and because the shape it produces — heroes for the
- * simulation and a matching cast for the diorama, from one source — is the
- * shape the real loader has to produce too.
+ * This was scaffolding — "a team and a player to look at until there is a
+ * save to load them from" — and `saveStore.ts` is now that somewhere, so the
+ * shell reaches for this only when there is no save at all. What is left is
+ * not a placeholder but an answer the cutover owed anyway: what does someone
+ * who has never played see?
+ *
+ * The shape it produces — heroes for the simulation and a matching cast for
+ * the diorama, from one source — is the shape `rosterFromSave` produces too,
+ * which is why the shell can take either without knowing which it got.
  */
 
 /**
@@ -101,8 +106,9 @@ export function demoCast(): Cast {
  * produces — which is the point. `profileFromSave` already builds this from a
  * migrated `SaveV3` and is tested against the shipped fixtures; what is
  * missing is somewhere to get a save from, since the shipped one lives behind
- * Supabase auth rather than in local storage. When Phase 5 wires that up, the
- * surfaces do not change: only which function the app calls does.
+ * Firebase auth rather than in local storage. `saveStore.ts` is now that
+ * somewhere for a local save; the surfaces do not change either way, because
+ * only which function the app calls does.
  */
 export function demoProfile(): PlayerProfile {
   const roster: RosterEntry[] = DEMO.map((hero, index) => {
@@ -149,3 +155,39 @@ export function demoProfile(): PlayerProfile {
 
 /** Enough spread to show the roster's rarity tones actually differ. */
 const DEMO_RARITY = ['legendary', 'epic', 'rare', 'mythic', 'uncommon', 'common'] as const;
+
+/**
+ * What the demo hands the loop, beyond the heroes.
+ *
+ * `incomingMult` defaults to zero in `Simulation`, which is right for a test
+ * that wants to isolate damage dealt — and wrong for the app, where it made
+ * the team literally invulnerable: they stalled out around wave 59 and sat
+ * there forever, never dying, so the wipe offer could not be reached at all.
+ * A shell demonstrating a game with no failure state is demonstrating the
+ * wrong game.
+ *
+ * The health is a flat number rather than anything derived, because nothing
+ * derives it yet — vitality reaches the simulation when the save does. It is
+ * chosen so the demo climbs into the forties and then starts losing, which is
+ * the sawtooth the whole offline model is built around.
+ */
+export function demoSimulationOptions(): { teamMaxHp: Decimal; incomingMult: number } {
+  return { teamMaxHp: new Decimal(2_000), incomingMult: 1 };
+}
+
+/**
+ * The team a player with no save starts on.
+ *
+ * This file was written as scaffolding — "a team and a player to look at
+ * until there is a save to load them from" — and `saveStore.ts` is now that
+ * somewhere. What is left is not scaffolding but the answer to a real
+ * question the cutover has to answer anyway: what does someone who has never
+ * played see? One of each class and a spare, taken from the catalogue,
+ * derived rather than authored, and identical on every load.
+ *
+ * Bundled into the same shape `rosterFromSave` returns, so the shell asks
+ * one question and does not care which branch answered it.
+ */
+export function startingRoster(): LoadedRoster {
+  return { heroes: demoHeroes(), cast: demoCast(), profile: demoProfile() };
+}
