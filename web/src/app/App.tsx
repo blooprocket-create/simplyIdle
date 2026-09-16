@@ -1,20 +1,38 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Diorama } from '../game/Diorama';
 import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
 import { demoCast, demoHeroes } from './demoRoster';
 import { GameLoop } from './GameLoop';
+import { Rail } from '../ui/nav/Rail';
 import { Shelf } from '../ui/nav/Shelf';
-import { PHASE_0_REGISTRY } from '../ui/nav/registry';
+import { DEFAULT_PINNED, REGISTRY } from '../ui/nav/registry';
+import { SurfaceHost } from '../ui/shell/SurfaceHost';
 import styles from './App.module.css';
 
 /**
- * Phase 0 shell. The diorama fills the screen and the shelf sits over it —
- * the shape the finished game keeps, with three pinned destinations and More,
- * and nothing that navigates away from the fight.
+ * The shell. The diorama fills the screen and everything else sits over it.
+ *
+ * The rule the whole structure exists for: nothing here unmounts the fight.
+ * The shipped game navigated away from the battle to reach any of fifty
+ * places, so the thing the player came for stopped while they were gone. A
+ * destination opens as an overlay and the simulation keeps stepping behind it.
  */
 export function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(() => emptySnapshot());
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [railOpen, setRailOpen] = useState(false);
+
+  const open = useMemo(() => REGISTRY.find(destination => destination.id === openId) ?? null, [openId]);
+
+  const select = (id: string) => {
+    if (id === 'more') {
+      setRailOpen(true);
+      return;
+    }
+    setRailOpen(false);
+    setOpenId(id);
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -46,10 +64,14 @@ export function App() {
       <canvas ref={canvasRef} className={styles.stage} />
       <header className={styles.status}>
         <span className={styles.brand}>SIMPLYIDLE</span>
-        <span className={styles.phase}>Phase 2 diorama</span>
+        <span className={styles.phase}>Phase 3 shell</span>
         <span className={styles.clock}>{(snapshot.elapsedMs / 1000).toFixed(1)}s</span>
       </header>
-      <Shelf registry={PHASE_0_REGISTRY} snapshot={snapshot} />
+      <SurfaceHost destination={open} onDismiss={() => setOpenId(null)} />
+      {railOpen && (
+        <Rail registry={REGISTRY} snapshot={snapshot} onSelect={select} onDismiss={() => setRailOpen(false)} />
+      )}
+      <Shelf registry={REGISTRY} snapshot={snapshot} pinnedIds={DEFAULT_PINNED} onSelect={select} />
     </div>
   );
 }

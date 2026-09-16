@@ -40,4 +40,12 @@
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
+
+  /*
+   * The shelf is three slots and More, forever, so its height is a fixed
+   * fact about the screen. Anything that opens over the fight reserves this
+   * much room rather than guessing, which is what stopped the shelf sitting
+   * on top of a surface and hiding it.
+   */
+  --shelf-height: 62px;
 }

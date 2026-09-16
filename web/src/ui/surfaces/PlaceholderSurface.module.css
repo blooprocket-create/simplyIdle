@@ -1,0 +1,19 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--ink-low);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.note {
+  margin: 0;
+}
+
+.group {
+  color: var(--ink-dim);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
