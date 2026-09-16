@@ -1,29 +1,34 @@
 import { scoreCapabilities } from '../../game/device/DeviceProfile';
 import { REGISTRY } from '../nav/registry';
+import { automationProgress } from '../automation/unlocks';
 import { shelfLayout } from '../nav/destinations';
 import type { SurfaceProps } from './SurfaceProps';
-import { Empty, Row, Rows, Section, Tag } from './parts/parts';
+import styles from './SettingsSurface.module.css';
+import { Empty, Meter, Row, Rows, Section, Tag } from './parts/parts';
 
 /**
  * What the game worked out about this device, and what it did about it.
  *
- * Deliberately not a control panel. There is nothing here to change yet and
- * pretending otherwise would be the lie: quality is chosen from the device
- * and then adapted per-frame by the governor, motion follows the operating
- * system's own setting, and the shelf is pinned from the rail where the
- * destinations are. A screen of switches that did nothing would be worse than
- * a screen that explains itself.
+ * Mostly an explanation rather than a control panel, and deliberately so.
+ * Quality is chosen from the device and then adapted per frame by the
+ * governor, motion follows the operating system, and the shelf is pinned from
+ * the rail where the destinations are — switches for any of those would do
+ * nothing, and a screen of switches that do nothing is worse than a screen
+ * that explains itself. So it answers "why does it look like this on my
+ * phone", which for a renderer that silently drops a tier has no other answer.
  *
- * What it is instead is the answer to "why does it look like this on my
- * phone" — which, for a renderer that silently drops a tier when frames get
- * long, is a question with no other answer.
+ * The exception is automation, which is a real choice and therefore a real
+ * control. Earning one makes it available; switching it on is separate, and
+ * stays the player's. A reward that applies itself the moment it is earned is
+ * a default that took longer to arrive, which is the thing Phase 4 is undoing.
  */
-export function SettingsSurface({ device, snapshot, profile, pinnedIds }: SurfaceProps) {
+export function SettingsSurface({ device, snapshot, profile, pinnedIds, automation }: SurfaceProps) {
   const { profile: quality, capabilities } = device;
   // The player's own pins, not the registry's defaults. Passing an empty
   // preference here made this section report what a new player would see
   // rather than what is on the shelf behind it.
   const pinned = shelfLayout(REGISTRY, snapshot, pinnedIds).pinned;
+  const automations = automationProgress(profile, snapshot);
 
   return (
     <>
@@ -83,6 +88,48 @@ export function SettingsSurface({ device, snapshot, profile, pinnedIds }: Surfac
             ? 'Recoil and rising damage numbers are off. The boss telegraph holds a steady tint instead of pulsing, so a boss still reads as one.'
             : 'Turn on reduced motion in your system settings and the recoil, the rising numbers and the boss pulse all stop.'}
         </Empty>
+      </Section>
+
+      <Section title="Automation">
+        <Empty>
+          Each of these is earned, then switched on. None of them plays better than you do — they buy consistency, not
+          skill.
+        </Empty>
+        <Rows>
+          {automations.map(entry => {
+            const { automation: it } = entry;
+            const earned = entry.unlocked && it.available;
+            const on = automation.active.has(it.id);
+            return (
+              <Row key={it.id} label={it.name} hint={earned ? it.tradeoff : it.effect}>
+                {earned ? (
+                  <button
+                    type="button"
+                    className={styles.toggle}
+                    aria-pressed={on}
+                    onClick={() => automation.toggle(it.id)}
+                  >
+                    {on ? 'On' : 'Off'}
+                  </button>
+                ) : it.available ? (
+                  <span className={styles.locked}>{entry.detail}</span>
+                ) : (
+                  <Tag>Not built</Tag>
+                )}
+              </Row>
+            );
+          })}
+        </Rows>
+        {automations
+          .filter(entry => entry.automation.available && !entry.unlocked)
+          .map(entry => (
+            <Meter
+              key={entry.automation.id}
+              fraction={entry.fraction}
+              tone="gold"
+              label={`Progress towards ${entry.automation.name}`}
+            />
+          ))}
       </Section>
 
       <Section title="Shelf">

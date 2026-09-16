@@ -1,8 +1,8 @@
 import Decimal from 'break_eternity.js';
 import { advanceAttackTimer, swingProgress } from './combat/attackTimer';
 import { isBossWave } from '../content/monsters';
-import { wipeView } from './views';
-import { hasLapsed, openWipe, resolveWipe, type PendingWipe, type WipeChoice } from './combat/wipe';
+
+import { RallyOffers } from './combat/RallyOffers';
 import { BURST_HIT_UID, type BurstQuality } from './combat/burst';
 import { BurstMeter } from './combat/BurstMeter';
 import { applyHit, spawnEnemy, type Enemy } from './combat/encounter';
@@ -59,7 +59,7 @@ export class Simulation {
   private overkill = new Decimal(0);
   private hits: HitEvent[] = [];
   private readonly burst: BurstMeter;
-  private pendingWipe: PendingWipe | null = null;
+  private readonly rally = new RallyOffers();
 
   constructor(options: SimulationOptions = { heroes: [] }) {
     this.burst = new BurstMeter(options.autoBurst ?? false);
@@ -78,9 +78,7 @@ export class Simulation {
     this.ticks += 1;
     this.hits = [];
 
-    // An offer the player did not take. The retreat already happened when
-    // they fell; this only closes the window on rallying back.
-    if (this.pendingWipe !== null && hasLapsed(this.pendingWipe, this.elapsedMs)) this.pendingWipe = null;
+    this.rally.tick(this.elapsedMs);
 
     /*
      * The monster hits back first, then the swings land.
@@ -119,6 +117,11 @@ export class Simulation {
    * Takes no time argument: the simulation owns the clock, and a caller
    * passing its own would be timing the window against a different one.
    */
+  /** Whether a lapsed BURST window fires itself. Earned, and then chosen. */
+  setAutoBurst(on: boolean): void {
+    this.burst.setAutomated(on);
+  }
+
   spendBurst(): { spent: boolean; multiplier: number; quality: BurstQuality } {
     const { payload, quality } = this.burst.spend(this.elapsedMs);
     if (payload) this.detonate(payload.multiplier, payload.seconds);
@@ -135,9 +138,8 @@ export class Simulation {
    * would have put them, rather than to a free climb or to nothing at all.
    */
   creditAway(elapsedMs: number): void {
-    // An offer nobody was present for. The retreat it followed has already
-    // been applied, so this only drops the window.
-    this.pendingWipe = null;
+    // An offer nobody was present for; the retreat it followed already ran.
+    this.rally.clear();
     const credit = creditAwayTime(
       {
         wave: this.enemy.wave,
@@ -234,42 +236,26 @@ export class Simulation {
   }
 
   /**
-   * A wipe. Counted, and then put to the player.
+   * A wipe. Counted, the retreat applied at once, and then put to the player.
    *
-   * The shipped game teleported the team to their chapter start without a
-   * word, so twenty waves of progress could vanish with nothing to see. Now
-   * the fight stops and waits — for eight seconds, after which it does what
-   * the shipped game always did.
+   * Applying it now rather than when the offer closes is what keeps this in
+   * step with the offline estimator: pausing the fight to ask cost an idle
+   * player eight seconds per wipe and made the two models disagree.
    */
   private wipe(): void {
     this.deaths += 1;
-    const pending = openWipe(this.enemy.wave, this.elapsedMs);
-    // The retreat is applied now, not when the offer closes: pausing the
-    // fight to ask cost an idle player eight seconds per wipe and put the
-    // live simulation out of step with the offline estimator.
-    this.enemy = spawnEnemy(pending.retreatTo, this.enemyHpMult);
+    this.enemy = spawnEnemy(this.rally.open(this.enemy.wave, this.elapsedMs), this.enemyHpMult);
     this.vitals = fullHealth(this.vitals.maxHp);
-    this.pendingWipe = pending;
   }
 
-  /**
-   * The player answered, or the clock did.
-   *
-   * `retreatWave` is still what a retreat uses — via `openWipe` — so the
-   * sawtooth the offline estimator models stays the same shape for anyone
-   * who does not answer.
-   */
-  decideWipe(choice: Exclude<WipeChoice, 'lapsed'>): boolean {
-    const pending = this.pendingWipe;
-    if (pending === null) return false;
-    this.pendingWipe = null;
-    // Retreating is what already happened, so answering "retreat" only
-    // dismisses the offer. Rallying is the one that moves anything.
-    if (choice === 'retreat') return true;
-    const outcome = resolveWipe(pending, choice);
-    this.enemy = spawnEnemy(outcome.wave, this.enemyHpMult);
-    this.vitals = { ...fullHealth(this.vitals.maxHp), hp: this.vitals.maxHp.mul(outcome.healthFraction) };
-    return true;
+  /** The player answered a rally offer. */
+  decideWipe(choice: 'retreat' | 'rally'): boolean {
+    const { answered, outcome } = this.rally.take(choice);
+    if (outcome !== null) {
+      this.enemy = spawnEnemy(outcome.wave, this.enemyHpMult);
+      this.vitals = { ...fullHealth(this.vitals.maxHp), hp: this.vitals.maxHp.mul(outcome.healthFraction) };
+    }
+    return answered;
   }
 
   /** The current read model. Callers must treat it as immutable. */
@@ -289,7 +275,7 @@ export class Simulation {
       })),
       hits: this.hits,
       burst: this.burst.view(this.elapsedMs),
-      wipe: wipeView(this.pendingWipe, this.elapsedMs),
+      wipe: this.rally.view(this.elapsedMs),
       totals: { kills: this.kills, deaths: this.deaths, dealt: this.dealt, overkill: this.overkill },
     };
   }

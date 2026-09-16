@@ -45,6 +45,11 @@ export class GameLoop {
    * is the player's own input and the HUD showing it a frame late is the
    * difference between a verb that feels answered and one that feels ignored.
    */
+  /** Whether a lapsed BURST window fires itself. */
+  setAutoBurst(on: boolean): void {
+    this.simulation.setAutoBurst(on);
+  }
+
   /** The player answered a wipe offer. Publishes for the same reason. */
   decideWipe(choice: 'retreat' | 'rally'): boolean {
     const decided = this.simulation.decideWipe(choice);

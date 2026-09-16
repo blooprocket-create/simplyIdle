@@ -24,7 +24,19 @@ export class BurstMeter {
   private state: BurstState = emptyBurst();
 
   /** Whether a lapsed window fires itself at the floor. Earned, not default. */
-  constructor(private readonly automated: boolean) {}
+  constructor(private automated: boolean) {}
+
+  /**
+   * Turned on or off while the game is running.
+   *
+   * Not constructor-only, because the unlock that grants it can be earned
+   * mid-session — the five-hundredth kill can land in the same sitting — and
+   * a reward that waits for a reload is a reward the player does not connect
+   * to the thing they just did.
+   */
+  setAutomated(automated: boolean): void {
+    this.automated = automated;
+  }
 
   charge(boss: boolean, nowMs: number): void {
     this.state = chargeAfterKill(this.state, { boss, nowMs });

@@ -11,6 +11,9 @@ import { BurstControl } from '../ui/burst/BurstControl';
 import { WipeOffer } from '../ui/wipe/WipeOffer';
 import { Ticker } from '../ui/objectives/Ticker';
 import { usePinned } from '../ui/prefs/usePinned';
+import { useAutomation } from '../ui/prefs/useAutomation';
+import { automationProgress } from '../ui/automation/unlocks';
+import type { AutomationId } from '../content/automation';
 import { SurfaceHost } from '../ui/shell/SurfaceHost';
 import styles from './App.module.css';
 
@@ -48,6 +51,31 @@ export function App() {
     return { capabilities, profile: profileFor(capabilities) };
   }, []);
   const { pinnedIds, toggle } = usePinned(knownIds);
+
+  /*
+   * What the player has earned, recomputed as the fight moves — the
+   * five-hundredth kill can land mid-session, and a reward that waited for a
+   * reload is one the player would not connect to what they just did.
+   *
+   * Only automations this build can actually honour are counted, so a bar
+   * that fills for a system nobody has written does not read as a benefit.
+   */
+  const earned = useMemo(() => {
+    const ids = automationProgress(profile, snapshot)
+      .filter(entry => entry.unlocked && entry.automation.available)
+      .map(entry => entry.automation.id);
+    return new Set<AutomationId>(ids);
+  }, [profile, snapshot]);
+  const automation = useAutomation(earned);
+
+  /*
+   * The one place a preference reaches the simulation. Kept in its own effect
+   * rather than folded into the loop's setup: the loop is built once and this
+   * changes whenever the player toggles it or earns the unlock mid-fight.
+   */
+  useEffect(() => {
+    loopRef.current?.setAutoBurst(automation.active.has('burst'));
+  }, [automation.active]);
 
   const select = (id: string) => {
     if (id === 'more') {
@@ -113,6 +141,7 @@ export function App() {
         cast={cast}
         device={device}
         pinnedIds={pinnedIds}
+        automation={automation}
         onDismiss={() => setOpenId(null)}
       />
       {railOpen && (
