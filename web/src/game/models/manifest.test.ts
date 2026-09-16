@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EMPTY_MANIFEST,
+  resolveFirst,
   heroModelKey,
   missingKeys,
   monsterModelKey,
@@ -73,6 +74,33 @@ describe('model manifest', () => {
 
   it('keys heroes and monsters into separate namespaces', () => {
     expect(heroModelKey('h1')).not.toBe(monsterModelKey('h1'));
+  });
+
+  it('keys a monster by who it is, not which wave it turned up on', () => {
+    // `spawnEnemy` ids encounters w1, w2, w3… — fine for the simulation and
+    // wrong for a pack, which would need one Goblin per wave forever.
+    expect(monsterModelKey('Goblin')).toBe('monster/goblin');
+    expect(monsterModelKey('Ancient Dragon')).toBe('monster/ancient-dragon');
+    expect(monsterModelKey('Orc King')).toBe('monster/orc-king');
+    // The same monster on two different waves is the same key.
+    expect(monsterModelKey('Goblin')).toBe(monsterModelKey('Goblin'));
+  });
+
+  it('settles for a less specific key when the pack lacks the exact one', () => {
+    const pack: ModelManifest = { root: '/m', models: { 'monster/orc': { file: 'orc.glb' } } };
+    // A king the pack never authored still draws an Orc, not a placeholder.
+    expect(resolveFirst(pack, ['monster/orc-king', 'monster/orc'])).toMatchObject({
+      kind: 'asset',
+      url: '/m/orc.glb',
+    });
+    // And a pack that did author one gets used in preference.
+    const royal: ModelManifest = {
+      root: '/m',
+      models: { ...pack.models, 'monster/orc-king': { file: 'king.glb' } },
+    };
+    expect(resolveFirst(royal, ['monster/orc-king', 'monster/orc'])).toMatchObject({ url: '/m/king.glb' });
+    expect(resolveFirst(pack, ['monster/grue', 'monster/grue-king']).kind).toBe('placeholder');
+    expect(resolveFirst(pack, []).kind).toBe('placeholder');
   });
 
   it('collects every problem in a manifest rather than stopping at the first', () => {

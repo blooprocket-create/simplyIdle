@@ -46,3 +46,32 @@ export function telegraphPulse(elapsedMs: number): number {
   const phase = (elapsedMs % TELEGRAPH_PERIOD_MS) / TELEGRAPH_PERIOD_MS;
   return (1 - Math.cos(phase * Math.PI * 2)) / 2;
 }
+
+/**
+ * How strongly a boss reads as dangerous, held steady when motion is off.
+ *
+ * Reduced motion silences movement, not meaning. A player who has asked the
+ * system not to animate things still has to be able to tell a boss from a
+ * Goblin, so the telegraph stops breathing and holds at a legible tint rather
+ * than disappearing. Anything that only conveys *when* — the recoil, the rise
+ * on a damage number — stops outright, because its whole content is motion.
+ */
+export const STILL_TELEGRAPH = 0.18;
+
+export function telegraphStrength(elapsedMs: number, reducedMotion: boolean): number {
+  return reducedMotion ? STILL_TELEGRAPH : telegraphPulse(elapsedMs) * TELEGRAPH_DEPTH;
+}
+
+/** How far the tint swings at full motion. */
+export const TELEGRAPH_DEPTH = 0.28;
+
+export function recoilOffset(ageMs: number, reducedMotion: boolean): number {
+  return reducedMotion ? 0 : hitRecoil(ageMs);
+}
+
+/** How far a damage number travels over its life, at full motion. */
+export const RISE_METRES = 1.1;
+
+export function riseOffset(t: number, reducedMotion: boolean): number {
+  return reducedMotion ? 0 : RISE_METRES * clamp01(t);
+}

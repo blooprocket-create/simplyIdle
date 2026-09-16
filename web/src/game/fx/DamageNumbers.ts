@@ -8,6 +8,7 @@ import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import type { Scene } from '@babylonjs/core/scene';
 
 import { formatDamage } from './formatDamage';
+import { riseOffset } from './reactions';
 
 /**
  * Damage as it lands: a number that rises off the target and fades.
@@ -34,7 +35,6 @@ export const DEFAULT_STYLE: DamageNumberStyle = {
 
 /** How long a number stays up, and how far it climbs in that time. */
 export const LIFETIME_MS = 900;
-export const RISE_METRES = 1.1;
 
 /** Babylon's BILLBOARDMODE_ALL. Named so the 7 is not a mystery. */
 const BILLBOARD_ALL = 7;
@@ -59,6 +59,8 @@ export class DamageNumbers {
     private readonly scene: Scene,
     private capacity: number,
     private readonly style: DamageNumberStyle = DEFAULT_STYLE,
+    /** Numbers still appear and still fade; they just do not travel. */
+    private readonly reducedMotion = false,
   ) {}
 
   /**
@@ -115,7 +117,7 @@ export class DamageNumbers {
         slot.mesh.setEnabled(false);
         continue;
       }
-      slot.mesh.position.y = slot.origin.y + RISE_METRES * t;
+      slot.mesh.position.y = slot.origin.y + riseOffset(t, this.reducedMotion);
       // Holds full strength for the first half, then goes. A number that
       // starts fading immediately is unreadable at the moment it matters.
       slot.material.alpha = t < 0.5 ? 1 : 1 - (t - 0.5) * 2;

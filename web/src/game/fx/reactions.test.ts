@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { REACTION_MS, RECOIL_METRES, TELEGRAPH_PERIOD_MS, hitFlash, hitRecoil, telegraphPulse } from './reactions';
+import {
+  REACTION_MS,
+  RECOIL_METRES,
+  RISE_METRES,
+  TELEGRAPH_DEPTH,
+  TELEGRAPH_PERIOD_MS,
+  hitFlash,
+  hitRecoil,
+  recoilOffset,
+  riseOffset,
+  telegraphPulse,
+  telegraphStrength,
+} from './reactions';
 
 describe('reaction curves', () => {
   it('flashes hardest at the moment of impact', () => {
@@ -52,5 +64,46 @@ describe('reaction curves', () => {
       expect(telegraphPulse(at)).toBeGreaterThanOrEqual(0);
       expect(telegraphPulse(at)).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+describe('reduced motion', () => {
+  it('stops the telegraph breathing but keeps the boss legible', () => {
+    // Silencing it entirely would make a boss indistinguishable from a
+    // Goblin for exactly the players least able to tell them apart.
+    const still = [0, 400, 800, 1200, 1599].map(ms => telegraphStrength(ms, true));
+    expect(new Set(still).size).toBe(1);
+    expect(still[0]).toBeGreaterThan(0);
+    // And it sits inside the range the moving version covers, so it never
+    // reads as brighter than a real telegraph at its peak.
+    expect(still[0]).toBeLessThanOrEqual(telegraphStrength(TELEGRAPH_PERIOD_MS / 2, false));
+  });
+
+  it('still breathes when motion is allowed', () => {
+    const moving = [0, 400, 800, 1200].map(ms => telegraphStrength(ms, false));
+    expect(new Set(moving).size).toBeGreaterThan(1);
+    expect(Math.max(...moving)).toBeLessThanOrEqual(TELEGRAPH_DEPTH);
+  });
+
+  it('stops the recoil outright, because a recoil is nothing but movement', () => {
+    for (const ms of [0, 55, 110, 165, 220]) {
+      expect(recoilOffset(ms, true)).toBe(0);
+    }
+    // Unstopped, it still moves.
+    expect(recoilOffset(REACTION_MS / 2, false)).toBeCloseTo(RECOIL_METRES, 5);
+  });
+});
+
+describe('damage number rise', () => {
+  it('climbs over its life and stops dead when motion is off', () => {
+    expect(riseOffset(0, false)).toBe(0);
+    expect(riseOffset(1, false)).toBeCloseTo(RISE_METRES, 5);
+    expect(riseOffset(0.5, false)).toBeLessThan(riseOffset(0.75, false));
+    for (const t of [0, 0.25, 0.5, 1]) expect(riseOffset(t, true)).toBe(0);
+  });
+
+  it('does not keep climbing past the end of its life', () => {
+    // `update` can overshoot t = 1 on a long step before it retires the slot.
+    expect(riseOffset(1.6, false)).toBe(riseOffset(1, false));
   });
 });

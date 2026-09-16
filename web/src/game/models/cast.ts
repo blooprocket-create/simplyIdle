@@ -1,6 +1,6 @@
 import type { FormationRole } from '../../engine/combat/formation';
-import type { ModelKey } from './manifest';
-import type { Silhouette } from './silhouette';
+import { monsterModelKey, type ModelKey } from './manifest';
+import { baseMonsterName, monsterSilhouette, type Silhouette } from './silhouette';
 
 /**
  * Who is on the field, as opposed to what they are doing.
@@ -38,4 +38,28 @@ export function sortedCast(cast: Cast): CastMember[] {
 
 export function castByRole(cast: Cast, role: FormationRole): CastMember[] {
   return sortedCast(cast).filter(member => member.role === role);
+}
+
+/**
+ * What to draw the wave's monster as.
+ *
+ * The enemy is not in the cast — it is replaced a thousand times a session
+ * while the roster sits still — but it is decided the same way, from content,
+ * so it is decided here rather than inside the renderer. `Diorama` needs a
+ * WebGL context to instantiate and so cannot be unit-tested; anything that
+ * picks what to draw therefore has to live somewhere that can be.
+ */
+export interface MonsterAppearance {
+  /** Tried in order; the first the pack can supply wins. */
+  modelKeys: readonly ModelKey[];
+  silhouette: Silhouette;
+}
+
+export function monsterAppearance(name: string): MonsterAppearance {
+  const base = baseMonsterName(name);
+  // A boss asks for its own model and settles for the monster it is a crowned
+  // version of, so a pack that authored a distinct king gets used and one that
+  // did not still draws an Orc rather than a placeholder.
+  const modelKeys = base === name ? [monsterModelKey(name)] : [monsterModelKey(name), monsterModelKey(base)];
+  return { modelKeys, silhouette: monsterSilhouette(name) };
 }
