@@ -47,12 +47,32 @@ describe('measuring an achievement signal', () => {
     expect(measure('vipLevel', emptyProfile(), emptySnapshot())).toBeNull();
   });
 
+  it('adds this run to the saved baseline', () => {
+    /*
+     * The profile is loaded once and never changes while the game runs, so
+     * reading it alone froze every kill achievement at whatever the save
+     * held: the meter moved on screen and the ledger did not. The same for
+     * the record — a player setting a new best could not complete an
+     * achievement about setting one.
+     */
+    const profile = profileWith({ totalKills: 1_000, highestWave: 40 });
+    const live = { ...emptySnapshot(), wave: 55, totals: { ...emptySnapshot().totals, kills: 23 } };
+    expect(measure('totalKills', profile, live)).toBe(1_023);
+    expect(measure('highestWaveReached', profile, live)).toBe(55);
+  });
+
+  it('never lets this run drag a lifetime figure backwards', () => {
+    // A fresh session has a zero snapshot; the record must not fall to it.
+    const profile = profileWith({ totalKills: 1_000, highestWave: 90 });
+    expect(measure('totalKills', profile, emptySnapshot())).toBe(1_000);
+    expect(measure('highestWaveReached', profile, emptySnapshot())).toBe(90);
+  });
+
   it('reads the player figures off the profile', () => {
+    // Level and prestige are not per-run, so they come from the save alone.
     const profile = profileWith({ level: 42, prestigeCount: 3, highestWave: 90, totalKills: 1_000 });
     expect(measure('level', profile, emptySnapshot())).toBe(42);
     expect(measure('prestigeCount', profile, emptySnapshot())).toBe(3);
-    expect(measure('highestWaveReached', profile, emptySnapshot())).toBe(90);
-    expect(measure('totalKills', profile, emptySnapshot())).toBe(1_000);
   });
 
   it('takes the wave from whichever source is further on', () => {

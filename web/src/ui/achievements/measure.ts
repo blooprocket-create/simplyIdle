@@ -33,10 +33,19 @@ export function measure(
       return profile.level;
     case 'prestigeCount':
       return profile.prestigeCount;
+    /*
+     * The saved baseline *plus* this run.
+     *
+     * The profile is loaded once and does not change while the game is
+     * running, so reading it alone froze every kill achievement at whatever
+     * the save held — the meter moved on screen and the ledger never did.
+     * The same for the record: a player setting a new best could not
+     * complete an achievement about setting one.
+     */
     case 'totalKills':
-      return profile.totalKills;
+      return profile.totalKills + snapshot.totals.kills;
     case 'highestWaveReached':
-      return profile.highestWave;
+      return Math.max(profile.highestWave, snapshot.wave);
     // The wave being fought, from whichever read model is further along —
     // the snapshot leads once a run is under way, the save leads before it
     // starts. Deliberately *not* folded in with `highestWave`: the shipped

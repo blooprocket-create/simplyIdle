@@ -28,10 +28,11 @@ interface SurfaceHostProps {
   profile: PlayerProfile;
   cast: Cast;
   device: { profile: DeviceProfile; capabilities: DeviceCapabilities };
+  pinnedIds: readonly string[];
   onDismiss: () => void;
 }
 
-export function SurfaceHost({ destination, snapshot, profile, cast, device, onDismiss }: SurfaceHostProps) {
+export function SurfaceHost({ destination, snapshot, profile, cast, device, pinnedIds, onDismiss }: SurfaceHostProps) {
   if (!destination) return null;
   const layout = ARCHETYPE_LAYOUT[destination.archetype];
   // A destination with no surface yet falls back to the placeholder. Deciding
@@ -67,7 +68,7 @@ export function SurfaceHost({ destination, snapshot, profile, cast, device, onDi
           {surface === undefined ? (
             <PlaceholderSurface destination={destination} />
           ) : (
-            createElement(surface, { destination, snapshot, profile, cast, device })
+            createElement(surface, { destination, snapshot, profile, cast, device, pinnedIds })
           )}
         </div>
       </section>

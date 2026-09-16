@@ -93,6 +93,7 @@ export function App() {
         profile={profile}
         cast={cast}
         device={device}
+        pinnedIds={pinnedIds}
         onDismiss={() => setOpenId(null)}
       />
       {railOpen && (

@@ -1,6 +1,6 @@
 import { ACTS } from '../../content/acts';
 import { HERO_POOL, HERO_TEMPLATE_COUNT, heroClassesInPool } from '../../content/heroes';
-import { MONSTER_POOL, getMonsterForWave, isBossWave } from '../../content/monsters';
+import { MONSTER_POOL, firstWaveFor, isBossWave, poolEntryForWave } from '../../content/monsters';
 import { CLASS_COPY } from '../copy/classes';
 import type { SurfaceProps } from './SurfaceProps';
 import { Card, Cards, Row, Rows, Section, Tag } from './parts/parts';
@@ -14,10 +14,16 @@ import { Card, Cards, Row, Rows, Section, Tag } from './parts/parts';
  */
 export function CodexSurface({ snapshot, profile }: SurfaceProps) {
   const reached = Math.max(profile.highestWave, snapshot.wave);
-  // A monster is "met" once the player has been to a wave that spawns it.
+  /*
+   * Met once the player has been to a wave that draws on that entry — in
+   * either form. Matching on the *shown* name instead left Ancient Dragon
+   * permanently unseen: it is last in the pool, so its ordinary slot is wave
+   * 10, 20, 30, every one of which is a boss wave, and it therefore never
+   * spawns uncrowned for the name to match.
+   */
   const seen = new Set<string>();
   for (let wave = 1; wave <= Math.min(reached, MONSTER_POOL.length * 10); wave += 1) {
-    seen.add(getMonsterForWave(wave).name);
+    seen.add(poolEntryForWave(wave).name);
   }
 
   return (
@@ -25,13 +31,20 @@ export function CodexSurface({ snapshot, profile }: SurfaceProps) {
       <Section title="Bestiary">
         <Cards>
           {MONSTER_POOL.map((monster, index) => {
-            // The pool cycles every wave, so this is the first wave it can be
-            // met on — the useful fact for someone deciding where to push.
-            const firstWave = index + 1;
+            // Scanned rather than taken from the index: the two cycles
+            // interleave, so position in the pool is not the wave it arrives
+            // on. This card used to promise Ancient Dragon at wave 10, which
+            // is a Slime King.
+            const firstWave = firstWaveFor(monster.name);
+            const crownedAt = (index + 1) * 10;
             return (
-              <Card key={monster.name} title={`${monster.emoji} ${monster.name}`} badge={`Wave ${firstWave}`}>
+              <Card
+                key={monster.name}
+                title={`${monster.emoji} ${monster.name}`}
+                badge={firstWave === null ? undefined : `Wave ${firstWave}`}
+              >
                 {seen.has(monster.name) ? <Tag tone="good">Met</Tag> : <Tag>Unseen</Tag>}
-                {isBossWave((index + 1) * 10) && <Tag tone="warn">Crowned at {(index + 1) * 10}</Tag>}
+                {isBossWave(crownedAt) && <Tag tone="warn">Crowned at {crownedAt}</Tag>}
               </Card>
             );
           })}
