@@ -106,8 +106,9 @@ export function demoCast(): Cast {
  * produces — which is the point. `profileFromSave` already builds this from a
  * migrated `SaveV3` and is tested against the shipped fixtures; what is
  * missing is somewhere to get a save from, since the shipped one lives behind
- * Supabase auth rather than in local storage. When Phase 5 wires that up, the
- * surfaces do not change: only which function the app calls does.
+ * Firebase auth rather than in local storage. `saveStore.ts` is now that
+ * somewhere for a local save; the surfaces do not change either way, because
+ * only which function the app calls does.
  */
 export function demoProfile(): PlayerProfile {
   const roster: RosterEntry[] = DEMO.map((hero, index) => {

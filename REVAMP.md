@@ -104,7 +104,9 @@ An earlier version of this plan said Phaser 3, reasoning from `autofighter`. **T
 
 ### On the backend
 
-The earlier plan justified keeping Firebase with *"live player data survives."* There are no *active* players, but there are **inactive accounts holding real saves**, so that reason holds in weaker form — and the scope argument is independent and stronger: a Supabase migration on top of a combat rewrite is two risky projects at once. Firebase stays behind `ports/`, and the swap is a separate pass.
+**Decided: Firebase stays, and the Supabase migration is dropped.** Not deferred — dropped. The earlier plan justified keeping Firebase with *"live player data survives."* There are no *active* players, but there are **inactive accounts holding real saves**, so that reason holds in weaker form. The scope argument was independent and stronger: a Supabase migration on top of a combat rewrite is two risky projects at once. What settles it is that nobody produced a reason to move at all — Firebase already carries the accounts, guilds, chat and leaderboards, and a migration that buys nothing is a migration that can only cost.
+
+Firebase stays behind `ports/` regardless. That seam's remaining justification is the one that never depended on a swap: the engine never learns what a network is, which is what keeps the simulation runnable in a bare Node test, which is what the parity suite depends on.
 
 Note that Evercast is **serverless with no accounts** — three `localStorage` keys, `connect-src 'self'`. SimplyIdle has Firebase, accounts, guilds, chat and leaderboards, so its save and privacy model cannot be copied wholesale. `SaveGuards`' field-bounding is portable; the architecture around it is not.
 
@@ -201,7 +203,7 @@ Port the destination registry, shelf, rail and `SurfaceHost`. File all ~50 surfa
 Bosses hand-played, one mechanic per act. BURST as a timing window. Automation as an earned reward rather than a default — the nine `auto*` flags currently let the game play itself from the start. Wipes become a decision instead of a silent teleport to the chapter start.
 
 ### Phase 5 — Cutover *(~1 week)*
-Retire the Expo app. Vercel points at the Vite build. Supabase migration afterwards, separately, if wanted.
+Retire the Expo app. Vercel points at the Vite build. Firebase stays — see *On the backend*; there is no migration pass.
 
 **Rough total: 10–11 weeks.** Phases 2 and 3 are where it stops being a menu simulator.
 

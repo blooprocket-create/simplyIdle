@@ -9,9 +9,10 @@ import type { PreferenceStore } from '../ui/prefs/store';
  * `demoRoster.ts` has carried a note since Phase 3 saying what was missing:
  * `profileFromSave` already builds the read model from a migrated `SaveV3`
  * and is tested against the shipped fixtures — there was simply nowhere to
- * get a save *from*, because the shipped one lives behind Supabase auth.
- * This is that somewhere, and it is local storage rather than Supabase on
- * purpose: the cutover should not need an account to be a game.
+ * get a save *from*, because the shipped one lives behind Firebase auth.
+ * This is that somewhere, and it is local storage rather than the account on
+ * purpose: the cutover should not need a login to be a game. Reading the
+ * account's save is `ports/SavePort`'s job, and a Firebase adapter's.
  */
 
 export const SAVE_KEY = 'simplyidle.save.v3';

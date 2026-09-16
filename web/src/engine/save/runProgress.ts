@@ -6,7 +6,7 @@ import { boundedInt, isRecord, MAX_SAVE_WAVE } from './guards';
  * A run in progress, small enough to write on a timer.
  *
  * Separate from `SaveV3`, which is the *shipped* save — sixty-odd fields of
- * heroes, gear and currencies that live behind Supabase auth and that this
+ * heroes, gear and currencies that live behind Firebase auth and that this
  * build has no way to fetch. This is the other half of the problem and the
  * one that was missing entirely: the shell ran on a demo roster and kept
  * nothing at all, so a refresh threw away the climb, the meter and every
