@@ -45,9 +45,17 @@ describe('what a pull costs this account', () => {
     expect(priceOfSummon(rich(), 'diamonds')).toBe(DIAMOND_SUMMON_COST);
   });
 
-  it('applies the VIP discount to both', () => {
+  it('applies the VIP discount to the diamond price and not the tear price', () => {
+    /*
+     * This asserted 450 for both, which was wrong twice: a tear pull costs
+     * **one** tear, and takes no discount at all. The shipped tear path is a
+     * guard — `bossTears < 1` — with no cost arithmetic on it to discount,
+     * while the diamond path computes `DIAMOND_SUMMON_COST * (1 - discount)`.
+     * Both measured through the reducer in `summonFixture`.
+     */
     const vip = rich({ vipLevel: VIP_SUMMON_DISCOUNT_LEVEL });
-    expect(priceOfSummon(vip, 'bossTears')).toBe(450);
+    expect(priceOfSummon(vip, 'bossTears')).toBe(GACHA_SUMMON_COST);
+    expect(priceOfSummon(rich({}), 'bossTears')).toBe(GACHA_SUMMON_COST);
     expect(priceOfSummon(vip, 'diamonds')).toBe(450);
     // And a level below it pays full price.
     expect(priceOfSummon(rich({ vipLevel: VIP_SUMMON_DISCOUNT_LEVEL - 1 }), 'diamonds')).toBe(DIAMOND_SUMMON_COST);
@@ -71,19 +79,32 @@ describe('whether a pull would go through', () => {
   it('agrees with what a pull actually does, discount and all', () => {
     /*
      * The one that matters. A button enabled by `canSummon` and refused by
-     * `summonOnce` is a button that does nothing, and the VIP discount is
-     * exactly where the two would drift: 450 held is enough at VIP 3 and not
-     * enough below it.
+     * `summonOnce` is a button that does nothing.
+     *
+     * Measured on the **diamond** price, which is where the VIP discount
+     * lives: 450 held is enough at VIP 3 and not enough below it. It used to
+     * be measured on tears, which took a discount this port invented.
      */
     const base = saveWith();
-    const at450 = { ...base, wallet: { ...base.wallet, bossTears: 450 } };
+    const at450 = { ...base, wallet: { ...base.wallet, diamonds: 450 } };
     const vip = { ...at450, legacy: { ...at450.legacy, vipLevel: VIP_SUMMON_DISCOUNT_LEVEL } };
 
-    expect(canSummon(at450, 'bossTears')).toBe(false);
-    expect(summonOnce({ save: at450, pay: 'bossTears', nowMs: NOW, random: () => 0.5 })).toBeNull();
+    expect(canSummon(at450, 'diamonds')).toBe(false);
+    expect(summonOnce({ save: at450, pay: 'diamonds', nowMs: NOW, random: () => 0.5 })).toBeNull();
 
-    expect(canSummon(vip, 'bossTears')).toBe(true);
-    expect(summonOnce({ save: vip, pay: 'bossTears', nowMs: NOW, random: () => 0.5 })).not.toBeNull();
+    expect(canSummon(vip, 'diamonds')).toBe(true);
+    expect(summonOnce({ save: vip, pay: 'diamonds', nowMs: NOW, random: () => 0.5 })).not.toBeNull();
+  });
+
+  it('lets a single boss tear buy a hero', () => {
+    // The shipped price, and the one this port had five hundred times wrong.
+    const base = saveWith();
+    const one = { ...base, wallet: { ...base.wallet, bossTears: 1 } };
+    expect(canSummon(one, 'bossTears')).toBe(true);
+    expect(summonOnce({ save: one, pay: 'bossTears', nowMs: NOW, random: () => 0.5 })).not.toBeNull();
+
+    const none = { ...base, wallet: { ...base.wallet, bossTears: 0 } };
+    expect(canSummon(none, 'bossTears')).toBe(false);
   });
 });
 

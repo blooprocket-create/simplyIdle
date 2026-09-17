@@ -187,6 +187,8 @@ interface Fixture {
     grantUniqueForge: boolean;
   }[];
   costs: { gacha: number; diamonds: number; vipDiscountLevel: number; vipDiscount: number };
+  /** What a pull charges, measured through the reducer rather than read. */
+  charged: Record<string, { bossTears: number; diamonds: number; summoned: boolean }>;
   bannerRateUpByRarity: Record<string, number>;
   /**
    * Seven banners that nothing in the shipped game ever selects.
@@ -216,6 +218,43 @@ interface Fixture {
 }
 
 const SEED = 20260115;
+
+/**
+ * What one pull takes out of the wallet, for each way of paying.
+ *
+ * Measured rather than read: a summon is driven through the real reducer with
+ * a known balance, and the difference is the price. The VIP rows are there
+ * because the discount applies to one of the two payments and not the other —
+ * the tear path does no cost arithmetic at all, so there is nothing to
+ * discount.
+ */
+function measureCharges() {
+  const held = Math.random;
+  Math.random = () => 0.5;
+  try {
+    const pull = (over: Partial<GameState>, payWithDiamonds: boolean) => {
+      const before = state({ bossTears: 5_000, diamonds: 5_000, ...over });
+      const after = reducer(before, { type: 'SUMMON_HERO', payWithDiamonds } as never);
+      return {
+        bossTears: before.bossTears - after.bossTears,
+        diamonds: before.diamonds - after.diamonds,
+        summoned: after.heroRoster.length > before.heroRoster.length,
+      };
+    };
+
+    return {
+      tears: pull({}, false),
+      tearsAtVip: pull({ vipLevel: VIP_SUMMON_DISCOUNT_LEVEL }, false),
+      diamonds: pull({}, true),
+      diamondsAtVip: pull({ vipLevel: VIP_SUMMON_DISCOUNT_LEVEL }, true),
+      /** One tear is enough, and none is refused. */
+      oneTear: pull({ bossTears: 1 }, false),
+      noTears: pull({ bossTears: 0 }, false),
+    };
+  } finally {
+    Math.random = held;
+  }
+}
 
 function build(): Fixture {
   const source = scriptedRandom(SEED);
@@ -250,6 +289,17 @@ function build(): Fixture {
       vipDiscountLevel: VIP_SUMMON_DISCOUNT_LEVEL,
       vipDiscount: VIP_SUMMON_DISCOUNT,
     },
+    /*
+     * What a pull actually *charges*, driven through the reducer.
+     *
+     * The block above records the constants, and recording a constant is not
+     * measuring a price. `GACHA_SUMMON_COST` is exported by `gameConfig` and
+     * **used by nothing**: both `SUMMON_HERO` implementations guard on
+     * `bossTears < 1` and charge `bossTears - 1`. The rewrite read the
+     * constant and priced a pull at five hundred tears, which is five hundred
+     * times the shipped price on the game's main gacha.
+     */
+    charged: measureCharges(),
     bannerRateUpByRarity: { ...BANNER_RATE_UP_BY_RARITY } as Record<string, number>,
     banners: FEATURED_SUMMON_BANNERS.map(entry => ({ ...entry })),
     // Long enough to cross the soft pity start at 20 and reach the first two
@@ -451,6 +501,41 @@ describe('summon fixture', () => {
     const next = fixture.earlyGame.find(pull => pull.index === setter!.index + 1);
     expect(next).toBeDefined();
     expect(next!.guaranteedMinRarity).toBeNull();
+  });
+
+  it('charges one boss tear a pull, whatever the constant says', () => {
+    /*
+     * `GACHA_SUMMON_COST` is exported by `gameConfig` as 500 and **used by
+     * nothing**. Both `SUMMON_HERO` implementations guard on `bossTears < 1`
+     * and charge `bossTears - 1`, so the price of the game's main gacha is one
+     * tear. The rewrite read the constant and charged five hundred.
+     *
+     * Recording a constant is not measuring a price, and this is the hole that
+     * leaves: the constant was in the fixture from Phase 8 and agreed with
+     * itself perfectly.
+     */
+    expect(fixture.charged.tears.bossTears).toBe(1);
+    expect(fixture.charged.tears.summoned).toBe(true);
+    expect(fixture.costs.gacha).not.toBe(fixture.charged.tears.bossTears);
+
+    // One is enough and none is refused, which is the guard rather than the
+    // arithmetic — there is no arithmetic on this path at all.
+    expect(fixture.charged.oneTear).toEqual({ bossTears: 1, diamonds: 0, summoned: true });
+    expect(fixture.charged.noTears).toEqual({ bossTears: 0, diamonds: 0, summoned: false });
+  });
+
+  it('discounts the diamond pull for VIP and leaves the tear pull alone', () => {
+    /*
+     * The discount is arithmetic on a cost, and the tear path has no cost to
+     * do arithmetic on. So a VIP pays 450 diamonds instead of 500 and still
+     * pays exactly one tear — which a port applying `summonCost` to both gets
+     * wrong on the cheaper of the two.
+     */
+    expect(fixture.charged.diamonds.diamonds).toBe(fixture.costs.diamonds);
+    expect(fixture.charged.diamondsAtVip.diamonds).toBe(
+      Math.floor(fixture.costs.diamonds * (1 - fixture.costs.vipDiscount)),
+    );
+    expect(fixture.charged.tearsAtVip.bossTears).toBe(fixture.charged.tears.bossTears);
   });
 
   it('matches the committed fixture the rewrite is measured against', () => {

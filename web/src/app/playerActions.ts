@@ -59,7 +59,9 @@ export function vipLevel(save: SaveV3): number {
 
 /** What one pull costs this account, in the currency it is paid with. */
 export function priceOfSummon(save: SaveV3, pay: SummonPayment): number {
-  return summonCost(pay === 'diamonds' ? DIAMOND_SUMMON_COST : GACHA_SUMMON_COST, vipLevel(save));
+  // The tear price is a flat one and takes no VIP discount — the shipped tear
+  // path has no cost arithmetic to discount. Only the diamond price does.
+  return pay === 'diamonds' ? summonCost(DIAMOND_SUMMON_COST, vipLevel(save)) : GACHA_SUMMON_COST;
 }
 
 /** Whether a pull would go through, without drawing anything to find out. */

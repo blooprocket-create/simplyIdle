@@ -12,13 +12,35 @@ import type { SparkExchangeOption } from '../engine/roster/team';
  * from the shipped source rather than trusting the transcription.
  */
 
-/** Boss tears for one pull. */
-export const GACHA_SUMMON_COST = 500;
+/**
+ * Boss tears for one pull. **One**, and the constant that says otherwise is
+ * dead.
+ *
+ * `gameConfig.GACHA_SUMMON_COST` is exported as 500 and used by nothing: both
+ * `SUMMON_HERO` implementations guard on `bossTears < 1` and charge
+ * `bossTears - 1`. This port read the constant and charged five hundred — five
+ * hundred times the shipped price on the game's main gacha — because the
+ * Phase 8 fixture *recorded the constant* rather than measuring a pull, and a
+ * recorded constant agrees with itself perfectly.
+ *
+ * `summonFixture` now drives a pull through the reducer and records what it
+ * takes out of the wallet. It takes one.
+ */
+export const GACHA_SUMMON_COST = 1;
 
-/** Diamonds for one pull. The same number, and not the same currency. */
+/** The dead constant, kept because the fixture records it and names it dead. */
+export const SHIPPED_GACHA_COST_CONSTANT = 500;
+
+/** Diamonds for one pull. This one is real, and is charged. */
 export const DIAMOND_SUMMON_COST = 500;
 
-/** VIP 3 and above takes a tenth off both summon costs. */
+/**
+ * VIP 3 and above takes a tenth off the **diamond** price.
+ *
+ * Not off the tear price, which is a guard rather than a cost: the tear path
+ * does no arithmetic at all, so there is nothing there to discount. Measured
+ * both ways — a VIP pays 450 diamonds and still pays exactly one tear.
+ */
 export const VIP_SUMMON_DISCOUNT_LEVEL = 3;
 export const VIP_SUMMON_DISCOUNT = 0.1;
 
