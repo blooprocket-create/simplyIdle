@@ -30,6 +30,7 @@ export class GameLoop {
   private readonly listeners = new Set<SnapshotListener>();
   private frame: number | null = null;
   private lastFrameAt = 0;
+  private autoPotion: ((hpRatio: number) => number) | null = null;
 
   /**
    * The roster comes in from outside. The loop builds no heroes of its own —
@@ -95,6 +96,24 @@ export class GameLoop {
     this.simulation.setAutoCastHeroActives(on);
   }
 
+  /**
+   * Whether a team in trouble drinks for itself.
+   *
+   * Wired here rather than on the `Simulation`, and that is the only
+   * automation of the nine for which that is the right answer. Its *trigger*
+   * is the fight — the team's health is not on the save — but the potion it
+   * spends is, so neither the simulation (which has never seen a save) nor
+   * `automationRunner.ts` (which runs on the save's cadence, not the frame's)
+   * can own it alone. The loop is where the two already meet.
+   *
+   * The handler is given the ratio and answers a heal fraction: nought when
+   * the bag is empty or the team is fine. `choosePotion` decides; nothing
+   * about which potion or when is decided here.
+   */
+  setAutoUsePotion(drink: ((hpRatio: number) => number) | null): void {
+    this.autoPotion = drink;
+  }
+
   /** The player pressed a hero's ability. Publishes for the same reason. */
   castHeroActive(uid: string): boolean {
     const cast = this.simulation.castHeroActive(uid);
@@ -156,11 +175,25 @@ export class GameLoop {
       if (gap >= AWAY_THRESHOLD_MS) this.simulation.creditAway(gap);
       else this.simulation.advance(gap);
       this.lastFrameAt = now;
+      this.maybeDrink();
       const snapshot = this.simulation.read();
       for (const listener of this.listeners) listener(snapshot);
       this.frame = requestAnimationFrame(step);
     };
     this.frame = requestAnimationFrame(step);
+  }
+
+  /**
+   * After the step, not before it. The shipped rule reads the health the
+   * monster's damage has already taken, which is what makes a potion an answer
+   * to the hit rather than a guess about the next one.
+   */
+  private maybeDrink(): void {
+    if (this.autoPotion === null) return;
+    const team = this.simulation.read().team;
+    if (!team.maxHp.gt(0)) return;
+    const fraction = this.autoPotion(team.hp.div(team.maxHp).toNumber());
+    if (fraction > 0) this.simulation.heal(fraction);
   }
 
   stop(): void {

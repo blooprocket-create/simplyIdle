@@ -144,7 +144,11 @@ export const AUTOMATIONS: readonly Automation[] = [
     tradeoff: 'Potions spent on waves you would have survived.',
     signal: 'totalKills',
     goal: 2_500,
-    available: false,
+    // Available as of Phase 10. It is the one automation honoured by the
+    // *loop* rather than by the simulation or the save runner: the trigger is
+    // the team's health, which only the fight knows, and the potion comes out
+    // of the bag, which only the save holds.
+    available: true,
   },
   {
     id: 'useCoolant',

@@ -16,6 +16,8 @@ import { worthBanking } from '../engine/save/bankRun';
 import { bankInto } from './bank';
 import { fightIdentity, fightTuning, fightTuningKey, rosterFromSave } from './roster';
 import { useItem } from './playerActions';
+import { choosePotion } from '../engine/items/autoPotion';
+import { autoPotionThresholdFromLegacy } from '../engine/character/fromSave';
 import { loadSave, writeSave } from './saveStore';
 import type { SaveV3 } from '../engine/save/schema';
 import type { SummonPayment } from '../engine/roster/summonSave';
@@ -151,6 +153,7 @@ export function App() {
   activeRef.current = automation.active;
   const automationStateRef = useRef(EMPTY_AUTOMATION_STATE);
   const autoCastRef = useRef(autoCast);
+  const autoUsePotion = automation.active.has('usePotion');
 
   /*
    * Change the save, and write it down.
@@ -474,6 +477,37 @@ export function App() {
     autoCastRef.current = autoCast;
     loopRef.current?.setAutoCastHeroActives(autoCast);
   }, [autoCast]);
+
+  /*
+   * Auto-potion is the one automation that is neither purely in-fight nor
+   * purely save-side: the loop watches the health and this decides what comes
+   * out of the bag. `choosePotion` owns the rule; nothing about *when* or
+   * *which* is decided here.
+   *
+   * It must not call `loopRef.heal` the way the manual press does — the loop
+   * applies what this returns, and healing twice would make an automatic
+   * potion worth double a hand-pressed one.
+   */
+  const drink = useCallback(
+    (hpRatio: number) => {
+      const current = live();
+      const itemId = choosePotion({
+        hpRatio,
+        held: current.usables,
+        threshold: autoPotionThresholdFromLegacy(current),
+      });
+      if (itemId === null) return 0;
+      const outcome = useItem(current, itemId, 1);
+      if (outcome === null) return 0;
+      applySave(outcome.save);
+      return outcome.healFraction;
+    },
+    [live, applySave],
+  );
+
+  useEffect(() => {
+    loopRef.current?.setAutoUsePotion(autoUsePotion ? drink : null);
+  }, [autoUsePotion, drink]);
 
   /*
    * New numbers for the fight in progress. Below the effect that builds the

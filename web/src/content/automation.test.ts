@@ -66,12 +66,24 @@ describe('the automation catalogue', () => {
      * cadence. Their other blocker was a wallet the simulation could not fill;
      * it earns and banks boss tears now.
      *
-     * The four still listed and unavailable each wait on something real:
-     * `equipBest` on a rule nobody has ported or measured, `tempo` on heat,
-     * and the two usable-item ones on usable items.
+     * `usePotion` arrived last, by a third route again: the loop. Its trigger
+     * is the team's health and its cost is an item in the bag, so neither the
+     * simulation (which has never seen a save) nor the runner (which runs on
+     * the save's cadence rather than the frame's) could own it alone.
+     *
+     * The three still listed and unavailable each wait on something real:
+     * `equipBest` on a rule nobody has ported or measured, and `tempo` and
+     * `useCoolant` on heat.
      */
     const available = availableAutomations();
-    expect(available.map(entry => entry.id)).toEqual(['burst', 'castHeroActives', 'summon', 'recycle', 'dismantle']);
+    expect(available.map(entry => entry.id)).toEqual([
+      'burst',
+      'castHeroActives',
+      'summon',
+      'recycle',
+      'dismantle',
+      'usePotion',
+    ]);
     for (const entry of AUTOMATIONS) {
       expect(entry.available, entry.id).toBe(available.includes(entry));
     }

@@ -1,9 +1,10 @@
 import { isRarity, type Rarity } from '../../content/rarities';
 import type { EconomyState } from '../combat/rewardRates';
 import type { ProgressionState } from '../combat/progressionMultipliers';
-import { MAX_SAVE_COLLECTION, boundedInt, isRecord } from '../save/guards';
+import { MAX_SAVE_COLLECTION, boundedFloat, boundedInt, isRecord } from '../save/guards';
 import type { SaveV3, StatBlock } from '../save/schema';
 import { teamMaxHp, type HealthHero } from './stats';
+import { AUTO_POTION_THRESHOLD } from '../items/autoPotion';
 
 /**
  * Team health for a save.
@@ -135,6 +136,18 @@ export function progressionFromSave(save: SaveV3): ProgressionState {
     classPassiveUnlocked: classPassiveUnlockedFromLegacy(save),
     damageBuffPct: 0,
   };
+}
+
+/**
+ * The health share below which auto-potion drinks, out of the bag.
+ *
+ * A player setting with no screen to change it on yet, which is exactly what
+ * `legacy` is for: an account that set it in the shipped game keeps its
+ * choice, and a new one gets the shipped default. The bounds are the shipped
+ * sanitiser's, so a stored 0 does not turn the automation off by the back door.
+ */
+export function autoPotionThresholdFromLegacy(save: SaveV3): number {
+  return boundedFloat(save.legacy.autoUsePotionThresholdPct, 0.1, 1, AUTO_POTION_THRESHOLD);
 }
 
 /** Which weekly event is running, out of the bag. Its rotation is Phase 11's. */

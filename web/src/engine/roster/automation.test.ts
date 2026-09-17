@@ -42,12 +42,19 @@ describe('what the catalogue still does not claim', () => {
      * cadence — and the wallet blocker is gone too, because the fight earns
      * and banks boss tears now.
      *
-     * `tempo` still waits, and on something else again: this engine has no
-     * heat.
+     * `usePotion` came later in the same phase and by a *third* route, which
+     * is why the gate now counts three: its trigger is the team's health, so
+     * only the fight can see it, and the potion comes out of the bag, so only
+     * the save holds it. `app/GameLoop.ts` is where those already meet.
+     *
+     * `tempo` and `useCoolant` still wait, and on the same thing as each
+     * other: this engine has no heat.
      */
     expect(automationById('summon')?.available).toBe(true);
     expect(automationById('recycle')?.available).toBe(true);
+    expect(automationById('usePotion')?.available).toBe(true);
     expect(automationById('tempo')?.available).toBe(false);
+    expect(automationById('useCoolant')?.available).toBe(false);
 
     expect(availableAutomations().map(entry => entry.id)).toEqual([
       'burst',
@@ -55,6 +62,7 @@ describe('what the catalogue still does not claim', () => {
       'summon',
       'recycle',
       'dismantle',
+      'usePotion',
     ]);
   });
 
@@ -63,7 +71,11 @@ describe('what the catalogue still does not claim', () => {
     // has one. The unavailable ones stay listed for the same reason the
     // untracked achievements do.
     expect(AUTOMATIONS).toHaveLength(9);
-    expect(AUTOMATIONS.filter(entry => !entry.available).length).toBe(4);
+    expect(AUTOMATIONS.filter(entry => !entry.available).map(entry => entry.id)).toEqual([
+      'tempo',
+      'equipBest',
+      'useCoolant',
+    ]);
   });
 });
 
