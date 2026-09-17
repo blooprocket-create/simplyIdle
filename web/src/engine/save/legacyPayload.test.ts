@@ -120,6 +120,53 @@ describe('writing a v3 save back as v2', () => {
   });
 });
 
+describe('the summon counters on the way out', () => {
+  it('writes them back under the names the shipped state uses', () => {
+    const save = fromV2('mid-gacha');
+    const payload = toLegacyPayload(save);
+    expect({
+      gachaPityCounter: payload.gachaPityCounter,
+      totalSummons: payload.totalSummons,
+      freeSummonCharges: payload.freeSummonCharges,
+      claimedSummonMilestones: payload.claimedSummonMilestones,
+      guaranteedMinRarity: payload.guaranteedMinRarity,
+      firstSummonGiven: payload.firstSummonGiven,
+    }).toEqual({
+      gachaPityCounter: 17,
+      totalSummons: 137,
+      freeSummonCharges: 3,
+      claimedSummonMilestones: [10, 50, 100],
+      guaranteedMinRarity: 'epic',
+      firstSummonGiven: true,
+    });
+  });
+
+  it('carries the history it deliberately did not claim, untouched', () => {
+    /*
+     * `summonHistory` stores each pull's hero *name and emoji* rather than a
+     * template id, and rebuilding those to write the key back would need the
+     * catalogue, which the engine may not read. So the typed slice leaves it
+     * alone — and a key the typed slice does not take is a key that cannot be
+     * damaged on the way through. It rides out in the `legacy` spread.
+     */
+    const save = fromV2('mid-gacha');
+    expect(save.legacy.summonHistory).toBeDefined();
+    expect(toLegacyPayload(save).summonHistory).toEqual(save.legacy.summonHistory);
+
+    const names = (toLegacyPayload(save).summonHistory as { heroName: string }[]).map(entry => entry.heroName);
+    expect(names).toEqual(['Ashen Vanguard', 'Tidecaller']);
+  });
+
+  it('does not let the claimed counters leak back into the bag', () => {
+    // The spread puts `legacy` down first and the typed slice over it, so a
+    // claimed key that somehow survived in the bag loses. Worth pinning on a
+    // case where the two would differ.
+    const save = fromV2('mid-gacha');
+    const tampered: SaveV3 = { ...save, legacy: { ...save.legacy, gachaPityCounter: 999 } };
+    expect(toLegacyPayload(tampered).gachaPityCounter).toBe(17);
+  });
+});
+
 describe('relics on the way out', () => {
   it('says unequipped in the spelling the shipped reader understands', () => {
     /*

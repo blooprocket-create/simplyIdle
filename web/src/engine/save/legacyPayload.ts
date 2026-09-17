@@ -123,6 +123,21 @@ export function toLegacyPayload(save: SaveV3): Record<string, unknown> {
     teamSlotsUnlocked: save.roster.slotsUnlocked,
 
     /*
+     * The summon counters, back under the names the shipped state uses.
+     *
+     * `summonHistory` is not among them, and that is the point of it not being
+     * claimed: it is still sitting in `legacy` and comes back out with the
+     * spread above, untouched. A key the typed slice does not take is a key
+     * that cannot be damaged on the way through.
+     */
+    gachaPityCounter: save.summon.pityCounter,
+    totalSummons: save.summon.totalSummons,
+    freeSummonCharges: save.summon.freeCharges,
+    claimedSummonMilestones: [...save.summon.claimedMilestones],
+    guaranteedMinRarity: save.summon.guaranteedMinRarity,
+    firstSummonGiven: save.summon.firstGiven,
+
+    /*
      * The away mark goes back as `lastActiveAt`, which is what the shipped
      * game calls it and reads for offline progress. The two are not the same
      * idea — `awayClock.ts` explains why the rewrite keeps a monotonic

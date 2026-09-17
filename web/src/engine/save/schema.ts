@@ -99,6 +99,31 @@ export interface SaveV3 {
     sparkTokens: number;
   };
 
+  /**
+   * Summoning, claimed out of `legacy` in Phase 8 because a Summon screen has
+   * to show a pity counter and a milestone track, and cannot read either from
+   * an untyped bag.
+   *
+   * `summonHistory` is deliberately **not** claimed. It stores each pull's
+   * hero *name and emoji* rather than a template id, and `toLegacyPayload`
+   * would have to rebuild those to write the key back — which needs the
+   * catalogue, which the engine may not read. It stays in `legacy`, carried
+   * verbatim, until something needs it enough to solve that.
+   */
+  summon: {
+    /** Pulls since the last legendary or better. */
+    pityCounter: number;
+    totalSummons: number;
+    /** Pulls that cost nothing. Spent before any currency. */
+    freeCharges: number;
+    /** Milestone thresholds already collected, in the order they were. */
+    claimedMilestones: number[];
+    /** A floor promised by a milestone, spent on the next pull either way. */
+    guaranteedMinRarity: Rarity | null;
+    /** Whether the account's one-off first summon has been handed out. */
+    firstGiven: boolean;
+  };
+
   roster: {
     heroes: SavedHero[];
     activeUids: string[];

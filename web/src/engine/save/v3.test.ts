@@ -9,6 +9,7 @@ import {
   expForLevel,
   migrateSave,
 } from './migrate';
+import { PITY_THRESHOLD } from '../roster/summon';
 import { SAVE_VERSION, type SaveContent, type SaveV3 } from './schema';
 import { looksLikeV3, readSave, readSaveV3, writeSaveV3 } from './v3';
 import fixture from './__fixtures__/v2-saves.json';
@@ -399,6 +400,60 @@ describe('bounding a stored v3 payload', () => {
     // newer reader no longer takes.
     const save = readSaveV3({ version: SAVE_VERSION, claimedLegacyKeys: ['nonsense'] }, OPTIONS);
     expect(save.claimedLegacyKeys).toEqual([...CLAIMED_V2_KEYS].sort());
+  });
+});
+
+describe('bounding the summon counters', () => {
+  /*
+   * Claimed out of `legacy` in Phase 8, so they get the same treatment every
+   * other typed field does: `version: 3` in local storage is a claim by
+   * whoever last edited that string.
+   */
+  const withSummon = (summon: unknown) => readSaveV3({ version: SAVE_VERSION, summon }, OPTIONS).summon;
+
+  it('reads an absent section as a fresh account rather than as nothing', () => {
+    expect(readSaveV3({ version: SAVE_VERSION }, OPTIONS).summon).toEqual({
+      pityCounter: 0,
+      totalSummons: 0,
+      freeCharges: 0,
+      claimedMilestones: [],
+      guaranteedMinRarity: null,
+      firstGiven: false,
+    });
+  });
+
+  it('caps the pity counter at the threshold rather than at a large number', () => {
+    /*
+     * The counter resets the moment it would reach the threshold, so a stored
+     * value above it is tampering or a bug — and either way the next pull is a
+     * free legendary. Clamping keeps that to one pull instead of standing
+     * forever, which an uncapped counter would.
+     */
+    expect(withSummon({ pityCounter: 1e9 }).pityCounter).toBe(PITY_THRESHOLD);
+    expect(withSummon({ pityCounter: -4 }).pityCounter).toBe(0);
+    expect(withSummon({ pityCounter: 'soon' }).pityCounter).toBe(0);
+  });
+
+  it('refuses a guaranteed rarity that is not one', () => {
+    // The floor is read against `RARITY_IDS` by rank, so a string that is not
+    // a rarity ranks at -1 and would floor every pull to itself.
+    expect(withSummon({ guaranteedMinRarity: 'epic' }).guaranteedMinRarity).toBe('epic');
+    expect(withSummon({ guaranteedMinRarity: 'ultra' }).guaranteedMinRarity).toBeNull();
+    expect(withSummon({ guaranteedMinRarity: 7 }).guaranteedMinRarity).toBeNull();
+  });
+
+  it('keeps claimed milestones in the order they were claimed, without repeats', () => {
+    // `claimMilestones` only tests membership, so sorting would rewrite the
+    // save for no gain — but a repeat would let one threshold be collected
+    // twice by a reader that walked the list instead.
+    expect(withSummon({ claimedMilestones: [100, 10, 100, 50] }).claimedMilestones).toEqual([100, 10, 50]);
+    expect(withSummon({ claimedMilestones: 'all of them' }).claimedMilestones).toEqual([]);
+  });
+
+  it('survives the round trip with the counters intact', () => {
+    const save = fromV2('mid-gacha');
+    expect(save.summon.pityCounter).toBe(17);
+    expect(roundTrip(save).summon).toEqual(save.summon);
   });
 });
 

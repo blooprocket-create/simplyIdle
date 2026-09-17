@@ -15,6 +15,7 @@ import {
   preferredUniqueBearer,
   readHero,
   readStatBlock,
+  readSummonProgress,
   statPointsSpent,
   type MigrateOptions,
 } from './migrate';
@@ -201,6 +202,7 @@ export function readSaveV3(payload: unknown, options: MigrateOptions): SaveV3 {
   const wallet = isRecord(raw.wallet) ? raw.wallet : {};
   const stats = isRecord(raw.stats) ? raw.stats : {};
   const roster = isRecord(raw.roster) ? raw.roster : {};
+  const summon = isRecord(raw.summon) ? raw.summon : {};
 
   const name = boundedString(identity.name, '', MAX_PLAYER_NAME_LENGTH);
   const playerClass = isPlayerClass(identity.playerClass) ? identity.playerClass : null;
@@ -290,6 +292,14 @@ export function readSaveV3(payload: unknown, options: MigrateOptions): SaveV3 {
       equipmentScrap: boundedInt(wallet.equipmentScrap, 0, SAFE_NUMBER_CAP, 0),
       sparkTokens: boundedInt(wallet.sparkTokens, 0, SAFE_NUMBER_CAP, 0),
     },
+    summon: readSummonProgress({
+      pityCounter: summon.pityCounter,
+      totalSummons: summon.totalSummons,
+      freeCharges: summon.freeCharges,
+      claimedMilestones: summon.claimedMilestones,
+      guaranteedMinRarity: summon.guaranteedMinRarity,
+      firstGiven: summon.firstGiven,
+    }),
     roster: {
       heroes,
       activeUids,

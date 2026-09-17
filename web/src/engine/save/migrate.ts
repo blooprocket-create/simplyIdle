@@ -1,6 +1,7 @@
 import type { PlayerClass } from '../../content/classes';
 import { RARITY_BOOST_MULTIPLIER, RARITY_IDS, isRarity, type Rarity } from '../../content/rarities';
 import { VALID_FORMATION_ROLES_FOR_CLASS, type FormationRole } from '../combat/formation';
+import { PITY_THRESHOLD } from '../roster/summon';
 import { roundTo4 } from '../math/safe';
 import {
   MAX_SAVE_COLLECTION,
@@ -10,6 +11,7 @@ import {
   boundedBoolean,
   boundedFloat,
   boundedInt,
+  boundedIntList,
   boundedString,
   boundedStringList,
   isRecord,
@@ -205,6 +207,39 @@ export function normalizeTeamSelection(
   return accepted;
 }
 
+/**
+ * The summon counters, from whichever payload shape carries them.
+ *
+ * Takes the values already picked out rather than a payload, because the two
+ * readers spell them differently — v2 has a flat `gachaPityCounter` and v3 has
+ * `summon.pityCounter` — and the *bounds* are the part worth sharing. A second
+ * copy of them is a second thing to get wrong on one side only.
+ */
+export function readSummonProgress(raw: {
+  pityCounter: unknown;
+  totalSummons: unknown;
+  freeCharges: unknown;
+  claimedMilestones: unknown;
+  guaranteedMinRarity: unknown;
+  firstGiven: unknown;
+}): SaveV3['summon'] {
+  return {
+    // Capped at the hard threshold rather than at a large number: the counter
+    // resets the moment it would reach it, so a stored value above it is
+    // either tampering or a bug, and either way the next pull is free
+    // legendary. Clamping keeps that to one pull instead of standing forever.
+    pityCounter: boundedInt(raw.pityCounter, 0, PITY_THRESHOLD, 0),
+    totalSummons: boundedInt(raw.totalSummons, 0, SAFE_NUMBER_CAP, 0),
+    freeCharges: boundedInt(raw.freeCharges, 0, SAFE_NUMBER_CAP, 0),
+    // Order is preserved rather than sorted. `claimMilestones` only tests
+    // membership, and rewriting the order would make the round trip visible in
+    // a diff for no gain.
+    claimedMilestones: boundedIntList(raw.claimedMilestones, MAX_SAVE_COLLECTION),
+    guaranteedMinRarity: isRarity(raw.guaranteedMinRarity) ? raw.guaranteedMinRarity : null,
+    firstGiven: boundedBoolean(raw.firstGiven, false),
+  };
+}
+
 /** Keys the typed slice of `SaveV3` claims out of a v2 payload. */
 export const CLAIMED_V2_KEYS: readonly string[] = [
   'saveVersion',
@@ -236,6 +271,12 @@ export const CLAIMED_V2_KEYS: readonly string[] = [
   'rebirthCores',
   'equipmentScrap',
   'sparkTokens',
+  'gachaPityCounter',
+  'totalSummons',
+  'freeSummonCharges',
+  'claimedSummonMilestones',
+  'guaranteedMinRarity',
+  'firstSummonGiven',
   'heroRoster',
   'activeTeamHeroIds',
   'heroFormationByUid',
@@ -387,6 +428,14 @@ export function migrateSave(payload: unknown, options: MigrateOptions): SaveV3 {
       equipmentScrap: boundedInt(raw.equipmentScrap, 0, SAFE_NUMBER_CAP, 0),
       sparkTokens: boundedInt(raw.sparkTokens, 0, SAFE_NUMBER_CAP, 0),
     },
+    summon: readSummonProgress({
+      pityCounter: raw.gachaPityCounter,
+      totalSummons: raw.totalSummons,
+      freeCharges: raw.freeSummonCharges,
+      claimedMilestones: raw.claimedSummonMilestones,
+      guaranteedMinRarity: raw.guaranteedMinRarity,
+      firstGiven: raw.firstSummonGiven,
+    }),
     roster: { heroes, activeUids, loadouts, slotsUnlocked, formationByUid, uniqueByHeroId },
     legacy,
     claimedLegacyKeys: [...CLAIMED_V2_KEYS].sort(),
