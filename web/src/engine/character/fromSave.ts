@@ -1,4 +1,5 @@
-import { boundedInt, isRecord } from '../save/guards';
+import type { ProgressionState } from '../combat/progressionMultipliers';
+import { MAX_SAVE_COLLECTION, boundedInt, isRecord } from '../save/guards';
 import type { SaveV3 } from '../save/schema';
 import { teamMaxHp, type HealthHero } from './stats';
 
@@ -33,6 +34,9 @@ const MAX_MASTERY_XP = 100_000_000;
 /** Matches the shipped `FACILITY_MAX_LEVEL`. */
 const MAX_FACILITY_LEVEL = 999;
 
+/** The shipped VIP track tops out at ten. */
+const MAX_VIP_LEVEL = 10;
+
 /**
  * Mastery experience for the class the player is actually playing.
  *
@@ -61,6 +65,58 @@ export function tacticsLevelFromLegacy(save: SaveV3): number {
   const tactics = facilities.tactics;
   if (!isRecord(tactics)) return 0;
   return boundedInt(tactics.level, 0, MAX_FACILITY_LEVEL, 0);
+}
+
+/** VIP level, out of the bag. The whole VIP system is Phase 10's to claim. */
+export function vipLevelFromLegacy(save: SaveV3): number {
+  return boundedInt(save.legacy.vipLevel, 0, MAX_VIP_LEVEL, 0);
+}
+
+/**
+ * How many achievements the account has unlocked.
+ *
+ * The bonus is three percent each with no ceiling, so the *count* is all the
+ * damage stack needs — which is why this reads a length rather than claiming
+ * the list. `achievements.ts` already carries the catalogue for the screen that
+ * shows them.
+ */
+export function achievementCountFromLegacy(save: SaveV3): number {
+  const unlocked = save.legacy.achievements;
+  return Array.isArray(unlocked) ? Math.min(unlocked.length, MAX_SAVE_COLLECTION) : 0;
+}
+
+/** Whether act one's boss has been cleared, which is what turns the class passive on. */
+export function classPassiveUnlockedFromLegacy(save: SaveV3): boolean {
+  const unlocks = save.legacy.permanentUnlocks;
+  return Array.isArray(unlocks) && unlocks.includes('class_passive');
+}
+
+/**
+ * The progression side of the damage stack, read out of a save.
+ *
+ * Five of its ten fields are still in `legacy`, for the reason this file
+ * already gives about mastery and tactics: each belongs to a phase that will
+ * claim it properly, and claiming them here would mean claiming them twice.
+ *
+ * `damageBuffPct` is deliberately **not** read. It is a temporary buff that the
+ * shipped game ticks down through `damageBuffMs`, and nothing in this build
+ * ticks anything down — so honouring a stored one would make it permanent. A
+ * buff that never expires is worse than a buff not shown, and usable items are
+ * Phase 10's.
+ */
+export function progressionFromSave(save: SaveV3): ProgressionState {
+  return {
+    playerClass: save.identity.playerClass,
+    prestigeCount: save.progression.prestigeCount,
+    achievementCount: achievementCountFromLegacy(save),
+    metaDamageLevel: save.progression.metaDamageLevel,
+    rebirthDamagePath: save.progression.rebirthDamagePath,
+    tacticsFacilityLevel: tacticsLevelFromLegacy(save),
+    vipLevel: vipLevelFromLegacy(save),
+    classMasteryXp: masteryXpFromLegacy(save),
+    classPassiveUnlocked: classPassiveUnlockedFromLegacy(save),
+    damageBuffPct: 0,
+  };
 }
 
 export function teamHealthFromSave(save: SaveV3, activeHeroes: readonly HealthHero[]): number {

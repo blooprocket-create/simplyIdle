@@ -32,6 +32,10 @@ function templateFrom(row: (typeof fixture.heroes)[number]): HeroTemplate {
     emoji: '',
     baseTeamBoost: 0,
     tier: row.tier as HeroTemplate['tier'],
+    // Neither reaches the damage formula. They are on the template because the
+    // passive and relic multipliers read them, and those are a different stack.
+    passiveTrait: 'bulwark_instinct',
+    activeSkillArchetype: 'frontline_ward',
   };
 }
 
@@ -132,7 +136,16 @@ describe('hero damage stays inside float range, which is why it is not Decimal',
         for (const rarity of RARITIES) {
           const damage = getHeroContribution({
             uid: 'max',
-            template: { id: 'max', name: 'max', heroClass, emoji: '', baseTeamBoost: 0, tier },
+            template: {
+              id: 'max',
+              name: 'max',
+              heroClass,
+              emoji: '',
+              baseTeamBoost: 0,
+              tier,
+              passiveTrait: 'bulwark_instinct',
+              activeSkillArchetype: 'frontline_ward',
+            },
             level: HERO_LEVEL_CAP,
             rank: HERO_RANK_CAP,
             rarity,

@@ -177,36 +177,26 @@ describe('what the running fight would notice', () => {
     }
   });
 
-  it("changes with a fielded hero's rarity above rank one, and not at rank one", () => {
+  it("changes with a fielded hero's rarity, at any rank", () => {
     /*
-     * Measured rather than assumed, and my first two attempts at this test
-     * were both wrong. Rarity reaches the fight through exactly one channel in
-     * this build: `getRankStatMultiplier(rank, rarity)`, which is **exactly 1
-     * at rank one whatever the rarity**. So a rank-one hero's rarity changes
-     * nothing the fight can see, and the signature holding is correct rather
-     * than lazy.
+     * This used to hold only above rank one, and the note explaining why was
+     * the finding that led to connecting the damage stack: rarity reached the
+     * fight through `getRankStatMultiplier` alone, which is **exactly 1 at rank
+     * one whatever the rarity**, so a rank-one legendary and a rank-one common
+     * fought identically. `teamBoost`, which rarity scales, was in no chain at
+     * all.
      *
-     * The other channel a reader would expect — `teamBoost`, which rarity
-     * scales — is not in the damage chain at all yet. `getHeroContribution`
-     * does not take it, and neither synergy, formation, hero passives, relics
-     * nor the prestige chain is applied to the live fight. All of them are
-     * ported and fixture-tested and none of them is called. REVAMP records it.
+     * It is now, so both ranks move.
      */
-    const withRank = (rarity: string) => ({
-      ...base,
-      heroRoster: [row(FIRST.id, 'a', { rank: 4, rarity }), row(SECOND.id, 'b')],
-    });
-    expect(fightSignature(rosterFromSave(saveWith(withRank('legendary'))))).not.toBe(
-      fightSignature(rosterFromSave(saveWith(withRank('rare')))),
-    );
-
-    const atRankOne = (rarity: string) => ({
-      ...base,
-      heroRoster: [row(FIRST.id, 'a', { rank: 1, rarity }), row(SECOND.id, 'b')],
-    });
-    expect(fightSignature(rosterFromSave(saveWith(atRankOne('legendary'))))).toBe(
-      fightSignature(rosterFromSave(saveWith(atRankOne('rare')))),
-    );
+    for (const rank of [1, 4]) {
+      const withRarity = (rarity: string) => ({
+        ...base,
+        heroRoster: [row(FIRST.id, 'a', { rank, rarity }), row(SECOND.id, 'b')],
+      });
+      expect(fightSignature(rosterFromSave(saveWith(withRarity('legendary')))), `rank ${rank}`).not.toBe(
+        fightSignature(rosterFromSave(saveWith(withRarity('rare')))),
+      );
+    }
   });
 
   it('changes when the player spends a stat point, because team health moves', () => {
@@ -231,21 +221,27 @@ describe('what the running fight would notice', () => {
     expect(backwards).not.toBe(forwards);
   });
 
-  it('has no case yet that isolates damage from team health', () => {
+  it('changes when a damage multiplier moves and team health does not', () => {
     /*
-     * Written down because it is a gap rather than an oversight. Deleting the
-     * damage term from the signature leaves every test above green: damage and
-     * team health are currently functions of the same hero fields, so nothing
-     * in a save moves one without the other.
+     * The tripwire that fired. This was written as `toBe` — an assertion that
+     * the signature's damage term was redundant, left deliberately so that
+     * connecting the damage multiplier chain would break it. It did, on the
+     * commit that connected it.
      *
-     * What would is the damage multiplier chain — `metaDamageLevel` and the
-     * rest — which is ported, fixture-tested and not applied to the live fight.
-     * This assertion is the reminder: when that lands, `metaDamageLevel`
-     * changes the signature and this stops holding.
+     * `metaDamageLevel` and `prestigeCount` reach damage and nothing else, so
+     * this is the case that isolates the term.
      */
     const before = fightSignature(rosterFromSave(saveWith(base)));
     const after = fightSignature(rosterFromSave(saveWith({ ...base, metaDamageLevel: 40, prestigeCount: 6 })));
-    expect(after).toBe(before);
+    expect(after).not.toBe(before);
+  });
+
+  it('changes when the player levels, because the player fights', () => {
+    // They were not a combatant at all for four phases. Their own level and
+    // their spent points now move the damage the team deals.
+    const before = fightSignature(rosterFromSave(saveWith(base)));
+    const after = fightSignature(rosterFromSave(saveWith({ ...base, level: 80 })));
+    expect(after).not.toBe(before);
   });
 
   it('is stable across two reads of the same save', () => {

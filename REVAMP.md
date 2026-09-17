@@ -294,15 +294,21 @@ Two things worth knowing, both ported rather than tidied:
 
 `Simulation.ts` was six lines under its 300-line cap, so `teamDps` moved to `entities/HeroEntity.ts`, beside the `nominalDps` it sums. That is what the cap is for: summing a roster's damage is a rule about heroes, and it was living in the coordinator only because it was two lines long.
 
-#### The damage multiplier chain is built and not connected
+#### The damage multiplier chain was built and not connected
 
-Found while working out what a running fight can observe about a roster. `engine/combat/` carries `synergy.ts`, `formation.ts`, `heroPassives.ts`, `uniqueRelics.ts` and `progressionMultipliers.ts` — every one ported, every one pinned against a fixture generated from the shipped source. **None of them is called by anything the player runs.** `app/roster.ts` builds a hero's damage from `getHeroContribution` alone, and `Simulation` multiplies it by nothing.
+Found while working out what a running fight can observe about a roster. `engine/combat/` carries `synergy.ts`, `formation.ts`, `heroPassives.ts`, `uniqueRelics.ts` and `progressionMultipliers.ts` — every one ported, every one pinned against a fixture generated from the shipped source. **None of them was called by anything the player ran.** `app/roster.ts` built a hero's damage from `getHeroContribution` and stopped.
 
-So the live fight is missing the whole chain the shipped game applies on top of base damage: team synergy, the formation bonus, hero passives, unique relics, the prestige and meta levels, the achievement bonus. The offline estimator is fed a `sustainedDpsMult` of 1 for the same reason.
+So the live fight was missing the whole stack the shipped game applies on top of base damage: team synergy, the formation bonus, hero passives, unique relics, the prestige and meta levels, class mastery, VIP, the achievement bonus and the team boost. It was the same shape as the wallet — rules complete, caller missing — and it was measurable: rarity reached the fight through exactly one channel, `getRankStatMultiplier(rank, rarity)`, which is **1 at rank one whatever the rarity**, so a rank-one legendary and a rank-one common fought identically.
 
-It is the same shape as the wallet — rules complete, caller missing — and it is measurable: rarity currently reaches the fight through exactly one channel, `getRankStatMultiplier(rank, rarity)`, which is **1 at rank one whatever the rarity**. A rank-one legendary and a rank-one common fight identically. `teamBoost`, which rarity scales, is not in the damage chain at all.
+**The player was not fighting either.** `getDpsBreakdown` adds `playerDps` to the hero total before any multiplier, and nothing in the port computed it — a character's class, level and every stat point they had ever spent did nothing. On a fresh account the player is *most* of the damage: 24.6 against about 9 for a level-one common hero.
 
-Connecting it is the next piece of Phase 8, ahead of the remaining roster verbs: levelling a hero that does not change what they hit for is not a verb worth building a screen around.
+Three things closed it. `playerDamage.ts` ports the player's own contribution, with its own constants — the shipped formula is not the hero formula and reads the class weights four times rather than once. `teamPower.ts` composes the fourteen factors in the shipped sequence, written out by hand because float multiplication is not associative and `multiplyProgression` reproduces only the progression subset's order. And `heroes.ts` finally carries `passiveTrait` and `activeSkillArchetype`, which it had left behind for four phases on the grounds that nothing read them — two of the fourteen multipliers did, and were unreachable from a real roster for want of two strings a hero.
+
+The player is now a seventh combatant with their own entity, cast member and swing cadence, not a bonus applied to the team. `PLAYER_ATTACK_INTERVAL_MS` was written for exactly that and had sat unused.
+
+Measured on the starting team: DPS goes from 365 to 1,094, of which the player is 222 — more than any single hero. The demo reaches wave 45 in a minute against wave 36, and still meets its first wall at wave 41.
+
+What is still not connected is the *mitigation* chain. `demoSimulationOptions` hands the loop a flat `incomingMult: 1`, where the shipped game crosses team defence with the formation, synergy, passive and relic incoming multipliers. Team health, by contrast, was already complete: `teamMaxHp` applies formation and synergy itself.
 
 #### The starting team is a save now, and that fixed four disagreements
 

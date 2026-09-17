@@ -167,5 +167,127 @@
       },
       "damage": 414.87907297297295
     }
+  ],
+  "stacks": [
+    {
+      "name": "fresh",
+      "note": "A new account: every factor at its identity, so the product is 1.",
+      "multipliers": {
+        "rebirthLegacy": 1,
+        "achievementLegacy": 1,
+        "metaDamage": 1,
+        "rebirthDamagePath": 1,
+        "tacticsFacility": 1,
+        "classPassive": 1,
+        "heroPassives": 1,
+        "formation": 1,
+        "synergy": 1,
+        "mastery": 1,
+        "vipDamage": 1,
+        "uniqueRelics": 1,
+        "temporaryBuff": 1,
+        "teamBoost": 1
+      },
+      "totalMultiplier": 1,
+      "playerBaseDps": 24.618902702702698,
+      "heroBaseDps": 0,
+      "finalDps": 24.618902702702698
+    },
+    {
+      "name": "one-hero",
+      "note": "A single fielded hero, which is enough to move formation and the team boost.",
+      "multipliers": {
+        "rebirthLegacy": 1,
+        "achievementLegacy": 1,
+        "metaDamage": 1,
+        "rebirthDamagePath": 1,
+        "tacticsFacility": 1,
+        "classPassive": 1,
+        "heroPassives": 1,
+        "formation": 1.092,
+        "synergy": 1,
+        "mastery": 1,
+        "vipDamage": 1,
+        "uniqueRelics": 1,
+        "temporaryBuff": 1,
+        "teamBoost": 1.055
+      },
+      "totalMultiplier": 1.15206,
+      "playerBaseDps": 24.618902702702698,
+      "heroBaseDps": 9.057003372510872,
+      "finalDps": 38.79666435301055
+    },
+    {
+      "name": "full-team",
+      "note": "Six heroes across classes, so synergy and the formation ranks both fire.",
+      "multipliers": {
+        "rebirthLegacy": 1,
+        "achievementLegacy": 1,
+        "metaDamage": 1,
+        "rebirthDamagePath": 1,
+        "tacticsFacility": 1,
+        "classPassive": 1,
+        "heroPassives": 1.0609,
+        "formation": 1.2650850576000003,
+        "synergy": 1.1,
+        "mastery": 1,
+        "vipDamage": 1,
+        "uniqueRelics": 1,
+        "temporaryBuff": 1,
+        "teamBoost": 1.9992
+      },
+      "totalMultiplier": 2.9515021494481544,
+      "playerBaseDps": 24.618902702702698,
+      "heroBaseDps": 3769.2522049571953,
+      "finalDps": 11197.61872898744
+    },
+    {
+      "name": "deep-progression",
+      "note": "Rebirths, meta levels, achievements, mastery, VIP, the tactics facility and a buff.",
+      "multipliers": {
+        "rebirthLegacy": 17.0859375,
+        "achievementLegacy": 1.15,
+        "metaDamage": 2.2,
+        "rebirthDamagePath": 1.35,
+        "tacticsFacility": 1.3,
+        "classPassive": 1.02,
+        "heroPassives": 1.0609,
+        "formation": 1.2650850576000003,
+        "synergy": 1.1,
+        "mastery": 1.4,
+        "vipDamage": 1.18,
+        "uniqueRelics": 1,
+        "temporaryBuff": 1.35,
+        "teamBoost": 1.9992
+      },
+      "totalMultiplier": 509.35848185757254,
+      "playerBaseDps": 24.618902702702698,
+      "heroBaseDps": 3769.2522049571953,
+      "finalDps": 1932440.4277609529
+    },
+    {
+      "name": "relics-equipped",
+      "note": "Unique relics on fielded heroes, the loosest cap in the game at 40x.",
+      "multipliers": {
+        "rebirthLegacy": 1,
+        "achievementLegacy": 1,
+        "metaDamage": 1,
+        "rebirthDamagePath": 1,
+        "tacticsFacility": 1,
+        "classPassive": 1,
+        "heroPassives": 1.03,
+        "formation": 1.1924640000000002,
+        "synergy": 1,
+        "mastery": 1,
+        "vipDamage": 1,
+        "uniqueRelics": 2.7710701199999996,
+        "temporaryBuff": 1,
+        "teamBoost": 1.2886
+      },
+      "totalMultiplier": 4.385793139707698,
+      "playerBaseDps": 24.618902702702698,
+      "heroBaseDps": 150.18662387639478,
+      "finalDps": 766.6608792535975
+    }
   ]
 }

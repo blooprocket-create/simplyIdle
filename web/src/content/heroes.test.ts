@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CLASS_PROFILES, type PlayerClass } from './classes';
+import relics from '../engine/combat/__fixtures__/unique-relics.json';
 import { HERO_POOL, HERO_TEMPLATE_COUNT, getHeroTemplate, heroTemplatesById } from './heroes';
 
 const CLASSES = new Set(Object.keys(CLASS_PROFILES) as PlayerClass[]);
@@ -18,6 +19,38 @@ describe('hero catalogue', () => {
     // loudly; it silently deletes that hero from every save that had one.
     const ids = HERO_POOL.map(hero => hero.id);
     expect(ids).toEqual(Array.from({ length: HERO_TEMPLATE_COUNT }, (_, index) => `h${index + 1}`));
+  });
+
+  it("carries every hero's passive trait and skill archetype, as recorded", () => {
+    /*
+     * Generated from the relic fixture rather than typed, and checked back
+     * against it: sixty-five rows of two strings each is exactly the shape a
+     * transcription gets wrong quietly, and the symptom would be a hero whose
+     * passive multiplier is somebody else's.
+     *
+     * The fields sat out of this file for four phases on the grounds that no
+     * phase read them. Two of the fourteen damage multipliers did, and were
+     * unreachable from a real roster for want of them.
+     */
+    const recorded = new Map(relics.heroes.map(entry => [entry.heroId, entry]));
+    expect(recorded.size).toBe(HERO_POOL.length);
+    for (const hero of HERO_POOL) {
+      const row = recorded.get(hero.id);
+      expect({ id: hero.id, trait: hero.passiveTrait, archetype: hero.activeSkillArchetype }).toEqual({
+        id: hero.id,
+        trait: row?.trait,
+        archetype: row?.archetype,
+      });
+    }
+  });
+
+  it('spreads both fields rather than giving everyone the same one', () => {
+    // A generator that wrote the first row sixty-five times would pass the
+    // check above only if the fixture agreed — but a hand-edit later would
+    // not, and a catalogue where every hero shares a trait is a catalogue
+    // where the passive multiplier has one value.
+    expect(new Set(HERO_POOL.map(hero => hero.passiveTrait)).size).toBeGreaterThan(1);
+    expect(new Set(HERO_POOL.map(hero => hero.activeSkillArchetype)).size).toBeGreaterThan(1);
   });
 
   it('never repeats an id or a name', () => {

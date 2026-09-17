@@ -4,7 +4,7 @@ import { VALID_FORMATION_ROLES_FOR_CLASS, type FormationRole } from '../engine/c
 import { ACTIVE_TEAM_SIZE } from '../engine/save/migrate';
 import { readSave, writeSaveV3 } from '../engine/save/v3';
 import { demoSimulationOptions, startingSave } from './demoRoster';
-import { rosterFromSave } from './roster';
+import { PLAYER_UID, rosterFromSave } from './roster';
 
 /**
  * The three shapes, from the one save. `App` composes these itself — there is
@@ -38,8 +38,15 @@ describe('the team a new player starts on', () => {
 
     const roster = startingRoster(NOW);
     expect(roster.profile.roster.filter(hero => hero.active)).toHaveLength(ACTIVE_TEAM_SIZE);
-    expect(roster.cast).toHaveLength(ACTIVE_TEAM_SIZE);
-    expect(roster.heroes).toHaveLength(ACTIVE_TEAM_SIZE);
+    /*
+     * Seven, not six. `ACTIVE_TEAM_SIZE` is six heroes "(+ player)" in the
+     * shipped comment, and the player is now a combatant in their own right
+     * rather than a multiplier — so they get an entity and a figure like
+     * anyone else fighting.
+     */
+    expect(roster.cast).toHaveLength(ACTIVE_TEAM_SIZE + 1);
+    expect(roster.heroes).toHaveLength(ACTIVE_TEAM_SIZE + 1);
+    expect(roster.cast.map(member => member.uid)).toContain(PLAYER_UID);
   });
 
   it('stands two in each rank, and never asks a class to stand where it cannot', () => {
@@ -54,10 +61,22 @@ describe('the team a new player starts on', () => {
 
   it('draws them where the rules put them', () => {
     // The cast is the diorama's view and the profile is the surfaces'. They
-    // are built from the same rows precisely so this holds.
+    // are built from the same rows precisely so this holds — for the heroes.
+    // The player is not a roster row, so they are checked separately below.
     const roster = startingRoster(NOW);
     const roleByUid = new Map(roster.profile.roster.map(hero => [hero.uid, hero.role]));
-    for (const member of roster.cast) expect(roleByUid.get(member.uid), member.uid).toBe(member.role);
+    for (const member of roster.cast) {
+      if (member.uid === PLAYER_UID) continue;
+      expect(roleByUid.get(member.uid), member.uid).toBe(member.role);
+    }
+  });
+
+  it('puts the player where their class may stand', () => {
+    // A warrior at the front. They are not a roster row and have no stored
+    // formation, so the class's own rule is the only answer.
+    const player = startingRoster(NOW).cast.find(member => member.uid === PLAYER_UID)!;
+    expect(player.role).toBe('front');
+    expect(player.name).toBe('Wanderer');
   });
 
   it('stores the ranks it states, rather than ranks the reader corrected', () => {

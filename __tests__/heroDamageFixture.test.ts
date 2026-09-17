@@ -131,6 +131,26 @@ interface Fixture {
    * for a warrior.
    */
   players: PlayerRow[];
+  /**
+   * The whole fourteen-factor damage stack, from complete states.
+   *
+   * The individual multipliers each have their own fixture already. What none
+   * of them records is the **product**, and the product is where a port goes
+   * wrong in ways the parts cannot show: a factor left out, a factor applied
+   * twice, or — because float multiplication is not associative — the shipped
+   * sequence reproduced in a different order.
+   */
+  stacks: StackRow[];
+}
+
+interface StackRow {
+  name: string;
+  note: string;
+  multipliers: Record<string, number>;
+  totalMultiplier: number;
+  playerBaseDps: number;
+  heroBaseDps: number;
+  finalDps: number;
 }
 
 const NOTHING = { strength: 0, vitality: 0, agility: 0, intelligence: 0, spirit: 0 };
@@ -143,6 +163,62 @@ const PLAYER_SAMPLES: { playerClass: PlayerClass; level: number; alloc: typeof N
   { playerClass: 'mage', level: 45, alloc: { ...NOTHING, intelligence: 80, spirit: 25 } },
   { playerClass: 'archer', level: 12, alloc: { ...NOTHING, agility: 30 } },
   { playerClass: 'monk', level: 250, alloc: { strength: 50, vitality: 50, agility: 50, intelligence: 50, spirit: 50 } },
+];
+
+/**
+ * Complete states whose damage stack is worth recording.
+ *
+ * Each one turns on a different part: the ones a fresh account never sees are
+ * exactly the ones a port can drop without any early test noticing.
+ */
+const STACK_SAMPLES: { name: string; note: string; state: () => GameState }[] = [
+  {
+    name: 'fresh',
+    note: 'A new account: every factor at its identity, so the product is 1.',
+    state: () => stateWith([]),
+  },
+  {
+    name: 'one-hero',
+    note: 'A single fielded hero, which is enough to move formation and the team boost.',
+    state: () => stateWith([buildUnit(SAMPLES[0])]),
+  },
+  {
+    name: 'full-team',
+    note: 'Six heroes across classes, so synergy and the formation ranks both fire.',
+    state: () => stateWith(SAMPLES.slice(0, 6).map(buildUnit)),
+  },
+  {
+    name: 'deep-progression',
+    note: 'Rebirths, meta levels, achievements, mastery, VIP, the tactics facility and a buff.',
+    state: () => ({
+      ...stateWith(SAMPLES.slice(0, 6).map(buildUnit)),
+      prestigeCount: 7,
+      metaDamageLevel: 24,
+      rebirthDamagePath: 5,
+      achievements: new Set(['a', 'b', 'c', 'd', 'e']) as unknown as GameState['achievements'],
+      permanentUnlocks: ['class_passive'] as GameState['permanentUnlocks'],
+      classMasteryXp: { warrior: 5_200 } as GameState['classMasteryXp'],
+      vipLevel: 6,
+      damageBuffPct: 0.35,
+      guildhallFacilities: {
+        ...DEFAULT_STATE.guildhallFacilities,
+        tactics: { ...DEFAULT_STATE.guildhallFacilities.tactics, level: 12 },
+      },
+    }),
+  },
+  {
+    name: 'relics-equipped',
+    note: 'Unique relics on fielded heroes, the loosest cap in the game at 40x.',
+    state: () => {
+      const team = SAMPLES.slice(0, 3).map(buildUnit);
+      return {
+        ...stateWith(team),
+        heroUniqueGearByHeroId: Object.fromEntries(
+          team.map(hero => [hero.id, { rank: 7, equippedByUid: hero.uid }]),
+        ) as GameState['heroUniqueGearByHeroId'],
+      };
+    },
+  },
 ];
 
 function build(): Fixture {
@@ -172,12 +248,26 @@ function build(): Fixture {
     }).playerBaseDps,
   }));
 
+  const stacks: StackRow[] = STACK_SAMPLES.map(sample => {
+    const breakdown = getDpsBreakdown(sample.state());
+    return {
+      name: sample.name,
+      note: sample.note,
+      multipliers: { ...breakdown.multipliers },
+      totalMultiplier: breakdown.totalMultiplier,
+      playerBaseDps: breakdown.playerBaseDps,
+      heroBaseDps: breakdown.heroBaseDps,
+      finalDps: breakdown.finalDps,
+    };
+  });
+
   return {
     note: 'Per-hero damage from the shipped implementation, read out one hero at a time. Owned by __tests__/heroDamageFixture.test.ts.',
     generatedFrom: 'src/useGameState.ts getDpsBreakdown',
     heroes,
     teamTotal: getDpsBreakdown(stateWith(SAMPLES.map(buildUnit))).heroBaseDps,
     players,
+    stacks,
   };
 }
 
@@ -209,6 +299,22 @@ describe('hero damage fixture', () => {
     const solo = getDpsBreakdown(stateWith([])).playerBaseDps;
     const withTeam = getDpsBreakdown(stateWith(SAMPLES.map(buildUnit))).playerBaseDps;
     expect(withTeam).toBe(solo);
+  });
+
+  it('records a stack where every factor is doing something', () => {
+    /*
+     * The guard on the stacks below. A sample set where the interesting
+     * multipliers all sat at 1 would let a port that dropped them pass, which
+     * is the exact failure the whole section exists to catch.
+     */
+    const deep = fixture.stacks.find(entry => entry.name === 'deep-progression')!;
+    const idle = Object.entries(deep.multipliers).filter(([, value]) => value === 1);
+    expect(idle.map(([name]) => name).sort()).toEqual(['uniqueRelics']);
+    expect(deep.totalMultiplier).toBeGreaterThan(10);
+
+    // And the relics have their own sample, because the deep one has none.
+    const relics = fixture.stacks.find(entry => entry.name === 'relics-equipped')!;
+    expect(relics.multipliers.uniqueRelics).toBeGreaterThan(1);
   });
 
   it('the shipped total is the sum of its shipped parts', () => {
