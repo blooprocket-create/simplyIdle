@@ -32,6 +32,23 @@ export const REGISTRY: readonly Destination[] = [
   // Power — what the player is made of.
   { id: 'character', group: 'power', label: 'Character', archetype: 'detail' },
   { id: 'equipment', group: 'power', label: 'Equipment', archetype: 'ledger' },
+  /*
+   * Listed, and deliberately left on the placeholder.
+   *
+   * The shipped game's skills tree is **inert**. `SKILLS` lists three upgrades
+   * with a `multiplier` and a `targetId: 'click'`, `BUY_SKILL` charges for
+   * them and records them, and nothing reads them: no damage path consumes the
+   * multiplier, no screen dispatches the action, and there is no click or tap
+   * attack for `'click'` to refer to. Measured rather than grepped — buying
+   * every skill costs 262,300 gold and moves no number anywhere. See
+   * `__tests__/skillsFixture.test.ts`.
+   *
+   * So there is no capability here to port. Building a screen for it would
+   * create a gold sink that charges a quarter of a million and hands back
+   * nothing, which is shipping the defect rather than reproducing it. The
+   * destination stays listed because the shipped game lists it, and the
+   * placeholder is the honest thing to draw.
+   */
   { id: 'skills', group: 'power', label: 'Skills', archetype: 'ledger' },
   // Consumables a run finds. A ledger: a list to spend down.
   { id: 'items', group: 'power', label: 'Items', archetype: 'ledger' },

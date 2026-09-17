@@ -1,0 +1,55 @@
+{
+  "note": "The skills tree, and the measurement showing it does nothing.",
+  "generatedFrom": "src/gameConfig.ts SKILLS, src/reducers/economyReducer.ts BUY_SKILL",
+  "skills": [
+    {
+      "id": "click_1",
+      "name": "Combat Drill",
+      "description": "Commander strike ×2",
+      "cost": 300,
+      "targetId": "click",
+      "multiplier": 2
+    },
+    {
+      "id": "click_2",
+      "name": "Execution Stance",
+      "description": "Commander strike ×2",
+      "cost": 12000,
+      "targetId": "click",
+      "multiplier": 2
+    },
+    {
+      "id": "click_3",
+      "name": "Heroic Burst",
+      "description": "Commander strike ×5",
+      "cost": 250000,
+      "targetId": "click",
+      "multiplier": 5
+    }
+  ],
+  "buyingEverything": {
+    "owned": 3,
+    "goldSpent": 262300,
+    "finalDpsMoved": false,
+    "totalMultiplierMoved": false,
+    "playerBaseDpsMoved": false,
+    "computedStatsMoved": false
+  },
+  "refusals": [
+    {
+      "name": "already owned",
+      "owned": 3,
+      "goldSpent": 0
+    },
+    {
+      "name": "cannot afford",
+      "owned": 0,
+      "goldSpent": 0
+    },
+    {
+      "name": "no such skill",
+      "owned": 0,
+      "goldSpent": 0
+    }
+  ]
+}
