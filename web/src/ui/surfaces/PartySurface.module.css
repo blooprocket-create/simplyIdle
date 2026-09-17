@@ -1,0 +1,42 @@
+/*
+ * The placement verbs, and the lines that explain a rank.
+ *
+ * Same shape as the Roster surface's buttons on purpose: a press that changes
+ * the save should look the same wherever the player meets it, and two screens
+ * with two button styles is how a build starts feeling like two builds.
+ */
+.verbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.verb {
+  padding: 2px var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.verb:disabled {
+  color: var(--ink-dim);
+  cursor: not-allowed;
+}
+
+.verb:focus-visible {
+  outline: 2px solid var(--ready);
+  outline-offset: 2px;
+}
+
+/* What a rank is for, and the one place the control does not do what it says. */
+.note {
+  margin: 0 0 var(--space-2);
+  color: var(--ink-dim);
+  font-size: 12px;
+  line-height: 1.4;
+}
