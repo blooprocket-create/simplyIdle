@@ -1,3 +1,4 @@
+import { isRarity, type Rarity } from '../../content/rarities';
 import type { EconomyState } from '../combat/rewardRates';
 import type { ProgressionState } from '../combat/progressionMultipliers';
 import { MAX_SAVE_COLLECTION, boundedInt, isRecord } from '../save/guards';
@@ -130,6 +131,19 @@ export function progressionFromSave(save: SaveV3): ProgressionState {
 /** Which weekly event is running, out of the bag. Its rotation is Phase 11's. */
 export function weeklyEventWeekFromLegacy(save: SaveV3): number {
   return boundedInt(save.legacy.weeklyEventWeek, 0, MAX_WEEKLY_EVENT_WEEK, 0);
+}
+
+/**
+ * The rarity floor an automatic recycle sweeps up to, out of the bag.
+ *
+ * `autoRecycleMaxRarity` on the shipped state, defaulting to `uncommon` as it
+ * does there — which is not the safest possible default and is the shipped
+ * one, and a port that chose `common` would quietly stop recycling the rarity
+ * the player's old account had been feeding on.
+ */
+export function autoRecycleFloorFromLegacy(save: SaveV3): Rarity {
+  const stored = save.legacy.autoRecycleMaxRarity;
+  return isRarity(stored) ? stored : 'uncommon';
 }
 
 /**

@@ -96,7 +96,10 @@ export const AUTOMATIONS: readonly Automation[] = [
     tradeoff: 'Gold you were saving for something else.',
     signal: 'totalGold',
     goal: 1_000_000,
-    available: false,
+    // Available as of Phase 10. The blocker was a wallet — an automatic
+    // summon spends boss tears and nothing earned them — and the fight earns
+    // and banks them now.
+    available: true,
   },
   {
     id: 'recycle',
@@ -106,7 +109,9 @@ export const AUTOMATIONS: readonly Automation[] = [
     tradeoff: 'Nothing asks before a hero goes.',
     signal: 'heroRosterCount',
     goal: 20,
-    available: false,
+    // Available as of Phase 10, for the same reason `summon` is: it pays into
+    // hero shards, which a banked run now holds.
+    available: true,
   },
   {
     id: 'dismantle',
@@ -116,7 +121,10 @@ export const AUTOMATIONS: readonly Automation[] = [
     tradeoff: 'Nothing asks before an item goes.',
     signal: 'equipmentScrap',
     goal: 500,
-    available: false,
+    // Available as of Phase 10. It runs off the shell's save cadence rather
+    // than the shipped combat tick, which is where every save-side automation
+    // runs here.
+    available: true,
   },
   {
     id: 'equipBest',

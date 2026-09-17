@@ -10,6 +10,7 @@ import type { PrestigePath } from '../engine/prestige/rebirth';
 import { canAffordSpark, canSummon, priceOfSummon, rosterActions, sparkExchange, summonOnce } from './playerActions';
 import { equipmentActions, migrateLegacyEquipment } from './equipmentActions';
 import { prestigeActions } from './prestigeActions';
+import { EMPTY_AUTOMATION_STATE, runAutomations } from './automationRunner';
 import { bankRun, worthBanking } from '../engine/save/bankRun';
 import { fightIdentity, fightTuning, fightTuningKey, rosterFromSave } from './roster';
 import { loadSave, writeSave } from './saveStore';
@@ -19,7 +20,7 @@ import type { HeroSpend } from '../engine/roster/rosterSave';
 import type { FormationRole } from '../engine/combat/formation';
 import { profileFromSave } from '../ui/profile/playerProfile';
 import { GameLoop } from './GameLoop';
-import { loadRun, RunSaver } from './runStore';
+import { loadRun, RunSaver, SAVE_INTERVAL_MS } from './runStore';
 import { browserStore } from '../ui/prefs/store';
 import { Rail } from '../ui/nav/Rail';
 import { Shelf } from '../ui/nav/Shelf';
@@ -139,6 +140,13 @@ export function App() {
   const autoBurst = automation.active.has('burst');
   const autoBurstRef = useRef(autoBurst);
   const autoCast = automation.active.has('castHeroActives');
+  /*
+   * Read through a ref by the subscription, which is built once per fight and
+   * would otherwise close over the set as it was when the loop was made.
+   */
+  const activeRef = useRef(automation.active);
+  activeRef.current = automation.active;
+  const automationStateRef = useRef(EMPTY_AUTOMATION_STATE);
   const autoCastRef = useRef(autoCast);
 
   /*
@@ -364,7 +372,27 @@ export function App() {
        * earn gold that stayed in the run forever and heroes who never
        * levelled — every verb banks, and a player at rest presses no verbs.
        */
-      if (saver.tick(next, Date.now())) live();
+      if (saver.tick(next, Date.now())) {
+        const banked = live();
+        /*
+         * And the save-side automations, on the same cadence and after the
+         * bank — an automatic summon spends the boss tears the run just
+         * earned, so running it against an unbanked wallet would refuse a
+         * purchase the player can afford.
+         */
+        const ran = runAutomations(
+          activeRef.current,
+          {
+            save: banked,
+            elapsedMs: SAVE_INTERVAL_MS,
+            nowMs: Date.now(),
+            random: Math.random,
+          },
+          automationStateRef.current,
+        );
+        automationStateRef.current = ran.state;
+        if (ran.save !== null) applySave(ran.save);
+      }
     });
     loop.start();
 

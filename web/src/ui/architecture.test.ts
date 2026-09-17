@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { SAVE_SIDE_AUTOMATIONS } from '../app/automationRunner';
 import { AUTOMATIONS } from '../content/automation';
 import { ARCHETYPES, GROUP_ORDER, SHELF_SLOTS } from './nav/destinations';
 import { REGISTRY } from './nav/registry';
@@ -229,7 +230,7 @@ describe('ui architecture', () => {
     expect(gatesAbove).toEqual([]);
   });
 
-  it('lets no automation reach the simulation except through the gate that earns it', () => {
+  it('lets no automation reach the player except through the gate that earns it', () => {
     /*
      * Phase 4's thesis, made structural rather than merely true today.
      *
@@ -237,29 +238,45 @@ describe('ui architecture', () => {
      * no gate on any of them, and the fault was the *absent* gate rather than
      * the default any of them shipped with. An absence that is only an
      * absence comes back the first time someone wires the next automation
-     * straight from a switch, and the policy this phase built would still be
-     * sitting there, correct and bypassed.
+     * straight from a switch.
      *
-     * `loopRef` is declared and used only in `App.tsx` — nothing else in the
-     * tree holds the loop — so reading that one file covers every path by
-     * which anything at all reaches the running simulation.
+     * **There are two ways to honour one, and this counts both.** The rule
+     * used to require `loopRef.setAuto…` in the shell, which is exactly right
+     * for `burst` — an in-fight behaviour — and has no shape at all for one
+     * that spends currency or rearranges a roster. That is why four
+     * automations sat `available: false` across three phases with a note
+     * saying the widening belonged to Phase 10. So an automation is honoured
+     * either by the loop, through `setAuto…`, or by `automationRunner.ts`.
+     *
+     * The two halves are gated differently, and deliberately. The loop's are
+     * gated here, by `automation.active.has`, because the shell is what calls
+     * them. The runner's are gated *by construction* — `runAutomations` skips
+     * anything not in the set it is handed — which is a stronger rule than a
+     * regex and has its own test.
      */
     const shell = codeOnly(readFileSync(join(process.cwd(), 'src', 'app', 'App.tsx'), 'utf8'));
     const lower = (name: string) => name.charAt(0).toLowerCase() + name.slice(1);
 
-    const wired = [...shell.matchAll(/\.setAuto([A-Z]\w*)\(/g)].map(match => lower(match[1])).sort();
+    const inFight = [...shell.matchAll(/\.setAuto([A-Z]\w*)\(/g)].map(match => lower(match[1]));
     const gated = [...shell.matchAll(/automation\.active\.has\('([^']+)'\)/g)].map(match => match[1]).sort();
+    const saveSide = Object.keys(SAVE_SIDE_AUTOMATIONS);
+    const honoured = [...inFight, ...saveSide].sort();
     const available = AUTOMATIONS.filter(entry => entry.available)
       .map(entry => entry.id)
       .sort();
 
-    expect(wired.length, 'the shell wires no automation at all').toBeGreaterThan(0);
+    expect(honoured.length, 'nothing honours any automation at all').toBeGreaterThan(0);
     // Wired but ungated is the shipped fault coming back. Gated but unwired
     // is a switch that promises something nothing delivers.
-    expect(wired, 'every automation the shell wires must read from `active`').toEqual(gated);
+    expect([...inFight].sort(), 'every automation the shell wires must read from `active`').toEqual(gated);
     // And the catalogue cannot claim an automation this build does not
     // honour, nor honour one it does not admit to having.
-    expect(wired, 'what is marked available must be exactly what is wired').toEqual(available);
+    expect(honoured, 'what is marked available must be exactly what is honoured').toEqual(available);
+
+    // The runner is handed the set rather than reading a global one, which is
+    // what makes "gated by construction" a fact about its signature.
+    const runner = codeOnly(readFileSync(join(process.cwd(), 'src', 'app', 'automationRunner.ts'), 'utf8'));
+    expect(runner, 'the runner does not take the active set').toMatch(/active: ReadonlySet<AutomationId>/);
   });
 
   it('banks the run before any verb reads the save', () => {
@@ -308,8 +325,9 @@ describe('ui architecture', () => {
      * carries. `saver.tick` already answers whether it wrote, so the throttle
      * is shared rather than invented a second time.
      */
-    const idleBank = shell.split('\n').filter(line => line.includes('saver.tick(') && line.includes('live()'));
-    expect(idleBank, 'nothing banks while the player is idle').not.toEqual([]);
+    const tickAt = shell.indexOf('saver.tick(');
+    expect(tickAt, 'the shell no longer throttles its run saves').toBeGreaterThan(-1);
+    expect(shell.slice(tickAt, tickAt + 400), 'nothing banks while the player is idle').toContain('live()');
   });
 
   it('never rebuilds the fight for numbers it could have handed over', () => {

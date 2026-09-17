@@ -128,7 +128,9 @@ export function sparkExchange(attempt: SparkAttempt): SparkOutcome | null {
 }
 
 /** The catalogue, as the save reader and the selection rules need it. */
-const CONTENT: SaveContent = { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() };
+/** Exported so the automation runner reads one catalogue rather than a second. */
+export const SAVE_CONTENT: SaveContent = { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() };
+const CONTENT = SAVE_CONTENT;
 
 /**
  * The shard rate a recycle pays at.

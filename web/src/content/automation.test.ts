@@ -58,12 +58,20 @@ describe('the automation catalogue', () => {
      * are exactly the state that looks finished and plays as though the system
      * is missing.
      *
-     * The remaining seven wait on a wallet: the simulation carries no shards
-     * or boss tears, so there is nothing for an automatic summon to spend or
-     * an automatic recycle to pay into. Later in Phase 10.
+     * Three more arrived together when the gate was widened. It had required
+     * the shell to call `loopRef.setAuto…` for every available automation,
+     * which is right for `burst` and has no shape at all for one that spends
+     * currency or rearranges a roster — so `summon`, `recycle` and `dismantle`
+     * are honoured by `app/automationRunner.ts` instead, on the shell's save
+     * cadence. Their other blocker was a wallet the simulation could not fill;
+     * it earns and banks boss tears now.
+     *
+     * The four still listed and unavailable each wait on something real:
+     * `equipBest` on a rule nobody has ported or measured, `tempo` on heat,
+     * and the two usable-item ones on usable items.
      */
     const available = availableAutomations();
-    expect(available.map(entry => entry.id)).toEqual(['burst', 'castHeroActives']);
+    expect(available.map(entry => entry.id)).toEqual(['burst', 'castHeroActives', 'summon', 'recycle', 'dismantle']);
     for (const entry of AUTOMATIONS) {
       expect(entry.available, entry.id).toBe(available.includes(entry));
     }
@@ -71,6 +79,9 @@ describe('the automation catalogue', () => {
 
   it('looks one up, and admits when it cannot', () => {
     expect(automationById('burst')?.shippedFlag).toBe('autoBurstEnabled');
-    expect(automationById('summon')?.available).toBe(false);
+    // `equipBest` took `summon`'s place here when Phase 10 wired the
+    // save-side automations. It is the one left, and for a different reason:
+    // no rule for it has been ported or measured.
+    expect(automationById('equipBest')?.available).toBe(false);
   });
 });
