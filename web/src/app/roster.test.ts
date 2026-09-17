@@ -3,7 +3,7 @@ import { HERO_POOL, heroTemplatesById } from '../content/heroes';
 import { migrateSave } from '../engine/save/migrate';
 import type { SaveV3 } from '../engine/save/schema';
 import { heroModelKey } from '../game/models/manifest';
-import { rosterFromSave } from './roster';
+import { fightSignature, rosterFromSave } from './roster';
 
 const CONTENT = { heroesById: heroTemplatesById() };
 const NOW = 1_700_000_000_000;
@@ -123,5 +123,136 @@ describe('a team built from a save', () => {
     // A player who has a save and has emptied it has made a choice. Making
     // heroes up for them would be making progress up for them.
     expect(rosterFromSave(saveWith({})).heroes).toEqual([]);
+  });
+});
+
+describe('what the running fight would notice', () => {
+  /*
+   * The shell rebuilds the loop when this signature changes and leaves it
+   * alone when it does not. Getting that wrong in either direction is a
+   * visible bug: too eager and every summon restarts the run at wave one, too
+   * lazy and a hero the player just fielded does not fight.
+   */
+  const base = {
+    playerName: 'Sig',
+    playerClass: 'warrior',
+    characterCreated: true,
+    level: 20,
+    teamSlotsUnlocked: 6,
+    heroRoster: [row(FIRST.id, 'a'), row(SECOND.id, 'b')],
+    activeTeamHeroIds: ['a'],
+  };
+
+  it('is unchanged by a hero arriving on the bench', () => {
+    // A summon. The roster is longer, the team is the same, and the run has
+    // to carry on — this is the case the whole split exists for.
+    const before = fightSignature(rosterFromSave(saveWith(base)));
+    const after = fightSignature(
+      rosterFromSave(saveWith({ ...base, heroRoster: [row(FIRST.id, 'z'), ...base.heroRoster] })),
+    );
+    expect(after).toBe(before);
+  });
+
+  it('is unchanged by a wallet or a counter moving', () => {
+    const before = fightSignature(rosterFromSave(saveWith(base)));
+    const after = fightSignature(
+      rosterFromSave(saveWith({ ...base, gold: 9_999_999, totalSummons: 412, gachaPityCounter: 17 })),
+    );
+    expect(after).toBe(before);
+  });
+
+  it('changes when a hero is fielded', () => {
+    const before = fightSignature(rosterFromSave(saveWith(base)));
+    const after = fightSignature(rosterFromSave(saveWith({ ...base, activeTeamHeroIds: ['a', 'b'] })));
+    expect(after).not.toBe(before);
+  });
+
+  it('changes when a fielded hero levels or ranks up', () => {
+    const before = fightSignature(rosterFromSave(saveWith(base)));
+    for (const change of [{ level: 40 }, { rank: 4 }]) {
+      const after = fightSignature(
+        rosterFromSave(saveWith({ ...base, heroRoster: [row(FIRST.id, 'a', change), row(SECOND.id, 'b')] })),
+      );
+      expect(after, JSON.stringify(change)).not.toBe(before);
+    }
+  });
+
+  it("changes with a fielded hero's rarity above rank one, and not at rank one", () => {
+    /*
+     * Measured rather than assumed, and my first two attempts at this test
+     * were both wrong. Rarity reaches the fight through exactly one channel in
+     * this build: `getRankStatMultiplier(rank, rarity)`, which is **exactly 1
+     * at rank one whatever the rarity**. So a rank-one hero's rarity changes
+     * nothing the fight can see, and the signature holding is correct rather
+     * than lazy.
+     *
+     * The other channel a reader would expect — `teamBoost`, which rarity
+     * scales — is not in the damage chain at all yet. `getHeroContribution`
+     * does not take it, and neither synergy, formation, hero passives, relics
+     * nor the prestige chain is applied to the live fight. All of them are
+     * ported and fixture-tested and none of them is called. REVAMP records it.
+     */
+    const withRank = (rarity: string) => ({
+      ...base,
+      heroRoster: [row(FIRST.id, 'a', { rank: 4, rarity }), row(SECOND.id, 'b')],
+    });
+    expect(fightSignature(rosterFromSave(saveWith(withRank('legendary'))))).not.toBe(
+      fightSignature(rosterFromSave(saveWith(withRank('rare')))),
+    );
+
+    const atRankOne = (rarity: string) => ({
+      ...base,
+      heroRoster: [row(FIRST.id, 'a', { rank: 1, rarity }), row(SECOND.id, 'b')],
+    });
+    expect(fightSignature(rosterFromSave(saveWith(atRankOne('legendary'))))).toBe(
+      fightSignature(rosterFromSave(saveWith(atRankOne('rare')))),
+    );
+  });
+
+  it('changes when the player spends a stat point, because team health moves', () => {
+    const before = fightSignature(rosterFromSave(saveWith(base)));
+    const after = fightSignature(
+      rosterFromSave(
+        saveWith({ ...base, statsAlloc: { strength: 0, vitality: 30, agility: 0, intelligence: 0, spirit: 0 } }),
+      ),
+    );
+    expect(after).not.toBe(before);
+  });
+
+  it('changes when the same heroes are fielded in a different order', () => {
+    /*
+     * The team's order is the player's, and it is not cosmetic: it decides
+     * which hero the swing scheduler reaches first on a tie and where each
+     * figure stands in the diorama. This is also the case that isolates the
+     * *cast* term — everything else here moves team health as well.
+     */
+    const forwards = fightSignature(rosterFromSave(saveWith({ ...base, activeTeamHeroIds: ['a', 'b'] })));
+    const backwards = fightSignature(rosterFromSave(saveWith({ ...base, activeTeamHeroIds: ['b', 'a'] })));
+    expect(backwards).not.toBe(forwards);
+  });
+
+  it('has no case yet that isolates damage from team health', () => {
+    /*
+     * Written down because it is a gap rather than an oversight. Deleting the
+     * damage term from the signature leaves every test above green: damage and
+     * team health are currently functions of the same hero fields, so nothing
+     * in a save moves one without the other.
+     *
+     * What would is the damage multiplier chain — `metaDamageLevel` and the
+     * rest — which is ported, fixture-tested and not applied to the live fight.
+     * This assertion is the reminder: when that lands, `metaDamageLevel`
+     * changes the signature and this stops holding.
+     */
+    const before = fightSignature(rosterFromSave(saveWith(base)));
+    const after = fightSignature(rosterFromSave(saveWith({ ...base, metaDamageLevel: 40, prestigeCount: 6 })));
+    expect(after).toBe(before);
+  });
+
+  it('is stable across two reads of the same save', () => {
+    // It is compared as a string, so a `Decimal` that stringified differently
+    // between reads — or a key order that moved — would restart the run on
+    // every render.
+    const save = saveWith(base);
+    expect(fightSignature(rosterFromSave(save))).toBe(fightSignature(rosterFromSave(save)));
   });
 });

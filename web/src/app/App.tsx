@@ -5,7 +5,7 @@ import { detectCapabilities, profileFor } from '../game/device/DeviceProfile';
 import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
 import { demoSimulationOptions, startingSave } from './demoRoster';
 import { canSummon, priceOfSummon, summonOnce } from './playerActions';
-import { rosterFromSave } from './roster';
+import { fightSignature, rosterFromSave } from './roster';
 import { loadSave, writeSave } from './saveStore';
 import type { SaveV3 } from '../engine/save/schema';
 import type { SummonPayment } from '../engine/roster/summonSave';
@@ -43,6 +43,8 @@ export function App() {
   // The loop is held so the one player-driven verb can reach the simulation.
   // Nothing else in the shell writes to it.
   const loopRef = useRef<GameLoop | null>(null);
+  // The renderer, held so the loop effect can hand it a cast without owning it.
+  const dioramaRef = useRef<Diorama | null>(null);
 
   const open = useMemo(() => REGISTRY.find(destination => destination.id === openId) ?? null, [openId]);
   const knownIds = useMemo(() => new Set(REGISTRY.map(destination => destination.id)), []);
@@ -63,16 +65,20 @@ export function App() {
   const [save, setSave] = useState<SaveV3>(initialSave);
 
   /*
-   * The fight's inputs, from the save the session *began* with, and
-   * deliberately not re-derived when the save changes.
+   * The fight's inputs, rebuilt whenever the save moves — and the *signature*
+   * is what the loop effect actually keys on.
    *
-   * They are in the loop effect's dependencies, so rebuilding them tears down
-   * the diorama and restarts the run from wave one — which is what summoning a
-   * hero would do if the whole roster were one value. A summon adds to the
-   * bench; fielding them is a different verb and will need the loop to be told
-   * rather than rebuilt.
+   * The distinction is the whole of how a roster can change under a running
+   * game. Summoning a hero rebuilds this object and changes nothing the fight
+   * can observe, so the signature holds and the run carries on. Fielding one,
+   * or levelling one, changes a hero's damage or the team's health, so the
+   * signature moves and the loop is rebuilt around the new team — resuming
+   * from the run that was just flushed, rather than starting again at wave one.
    */
-  const [roster] = useState(() => rosterFromSave(initialSave));
+  const roster = useMemo(() => rosterFromSave(save), [save]);
+  const rosterRef = useRef(roster);
+  rosterRef.current = roster;
+  const fightKey = useMemo(() => fightSignature(roster), [roster]);
   const cast = roster.cast;
   // Rebuilt whenever the save moves, which is what makes a summon show up.
   const profile = useMemo(() => profileFromSave(save), [save]);
@@ -149,12 +155,44 @@ export function App() {
     setOpenId(id);
   };
 
+  /*
+   * The renderer, which outlives a team change.
+   *
+   * Split from the loop below for exactly that reason: disposing a Babylon
+   * engine and building another costs hundreds of milliseconds, and a player
+   * who swapped a hero would pay it every time. The diorama takes a new cast
+   * through `setCast`; it does not need to be rebuilt to draw different people.
+   *
+   * Its dependencies are a subset of the loop's, so any run of this effect is
+   * followed by a run of that one — which is what guarantees a freshly built
+   * diorama is handed a cast before it draws.
+   */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const diorama = new Diorama(canvas, { profile: device.profile });
-    diorama.setCast(cast);
+    dioramaRef.current = diorama;
+
+    const onResize = () => diorama.resize();
+    window.addEventListener('resize', onResize);
+
+    return () => {
+      window.removeEventListener('resize', onResize);
+      dioramaRef.current = null;
+      diorama.dispose();
+    };
+  }, [device.profile]);
+
+  useEffect(() => {
+    const diorama = dioramaRef.current;
+    if (!diorama) return;
+
+    // Read through a ref rather than taken as a dependency: the object is
+    // rebuilt on every save change, and only the signature says whether the
+    // fight would notice.
+    const roster = rosterRef.current;
+    diorama.setCast(roster.cast);
 
     /*
      * The run, and how long the player was gone.
@@ -170,8 +208,8 @@ export function App() {
     const saver = new RunSaver(store);
     /*
      * Seeded from the ref rather than the value, so a toggle does not belong
-     * in this effect's deps — it would tear down the diorama and restart the
-     * fight from wave one every time the player flipped a switch.
+     * in this effect's deps — it would restart the fight from wave one every
+     * time the player flipped a switch.
      */
     const loop = new GameLoop({
       heroes: roster.heroes,
@@ -193,9 +231,6 @@ export function App() {
     });
     loop.start();
 
-    const onResize = () => diorama.resize();
-    window.addEventListener('resize', onResize);
-
     /*
      * `pagehide` rather than `beforeunload`: on iOS a backgrounded tab is
      * frozen and may never unload at all, so `beforeunload` is the one event
@@ -207,14 +242,18 @@ export function App() {
 
     return () => {
       window.removeEventListener('pagehide', onHide);
-      window.removeEventListener('resize', onResize);
+      /*
+       * Flushed on the way out, which is what makes a rebuild continue rather
+       * than restart: the next run of this effect reads it straight back
+       * through `loadRun`. The mark is restamped by that read, so the gap
+       * between the two — a few milliseconds — credits nothing.
+       */
       saver.flush(loop.read(), Date.now());
       unsubscribe();
       loop.stop();
       loopRef.current = null;
-      diorama.dispose();
     };
-  }, [cast, device.profile, roster]);
+  }, [fightKey, device.profile]);
 
   /*
    * The one place a preference reaches the simulation, and deliberately below

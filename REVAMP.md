@@ -294,6 +294,16 @@ Two things worth knowing, both ported rather than tidied:
 
 `Simulation.ts` was six lines under its 300-line cap, so `teamDps` moved to `entities/HeroEntity.ts`, beside the `nominalDps` it sums. That is what the cap is for: summing a roster's damage is a rule about heroes, and it was living in the coordinator only because it was two lines long.
 
+#### The damage multiplier chain is built and not connected
+
+Found while working out what a running fight can observe about a roster. `engine/combat/` carries `synergy.ts`, `formation.ts`, `heroPassives.ts`, `uniqueRelics.ts` and `progressionMultipliers.ts` — every one ported, every one pinned against a fixture generated from the shipped source. **None of them is called by anything the player runs.** `app/roster.ts` builds a hero's damage from `getHeroContribution` alone, and `Simulation` multiplies it by nothing.
+
+So the live fight is missing the whole chain the shipped game applies on top of base damage: team synergy, the formation bonus, hero passives, unique relics, the prestige and meta levels, the achievement bonus. The offline estimator is fed a `sustainedDpsMult` of 1 for the same reason.
+
+It is the same shape as the wallet — rules complete, caller missing — and it is measurable: rarity currently reaches the fight through exactly one channel, `getRankStatMultiplier(rank, rarity)`, which is **1 at rank one whatever the rarity**. A rank-one legendary and a rank-one common fight identically. `teamBoost`, which rarity scales, is not in the damage chain at all.
+
+Connecting it is the next piece of Phase 8, ahead of the remaining roster verbs: levelling a hero that does not change what they hit for is not a verb worth building a screen around.
+
 #### The starting team is a save now, and that fixed four disagreements
 
 `demoRoster.ts` bolted four independently written things together — heroes with hand-written DPS, a cast, a `PlayerProfile` built by hand, and a team health figure derived from *different heroes again* — and each told a different story about the same six people. Building one `SaveV3` and running it through `rosterFromSave` makes that impossible rather than merely fixed, for the reason that function's own comment already gave: a save has three readers, which is three chances to disagree.

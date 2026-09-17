@@ -128,3 +128,37 @@ export function rosterFromSave(save: SaveV3): LoadedRoster {
     teamMaxHp: teamHealthFromSave(save, healthHeroes),
   };
 }
+
+/**
+ * Everything the running fight can observe about a roster, as one string.
+ *
+ * The shell rebuilds the loop when this changes and leaves it alone when it
+ * does not, which is what lets a summon add a hero to the bench without
+ * restarting the run — and lets fielding one, or levelling one, take effect
+ * without a reload.
+ *
+ * Derived from the *built* roster rather than from the save's fields, and that
+ * is the whole point. Enumerating which save fields the fight depends on means
+ * keeping a second list in step with `rosterFromSave` — and the day equipment
+ * or a passive joins the damage calculation, the list is wrong and the symptom
+ * is a hero whose new gear does nothing until the tab is reloaded. Comparing
+ * the output cannot drift from the thing it describes.
+ *
+ * **Two of the three terms are redundant today**, and are kept anyway. Damage
+ * and team health are currently functions of the same hero fields, so no save
+ * change moves one without the other, and the cast's ordering follows the
+ * heroes'. That is a fact about this build rather than about the idea: the
+ * damage multiplier chain — synergy, formation, hero passives, relics, the
+ * prestige and meta levels — is ported and fixture-tested and **not applied to
+ * the live fight**, and the moment it is, `metaDamageLevel` moves damage
+ * without touching health. Dropping the terms now to match the tests would
+ * mean putting them back then, having shipped a build where a meta upgrade did
+ * nothing until reload.
+ */
+export function fightSignature(roster: LoadedRoster): string {
+  return JSON.stringify([
+    roster.teamMaxHp,
+    roster.heroes.map(hero => [hero.uid, hero.damagePerHit.toString(), hero.timer.intervalMs]),
+    roster.cast.map(member => [member.uid, member.role, member.modelKey, member.silhouette]),
+  ]);
+}
