@@ -308,8 +308,7 @@ export class Simulation {
   /** A fresh enemy on `wave`, and the team back on their feet. */
   private restart(wave: number, healthFraction = 1): void {
     this.enemy = spawnEnemy(wave, this.enemyHpMult);
-    const full = fullHealth(this.vitals.maxHp);
-    this.vitals = healthFraction === 1 ? full : { ...full, hp: full.maxHp.mul(healthFraction) };
+    this.vitals = { hp: this.vitals.maxHp.mul(healthFraction), maxHp: this.vitals.maxHp };
   }
 
   /** The player answered a rally offer. */
@@ -334,6 +333,16 @@ export class Simulation {
     this.incomingMult = next.incomingMult;
     this.casters = next.casters;
     this.earnings.rates = next.rates;
+  }
+
+  /**
+   * Take the run's earnings out, to be put in the save's wallet.
+   *
+   * Zeroes the run's tally in the same breath, which is the point: the two
+   * must never both hold the same coin. See `RunEarnings.bank`.
+   */
+  bank(): ReturnType<RunEarnings['bank']> {
+    return this.earnings.bank();
   }
 
   /** The current read model. Callers must treat it as immutable. */

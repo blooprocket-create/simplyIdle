@@ -262,6 +262,46 @@ describe('ui architecture', () => {
     expect(wired, 'what is marked available must be exactly what is wired').toEqual(available);
   });
 
+  it('banks the run before any verb reads the save', () => {
+    /*
+     * A coin has to belong to the wallet or to the run and never to both.
+     *
+     * The player's spendable balance was the wallet plus the run's unbanked
+     * earnings; a purchase deducted from the wallet alone and floored it at
+     * zero; nothing ever reduced the run's tally. Measured: an empty wallet
+     * with a million unbanked gold bought seven facility levels and still read
+     * a million. Free, seven times over.
+     *
+     * So every verb in the shell's `actions` starts from `live()`, which banks
+     * first. A verb that reached for `save` directly would charge against a
+     * balance that is not the one the player is spending from — and the next
+     * verb anyone adds is exactly where that comes back, which is why this is
+     * a rule rather than a fixed set of call sites.
+     *
+     * Queries are deliberately *not* held to it: they change nothing, and a
+     * price is a price. They are told apart by shape — a verb hands its result
+     * to `applying` or to `applySave`, and a query returns it.
+     */
+    const shell = codeOnly(readFileSync(join(process.cwd(), 'src', 'app', 'App.tsx'), 'utf8'));
+    const actions = /const actions = useMemo\(([\s\S]*?)\n {4}\[/.exec(shell);
+    expect(actions, 'App.tsx no longer builds its actions in one memo').not.toBeNull();
+
+    const lines = actions![1].split('\n');
+    const writes = lines.filter(line => line.includes('applying(') || line.includes('applySave('));
+    expect(writes.length, 'the shell has no verbs at all').toBeGreaterThan(5);
+
+    /*
+     * A verb naming the closure's `save` on the line it charges is reading the
+     * balance the bank was supposed to have moved. `outcome.save` and
+     * `save: live()` are not that — one is a property on a result and the
+     * other is the banked save being passed in — so the lookaround excludes a
+     * preceding dot or word character and a following colon.
+     */
+    const unbanked = writes.filter(line => /(?<![.\w])save\b(?!\s*:)/.test(line));
+    expect(unbanked, 'a verb reads `save` instead of banking the run first').toEqual([]);
+    expect(shell, 'nothing in the shell banks the run').toContain('loopRef.current?.bank()');
+  });
+
   it('never rebuilds the fight for numbers it could have handed over', () => {
     /*
      * The split, held. A rebuild resumes from `RunProgress` — wave, kills,

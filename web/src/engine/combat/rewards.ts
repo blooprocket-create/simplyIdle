@@ -50,6 +50,13 @@ export interface RewardRates {
 
 export const FLAT_RATES: RewardRates = { goldMult: 1, expMult: 1 };
 
+/** What a bank moves out of the run. See `RunEarnings.bank` for what does not. */
+export interface BankedRun {
+  gold: Decimal;
+  essence: number;
+  bossTears: number;
+}
+
 export interface Purse {
   gold: Decimal;
   exp: Decimal;
@@ -132,6 +139,39 @@ export class RunEarnings {
   /** What the run has earned that is not gold or EXP. */
   spoils(): KillPayout {
     return this.payout;
+  }
+
+  /**
+   * Hand over the earnings the account can store, and stop holding them.
+   *
+   * The half that was missing. `RunEarnings` is documented as "deliberately
+   * not a balance" — what the player *holds* is the save's wallet plus this —
+   * and that held true right up until something spent it. `heldGold` added the
+   * two, purchases deducted from the wallet alone and floored it at zero, and
+   * the run's tally never moved: measured, an empty wallet with a million
+   * unbanked gold bought **seven** facility levels and still read a million.
+   *
+   * Essence and boss tears have the opposite fault rather than the same one.
+   * Nothing adds the run's share of those to the wallet before spending, so
+   * they were simply never arriving. Both are one bug: a coin has to belong to
+   * the wallet or to the run, and never to both or to neither.
+   *
+   * **EXP, season points and mastery XP stay in the run**, and deliberately:
+   * the account has nowhere to put them yet. Player levelling reads
+   * `save.progression.level` and nothing converts EXP into it; season points
+   * and mastery live in the legacy bag untyped. Zeroing them here would lose
+   * them, which is worse than leaving them uncounted — so they keep
+   * accumulating and the phase that gives them a home banks them.
+   */
+  bank(): BankedRun {
+    const banked = {
+      gold: this.purse.gold,
+      essence: this.payout.essence,
+      bossTears: this.payout.bossTears,
+    };
+    this.purse = { gold: new Decimal(0), exp: this.purse.exp };
+    this.payout = { ...this.payout, essence: 0, bossTears: 0 };
+    return banked;
   }
 
   /**

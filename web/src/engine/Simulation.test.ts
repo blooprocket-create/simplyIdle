@@ -1436,3 +1436,82 @@ describe('new numbers for a fight in progress', () => {
     expect(sim.read().abilities[0].remainingMs).toBe(held);
   });
 });
+
+describe('banking a run', () => {
+  const winnable = () =>
+    new Simulation({
+      heroes: [hero('a', 200, 900)],
+      teamMaxHp: new Decimal(1e9),
+      enemyHpMult: 1e-9,
+      startWave: 10,
+    });
+
+  it('hands over the gold and stops holding it', () => {
+    /*
+     * The whole point: after this, the coin is in exactly one place. Before
+     * banking existed the run kept its tally forever and the wallet was added
+     * to it, so the same gold was spendable again on every press.
+     */
+    const sim = winnable();
+    run(sim, 3_000, 100);
+    const earned = sim.read().totals.gold;
+    expect(earned.gt(0)).toBe(true);
+
+    const banked = sim.bank();
+    expect(banked.gold.eq(earned)).toBe(true);
+    expect(sim.read().totals.gold.eq(0)).toBe(true);
+  });
+
+  it('hands over the essence and tears a boss paid', () => {
+    const sim = winnable();
+    run(sim, 3_000, 100);
+    const before = sim.read().totals;
+    expect(before.bossTears).toBeGreaterThan(0);
+
+    const banked = sim.bank();
+    expect(banked.essence).toBe(before.essence);
+    expect(banked.bossTears).toBe(before.bossTears);
+    expect(sim.read().totals.essence).toBe(0);
+    expect(sim.read().totals.bossTears).toBe(0);
+  });
+
+  it('keeps what the account has nowhere to put', () => {
+    /*
+     * EXP, season points and mastery XP stay in the run, and deliberately —
+     * nothing converts run EXP into a player level and the other two live in
+     * the legacy bag untyped. Zeroing them here would lose them outright,
+     * which is worse than leaving them uncounted. The phase that gives them a
+     * home is the phase that banks them.
+     */
+    const sim = winnable();
+    run(sim, 3_000, 100);
+    const before = sim.read().totals;
+    expect(before.exp.gt(0)).toBe(true);
+    expect(before.seasonPoints).toBeGreaterThan(0);
+
+    sim.bank();
+    const after = sim.read().totals;
+    expect(after.exp.eq(before.exp)).toBe(true);
+    expect(after.seasonPoints).toBe(before.seasonPoints);
+    expect(after.masteryXp).toBe(before.masteryXp);
+  });
+
+  it('banks nothing twice', () => {
+    const sim = winnable();
+    run(sim, 3_000, 100);
+    sim.bank();
+    const second = sim.bank();
+    expect(second.gold.eq(0)).toBe(true);
+    expect(second.essence).toBe(0);
+    expect(second.bossTears).toBe(0);
+  });
+
+  it('goes on earning after a bank', () => {
+    // A bank is not a stop. The run keeps paying into an empty tally.
+    const sim = winnable();
+    run(sim, 3_000, 100);
+    sim.bank();
+    run(sim, 3_000, 100);
+    expect(sim.read().totals.gold.gt(0)).toBe(true);
+  });
+});

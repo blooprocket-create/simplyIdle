@@ -68,6 +68,17 @@ export class GameLoop {
     for (const listener of this.listeners) listener(snapshot);
   }
 
+  /**
+   * Take the run's earnings out, for the caller to put in the save's wallet.
+   *
+   * Does **not** publish. The snapshot's totals drop to zero as the wallet
+   * rises, and pushing that to the HUD before the caller has written the save
+   * would show the player a frame with their gold in neither place.
+   */
+  bank(): ReturnType<Simulation['bank']> {
+    return this.simulation.bank();
+  }
+
   /** Whether abilities fire themselves the moment they come up. */
   setAutoCastHeroActives(on: boolean): void {
     this.simulation.setAutoCastHeroActives(on);

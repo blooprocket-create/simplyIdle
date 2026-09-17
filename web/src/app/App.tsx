@@ -10,13 +10,14 @@ import type { PrestigePath } from '../engine/prestige/rebirth';
 import { canAffordSpark, canSummon, priceOfSummon, rosterActions, sparkExchange, summonOnce } from './playerActions';
 import { equipmentActions, migrateLegacyEquipment } from './equipmentActions';
 import { prestigeActions } from './prestigeActions';
+import { bankRun, worthBanking } from '../engine/save/bankRun';
 import { fightIdentity, fightTuning, fightTuningKey, rosterFromSave } from './roster';
 import { loadSave, writeSave } from './saveStore';
 import type { SaveV3 } from '../engine/save/schema';
 import type { SummonPayment } from '../engine/roster/summonSave';
 import type { HeroSpend } from '../engine/roster/rosterSave';
 import type { FormationRole } from '../engine/combat/formation';
-import { heldGold, profileFromSave } from '../ui/profile/playerProfile';
+import { profileFromSave } from '../ui/profile/playerProfile';
 import { GameLoop } from './GameLoop';
 import { loadRun, RunSaver } from './runStore';
 import { browserStore } from '../ui/prefs/store';
@@ -169,59 +170,90 @@ export function App() {
     [applySave],
   );
 
+  /**
+   * The save, with anything the run has earned already in the wallet.
+   *
+   * **Every verb starts here rather than from `save`**, and that is what makes
+   * a purchase cost something. The player's spendable balance was read as the
+   * wallet plus the run's unbanked earnings, while a purchase deducted from
+   * the wallet alone and floored it at zero — so an empty wallet with a
+   * million unbanked gold bought seven facility levels and still read a
+   * million. Measured, not reasoned about.
+   *
+   * Banking first means the wallet *is* the balance at the moment anything is
+   * charged, so there is no second place holding the same coin. Queries below
+   * still read `save` directly: they change nothing, and a price is a price.
+   */
+  const live = useCallback((): SaveV3 => {
+    const banked = loopRef.current?.bank();
+    if (banked === undefined || !worthBanking(banked)) return save;
+    const next = bankRun(save, banked);
+    applySave(next);
+    return next;
+  }, [save, applySave]);
+
   const actions = useMemo(
     () => ({
       summon: (pay: SummonPayment) => {
-        const outcome = summonOnce({ save, pay, nowMs: Date.now(), random: Math.random });
+        const outcome = summonOnce({ save: live(), pay, nowMs: Date.now(), random: Math.random });
         if (outcome) applySave(outcome.save);
         return outcome;
       },
       canSummon: (pay: SummonPayment) => canSummon(save, pay),
       priceOfSummon: (pay: SummonPayment) => priceOfSummon(save, pay),
       sparkExchange: (optionId: string) => {
-        const outcome = sparkExchange({ save, optionId, nowMs: Date.now(), random: Math.random });
+        const outcome = sparkExchange({ save: live(), optionId, nowMs: Date.now(), random: Math.random });
         if (outcome) applySave(outcome.save);
         return outcome;
       },
       canAffordSpark: (optionId: string) => canAffordSpark(save, optionId),
-      spendOnHero: (uid: string, spend: HeroSpend) => applying(rosterActions.spendOnHero(save, uid, spend)),
+      spendOnHero: (uid: string, spend: HeroSpend) => applying(rosterActions.spendOnHero(live(), uid, spend)),
       batchLevel: (uids: readonly string[], addLevels: number | 'max') =>
-        applying(rosterActions.batchLevel(save, uids, addLevels)),
-      recycle: (uid: string) => applying(rosterActions.recycle(save, uid)),
-      fieldTeam: (requested: readonly string[]) => applying(rosterActions.fieldTeam(save, requested)),
-      place: (uid: string, role: FormationRole) => applying(rosterActions.place(save, uid, role)),
-      storeLoadout: (slot: number) => applying(rosterActions.storeLoadout(save, slot)),
-      recallLoadout: (slot: number) => applying(rosterActions.recallLoadout(save, slot)),
-      buySlot: () => applying(rosterActions.buySlot(save)),
-      toggleRelic: (uid: string) => applying(rosterActions.toggleRelic(save, uid)),
-      equip: (id: string) => applying(equipmentActions.equip(save, id)),
-      unequip: (slot: EquipmentSlot) => applying(equipmentActions.unequip(save, slot)),
-      dismantle: (id: string) => applying(equipmentActions.dismantle(save, id)),
-      sweep: () => applying(equipmentActions.sweep(save)),
-      setSweepFloor: (floor: EquipmentRarity) => applying(equipmentActions.setFloor(save, floor)),
+        applying(rosterActions.batchLevel(live(), uids, addLevels)),
+      recycle: (uid: string) => applying(rosterActions.recycle(live(), uid)),
+      fieldTeam: (requested: readonly string[]) => applying(rosterActions.fieldTeam(live(), requested)),
+      place: (uid: string, role: FormationRole) => applying(rosterActions.place(live(), uid, role)),
+      storeLoadout: (slot: number) => applying(rosterActions.storeLoadout(live(), slot)),
+      recallLoadout: (slot: number) => applying(rosterActions.recallLoadout(live(), slot)),
+      buySlot: () => applying(rosterActions.buySlot(live())),
+      toggleRelic: (uid: string) => applying(rosterActions.toggleRelic(live(), uid)),
+      equip: (id: string) => applying(equipmentActions.equip(live(), id)),
+      unequip: (slot: EquipmentSlot) => applying(equipmentActions.unequip(live(), slot)),
+      dismantle: (id: string) => applying(equipmentActions.dismantle(live(), id)),
+      sweep: () => applying(equipmentActions.sweep(live())),
+      setSweepFloor: (floor: EquipmentRarity) => applying(equipmentActions.setFloor(live(), floor)),
       craft: (slot: EquipmentSlot) => {
-        const outcome = equipmentActions.craft({ save, nowMs: Date.now(), random: Math.random }, slot);
+        const outcome = equipmentActions.craft({ save: live(), nowMs: Date.now(), random: Math.random }, slot);
         if (outcome) applySave(outcome.save);
         return outcome;
       },
       upgrade: (id: string) => {
-        const outcome = equipmentActions.upgrade({ save, nowMs: Date.now(), random: Math.random }, id);
+        const outcome = equipmentActions.upgrade({ save: live(), nowMs: Date.now(), random: Math.random }, id);
         if (outcome) applySave(outcome.save);
         return outcome;
       },
-      refineEssence: (count?: number) => applying(equipmentActions.refineEssence(save, count)),
-      refineShards: (count?: number) => applying(equipmentActions.refineShards(save, count)),
+      refineEssence: (count?: number) => applying(equipmentActions.refineEssence(live(), count)),
+      refineShards: (count?: number) => applying(equipmentActions.refineShards(live(), count)),
       previewRebirth: () => prestigeActions.preview(save),
-      rebirth: () => applying(prestigeActions.rebirth(save)),
+      rebirth: () => applying(prestigeActions.rebirth(live())),
       priceOfPath: (path: PrestigePath) => prestigeActions.priceOfPath(save, path),
-      spendCore: (path: PrestigePath) => applying(prestigeActions.spendCore(save, path)),
+      spendCore: (path: PrestigePath) => applying(prestigeActions.spendCore(live(), path)),
       priceOfMeta: (path: PrestigePath) => prestigeActions.priceOfMeta(save, path),
-      spendEssence: (path: PrestigePath) => applying(prestigeActions.spendEssence(save, path)),
+      spendEssence: (path: PrestigePath) => applying(prestigeActions.spendEssence(live(), path)),
       priceOfFacility: (facilityId: FacilityId) => prestigeActions.priceOfFacility(save, facilityId),
-      upgradeFacility: (facilityId: FacilityId) =>
-        applying(prestigeActions.upgradeFacility(save, facilityId, heldGold(profile, snapshot).toNumber())),
+      upgradeFacility: (facilityId: FacilityId) => {
+        /*
+         * Priced off the banked wallet rather than off `heldGold`, which adds
+         * the run's tally to it. Once `live()` has moved that tally into the
+         * wallet the two would be the same coin counted twice — the very bug
+         * this banking exists to close, reappearing on the one line that
+         * spends the largest sums.
+         */
+        const current = live();
+        return applying(prestigeActions.upgradeFacility(current, facilityId, current.wallet.gold));
+      },
     }),
-    [save, applySave, applying],
+    [save, applySave, applying, live],
   );
 
   const select = (id: string) => {
