@@ -10,6 +10,9 @@ import type { HeroSpend } from '../../engine/roster/rosterSave';
 import type { FormationRole } from '../../engine/combat/formation';
 import type { EquipmentRarity, EquipmentSlot } from '../../content/equipment';
 import type { CraftOutcome, UpgradeOutcome } from '../../engine/equipment/equipmentSave';
+import type { FacilityId } from '../../engine/prestige/facilities';
+import type { PrestigePath } from '../../engine/prestige/rebirth';
+import type { RebirthPreview } from '../../engine/prestige/prestigeSave';
 import type { SaveV3 } from '../../engine/save/schema';
 
 /**
@@ -98,6 +101,18 @@ export interface SurfaceProps {
     upgrade: (id: string) => UpgradeOutcome | null;
     refineEssence: (count?: number) => boolean;
     refineShards: (count?: number) => boolean;
+    /**
+     * Prestige. `previewRebirth` is a query rather than a verb — unlike the
+     * equipment upgrade's plan, it draws nothing, so a screen may quote it.
+     */
+    previewRebirth: () => RebirthPreview;
+    rebirth: () => boolean;
+    priceOfPath: (path: PrestigePath) => number;
+    spendCore: (path: PrestigePath) => boolean;
+    priceOfMeta: (path: PrestigePath) => number;
+    spendEssence: (path: PrestigePath) => boolean;
+    priceOfFacility: (facilityId: FacilityId) => number;
+    upgradeFacility: (facilityId: FacilityId) => boolean;
   };
   /** The player's save, for the counters no read model carries yet. */
   save: SaveV3;

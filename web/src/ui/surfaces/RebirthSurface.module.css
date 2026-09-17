@@ -1,0 +1,43 @@
+/* The verbs on a hero card. A row of small buttons under the tags. */
+.verbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.verb {
+  padding: 2px var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.verb:disabled {
+  color: var(--ink-dim);
+  cursor: not-allowed;
+}
+
+.verb:focus-visible {
+  outline: 2px solid var(--ready);
+  outline-offset: 2px;
+}
+
+/* Recycling destroys a hero, so it does not look like levelling one. */
+.destructive {
+  border-color: var(--hp-foe);
+  color: var(--hp-foe);
+}
+
+/*
+ * The rebirth press itself, which is irreversible: a two-hundred-wave run ends
+ * here. Marked out from the two trees' buttons, which are ordinary purchases.
+ */
+.commit {
+  border-color: var(--ready);
+  color: var(--ready);
+}

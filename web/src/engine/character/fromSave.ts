@@ -55,16 +55,17 @@ export function masteryXpFromLegacy(save: SaveV3): number {
 /**
  * The tactics facility's level.
  *
- * Stored as `guildhallFacilities.tactics.level` — a record of records, one
- * level deeper than it looks, which is the shape that made the fixture's first
- * tactics scenario silently do nothing when it was written as a flat map.
+ * **Typed since Phase 10**, which is the phase that can raise one. It was read
+ * out of `legacy` for three phases before that, as
+ * `guildhallFacilities.tactics.level` — a record of records, one level deeper
+ * than it looks, which is the shape that made the Phase 7 fixture's first
+ * tactics scenario silently measure nothing at all.
+ *
+ * The name is kept so the callers do not churn, and because it still describes
+ * where the number came from.
  */
 export function tacticsLevelFromLegacy(save: SaveV3): number {
-  const facilities = save.legacy.guildhallFacilities;
-  if (!isRecord(facilities)) return 0;
-  const tactics = facilities.tactics;
-  if (!isRecord(tactics)) return 0;
-  return boundedInt(tactics.level, 0, MAX_FACILITY_LEVEL, 0);
+  return boundedInt(save.facilities.tactics, 0, MAX_FACILITY_LEVEL, 0);
 }
 
 /** VIP level, out of the bag. The whole VIP system is Phase 10's to claim. */

@@ -5,15 +5,18 @@ import { detectCapabilities, profileFor } from '../game/device/DeviceProfile';
 import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
 import { startingSave } from './demoRoster';
 import type { EquipmentRarity, EquipmentSlot } from '../content/equipment';
+import type { FacilityId } from '../engine/prestige/facilities';
+import type { PrestigePath } from '../engine/prestige/rebirth';
 import { canAffordSpark, canSummon, priceOfSummon, rosterActions, sparkExchange, summonOnce } from './playerActions';
 import { equipmentActions, migrateLegacyEquipment } from './equipmentActions';
+import { prestigeActions } from './prestigeActions';
 import { fightSignature, rosterFromSave } from './roster';
 import { loadSave, writeSave } from './saveStore';
 import type { SaveV3 } from '../engine/save/schema';
 import type { SummonPayment } from '../engine/roster/summonSave';
 import type { HeroSpend } from '../engine/roster/rosterSave';
 import type { FormationRole } from '../engine/combat/formation';
-import { profileFromSave } from '../ui/profile/playerProfile';
+import { heldGold, profileFromSave } from '../ui/profile/playerProfile';
 import { GameLoop } from './GameLoop';
 import { loadRun, RunSaver } from './runStore';
 import { browserStore } from '../ui/prefs/store';
@@ -200,6 +203,15 @@ export function App() {
       },
       refineEssence: (count?: number) => applying(equipmentActions.refineEssence(save, count)),
       refineShards: (count?: number) => applying(equipmentActions.refineShards(save, count)),
+      previewRebirth: () => prestigeActions.preview(save),
+      rebirth: () => applying(prestigeActions.rebirth(save)),
+      priceOfPath: (path: PrestigePath) => prestigeActions.priceOfPath(save, path),
+      spendCore: (path: PrestigePath) => applying(prestigeActions.spendCore(save, path)),
+      priceOfMeta: (path: PrestigePath) => prestigeActions.priceOfMeta(save, path),
+      spendEssence: (path: PrestigePath) => applying(prestigeActions.spendEssence(save, path)),
+      priceOfFacility: (facilityId: FacilityId) => prestigeActions.priceOfFacility(save, facilityId),
+      upgradeFacility: (facilityId: FacilityId) =>
+        applying(prestigeActions.upgradeFacility(save, facilityId, heldGold(profile, snapshot).toNumber())),
     }),
     [save, applySave, applying],
   );

@@ -3,6 +3,7 @@ import type { EquipmentRarity, EquipmentSlot } from '../../content/equipment';
 import type { Rarity } from '../../content/rarities';
 import type { FormationRole } from '../combat/formation';
 import type { EquipmentSource } from '../equipment/instance';
+import type { FacilityId } from '../prestige/facilities';
 
 /**
  * The v3 save.
@@ -170,6 +171,18 @@ export interface SaveV3 {
     /** Whether the account's one-off first summon has been handed out. */
     firstGiven: boolean;
   };
+
+  /**
+   * The guildhall's four facility levels, claimed out of `legacy` in Phase 10
+   * because this is the phase that can raise one.
+   *
+   * Two of them have been *read* out of the bag since earlier phases — tactics
+   * multiplies team power in the health and defence chains, forge multiplies a
+   * crafted item's stat budget — which is exactly the arrangement `legacy` is
+   * for: read a field on the phase that needs it, claim it on the phase that
+   * owns it.
+   */
+  facilities: Record<FacilityId, number>;
 
   /**
    * Equipment, claimed out of `legacy` in Phase 9 because `derivedStats` has

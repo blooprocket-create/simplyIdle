@@ -1,5 +1,6 @@
 import type { FormationRole } from '../combat/formation';
 import { readEquipment } from './equipmentSlice';
+import { readFacilityLevels } from './facilitiesSlice';
 import { VALID_FORMATION_ROLES_FOR_CLASS } from '../combat/formation';
 import {
   ACTIVE_TEAM_SIZE,
@@ -298,6 +299,7 @@ export function readSaveV3(payload: unknown, options: MigrateOptions): SaveV3 {
       metaSurvivalLevel: boundedInt(progression.metaSurvivalLevel, 0, SAFE_NUMBER_CAP, 0),
     },
     stats: readStats(stats, level),
+    facilities: readFacilityLevels(raw.facilities),
     equipment,
     wallet: {
       gold,

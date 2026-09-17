@@ -33,11 +33,16 @@ export const REGISTRY: readonly Destination[] = [
   { id: 'character', group: 'power', label: 'Character', archetype: 'detail' },
   { id: 'equipment', group: 'power', label: 'Equipment', archetype: 'ledger' },
   { id: 'skills', group: 'power', label: 'Skills', archetype: 'ledger' },
+  // A ledger, not a moment — the same correction `party` needed and for the
+  // same reason. The *press* is a moment: irreversible, and it ends a run of
+  // two hundred waves. But the screen around it is two upgrade trees and four
+  // facilities, which is a list to spend down, and a `moment` does not scroll.
+  // The irreversibility is carried by the button rather than by the geometry.
   {
     id: 'rebirth',
     group: 'power',
     label: 'Rebirth',
-    archetype: 'moment',
+    archetype: 'ledger',
     available: snapshot => snapshot.wave >= REBIRTH_VISIBLE_FROM_WAVE,
   },
 

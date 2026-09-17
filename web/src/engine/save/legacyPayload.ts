@@ -1,4 +1,5 @@
 import { equipmentToLegacy } from './equipmentSlice';
+import { facilitiesToLegacy } from './facilitiesSlice';
 import { STAT_POINTS_PER_LEVEL, statPointsSpent } from './migrate';
 import { LEGACY_SAVE_VERSION, type SaveV3 } from './schema';
 
@@ -134,6 +135,14 @@ export function toLegacyPayload(save: SaveV3): Record<string, unknown> {
      * no reload in between would otherwise lose it.
      */
     ...equipmentToLegacy(save.equipment),
+
+    /*
+     * The facilities, back to the nested `{ tactics: { level: 3 } }` shape the
+     * shipped reader wants. Ours is flat, because a record of one-key records
+     * is a shape nothing here needs — and writing the flat one out would read
+     * as every facility being level zero.
+     */
+    guildhallFacilities: facilitiesToLegacy(save.facilities),
 
     /*
      * The summon counters, back under the names the shipped state uses.

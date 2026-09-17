@@ -5,6 +5,7 @@ import { CampaignSurface } from './CampaignSurface';
 import { CharacterSurface } from './CharacterSurface';
 import { CodexSurface } from './CodexSurface';
 import { EquipmentSurface } from './EquipmentSurface';
+import { RebirthSurface } from './RebirthSurface';
 import { PartySurface } from './PartySurface';
 import { RosterSurface } from './RosterSurface';
 import { SettingsSurface } from './SettingsSurface';
@@ -27,6 +28,7 @@ export const SURFACES: Partial<Record<string, ComponentType<SurfaceProps>>> = {
   achievements: AchievementsSurface,
   character: CharacterSurface,
   equipment: EquipmentSurface,
+  rebirth: RebirthSurface,
   party: PartySurface,
   campaign: CampaignSurface,
   roster: RosterSurface,
