@@ -162,6 +162,28 @@ interface Fixture {
   chestNodes: { wave: number; roll: number; bossTears: number }[];
   /** Hero levelling, which is per kill and per active hero. */
   heroLevels: { name: string; active: number; benched: number; startLevel: number; leveled: number }[];
+  /** What a kill drops, and how often. */
+  drops: {
+    /** The two chance curves, at waves that pin both terms and the ceiling. */
+    chances: { wave: number; boss: boolean; equipment: number; usable: number }[];
+    /**
+     * A scripted kill, and every draw it took.
+     *
+     * The dropped item is recorded **without its id**, which is built from
+     * `Date.now()` — recording it would make this fixture drift with the
+     * clock, exactly as `weeklyEventWeek` did before it was pinned. The
+     * *shape* of the id is asserted instead.
+     */
+    scripted: {
+      name: string;
+      wave: number;
+      draws: number;
+      equipment: { slot: string; rarity: string; itemLevel: number; source: string } | null;
+      usables: number;
+    }[];
+    /** The boundary: the roll is `<=`, so landing exactly on it drops. */
+    boundary: { roll: number; dropped: boolean }[];
+  };
 }
 
 function buildBaseline(): Fixture['baseline'] {
@@ -292,6 +314,161 @@ function buildHeroLevels(): Fixture['heroLevels'] {
   return rows;
 }
 
+/**
+ * The two drop chances, **measured** by bisection.
+ *
+ * My first version computed them — `min(0.4, 0.1 + wave * 0.003 + ...)` copied
+ * into this file — and that is not a measurement. Removing the usable
+ * ceiling from the shipped source left every row of it green, because the rows
+ * were agreeing with my transcription rather than with the game. Exactly the
+ * hole the summon price fell through, one commit later.
+ *
+ * So each chance is found the way `prestigeFixture` finds a private cost: hand
+ * the kill a scripted roll and ask whether it dropped, and bisect on the
+ * answer. The comparison is `<=`, so the largest roll that still drops **is**
+ * the chance.
+ */
+function dropChances(): Fixture['drops']['chances'] {
+  const dropped = (wave: number, roll: number, usable: boolean) => {
+    let draw = 0;
+    const held = Math.random;
+    // The equipment roll comes first, so measuring the usable chance means
+    // refusing the equipment one and reading the second draw.
+    Math.random = () => {
+      const value = usable ? (draw === 0 ? 0.99 : draw === 1 ? roll : 0.5) : draw === 0 ? roll : 0.5;
+      draw += 1;
+      return value;
+    };
+    try {
+      const before = state({ wave, level: 60 });
+      const after = advanceCombatStep(before, 100);
+      return usable
+        ? Object.values(after.usableItemCounts).reduce((sum, count) => sum + count, 0) > 0
+        : after.inventoryItemIds.length > before.inventoryItemIds.length;
+    } finally {
+      Math.random = held;
+    }
+  };
+
+  /** The largest roll that still drops, to a millionth. */
+  const threshold = (wave: number, usable: boolean) => {
+    let low = 0;
+    let high = 1;
+    for (let step = 0; step < 40; step += 1) {
+      const mid = (low + high) / 2;
+      if (dropped(wave, mid, usable)) low = mid;
+      else high = mid;
+    }
+    return Math.round(low * 1e6) / 1e6;
+  };
+
+  return [1, 10, 41, 50, 100, 200, 400].map(wave => ({
+    wave,
+    boss: wave % 10 === 0,
+    equipment: threshold(wave, false),
+    usable: threshold(wave, true),
+  }));
+}
+
+/**
+ * A kill with the dice scripted, and the number of draws it took.
+ *
+ * The draw *count* is as much of the record as the item is. A port that rolled
+ * the rarity before the chance, or drew a pool index it did not need, would
+ * produce a different item from the same seed on the very next kill.
+ */
+function buildDrops(): Fixture['drops'] {
+  const scripted: Fixture['drops']['scripted'] = [];
+
+  /**
+   * A kill with the dice handed to it one at a time.
+   *
+   * The draw *count* is as much of the record as the item is: a port that
+   * rolled the rarity before the chance, or drew a pool index it did not need,
+   * would produce a different item from the same seed on the very next kill.
+   * The sequence returns 0.5 once it runs out, which is above every drop
+   * chance and below every ceiling, so a miscount shows up as a missing drop
+   * rather than as silence.
+   */
+  const run = (name: string, wave: number, values: number[]) => {
+    let draws = 0;
+    const before = state({ wave, level: 60 });
+    const held = Math.random;
+    Math.random = () => {
+      const value = draws < values.length ? values[draws] : 0.5;
+      draws += 1;
+      return value;
+    };
+    let after: GameState;
+    try {
+      after = advanceCombatStep(before, 100);
+    } finally {
+      Math.random = held;
+    }
+
+    const added = after.inventoryItemIds.filter(id => !before.inventoryItemIds.includes(id));
+    const item = added.length > 0 ? after.equipmentInventory[added[0]] : null;
+    scripted.push({
+      name,
+      wave,
+      draws,
+      equipment: item ? { slot: item.slot, rarity: item.rarity, itemLevel: item.itemLevel, source: item.source } : null,
+      usables: Object.values(after.usableItemCounts).reduce((sum, count) => sum + count, 0),
+    });
+  };
+
+  /*
+   * Wave 41 rather than 40: not a boss, so the boss terms are out of both
+   * chances and each row measures one thing. The equipment chance there is
+   * 0.223 and the usable chance 0.1815.
+   */
+  run('nothing drops', 41, [0.99, 0.99]);
+  run('equipment only', 41, [0.05, 0.5, 0.5, 0.99]);
+  run('usable only', 41, [0.99, 0.05, 0.5]);
+  /*
+   * Both, and the shape of this list is the finding: an equipment drop costs
+   * **nine** draws — the chance, the rarity, the pool index, and six inside
+   * `createEquipmentInstance` — so the usable chance is the *tenth*. A list
+   * that put it fourth, as my first version did, tested a kill where the
+   * usable roll was whatever the sequence returned after it ran out.
+   */
+  run('both drop', 41, [0.05, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.05]);
+
+  /*
+   * The boss term, as a pair. A roll of 0.24 is above wave 41's 0.223 and
+   * below wave 40's 0.34, so the same dice drop on the boss and miss beside
+   * it — which is the only way to show the term is read at all.
+   */
+  run('a boss drops on a roll that misses', 40, [0.24, 0.5, 0.5]);
+  run('and the wave beside it does not', 41, [0.24, 0.5, 0.5]);
+
+  /*
+   * The comparison is `Math.random() <= chance`, and the only roll that tells
+   * `<=` from `<` is one landing *exactly* on it. At wave 41 the equipment
+   * chance is 0.1 + 41 * 0.003 = 0.223, which is representable — so a port
+   * reading the shipped `<=` as `<` fails this row and nothing else.
+   */
+  const exact = 0.1 + 41 * 0.003;
+  const boundary = [exact, exact - Number.EPSILON, exact + 0.001].map(roll => {
+    let first = true;
+    const held = Math.random;
+    Math.random = () => {
+      if (!first) return 0.5;
+      first = false;
+      return roll;
+    };
+    try {
+      const before = state({ wave: 41, level: 60 });
+      const after = advanceCombatStep(before, 100);
+      return { roll, dropped: after.inventoryItemIds.length > before.inventoryItemIds.length };
+    } finally {
+      Math.random = held;
+    }
+  });
+
+  return { chances: dropChances(), scripted, boundary };
+}
+
 function build(): Fixture {
   return {
     note: 'What one kill pays, measured through advanceCombatStep on the shipped reducer.',
@@ -311,6 +488,7 @@ function build(): Fixture {
     bossEssence: buildBossEssence(),
     chestNodes: buildChestNodes(),
     heroLevels: buildHeroLevels(),
+    drops: buildDrops(),
   };
 }
 
@@ -480,6 +658,70 @@ describe('what a kill pays', () => {
     expect(at('one under the cap').leveled).toBe(2);
     // At 999 they stop, rather than running past it.
     expect(at('at the cap').leveled).toBe(0);
+  });
+
+  it('lifts both drop chances with the wave and again on a boss, to a ceiling', () => {
+    /*
+     * `min(0.4, 0.1 + wave * 0.003 + boss * 0.12)` for equipment and
+     * `min(0.32, 0.12 + wave * 0.0015 + boss * 0.08)` for usables. Four terms
+     * each, and the rows are chosen so a port with any one of them wrong still
+     * matches on some of them — which is why the ceiling rows are here at all.
+     */
+    const at = (wave: number) => fixture.drops.chances.find(row => row.wave === wave)!;
+    expect(at(1).equipment).toBeCloseTo(0.103, 12);
+    expect(at(1).usable).toBeCloseTo(0.1215, 12);
+
+    // The boss term, and then the ceiling swallowing everything past it.
+    expect(at(10).equipment).toBeGreaterThan(at(1).equipment);
+    expect(at(100).equipment).toBe(0.4);
+    expect(at(400).equipment).toBe(at(100).equipment);
+    expect(at(100).usable).toBe(0.32);
+    expect(at(400).usable).toBe(at(100).usable);
+  });
+
+  it('spends nine draws on an equipment drop and one on refusing it', () => {
+    /*
+     * The draw count is as much of the record as the item: a port that rolled
+     * the rarity before the chance, or drew a pool index it did not need,
+     * produces a different item from the same seed on the very next kill.
+     *
+     * A kill that drops nothing costs **two** — one chance roll each. An
+     * equipment drop costs nine, so the usable chance is the tenth draw and
+     * not the fourth.
+     */
+    const at = (name: string) => fixture.drops.scripted.find(row => row.name === name)!;
+    expect(at('nothing drops').draws).toBe(2);
+    expect(at('equipment only').draws).toBe(10);
+    expect(at('usable only').draws).toBe(3);
+    expect(at('both drop').draws).toBe(11);
+
+    expect(at('equipment only').equipment).not.toBeNull();
+    expect(at('equipment only').equipment!.source).toBe('drop');
+    // Rolled against the player's level, not the item's row.
+    expect(at('equipment only').equipment!.itemLevel).toBe(60);
+    expect(at('usable only').usables).toBe(1);
+    expect(at('both drop').usables).toBe(1);
+  });
+
+  it('reads the boss term, shown by a roll that lands on one side of it', () => {
+    // 0.24 is above wave 41's 0.223 and below wave 40's 0.34. Same dice.
+    expect(
+      fixture.drops.scripted.find(row => row.name === 'a boss drops on a roll that misses')!.equipment,
+    ).not.toBeNull();
+    expect(fixture.drops.scripted.find(row => row.name === 'and the wave beside it does not')!.equipment).toBeNull();
+  });
+
+  it('drops on a roll landing exactly on the chance', () => {
+    /*
+     * `Math.random() <= chance`, and the only roll that tells `<=` from `<` is
+     * one landing exactly on it. Every other drop and refusal in this game
+     * reads `<`; this one does not, and a port that tidied it would be wrong
+     * on a boundary nobody would ever reproduce by playing.
+     */
+    const [exact, justUnder, over] = fixture.drops.boundary;
+    expect(exact.dropped).toBe(true);
+    expect(justUnder.dropped).toBe(true);
+    expect(over.dropped).toBe(false);
   });
 
   it('matches the committed fixture the rewrite is measured against', () => {

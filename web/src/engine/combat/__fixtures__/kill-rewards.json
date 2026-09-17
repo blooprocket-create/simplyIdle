@@ -311,5 +311,124 @@
       "startLevel": 998,
       "leveled": 2
     }
-  ]
+  ],
+  "drops": {
+    "chances": [
+      {
+        "wave": 1,
+        "boss": false,
+        "equipment": 0.103,
+        "usable": 0.1215
+      },
+      {
+        "wave": 10,
+        "boss": true,
+        "equipment": 0.25,
+        "usable": 0.215
+      },
+      {
+        "wave": 41,
+        "boss": false,
+        "equipment": 0.223,
+        "usable": 0.1815
+      },
+      {
+        "wave": 50,
+        "boss": true,
+        "equipment": 0.37,
+        "usable": 0.275
+      },
+      {
+        "wave": 100,
+        "boss": true,
+        "equipment": 0.4,
+        "usable": 0.32
+      },
+      {
+        "wave": 200,
+        "boss": true,
+        "equipment": 0.4,
+        "usable": 0.32
+      },
+      {
+        "wave": 400,
+        "boss": true,
+        "equipment": 0.4,
+        "usable": 0.32
+      }
+    ],
+    "scripted": [
+      {
+        "name": "nothing drops",
+        "wave": 41,
+        "draws": 2,
+        "equipment": null,
+        "usables": 0
+      },
+      {
+        "name": "equipment only",
+        "wave": 41,
+        "draws": 10,
+        "equipment": {
+          "slot": "armor",
+          "rarity": "common",
+          "itemLevel": 60,
+          "source": "drop"
+        },
+        "usables": 0
+      },
+      {
+        "name": "usable only",
+        "wave": 41,
+        "draws": 3,
+        "equipment": null,
+        "usables": 1
+      },
+      {
+        "name": "both drop",
+        "wave": 41,
+        "draws": 11,
+        "equipment": {
+          "slot": "armor",
+          "rarity": "common",
+          "itemLevel": 60,
+          "source": "drop"
+        },
+        "usables": 1
+      },
+      {
+        "name": "a boss drops on a roll that misses",
+        "wave": 40,
+        "draws": 10,
+        "equipment": {
+          "slot": "armor",
+          "rarity": "common",
+          "itemLevel": 60,
+          "source": "drop"
+        },
+        "usables": 0
+      },
+      {
+        "name": "and the wave beside it does not",
+        "wave": 41,
+        "draws": 2,
+        "equipment": null,
+        "usables": 0
+      }
+    ],
+    "boundary": [
+      {
+        "roll": 0.223,
+        "dropped": true
+      },
+      {
+        "roll": 0.22299999999999978,
+        "dropped": true
+      },
+      {
+        "roll": 0.224,
+        "dropped": false
+      }
+    ]
+  }
 }
