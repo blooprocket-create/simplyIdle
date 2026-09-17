@@ -58,8 +58,9 @@ export function App() {
    * it safe in the loop effect's dependencies below.
    */
   const [roster] = useState(() => {
-    const save = loadSave(browserStore(), Date.now());
-    return save === null ? startingRoster() : rosterFromSave(save);
+    const nowMs = Date.now();
+    const save = loadSave(browserStore(), nowMs);
+    return save === null ? startingRoster(nowMs) : rosterFromSave(save);
   });
   const cast = roster.cast;
   const profile = roster.profile;

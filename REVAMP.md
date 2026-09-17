@@ -294,7 +294,22 @@ Two things worth knowing, both ported rather than tidied:
 
 `Simulation.ts` was six lines under its 300-line cap, so `teamDps` moved to `entities/HeroEntity.ts`, beside the `nominalDps` it sums. That is what the cap is for: summing a roster's damage is a rule about heroes, and it was living in the coordinator only because it was two lines long.
 
-**Still outstanding, and flagged rather than quietly changed:** `demoRoster.ts` describes a *showcase* account, not a new player — level 42, 1,482 kills, six heroes past level 40 and a seeded wallet — while the file's own comment says it answers "what does someone who has never played see?". The seeded gold is no longer a stand-in for a missing economy, since the displayed figure is now the seed plus what the run earns; but what a genuinely new player should start with is a design question, not a port, and it belongs with the rest of the economy in Phase 10.
+#### The starting team is a save now, and that fixed four disagreements
+
+`demoRoster.ts` bolted four independently written things together — heroes with hand-written DPS, a cast, a `PlayerProfile` built by hand, and a team health figure derived from *different heroes again* — and each told a different story about the same six people. Building one `SaveV3` and running it through `rosterFromSave` makes that impossible rather than merely fixed, for the reason that function's own comment already gave: a save has three readers, which is three chances to disagree.
+
+What was wrong:
+
+- **The formation was illegal.** Picking one hero of each class gives three whose intended rank is `front` plus a spare that was usually a fourth, and a rank holds two — so the shipped selection rules fielded **four of the six**. The cast path does not check, so the diorama drew all six standing somewhere the game says they cannot stand. The sixth is now a *second archer* rather than an arbitrary spare, and the monk spends their one choice on mid, which is what makes a legal two-two-two.
+- **Health measured a different team.** The profile listed them at levels 40–75 with mixed rarities; the health derivation assumed six **level-one commons** and came out at 843 for a team the screens described as veterans. Everything downstream of health — how long they survive, which wave is the wall, where the offline sawtooth turns over — was measured against the wrong one.
+- **Damage rested on a presentation decision.** `100 + index * 18`, chosen so the cast bars would visibly run at different rates. Nothing derived it.
+- **Every third hero had rank zero.** There is no rank zero; the reader clamps it, so the only symptom was a roster row that would not move.
+
+The starting save is built as a raw payload and read through `readSave`, so it is a save *by construction* — bounded by the same reader every stored save goes through, and subject to the idempotence `v3.test.ts` holds that reader to. A literal could quietly carry exactly the rank of zero the hand-built profile did. `teamBoost` is deliberately left out of the payload, because the reader floors it at the hero's own authored base boost.
+
+It costs the demo 365 DPS against 870, and buys it 3,826 health against 843, both derived from the six heroes actually shown. The demo is **better** for it: over ten minutes it reaches wave 48 against the old wave 43, wiping twice instead of eight times, and both versions meet their first wall at wave 41.
+
+What this does *not* settle is what a genuinely new player should start with. The save still carries the showcase numbers — level 42, 1,482 kills, a seeded wallet — because those are contents rather than structure, and choosing them is a design question for Phase 10 rather than a port. It is now one number in one place to change.
 
 ### Phase 9 — Equipment *(~2 weeks)*
 `EQUIP_ITEM`, `TOGGLE_EQUIP_HERO`, `CRAFT_EQUIPMENT`, `DISMANTLE_EQUIPMENT`, `UPGRADE_EQUIPMENT_RARITY`, `CONVERT_SCRAP_TO_ESSENCE`, `CONVERT_SCRAP_TO_SHARDS`, `TOGGLE_HERO_UNIQUE_WEAPON`. Content: `EQUIPMENT_CATALOG`, `EQUIPMENT_RARITIES`.
