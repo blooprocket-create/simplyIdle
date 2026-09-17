@@ -44,6 +44,17 @@ describe('the automation catalogue', () => {
   });
 
   it('marks only what this build can honour as available', () => {
+    /*
+     * Still only `burst`, and Phase 8 did not change that despite building
+     * summoning and recycling. `available` is a claim that the *shell wires
+     * this flag to the running simulation*, not that the rules exist — and
+     * `ui/architecture.test.ts` enforces exactly that correspondence. It
+     * caught an attempt to flip these two on the strength of the rules alone.
+     *
+     * What the wiring waits on is a wallet: the simulation carries no gold,
+     * shards or boss tears, so there is nothing for an automatic summon to
+     * spend or an automatic recycle to pay into. That is Phase 10's.
+     */
     const available = availableAutomations();
     expect(available.map(entry => entry.id)).toEqual(['burst']);
     for (const entry of AUTOMATIONS) {
