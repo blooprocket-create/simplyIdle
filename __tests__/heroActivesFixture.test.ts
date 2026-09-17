@@ -123,6 +123,18 @@ interface Fixture {
   rankScaling: { heroId: string; type: string; rank: number; power: number; cooldownMs: number }[];
   /** How the ability bar reads, which is its own published shape. */
   statuses: { uid: string; skillName: string; totalCooldownMs: number; ready: boolean }[];
+  /**
+   * Every hero's unique skill at rank one, and their archetype.
+   *
+   * The table the port's content file is generated from and checked against —
+   * sixty-five rows of type, power, duration and cooldown is more
+   * transcription than anybody reads carefully.
+   */
+  byHero: {
+    heroId: string;
+    archetype: string;
+    unique: { type: string; power: number; durationMs: number; cooldownMs: number } | null;
+  }[];
 }
 
 /** A hero for each generic archetype, found by walking the pool. */
@@ -318,6 +330,21 @@ function build(): Fixture {
     refusals,
     rankScaling,
     statuses,
+    byHero: HERO_POOL.map(template => {
+      const params = getHeroUniqueSkillParams(template.id, 1);
+      return {
+        heroId: template.id,
+        archetype: template.activeSkillArchetype,
+        unique: params
+          ? {
+              type: params.type,
+              power: params.power,
+              durationMs: params.durationMs,
+              cooldownMs: params.cooldownMs,
+            }
+          : null,
+      };
+    }),
   };
 }
 
@@ -478,6 +505,25 @@ describe('hero actives fixture', () => {
     expect(fixture.statuses.map(entry => entry.uid)).toEqual(['ward', 'mend']);
     expect(fixture.statuses.find(entry => entry.uid === 'ward')!.ready).toBe(true);
     expect(fixture.statuses.find(entry => entry.uid === 'mend')!.ready).toBe(false);
+  });
+
+  it('gives every hero an archetype, and a unique skill if they have a relic', () => {
+    /*
+     * Sixty-five rows. Every hero has an archetype — `getHeroActiveArchetypeInfo`
+     * would have nothing to answer otherwise — and a hero with no relic profile
+     * has no unique skill, which is the `null` the port's generator has to keep.
+     */
+    expect(fixture.byHero).toHaveLength(65);
+    for (const row of fixture.byHero) {
+      expect({ id: row.heroId, hasArchetype: row.archetype.length > 0 }).toEqual({
+        id: row.heroId,
+        hasArchetype: true,
+      });
+    }
+    // And the ten types are all represented, so the port's table cannot be
+    // generated from a pool that happens to miss one.
+    const types = new Set(fixture.byHero.map(row => row.unique?.type).filter(Boolean));
+    expect([...types].sort()).toEqual([...UNIQUE_TYPES].sort());
   });
 
   it('matches the committed fixture the rewrite is measured against', () => {

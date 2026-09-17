@@ -746,5 +746,657 @@
       "totalCooldownMs": 6000,
       "ready": false
     }
+  ],
+  "byHero": [
+    {
+      "heroId": "h1",
+      "archetype": "frontline_ward",
+      "unique": {
+        "type": "shield_wall",
+        "power": 0.3,
+        "durationMs": 4000,
+        "cooldownMs": 10000
+      }
+    },
+    {
+      "heroId": "h2",
+      "archetype": "frontline_ward",
+      "unique": {
+        "type": "barrier_pulse",
+        "power": 0.1,
+        "durationMs": 3500,
+        "cooldownMs": 9000
+      }
+    },
+    {
+      "heroId": "h3",
+      "archetype": "battle_chant",
+      "unique": {
+        "type": "armor_shred",
+        "power": 0.2,
+        "durationMs": 4000,
+        "cooldownMs": 8000
+      }
+    },
+    {
+      "heroId": "h4",
+      "archetype": "battle_chant",
+      "unique": {
+        "type": "rallying_cry",
+        "power": 0.2,
+        "durationMs": 4000,
+        "cooldownMs": 9000
+      }
+    },
+    {
+      "heroId": "h5",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "crit_storm",
+        "power": 0.06,
+        "durationMs": 0,
+        "cooldownMs": 7000
+      }
+    },
+    {
+      "heroId": "h6",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "execute",
+        "power": 0.12,
+        "durationMs": 0,
+        "cooldownMs": 7000
+      }
+    },
+    {
+      "heroId": "h7",
+      "archetype": "mending_pulse",
+      "unique": {
+        "type": "barrier_pulse",
+        "power": 0.12,
+        "durationMs": 3500,
+        "cooldownMs": 6000
+      }
+    },
+    {
+      "heroId": "h8",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "chain_lightning",
+        "power": 0.1,
+        "durationMs": 3000,
+        "cooldownMs": 7000
+      }
+    },
+    {
+      "heroId": "h9",
+      "archetype": "mending_pulse",
+      "unique": {
+        "type": "shield_wall",
+        "power": 0.25,
+        "durationMs": 4500,
+        "cooldownMs": 8000
+      }
+    },
+    {
+      "heroId": "h10",
+      "archetype": "frontline_ward",
+      "unique": {
+        "type": "barrier_pulse",
+        "power": 0.1,
+        "durationMs": 4000,
+        "cooldownMs": 8000
+      }
+    },
+    {
+      "heroId": "h11",
+      "archetype": "frontline_ward",
+      "unique": {
+        "type": "shield_wall",
+        "power": 0.35,
+        "durationMs": 4000,
+        "cooldownMs": 10000
+      }
+    },
+    {
+      "heroId": "h12",
+      "archetype": "battle_chant",
+      "unique": {
+        "type": "soul_drain",
+        "power": 0.08,
+        "durationMs": 0,
+        "cooldownMs": 7000
+      }
+    },
+    {
+      "heroId": "h13",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "mark_prey",
+        "power": 0.22,
+        "durationMs": 4000,
+        "cooldownMs": 8000
+      }
+    },
+    {
+      "heroId": "h14",
+      "archetype": "mending_pulse",
+      "unique": {
+        "type": "barrier_pulse",
+        "power": 0.12,
+        "durationMs": 4000,
+        "cooldownMs": 6000
+      }
+    },
+    {
+      "heroId": "h15",
+      "archetype": "battle_chant",
+      "unique": {
+        "type": "rallying_cry",
+        "power": 0.2,
+        "durationMs": 4500,
+        "cooldownMs": 9000
+      }
+    },
+    {
+      "heroId": "h16",
+      "archetype": "frontline_ward",
+      "unique": {
+        "type": "shield_wall",
+        "power": 0.3,
+        "durationMs": 3800,
+        "cooldownMs": 9500
+      }
+    },
+    {
+      "heroId": "h17",
+      "archetype": "battle_chant",
+      "unique": {
+        "type": "rallying_cry",
+        "power": 0.22,
+        "durationMs": 4200,
+        "cooldownMs": 9000
+      }
+    },
+    {
+      "heroId": "h18",
+      "archetype": "battle_chant",
+      "unique": {
+        "type": "mark_prey",
+        "power": 0.2,
+        "durationMs": 4000,
+        "cooldownMs": 8000
+      }
+    },
+    {
+      "heroId": "h19",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "crit_storm",
+        "power": 0.06,
+        "durationMs": 0,
+        "cooldownMs": 6500
+      }
+    },
+    {
+      "heroId": "h20",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "execute",
+        "power": 0.12,
+        "durationMs": 0,
+        "cooldownMs": 7000
+      }
+    },
+    {
+      "heroId": "h21",
+      "archetype": "frontline_ward",
+      "unique": {
+        "type": "overcharge",
+        "power": 0.15,
+        "durationMs": 0,
+        "cooldownMs": 8000
+      }
+    },
+    {
+      "heroId": "h22",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "chain_lightning",
+        "power": 0.1,
+        "durationMs": 3000,
+        "cooldownMs": 7000
+      }
+    },
+    {
+      "heroId": "h23",
+      "archetype": "mending_pulse",
+      "unique": {
+        "type": "chain_lightning",
+        "power": 0.08,
+        "durationMs": 3500,
+        "cooldownMs": 7000
+      }
+    },
+    {
+      "heroId": "h24",
+      "archetype": "mending_pulse",
+      "unique": {
+        "type": "barrier_pulse",
+        "power": 0.1,
+        "durationMs": 4000,
+        "cooldownMs": 6000
+      }
+    },
+    {
+      "heroId": "h25",
+      "archetype": "battle_chant",
+      "unique": {
+        "type": "armor_shred",
+        "power": 0.2,
+        "durationMs": 3500,
+        "cooldownMs": 8000
+      }
+    },
+    {
+      "heroId": "h26",
+      "archetype": "frontline_ward",
+      "unique": {
+        "type": "rallying_cry",
+        "power": 0.2,
+        "durationMs": 4000,
+        "cooldownMs": 9000
+      }
+    },
+    {
+      "heroId": "h27",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "overcharge",
+        "power": 0.18,
+        "durationMs": 0,
+        "cooldownMs": 7500
+      }
+    },
+    {
+      "heroId": "h28",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "mark_prey",
+        "power": 0.22,
+        "durationMs": 4000,
+        "cooldownMs": 7500
+      }
+    },
+    {
+      "heroId": "h29",
+      "archetype": "mending_pulse",
+      "unique": {
+        "type": "barrier_pulse",
+        "power": 0.12,
+        "durationMs": 4000,
+        "cooldownMs": 6000
+      }
+    },
+    {
+      "heroId": "h30",
+      "archetype": "frontline_ward",
+      "unique": {
+        "type": "shield_wall",
+        "power": 0.25,
+        "durationMs": 4500,
+        "cooldownMs": 9000
+      }
+    },
+    {
+      "heroId": "h31",
+      "archetype": "frontline_ward",
+      "unique": {
+        "type": "armor_shred",
+        "power": 0.22,
+        "durationMs": 4000,
+        "cooldownMs": 8500
+      }
+    },
+    {
+      "heroId": "h32",
+      "archetype": "battle_chant",
+      "unique": {
+        "type": "shield_wall",
+        "power": 0.3,
+        "durationMs": 4000,
+        "cooldownMs": 9000
+      }
+    },
+    {
+      "heroId": "h33",
+      "archetype": "battle_chant",
+      "unique": {
+        "type": "crit_storm",
+        "power": 0.07,
+        "durationMs": 0,
+        "cooldownMs": 6500
+      }
+    },
+    {
+      "heroId": "h34",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "overcharge",
+        "power": 0.18,
+        "durationMs": 0,
+        "cooldownMs": 7500
+      }
+    },
+    {
+      "heroId": "h35",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "crit_storm",
+        "power": 0.07,
+        "durationMs": 0,
+        "cooldownMs": 6500
+      }
+    },
+    {
+      "heroId": "h36",
+      "archetype": "mending_pulse",
+      "unique": {
+        "type": "mark_prey",
+        "power": 0.25,
+        "durationMs": 4500,
+        "cooldownMs": 7500
+      }
+    },
+    {
+      "heroId": "h37",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "soul_drain",
+        "power": 0.1,
+        "durationMs": 0,
+        "cooldownMs": 7000
+      }
+    },
+    {
+      "heroId": "h38",
+      "archetype": "mending_pulse",
+      "unique": {
+        "type": "mark_prey",
+        "power": 0.22,
+        "durationMs": 4000,
+        "cooldownMs": 7500
+      }
+    },
+    {
+      "heroId": "h39",
+      "archetype": "battle_chant",
+      "unique": {
+        "type": "shield_wall",
+        "power": 0.28,
+        "durationMs": 4000,
+        "cooldownMs": 9000
+      }
+    },
+    {
+      "heroId": "h40",
+      "archetype": "mending_pulse",
+      "unique": {
+        "type": "barrier_pulse",
+        "power": 0.12,
+        "durationMs": 4000,
+        "cooldownMs": 6000
+      }
+    },
+    {
+      "heroId": "h41",
+      "archetype": "frontline_ward",
+      "unique": {
+        "type": "soul_drain",
+        "power": 0.12,
+        "durationMs": 0,
+        "cooldownMs": 7000
+      }
+    },
+    {
+      "heroId": "h42",
+      "archetype": "battle_chant",
+      "unique": {
+        "type": "rallying_cry",
+        "power": 0.25,
+        "durationMs": 4500,
+        "cooldownMs": 8500
+      }
+    },
+    {
+      "heroId": "h43",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "execute",
+        "power": 0.15,
+        "durationMs": 0,
+        "cooldownMs": 6500
+      }
+    },
+    {
+      "heroId": "h44",
+      "archetype": "battle_chant",
+      "unique": {
+        "type": "armor_shred",
+        "power": 0.25,
+        "durationMs": 4000,
+        "cooldownMs": 8000
+      }
+    },
+    {
+      "heroId": "h45",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "overcharge",
+        "power": 0.2,
+        "durationMs": 0,
+        "cooldownMs": 7000
+      }
+    },
+    {
+      "heroId": "h46",
+      "archetype": "frontline_ward",
+      "unique": {
+        "type": "execute",
+        "power": 0.15,
+        "durationMs": 0,
+        "cooldownMs": 7000
+      }
+    },
+    {
+      "heroId": "h47",
+      "archetype": "mending_pulse",
+      "unique": {
+        "type": "barrier_pulse",
+        "power": 0.15,
+        "durationMs": 4500,
+        "cooldownMs": 6000
+      }
+    },
+    {
+      "heroId": "h48",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "chain_lightning",
+        "power": 0.12,
+        "durationMs": 3500,
+        "cooldownMs": 6500
+      }
+    },
+    {
+      "heroId": "h49",
+      "archetype": "battle_chant",
+      "unique": {
+        "type": "overcharge",
+        "power": 0.2,
+        "durationMs": 0,
+        "cooldownMs": 7000
+      }
+    },
+    {
+      "heroId": "h50",
+      "archetype": "mending_pulse",
+      "unique": {
+        "type": "rallying_cry",
+        "power": 0.25,
+        "durationMs": 4500,
+        "cooldownMs": 7000
+      }
+    },
+    {
+      "heroId": "h51",
+      "archetype": "frontline_ward",
+      "unique": {
+        "type": "armor_shred",
+        "power": 0.3,
+        "durationMs": 4500,
+        "cooldownMs": 8000
+      }
+    },
+    {
+      "heroId": "h52",
+      "archetype": "battle_chant",
+      "unique": {
+        "type": "rallying_cry",
+        "power": 0.28,
+        "durationMs": 5000,
+        "cooldownMs": 8000
+      }
+    },
+    {
+      "heroId": "h53",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "crit_storm",
+        "power": 0.1,
+        "durationMs": 0,
+        "cooldownMs": 6000
+      }
+    },
+    {
+      "heroId": "h54",
+      "archetype": "battle_chant",
+      "unique": {
+        "type": "mark_prey",
+        "power": 0.3,
+        "durationMs": 5000,
+        "cooldownMs": 7500
+      }
+    },
+    {
+      "heroId": "h55",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "execute",
+        "power": 0.18,
+        "durationMs": 0,
+        "cooldownMs": 6500
+      }
+    },
+    {
+      "heroId": "h56",
+      "archetype": "mending_pulse",
+      "unique": {
+        "type": "soul_drain",
+        "power": 0.14,
+        "durationMs": 0,
+        "cooldownMs": 6500
+      }
+    },
+    {
+      "heroId": "h57",
+      "archetype": "mending_pulse",
+      "unique": {
+        "type": "barrier_pulse",
+        "power": 0.18,
+        "durationMs": 5000,
+        "cooldownMs": 5500
+      }
+    },
+    {
+      "heroId": "h58",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "chain_lightning",
+        "power": 0.15,
+        "durationMs": 4000,
+        "cooldownMs": 6000
+      }
+    },
+    {
+      "heroId": "h59",
+      "archetype": "battle_chant",
+      "unique": {
+        "type": "rallying_cry",
+        "power": 0.28,
+        "durationMs": 5000,
+        "cooldownMs": 8000
+      }
+    },
+    {
+      "heroId": "h60",
+      "archetype": "mending_pulse",
+      "unique": {
+        "type": "shield_wall",
+        "power": 0.4,
+        "durationMs": 5000,
+        "cooldownMs": 9000
+      }
+    },
+    {
+      "heroId": "h61",
+      "archetype": "frontline_ward",
+      "unique": {
+        "type": "armor_shred",
+        "power": 0.35,
+        "durationMs": 5000,
+        "cooldownMs": 7500
+      }
+    },
+    {
+      "heroId": "h62",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "overcharge",
+        "power": 0.3,
+        "durationMs": 0,
+        "cooldownMs": 6000
+      }
+    },
+    {
+      "heroId": "h63",
+      "archetype": "burst_volley",
+      "unique": {
+        "type": "soul_drain",
+        "power": 0.18,
+        "durationMs": 0,
+        "cooldownMs": 6000
+      }
+    },
+    {
+      "heroId": "h64",
+      "archetype": "mending_pulse",
+      "unique": {
+        "type": "chain_lightning",
+        "power": 0.18,
+        "durationMs": 4500,
+        "cooldownMs": 5500
+      }
+    },
+    {
+      "heroId": "h65",
+      "archetype": "battle_chant",
+      "unique": {
+        "type": "barrier_pulse",
+        "power": 0.2,
+        "durationMs": 5000,
+        "cooldownMs": 5500
+      }
+    }
   ]
 }
