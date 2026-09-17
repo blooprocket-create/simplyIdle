@@ -89,6 +89,16 @@ interface Pull {
   rarity: Rarity;
   heroId: string;
   tier: number;
+  /**
+   * How many random values the whole action consumed for this pull.
+   *
+   * The roll and the template pick are only the front of it: the shipped
+   * action also draws for the new hero's uid and for the chance of a unique
+   * relic, and a milestone that grants one draws again. A port that models
+   * the front has to know how far to advance the source before the next pull,
+   * or every pull after the first is compared against the wrong draw.
+   */
+  randomDraws: number;
   /** The pity counter *after* the pull. */
   pityCounter: number;
   pityTriggered: boolean;
@@ -110,12 +120,17 @@ interface Pull {
  */
 function run(start: GameState, count: number, seed: number): Pull[] {
   const random = scriptedRandom(seed);
-  const randomSpy = jest.spyOn(Math, 'random').mockImplementation(random);
+  let draws = 0;
+  const randomSpy = jest.spyOn(Math, 'random').mockImplementation(() => {
+    draws += 1;
+    return random();
+  });
   try {
     const pulls: Pull[] = [];
     let current = start;
     for (let index = 0; index < count; index += 1) {
       const before = current;
+      const drawsBefore = draws;
       current = reducer(current, { type: 'SUMMON_HERO', payWithDiamonds: true } as never);
       // The newest hero is pushed onto the front of the roster.
       const [hero] = current.heroRoster;
@@ -125,6 +140,7 @@ function run(start: GameState, count: number, seed: number): Pull[] {
         rarity: hero.rarity,
         heroId: hero.id,
         tier: template?.tier ?? 0,
+        randomDraws: draws - drawsBefore,
         pityCounter: current.gachaPityCounter,
         pityTriggered: current.summonHistory[0]?.pityTriggered ?? false,
         sparkTokens: current.sparkTokens - before.sparkTokens,
@@ -299,6 +315,25 @@ describe('summon fixture', () => {
       .reduce((sum, entry) => sum + entry.chance, 0);
     expect(total).toBeCloseTo(1, 10);
     expect(withoutTranscendent).toBeCloseTo(0.999, 10);
+  });
+
+  it('records how many random values each pull consumed', () => {
+    /*
+     * The number a port needs in order to stay in step. The roll takes one or
+     * two, the template pick takes one, and the action then draws again for
+     * the hero's uid and for a relic chance — so a port that models only the
+     * front of a pull has to advance the source past the rest or compare its
+     * second pull against the first pull's leftovers.
+     *
+     * Asserted to be at least three rather than pinned exactly: the trailing
+     * draws vary with what the pull granted, and pinning the total would make
+     * this fixture brittle against a change in a system it is not about.
+     */
+    for (const pull of fixture.earlyGame) {
+      expect({ index: pull.index, enough: pull.randomDraws >= 3 }).toEqual({ index: pull.index, enough: true });
+    }
+    // And they do vary, so a port cannot assume a constant.
+    expect(new Set(fixture.earlyGame.map(pull => pull.randomDraws)).size).toBeGreaterThan(1);
   });
 
   it('clamps a rarity into the band its tier allows', () => {

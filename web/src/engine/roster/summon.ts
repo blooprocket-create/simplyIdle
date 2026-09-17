@@ -231,3 +231,137 @@ export function sparkTokensForSummon(
 ): number {
   return isDuplicate ? rates[rarity] : 0;
 }
+
+/**
+ * Which slice of the catalogue a rarity draws its hero from.
+ *
+ * Indices into `HERO_POOL`, so the *order* of that array is part of the
+ * balance and not a presentation choice. The legendary/mythic band overlaps
+ * the rare/epic one by ten heroes on purpose — the shipped comment says
+ * "overlaps for variety" — so the same hero can be pulled at two very
+ * different rarities.
+ */
+export interface TierRange {
+  rarities: readonly Rarity[];
+  startIndex: number;
+  endIndex: number;
+}
+
+export const HERO_TIER_RANGES: readonly TierRange[] = [
+  { rarities: ['common', 'uncommon'], startIndex: 0, endIndex: 30 },
+  { rarities: ['rare', 'epic'], startIndex: 30, endIndex: 50 },
+  { rarities: ['legendary', 'mythic'], startIndex: 40, endIndex: 60 },
+  { rarities: ['godly', 'transcendent'], startIndex: 50, endIndex: 65 },
+];
+
+/** The rarity band a hero tier may hold. A roll outside it is pulled to the edge. */
+export const TIER_RARITY_RANGE: Readonly<Record<number, { min: Rarity; max: Rarity }>> = {
+  1: { min: 'common', max: 'legendary' },
+  2: { min: 'common', max: 'legendary' },
+  3: { min: 'rare', max: 'godly' },
+  4: { min: 'epic', max: 'transcendent' },
+  5: { min: 'epic', max: 'transcendent' },
+};
+
+/**
+ * Pull a rarity into the band its hero's tier allows.
+ *
+ * A tier-one hero cannot be mythic and a tier-four cannot be common, so a roll
+ * outside the band is clamped rather than rejected — which is why a run's
+ * rarities do not match its rolls one for one. Clamping rather than re-rolling
+ * also means the clamp costs no random value, which matters for staying in
+ * step with a recorded run.
+ */
+export function clampRarityToTier(rarity: Rarity, tier: number): Rarity {
+  const range = TIER_RARITY_RANGE[tier];
+  if (!range) return rarity;
+  const index = rarityRank(rarity);
+  const min = rarityRank(range.min);
+  const max = rarityRank(range.max);
+  if (index < min) return range.min;
+  if (index > max) return range.max;
+  return rarity;
+}
+
+/** The two facts a pick needs about a hero. */
+export interface SummonTemplate {
+  id: string;
+  tier: number;
+}
+
+/**
+ * Pick a hero for a rarity, from that rarity's slice of the catalogue.
+ *
+ * One draw, always — including the fallback for a rarity no band covers, which
+ * draws from the whole pool. Keeping the draw count the same on both paths is
+ * what lets a caller advance a recorded sequence without knowing which path
+ * was taken.
+ */
+export function pickTemplateForRarity<T extends SummonTemplate>(
+  rarity: Rarity,
+  pool: readonly T[],
+  random: () => number,
+): T {
+  const band = HERO_TIER_RANGES.find(entry => entry.rarities.includes(rarity));
+  const slice = band ? pool.slice(band.startIndex, band.endIndex) : pool;
+  return slice[Math.floor(random() * slice.length)];
+}
+
+/**
+ * The same pick, with a banner's featured hero given a chance to win it.
+ *
+ * The rate-up check is short-circuited when there is no featured hero — the
+ * shipped expression is `featuredTemplate && rateUp && Math.random() < rateUp`
+ * — so a pull with no banner draws *once*, not twice. Writing the condition in
+ * a different order would draw an extra value on every ordinary pull and
+ * desynchronise the whole sequence.
+ */
+export function pickWithBanner<T extends SummonTemplate>(
+  rarity: Rarity,
+  featured: T | null,
+  rateUpByRarity: Readonly<Partial<Record<Rarity, number>>>,
+  pool: readonly T[],
+  random: () => number,
+): { template: T; wasFeatured: boolean } {
+  const rateUp = rateUpByRarity[rarity];
+  if (featured && rateUp !== undefined && random() < rateUp) {
+    return { template: featured, wasFeatured: true };
+  }
+  return { template: pickTemplateForRarity(rarity, pool, random), wasFeatured: false };
+}
+
+export interface SummonResult {
+  /** The rarity after the tier clamp, which is the one the hero is created at. */
+  rarity: Rarity;
+  /** The rarity the dice actually produced, before the clamp moved it. */
+  rolledRarity: Rarity;
+  template: SummonTemplate;
+  nextCounter: number;
+  pityTriggered: boolean;
+}
+
+/**
+ * One pull: roll, pick, clamp — in the order the shipped action does them.
+ *
+ * The order is the point. The clamp reads the *template's* tier, so it can
+ * only run after the pick, and the pick reads the *rolled* rarity rather than
+ * the clamped one — so a hero is chosen from the band the dice named and then
+ * has their rarity dragged into their own tier's band. A port that clamped
+ * first would pick from a different slice of the catalogue.
+ */
+export function summonPull<T extends SummonTemplate>(
+  state: PityState,
+  postgameUnlocked: boolean,
+  pool: readonly T[],
+  random: () => number,
+): SummonResult & { template: T } {
+  const roll = rollRarityWithPity(state, postgameUnlocked, random);
+  const template = pickTemplateForRarity(roll.rarity, pool, random);
+  return {
+    rarity: clampRarityToTier(roll.rarity, template.tier),
+    rolledRarity: roll.rarity,
+    template,
+    nextCounter: roll.nextCounter,
+    pityTriggered: roll.pityTriggered,
+  };
+}

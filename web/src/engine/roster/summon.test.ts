@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { RARITY_IDS, RARITY_SUMMON_CHANCE, type Rarity } from '../../content/rarities';
+import { HERO_POOL } from '../../content/heroes';
 import {
+  HERO_TIER_RANGES,
   PITY_THRESHOLD,
   SOFT_PITY_BOOST_PER_PULL,
   SOFT_PITY_START,
@@ -10,7 +12,11 @@ import {
   rollRarityWithPity,
   sparkTokensForSummon,
   spendGuarantee,
+  summonPull,
   summonRarityPool,
+  clampRarityToTier,
+  pickTemplateForRarity,
+  pickWithBanner,
   type Milestone,
   type PityState,
 } from './summon';
@@ -45,44 +51,59 @@ const MILESTONES: Milestone[] = [
 const rank = (rarity: Rarity) => RARITY_IDS.indexOf(rarity);
 
 /**
- * Replay a recorded run through the port.
+ * Replay a whole recorded run through the port, pull for pull.
  *
- * Only the rarity roll is replayed, not the whole action: the shipped pull also
- * picks a hero template and clamps the rarity to that template's tier, and
- * picking a template is Phase 8's next piece. So each recorded pull's *tier* is
- * used to undo the clamp — the port has to produce a rarity that clamps to the
- * one recorded, which is exactly as strong a claim for every pull the clamp did
- * not move, and the weakest honest one for the rest.
+ * The part that makes this possible is `randomDraws`: the shipped action draws
+ * more values per pull than the port models — for the new hero's uid and for a
+ * relic chance — so after each pull the source is advanced past the remainder.
+ * Without that, every pull after the first is compared against the previous
+ * pull's leftovers and the whole run looks like noise.
  */
-function replay(pulls: typeof fixture.earlyGame, postgameUnlocked: boolean, startCounter: number) {
+function replay(pulls: readonly Pull[], postgameUnlocked: boolean, startCounter: number) {
   const random = scriptedRandom(fixture.seed);
-  const results: { index: number; rarity: Rarity; counter: number; triggered: boolean }[] = [];
+  let drawn = 0;
+  const counted = () => {
+    drawn += 1;
+    return random();
+  };
+
+  const results: { index: number; rarity: Rarity; heroId: string; triggered: boolean; counter: number }[] = [];
   let state: PityState = { counter: startCounter, guaranteedMin: null };
   let totalSummons = 0;
   let claimed: number[] = [];
 
   for (const pull of pulls) {
-    const roll = rollRarityWithPity(state, postgameUnlocked, random);
-    results.push({ index: pull.index, rarity: roll.rarity, counter: roll.nextCounter, triggered: roll.pityTriggered });
+    const before = drawn;
+    const result = summonPull(state, postgameUnlocked, HERO_POOL, counted);
+    results.push({
+      index: pull.index,
+      rarity: result.rarity,
+      heroId: result.template.id,
+      triggered: result.pityTriggered,
+      counter: result.nextCounter,
+    });
 
-    /*
-     * The bookkeeping the action does around the roll, in the order it does
-     * it: the template pick consumes random values too, so this replay cannot
-     * be pull-for-pull past the first draw — which is why the assertions below
-     * check the first pull of each run exactly and the pity arithmetic for all
-     * of them.
-     */
+    // The port must never draw more than the action did, or "skip the rest"
+    // would mean rewinding.
+    expect({ index: pull.index, within: drawn - before <= pull.randomDraws }).toEqual({
+      index: pull.index,
+      within: true,
+    });
+    for (let skip = drawn - before; skip < pull.randomDraws; skip += 1) counted();
+
     totalSummons += 1;
     const rewards = claimMilestones(totalSummons, claimed, MILESTONES);
     claimed = rewards.claimed;
     state = {
-      counter: roll.nextCounter,
+      counter: result.nextCounter,
       guaranteedMin: spendGuarantee(state.guaranteedMin, rewards.guaranteedRarity),
     };
   }
 
   return results;
 }
+
+type Pull = (typeof fixture.earlyGame)[number];
 
 describe('the scripted source', () => {
   it('reproduces the generator’s sequence from the seed alone', () => {
@@ -140,16 +161,18 @@ describe('the rarity table', () => {
 });
 
 describe('pity', () => {
-  it('produces the shipped first pull for every recorded run', () => {
+  it('reproduces every pull of every recorded run, rarity and hero', () => {
     /*
-     * The pull-for-pull claim, at the only depth this port can honestly make
-     * it: the first pull of each run, before the shipped action's template
-     * pick has consumed any random values the port does not yet consume.
+     * The claim the whole fixture exists for, and it is a strong one: sixty
+     * pulls of rarity *and* hero id matched against a run of the shipped
+     * reducer, from one seed.
      *
-     * Four runs with four different starting counters, which is what makes
-     * this worth more than one: each enters a different branch of the roll.
+     * Four runs, each entering a different branch — an ordinary early-game
+     * run, the postgame pool, one parked at hard pity and one inside the soft
+     * window. A port that drew its random values in a different order would
+     * survive the first pull of one run and fail the rest.
      */
-    const runs: [string, typeof fixture.earlyGame, boolean, number][] = [
+    const runs: [string, readonly Pull[], boolean, number][] = [
       ['earlyGame', fixture.earlyGame, false, 0],
       ['postgame', fixture.postgame, true, 0],
       ['hardPity', fixture.hardPity, false, 29],
@@ -157,13 +180,18 @@ describe('pity', () => {
     ];
 
     for (const [name, pulls, postgame, startCounter] of runs) {
-      const [first] = replay(pulls, postgame, startCounter);
-      const recorded = pulls[0];
-      expect({ name, rarity: first.rarity, triggered: first.triggered }).toEqual({
-        name,
-        rarity: recorded.rarity,
-        triggered: recorded.pityTriggered,
-      });
+      const results = replay(pulls, postgame, startCounter);
+      expect({ name, count: results.length }).toEqual({ name, count: pulls.length });
+      for (const [index, result] of results.entries()) {
+        const recorded = pulls[index];
+        expect({ name, index, rarity: result.rarity, heroId: result.heroId, triggered: result.triggered }).toEqual({
+          name,
+          index,
+          rarity: recorded.rarity,
+          heroId: recorded.heroId,
+          triggered: recorded.pityTriggered,
+        });
+      }
     }
   });
 
@@ -387,5 +415,111 @@ describe('spark tokens', () => {
       });
       seen.add(pull.heroId);
     }
+  });
+});
+
+describe('picking a hero', () => {
+  it('draws from the slice its rarity names', () => {
+    // The indices are into `HERO_POOL`, so the order of that array is balance
+    // rather than presentation. A rarity always lands inside its own band.
+    for (const band of HERO_TIER_RANGES) {
+      const slice = HERO_POOL.slice(band.startIndex, band.endIndex).map(hero => hero.id);
+      for (const rarity of band.rarities) {
+        for (const roll of [0, 0.25, 0.5, 0.75, 0.999]) {
+          const picked = pickTemplateForRarity(rarity, HERO_POOL, () => roll);
+          expect({ rarity, roll, inBand: slice.includes(picked.id) }).toEqual({ rarity, roll, inBand: true });
+        }
+      }
+    }
+  });
+
+  it('overlaps the legendary band with the rare one, as shipped', () => {
+    /*
+     * Ten heroes sit in both the rare/epic band and the legendary/mythic one —
+     * the shipped comment says "overlaps for variety". So the same hero can be
+     * pulled at two very different rarities, which is why the tier clamp has
+     * work to do at all.
+     */
+    const rare = HERO_TIER_RANGES.find(band => band.rarities.includes('rare'))!;
+    const legendary = HERO_TIER_RANGES.find(band => band.rarities.includes('legendary'))!;
+    expect(legendary.startIndex).toBeLessThan(rare.endIndex);
+    expect(rare.endIndex - legendary.startIndex).toBe(10);
+  });
+
+  it('draws exactly once, with or without a band', () => {
+    // Keeping the count the same on both paths is what lets a caller advance a
+    // recorded sequence without knowing which path was taken.
+    const count = (rarity: Rarity) => {
+      let draws = 0;
+      pickTemplateForRarity(rarity, HERO_POOL, () => {
+        draws += 1;
+        return 0.5;
+      });
+      return draws;
+    };
+    expect(count('common')).toBe(1);
+    expect(count('transcendent')).toBe(1);
+  });
+
+  it('does not draw for a banner that is not running', () => {
+    /*
+     * The shipped expression short-circuits: `featured && rateUp && random()`.
+     * With no featured hero the rate-up check never draws, so an ordinary pull
+     * takes one value and not two. Written in a different order this would
+     * draw an extra value on every pull in the game and desynchronise
+     * everything after it.
+     */
+    let draws = 0;
+    const counting = () => {
+      draws += 1;
+      return 0.5;
+    };
+    pickWithBanner('legendary', null, { legendary: 0.35 }, HERO_POOL, counting);
+    expect(draws).toBe(1);
+
+    draws = 0;
+    pickWithBanner('legendary', HERO_POOL[0], { legendary: 0.35 }, HERO_POOL, counting);
+    // With a banner the rate-up check draws first; 0.5 misses a 0.35 rate-up,
+    // so the ordinary pick draws too.
+    expect(draws).toBe(2);
+  });
+
+  it('gives the featured hero the banner rate and no more', () => {
+    const featured = HERO_POOL[0];
+    const rates = { legendary: 0.35 };
+    expect(pickWithBanner('legendary', featured, rates, HERO_POOL, () => 0.34).wasFeatured).toBe(true);
+    expect(pickWithBanner('legendary', featured, rates, HERO_POOL, () => 0.36).wasFeatured).toBe(false);
+    // A rarity with no rate-up never favours the banner at all.
+    expect(pickWithBanner('common', featured, rates, HERO_POOL, () => 0).wasFeatured).toBe(false);
+  });
+});
+
+describe('the tier clamp', () => {
+  it('pulls a rarity into the band its tier allows', () => {
+    for (const entry of fixture.tierClamp) {
+      expect({ ...entry, got: clampRarityToTier(entry.rarity as Rarity, entry.tier) }).toEqual({
+        ...entry,
+        got: entry.clamped,
+      });
+    }
+  });
+
+  it('runs after the pick, not before it', () => {
+    /*
+     * The order matters and is easy to invert. The pick reads the *rolled*
+     * rarity and the clamp reads the picked hero's tier, so a hero is chosen
+     * from the band the dice named and then has their rarity dragged into
+     * their own tier's band. Clamping first would pick from a different slice
+     * of the catalogue entirely.
+     */
+    const result = summonPull({ counter: 0, guaranteedMin: null }, false, HERO_POOL, () => 0.9995);
+    // 0.9995 falls off the truncated table into common, which draws from the
+    // first thirty heroes — all tier one, whose band starts at common.
+    expect(result.rolledRarity).toBe('common');
+    expect(result.template.tier).toBe(1);
+    expect(result.rarity).toBe('common');
+
+    // And a rolled rarity the picked hero's tier cannot hold is moved.
+    expect(clampRarityToTier('mythic', 1)).toBe('legendary');
   });
 });
