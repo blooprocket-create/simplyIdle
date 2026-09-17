@@ -9,6 +9,7 @@ import { BURST_HIT_UID, TELL_HIT_UID, type BurstQuality } from './combat/burst';
 import { BurstMeter } from './combat/BurstMeter';
 import { applyHit, spawnEnemy, type Enemy } from './combat/encounter';
 import { FLAT_RATES, RunEarnings, type RewardRates } from './combat/rewards';
+import { seededRandom } from './rng';
 import { applyIncoming, fullHealth, type TeamVitals } from './combat/survival';
 import { scheduleSwings } from './combat/swingSchedule';
 import { heroViews, teamDps, type HeroEntity } from './entities/HeroEntity';
@@ -59,6 +60,16 @@ export interface SimulationOptions {
    * null loop on mount and drop the player's earned choice for a frame.
    */
   autoCast?: boolean;
+  /**
+   * The chest roll, and the only randomness in the fight.
+   *
+   * An argument because everything random in this engine is one. The default
+   * is **deterministic rather than `Math.random`** — a fight built without one
+   * still drops chests, and drops the same ones twice, which is what the
+   * parity suite and the offline estimator need. The shell passes the real
+   * thing; see `App.tsx`.
+   */
+  random?: () => number;
 }
 
 export class Simulation {
@@ -80,12 +91,14 @@ export class Simulation {
   private readonly boss = new BossFight();
   private readonly actives = new HeroActiveClock();
   private readonly casters: readonly ActiveCaster[];
+  private readonly random: () => number;
 
   constructor(options: SimulationOptions = { heroes: [] }) {
     this.burst = new BurstMeter(options.autoBurst ?? false);
     this.enemyHpMult = options.enemyHpMult ?? 1;
     this.incomingMult = options.incomingMult ?? 0;
     this.casters = options.casters ?? [];
+    this.random = options.random ?? seededRandom();
     if (options.autoCast !== undefined) this.actives.setAutoCast(options.autoCast);
     const resume = options.resume;
     this.kills = resume?.kills ?? 0;
@@ -283,7 +296,7 @@ export class Simulation {
     // boss is worth three charges and seven times the gold, and reading after
     // the respawn credits the wrong fight on both counts.
     this.burst.charge(isBossWave(this.enemy.wave), this.elapsedMs);
-    this.earnings.creditKill(this.enemy.wave);
+    this.earnings.creditKill(this.enemy.wave, this.random);
     // The shipped game heals the team to full on a win, and so does the
     // estimator's round model. Matching it keeps the sawtooth the same shape.
     this.restart(this.enemy.wave + 1);
@@ -329,7 +342,14 @@ export class Simulation {
       burst: this.burst.view(this.elapsedMs),
       wipe: this.rally.view(this.elapsedMs),
       boss: this.boss.view(this.elapsedMs),
-      totals: { kills: this.kills, deaths: this.deaths, dealt: this.dealt, overkill: this.overkill, ...earned },
+      totals: {
+        kills: this.kills,
+        deaths: this.deaths,
+        dealt: this.dealt,
+        overkill: this.overkill,
+        ...earned,
+        ...this.earnings.spoils(),
+      },
     };
   }
 }

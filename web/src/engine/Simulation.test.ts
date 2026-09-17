@@ -9,7 +9,7 @@ import { bossMechanicForWave } from '../content/bossMechanics';
 import { MENDING_PULSE_BASE_HEAL, MENDING_PULSE_LEVEL_SCALE } from '../content/heroSkills';
 import { AWAY_THRESHOLD_MS } from './offline/awayCredit';
 import { estimateOffline, retreatWave as estimateRetreatWave } from './offline/estimate';
-import { Simulation } from './Simulation';
+import { Simulation, type SimulationOptions } from './Simulation';
 import type { PlayerClass } from '../content/classes';
 import { createHeroEntity, nominalDps, startOffsetMs, type HeroEntity } from './entities/HeroEntity';
 
@@ -1247,5 +1247,63 @@ describe('an ability the player presses', () => {
 
   it('reports no abilities for a fight that has none', () => {
     expect(new Simulation({ heroes: [], teamMaxHp: new Decimal(1e9) }).read().abilities).toEqual([]);
+  });
+});
+
+describe('the currencies a run earns', () => {
+  /**
+   * The other half of the economy. Gold and EXP have been earned since Phase
+   * 8; these four were earned by nothing at all, while the forge, the summon
+   * pool and the prestige trees all spent from a wallet with no income.
+   */
+  const sim = (over: Partial<SimulationOptions> = {}) =>
+    new Simulation({ heroes: team(), teamMaxHp: new Decimal(1e12), enemyHpMult: 1e-9, ...over });
+
+  it('earns nothing but season points and mastery from plain waves', () => {
+    // Waves 1 to 9 hold no boss and no chest, which is the whole first chapter
+    // of a new game — and is why a port earning only gold looked right.
+    const early = new Simulation({ heroes: team(), teamMaxHp: new Decimal(1e12), enemyHpMult: 1e-9, startWave: 1 });
+    run(early, 2_000, 100);
+    const totals = early.read().totals;
+    expect(totals.kills).toBeGreaterThan(0);
+    expect(totals.seasonPoints).toBe(totals.kills * 12);
+    expect(totals.masteryXp).toBe(totals.kills * 2);
+  });
+
+  it('earns essence and a tear from a boss', () => {
+    const boss = sim({ startWave: 10 });
+    expect(boss.read().totals.essence).toBe(0);
+    run(boss, 2_000, 100);
+    const after = boss.read().totals;
+    expect(after.essence).toBeGreaterThan(0);
+    expect(after.bossTears).toBeGreaterThan(0);
+  });
+
+  it('rolls a chest with the generator it was given, not a global one', () => {
+    /*
+     * The same fight twice, once with a generator that always rolls a chest
+     * and once with one that never does. Everything else is identical, so the
+     * gap is the chest and nothing else — and a simulation reaching for
+     * `Math.random` would show no gap at all.
+     */
+    const lucky = sim({ startWave: 5, random: () => 0.49 });
+    const unlucky = sim({ startWave: 5, random: () => 0.99 });
+    run(lucky, 5_000, 100);
+    run(unlucky, 5_000, 100);
+    expect(lucky.read().totals.bossTears).toBeGreaterThan(unlucky.read().totals.bossTears);
+    // And the rest of the fight is untouched by which generator ran.
+    expect(lucky.read().totals.kills).toBe(unlucky.read().totals.kills);
+    expect(lucky.read().totals.gold.eq(unlucky.read().totals.gold)).toBe(true);
+  });
+
+  it('runs the same campaign twice when nobody supplies a generator', () => {
+    // The engine's default is seeded rather than global, which is what the
+    // parity suite and the offline estimator need.
+    const first = sim({ startWave: 1 });
+    const second = sim({ startWave: 1 });
+    run(first, 5_000, 100);
+    run(second, 5_000, 100);
+    expect(first.read().totals.bossTears).toBe(second.read().totals.bossTears);
+    expect(first.read().totals.essence).toBe(second.read().totals.essence);
   });
 });

@@ -145,6 +145,21 @@ export interface SimulationSnapshot {
      */
     gold: Decimal;
     exp: Decimal;
+    /**
+     * The four currencies a kill pays that are not gold.
+     *
+     * Plain numbers rather than `Decimal` because they are counted rather than
+     * scaled: a boss pays one tear and eight mastery whatever wave it is on,
+     * and nothing multiplies them. Gold and EXP run through a twelve-factor
+     * chain and past `Number.MAX_SAFE_INTEGER` on a deep account; these do not.
+     *
+     * Earned by the run, like the two above, and for the same reason: what a
+     * player *holds* is the save's wallet plus this.
+     */
+    essence: number;
+    bossTears: number;
+    seasonPoints: number;
+    masteryXp: number;
   };
 }
 
@@ -182,6 +197,10 @@ export function emptySnapshot(): SimulationSnapshot {
       overkill: new Decimal(0),
       gold: new Decimal(0),
       exp: new Decimal(0),
+      essence: 0,
+      bossTears: 0,
+      seasonPoints: 0,
+      masteryXp: 0,
     },
   };
 }

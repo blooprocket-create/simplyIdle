@@ -11,6 +11,9 @@ import { FLAT_RATES, RunEarnings, killReward } from './rewards';
  * earned nothing and a player who left was told nothing.
  */
 
+/** These measure gold and EXP; a chest tear is another test's subject. */
+const NO_CHEST = () => 0.99;
+
 describe('what one kill pays', () => {
   it('rounds the whole chain up, once', () => {
     /*
@@ -132,9 +135,9 @@ describe('against what the shipped game actually paid', () => {
 describe("a run's earnings", () => {
   it('adds up the kills it is told about', () => {
     const run = new RunEarnings();
-    run.creditKill(1);
-    run.creditKill(1);
-    run.creditKill(10);
+    run.creditKill(1, NO_CHEST);
+    run.creditKill(1, NO_CHEST);
+    run.creditKill(10, NO_CHEST);
     // 9 + 9 + 213, and 6 + 6 + 64.
     expect({ gold: run.read().gold.toString(), exp: run.read().exp.toString() }).toEqual({
       gold: '231',
@@ -144,7 +147,7 @@ describe("a run's earnings", () => {
 
   it('starts from what a resumed run had already earned', () => {
     const run = new RunEarnings(FLAT_RATES, { gold: new Decimal(100), exp: new Decimal(7) });
-    run.creditKill(1);
+    run.creditKill(1, NO_CHEST);
     expect({ gold: run.read().gold.toString(), exp: run.read().exp.toString() }).toEqual({
       gold: '109',
       exp: '13',
@@ -196,9 +199,9 @@ describe("a run's earnings", () => {
     // Crediting replaces the purse rather than mutating it, which is what lets
     // a snapshot handed to the UI stay the frame it was taken on.
     const run = new RunEarnings();
-    run.creditKill(1);
+    run.creditKill(1, NO_CHEST);
     const before = run.read();
-    run.creditKill(1);
+    run.creditKill(1, NO_CHEST);
     expect(before.gold.toString()).toBe('9');
     expect(run.read().gold.toString()).toBe('18');
   });

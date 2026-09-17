@@ -297,6 +297,10 @@ export function App() {
       casters: roster.casters,
       autoBurst: autoBurstRef.current,
       autoCast: autoCastRef.current,
+      // The one place the real generator enters the fight. The engine's own
+      // default is seeded, so a shell that forgot this would run a repeating
+      // campaign rather than no campaign — quiet, and worth not being quiet.
+      random: Math.random,
       resume: restored.resume ?? undefined,
       awayMs: restored.awayMs,
     });

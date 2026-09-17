@@ -1,6 +1,7 @@
 import Decimal from 'break_eternity.js';
 import { getMonsterAffixModifiers } from '../../content/affixes';
 import { getMonsterExp, getMonsterGold } from '../waves/curves';
+import { addPayout, EMPTY_PAYOUT, killPayout, type KillPayout } from './killPayout';
 
 /**
  * What a kill pays.
@@ -111,10 +112,26 @@ export class RunEarnings {
     this.purse = { gold: resume.gold, exp: resume.exp };
   }
 
-  /** Credit one kill, at the wave that died rather than the one replacing it. */
-  creditKill(wave: number): void {
+  private payout: KillPayout = EMPTY_PAYOUT;
+
+  /**
+   * Credit one kill, at the wave that died rather than the one replacing it.
+   *
+   * `random` is the chest roll and nothing else — an argument rather than a
+   * reach for `Math.random`, so the away estimator and the live loop cannot
+   * disagree about a wave they both modelled. `killPayout` draws only on a
+   * chest node, so a seeded generator advances exactly where the shipped game
+   * advances it.
+   */
+  creditKill(wave: number, random: () => number): void {
     const reward = killReward(wave, this.rates);
     this.purse = { gold: this.purse.gold.add(reward.gold), exp: this.purse.exp.add(reward.exp) };
+    this.payout = addPayout(this.payout, killPayout(wave, random));
+  }
+
+  /** What the run has earned that is not gold or EXP. */
+  spoils(): KillPayout {
+    return this.payout;
   }
 
   /**

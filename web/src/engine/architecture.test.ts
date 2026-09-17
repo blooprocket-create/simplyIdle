@@ -115,6 +115,24 @@ describe('engine dependency boundary', () => {
     }
   });
 
+  it('never reaches for the global generator', () => {
+    /*
+     * Randomness is an argument here, exactly as time is, and for the same
+     * reason: the live loop and the offline estimator model the same campaign,
+     * and a module drawing from the global generator makes the two disagree
+     * about a wave they both simulated. It would also make the parity fixtures
+     * unrepeatable — they script a generator and compare draw for draw.
+     *
+     * The convention has held since the summon port without anything checking
+     * it. This checks it. `rng.ts` is the default a caller gets when they pass
+     * nothing, and it is seeded rather than global, which is the whole point.
+     */
+    for (const file of ENGINE_FILES) {
+      const source = codeOnly(readFileSync(file, 'utf8'));
+      expect(source, file).not.toMatch(/\bMath\.random\s*\(/);
+    }
+  });
+
   it('never imports from a layer above it', () => {
     // The engine is the bottom of the stack. `ui`, `game` and `app` all read
     // from it; a single import the other way makes the simulation unrunnable
