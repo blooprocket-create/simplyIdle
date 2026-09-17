@@ -13,6 +13,28 @@ export const RARITY_RANK_POWER: Record<Rarity, number> = {
 };
 
 /**
+ * How often a summon rolls each rarity.
+ *
+ * Authored, and it sums to exactly 1 — which matters, because the summon pool
+ * removes transcendent until the postgame and `rollRarity` walks the table
+ * accumulating chances and falls through to its *first* entry when nothing
+ * matches. Take 0.001 out and the table sums to 0.999, so a roll above that
+ * returns common: one pull in a thousand is silently the worst outcome rather
+ * than the best. `engine/roster/summon.ts` ports that as it stands and the
+ * fixture records it.
+ */
+export const RARITY_SUMMON_CHANCE: Record<Rarity, number> = {
+  common: 0.499,
+  uncommon: 0.25,
+  rare: 0.13,
+  epic: 0.07,
+  legendary: 0.03,
+  mythic: 0.015,
+  godly: 0.005,
+  transcendent: 0.001,
+};
+
+/**
  * Stat multiplier from a hero's rank. Additive growth plus an accelerating
  * term, with high-rarity power tapering after rank 5 so the top rarities do
  * not run away.
