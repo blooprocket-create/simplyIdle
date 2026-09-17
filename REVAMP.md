@@ -265,7 +265,19 @@ Summoning and everything that shapes a team: `SUMMON_HERO` with banners, rate-up
 
 Content: `RANK_CONFIGS`, `FEATURED_SUMMON_BANNERS`, `GACHA_SUMMON_COST`, `DIAMOND_SUMMON_COST`, `HERO_LEVEL_EXP_FORMULA`, `SPARK_TOKEN_BY_RARITY`, `SPARK_EXCHANGE_OPTIONS`, `BANNER_RATE_UP_BY_RARITY`, `SUMMON_MILESTONES`, `SOFT_PITY_*`, `VIP_SUMMON_DISCOUNT*`.
 
-Unlocks the `summon`, `recycle` and `tempo` automations, which have been declared and unavailable since Phase 4.
+**Engine layer done.** Summoning with both pity systems, the template pick and tier clamp, milestones, spark tokens and the spark exchange; levelling, ranking, rebirth and recycling; team selection, formation, loadouts, slot unlocks and batch levelling. What remains of the phase is the UI that calls it.
+
+The strongest parity claim in the rewrite so far: **118 pulls across four recorded runs, matched on rarity and hero id, from one seed.** Every function takes a `random: () => number` rather than reaching for the global, for the same reason the engine may not read the clock — and because the *draw order* is part of the behaviour, so a port with the same distribution but a different order would pass any statistical test and disagree on every pull.
+
+Thirteen shipped behaviours ported deliberately rather than tidied. The ones worth knowing: soft and hard pity draw from **different** tables; the pre-postgame pool sums to 0.999, so one pull in a thousand is silently *common* rather than the best outcome; `calculateShardReward` floors level at `max(1, level - 1)`, so a level-one hero recycles for what a level-two does; batch levelling spends in **roster order**, not the order the caller asked in; and a batch recycle rounds once at the end, so a sweep pays strictly less than the same heroes one at a time.
+
+#### The automation line above was wrong
+
+It said this phase unlocks `summon`, `recycle` and `tempo`. It unlocks none of them, for two different reasons, and the flags stay `available: false`.
+
+`summon` and `recycle` have their rules now, and `available` is a claim that **the shell wires the flag to the running simulation** — `ui/architecture.test.ts` enforces that correspondence directly and caught an attempt to flip them on the strength of the rules alone. The wiring waits on a **wallet**: `SimulationSnapshot` carries the fight and nothing else, so there is nothing for an automatic summon to spend or an automatic recycle to pay into. They get switched on in **Phase 10**.
+
+`tempo` cannot get rules here at all. Auto-tempo raises `combatTempo` when `combatHeat` is zero, and this engine has neither — heat does not exist in it, and `tempo` survives only as a scalar the offline estimator multiplies by. It waits on whichever phase builds heat.
 
 ### Phase 9 — Equipment *(~2 weeks)*
 `EQUIP_ITEM`, `TOGGLE_EQUIP_HERO`, `CRAFT_EQUIPMENT`, `DISMANTLE_EQUIPMENT`, `UPGRADE_EQUIPMENT_RARITY`, `CONVERT_SCRAP_TO_ESSENCE`, `CONVERT_SCRAP_TO_SHARDS`, `TOGGLE_HERO_UNIQUE_WEAPON`. Content: `EQUIPMENT_CATALOG`, `EQUIPMENT_RARITIES`.
