@@ -203,9 +203,90 @@ Port the destination registry, shelf, rail and `SurfaceHost`. File all ~50 surfa
 Bosses hand-played, one mechanic per act. BURST as a timing window. Automation as an earned reward rather than a default — the nine `auto*` flags currently let the game play itself from the start. Wipes become a decision instead of a silent teleport to the chapter start.
 
 ### Phase 5 — Cutover *(~1 week)*
-Retire the Expo app. Vercel points at the Vite build. Firebase stays — see *On the backend*; there is no migration pass.
+Vercel points at the Vite build: the rewrite takes the site root and the Expo app moves to `/legacy`. Firebase stays — see *On the backend*; there is no migration pass.
 
-**Rough total: 10–11 weeks.** Phases 2 and 3 are where it stops being a menu simulator.
+**"Retire the Expo app" was the wrong instruction and is withdrawn.** Expo does two jobs here and only one of them is the cutover. It builds the web bundle served at `/`, and it is also the *entire* native path — `eas.json` carries four EAS profiles including `build:android:apk`, and `app.json` declares android, ios and web. Deleting it to swap a web route would have thrown away APK and iOS shipping as collateral for a four-word plan line. The swap needs no file in `src/` deleted, so none is.
+
+The Expo app also stays *on the web*, not just in the repo. There are inactive accounts holding real saves, those saves live behind Firebase, and the rewrite reads local storage only — so until `ports/SavePort` has a Firebase adapter, `/legacy` is the only route by which those players reach their own game. Removing it is **Phase 13**, and it waits on the whole parity run below, not on this phase.
+
+What the new stack does *not* have is a native path of its own: it is Vite and Babylon, so an APK of the rewrite means a WebView wrapper and a real question about WebGL performance on mid-range Android. That is separate work and no part of this phase. Meanwhile the Expo app's native builds are untouched and keep working.
+
+**Phases 0–5: roughly 10–11 weeks.** Phases 2 and 3 are where it stops being a menu simulator.
+
+---
+
+## 5b. Parity — Phases 6 to 13
+
+**Phases 0–5 never ported the game.** They ported the *fight*: an engine, a diorama, a shell, four verbs, and a deploy swap. That was the plan as written, and the plan as written stops well short of what the shipped game does. Said plainly so nobody reads a green Phase 5 as a finished port:
+
+| | shipped | rewrite |
+| --- | --- | --- |
+| lines | 54,446 | 11,007 |
+| nav destinations built | — | 7 of 19 |
+| player actions | **85 reducer actions** | 4 |
+| account / social services | 18 files, 6,090 lines | 0 |
+
+Everything you can click in the rewrite today: spend BURST, answer a wipe, answer a boss tell, toggle one automation, and navigate. **No surface changes your character.** You cannot equip, level, summon, rebirth, spend a stat point, or buy anything. Where a word like `rebirth` appears in the new engine it is a *saved field* read so the damage maths is right, not a system.
+
+The phases below end at parity. They are ordered by what unblocks what, not by what is fun — the first two are unglamorous and everything else waits on them.
+
+### Phase 6 — The save round-trip *(~2 weeks)* — **done, bar one binding**
+A v3 reader that bounds a stored payload as hard as `migrateSave` bounds a v2 one, the writer to pair with it, and the adapter behind `ports/SavePort`. `saveStore.ts` shipped read-only because `migrateSave` reads the *v2* shape and would silently empty a v3 payload.
+
+**Everything downstream needs this.** Without it no system below can persist what it changes, and returning accounts cannot reach their saves — which is the sole reason `/legacy` cannot be retired.
+
+Delivered: `engine/save/v3.ts` (reader, writer, version dispatcher), `engine/save/legacyPayload.ts` (the trip back to v2), `ports/remoteSave.ts` (the save documents), `saveStore.writeSave`. The bounding is *shared* with the migration rather than restated, so "as hard as" is a fact about the call graph.
+
+Three bugs the round-trip laws caught, none visible by reading the code:
+
+- **Unspent stat points inflated on every load.** v2 stores `unspentStatPoints` as a pool held *on top of* the level budget; a `SaveV3` has already done that sum. A level-100 character would gain 495 points by loading their own save, and again on the next load.
+- **The shipped game re-equips a relic you took off.** `equippedByUid: null` does not mean "unequipped" to `sanitizeSaveData` — it tests for a string first and falls through to `boundedBoolean(equipped, true)`, and its own writer stopped emitting that flag.
+- **Writing v3 into the shared document is silent, not loud.** The shipped reader is total, so it reads a `SaveV3` as a valid save with nothing in it and hands the player a new account.
+
+**Not done, and moved to Phase 12:** binding `SaveDocStore` to `firebase/firestore`. `users/{uid}/saveSlots/{slot}` needs a uid and the rewrite has no auth at all, so that binding would be a dependency and a file nothing could exercise, added in front of the thing it waits on. Around thirty lines once `onlineAuth` lands.
+
+### Phase 7 — The character *(~2 weeks)*
+`ALLOCATE_STAT`, `ALLOCATE_STAT_N`, `ALLOCATE_STAT_MAX`, `CREATE_CHARACTER`. With them the missing engine layer underneath: `derivedStats`, and the four multipliers `getTeamMaxHp` needs that this engine does not have — `getRankMultiplier`, `getMetaSurvivalMultiplier`, `getRebirthSurvivalMultiplier`, plus the mastery and tactics stacks. Team health is a flat `2000` until this lands, so every later balance number is unanchored.
+
+Fixture-backed like the Phase 1 ports, against `useGameState`, before anything reads them.
+
+### Phase 8 — The roster *(~3 weeks)*
+Summoning and everything that shapes a team: `SUMMON_HERO` with banners, rate-ups, soft pity and milestones; `SPARK_EXCHANGE`; `LEVEL_UP_HERO_GOLD`, `BATCH_LEVEL_HEROES`, `RANK_UP_HERO` and its max/rebirth variants; `REBIRTH_HERO`, `RECYCLE_HERO`; `SET_ACTIVE_TEAM`, `SET_HERO_FORMATION`, `SAVE_TEAM_LOADOUT`, `LOAD_TEAM_LOADOUT`, `UNLOCK_TEAM_SLOT`.
+
+Content: `RANK_CONFIGS`, `FEATURED_SUMMON_BANNERS`, `GACHA_SUMMON_COST`, `DIAMOND_SUMMON_COST`, `HERO_LEVEL_EXP_FORMULA`, `SPARK_TOKEN_BY_RARITY`, `SPARK_EXCHANGE_OPTIONS`, `BANNER_RATE_UP_BY_RARITY`, `SUMMON_MILESTONES`, `SOFT_PITY_*`, `VIP_SUMMON_DISCOUNT*`.
+
+Unlocks the `summon`, `recycle` and `tempo` automations, which have been declared and unavailable since Phase 4.
+
+### Phase 9 — Equipment *(~2 weeks)*
+`EQUIP_ITEM`, `TOGGLE_EQUIP_HERO`, `CRAFT_EQUIPMENT`, `DISMANTLE_EQUIPMENT`, `UPGRADE_EQUIPMENT_RARITY`, `CONVERT_SCRAP_TO_ESSENCE`, `CONVERT_SCRAP_TO_SHARDS`, `TOGGLE_HERO_UNIQUE_WEAPON`. Content: `EQUIPMENT_CATALOG`, `EQUIPMENT_RARITIES`.
+
+Unlocks `equipBest` and `dismantle`.
+
+### Phase 10 — The economy *(~3 weeks)*
+Shops and everything spendable: `BUY_GOLD_SHOP_ITEM`, `BUY_DIAMOND_SHOP_ITEM`, `BUY_PREMIUM_COOLANT`, `USE_USABLE_ITEM`, `SIMULATE_DOLLAR_PURCHASE`; skills via `BUY_SKILL` and `CAST_HERO_ACTIVE`; prestige via `REBIRTH`, `SPEND_REBIRTH_CORE`, `SPEND_ESSENCE_UPGRADE`, `UPGRADE_FACILITY`; VIP via `CLAIM_VIP_REWARD`, `CLAIM_CODEX_HERO_VIP`, `CLAIM_CODEX_UNIQUE_VIP`. Content: `USABLE_ITEMS`, `SKILLS`, `REBIRTH_BONUS`, `REBIRTH_WAVE_THRESHOLD`, `COST_SCALE`, `GIFT_AMOUNTS`.
+
+**All nine `auto*` flags finally have systems** — `usePotion`, `useCoolant` and `castHeroActives` land here, and the earn-then-choose gate built in Phase 4 stops being a policy with one subject.
+
+### Phase 11 — The loops *(~3 weeks)*
+The reasons to log in: `CLAIM_MISSION`; `START_EXPEDITION`, `COMPLETE_EXPEDITION`, `REFRESH_EXPEDITION_CONTRACTS`; `RUN_RIFT_DUNGEON`, `RUN_TREASURY_RAID`; the four minigames and the bounty draft; `APPLY_DAILY_LOGIN`, `APPLY_WEEKLY_ROLLOVER`, `CLAIM_WEEKLY_TRACK`; mail (`APPEND_MAIL_MESSAGES`, `CLAIM_MAIL_ATTACHMENT`, `CLAIM_ALL_MAIL_ATTACHMENTS`); `MARK_STORY_BEAT_SEEN`. Content: `MISSION_BOARD_GOALS`, `WEEKLY_EVENTS`, `WEEKLY_TRACK_MILESTONES`, `STORY_BEATS`.
+
+Clears eight of the twelve placeholder destinations.
+
+### Phase 12 — Accounts and the social layer *(~4 weeks)*
+The 6,090 lines nothing has touched: `onlineAuth`, `onlineSave`, `guild`, `guildWars`, `chat`, `directMessages`, `friends`, `leaderboard`, `presence`, `publicProfile`, `activityFeed`, `blockReport`, `characterNameRegistry`, `cloudMail`, `playerSearch`.
+
+Behind `ports/`, as the seam has always promised — the engine still never learns what a network is. Largest phase, and the one with real moderation and privacy surface: `blockReport` and `presence` are not features to port thoughtlessly.
+
+Starts with `onlineAuth`, because `ports/remoteSave.ts` is finished and waiting on a uid. Binding its `SaveDocStore` to `firebase/firestore` is the first thing this phase can do and the last thing Phase 6 needed.
+
+### Phase 13 — Retire `/legacy` *(~3 days)*
+Only now. The old app comes off the web when the new one can reach a player's account and do everything they did — which is the condition Phase 5 named and could not meet. `src/` and the EAS native builds are a separate decision, taken then, on evidence.
+
+**Parity total: roughly 19–21 weeks on top of Phases 0–5.** Estimated from the shipped implementation's size and the observed rate of Phases 1–4, so treat it as a shape rather than a schedule. The honest headline: **the fight was about a fifth of the game, and it took eleven weeks.**
+
+### What this plan still does not cover
+- **A native path for the rewrite.** Vite and Babylon build a web app; an APK means a WebView wrapper and a genuine question about WebGL on mid-range Android. Expo keeps shipping native throughout, so this is a choice rather than a blocker.
+- **Boss mechanics beyond one shape.** Phase 4 shipped one mechanic tuned six ways and said so. Six genuinely distinct mechanics is a design decision, not a port.
 
 ---
 

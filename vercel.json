@@ -15,16 +15,28 @@
   ],
   "rewrites": [
     {
+      "source": "/legacy",
+      "destination": "/legacy/index.html"
+    },
+    {
+      "source": "/legacy/",
+      "destination": "/legacy/index.html"
+    },
+    {
+      "source": "/legacy/:path((?!.*\\..*).*)",
+      "destination": "/legacy/index.html"
+    },
+    {
       "source": "/next",
-      "destination": "/next/index.html"
+      "destination": "/index.html"
     },
     {
       "source": "/next/",
-      "destination": "/next/index.html"
+      "destination": "/index.html"
     },
     {
       "source": "/next/:path((?!.*\\..*).*)",
-      "destination": "/next/index.html"
+      "destination": "/index.html"
     },
     {
       "source": "/",
