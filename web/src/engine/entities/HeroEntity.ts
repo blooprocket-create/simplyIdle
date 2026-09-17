@@ -87,3 +87,21 @@ export function heroViews(heroes: readonly HeroEntity[]): HeroView[] {
     targetId: hero.targetId,
   }));
 }
+
+/**
+ * Give the fielded heroes new damage without restarting their swings.
+ *
+ * Matched by uid, and a hero the new list does not name keeps what they had —
+ * this is a retune rather than a roster change, and a roster change rebuilds
+ * the fight instead. Keeping the `timer` is the whole point: replacing the
+ * entities outright would put every hero back to the start of their swing, so
+ * a player who levelled someone mid-fight would lose a fraction of a second
+ * of the team's damage every time they did it.
+ */
+export function retuneHeroes(current: readonly HeroEntity[], next: readonly HeroEntity[]): HeroEntity[] {
+  const byUid = new Map(next.map(hero => [hero.uid, hero]));
+  return current.map(hero => {
+    const tuned = byUid.get(hero.uid);
+    return tuned === undefined ? hero : { ...hero, damagePerHit: tuned.damagePerHit };
+  });
+}

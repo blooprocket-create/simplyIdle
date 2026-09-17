@@ -6,7 +6,7 @@ import { ACTIVE_TEAM_SIZE } from '../engine/save/migrate';
 import { readSave, writeSaveV3 } from '../engine/save/v3';
 import { startingSave } from './demoRoster';
 import { uniqueSkillFor } from '../content/heroSkills';
-import { fightSignature, PLAYER_UID, rosterFromSave } from './roster';
+import { fightTuningKey, PLAYER_UID, rosterFromSave } from './roster';
 
 /**
  * The three shapes, from the one save. `App` composes these itself — there is
@@ -253,10 +253,10 @@ describe('the team a new player starts on', () => {
      * correction: my first version equipped a relic and asserted the signature
      * moved, which it did — but a carried relic also multiplies its bearer's
      * damage, and damage was already in the signature. The test passed with
-     * the caster list stripped out of `fightSignature` entirely, which is
+     * the caster list stripped out of `fightTuningKey` entirely, which is
      * exactly the regression it was supposed to catch.
      *
-     * `fightSignature` is a pure function of a `LoadedRoster`, so the honest
+     * `fightTuningKey` is a pure function of a `LoadedRoster`, so the honest
      * way to ask whether abilities are in it is to move an ability and nothing
      * else. The loop is keyed on this string: a hero who picked up a relic
      * casts a different skill, and a fight that was not rebuilt goes on
@@ -266,7 +266,7 @@ describe('the team a new player starts on', () => {
     const roster = rosterFromSave(save);
     // Two reads of the same save agree, so a difference below is the change
     // and not the building of it.
-    expect(fightSignature(rosterFromSave(startingSave(NOW, fixedRandom())))).toBe(fightSignature(roster));
+    expect(fightTuningKey(rosterFromSave(startingSave(NOW, fixedRandom())))).toBe(fightTuningKey(roster));
 
     const [first, ...rest] = roster.casters;
     const skill = uniqueSkillFor(save.roster.heroes.find(hero => hero.uid === first.uid)!.id)!;
@@ -275,14 +275,14 @@ describe('the team a new player starts on', () => {
       ...roster,
       casters: [{ ...first, caster: { ...first.caster, unique: { skill, rank: 4 } } }, ...rest],
     };
-    expect(fightSignature(armed)).not.toBe(fightSignature(roster));
+    expect(fightTuningKey(armed)).not.toBe(fightTuningKey(roster));
 
     // And the rank alone moves it, because a rank is twelve percent of power.
     const higher = {
       ...roster,
       casters: [{ ...first, caster: { ...first.caster, unique: { skill, rank: 5 } } }, ...rest],
     };
-    expect(fightSignature(higher)).not.toBe(fightSignature(armed));
+    expect(fightTuningKey(higher)).not.toBe(fightTuningKey(armed));
   });
 });
 
@@ -345,6 +345,6 @@ describe('what the starting team earns', () => {
      */
     const base = startingSave(NOW, fixedRandom());
     const studied: typeof base = { ...base, facilities: { ...base.facilities, training: 5 } };
-    expect(fightSignature(rosterFromSave(studied))).not.toBe(fightSignature(rosterFromSave(base)));
+    expect(fightTuningKey(rosterFromSave(studied))).not.toBe(fightTuningKey(rosterFromSave(base)));
   });
 });

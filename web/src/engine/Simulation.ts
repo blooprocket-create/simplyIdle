@@ -5,6 +5,7 @@ import { BossFight } from './combat/BossFight';
 import { HeroActiveClock, type ActiveCaster } from './combat/HeroActiveClock';
 import { applyActives, castOne } from './combat/applyActives';
 import { RallyOffers } from './combat/RallyOffers';
+import { retuneFight, type FightTuning } from './combat/retune';
 import { BURST_HIT_UID, TELL_HIT_UID, type BurstQuality } from './combat/burst';
 import { BurstMeter } from './combat/BurstMeter';
 import { applyHit, spawnEnemy, type Enemy } from './combat/encounter';
@@ -77,7 +78,7 @@ export class Simulation {
   private enemy: Enemy;
   private vitals: TeamVitals;
   private readonly enemyHpMult: number;
-  private readonly incomingMult: number;
+  private incomingMult: number;
   private elapsedMs = 0;
   private ticks = 0;
   private kills = 0;
@@ -90,7 +91,7 @@ export class Simulation {
   private readonly rally = new RallyOffers();
   private readonly boss = new BossFight();
   private readonly actives = new HeroActiveClock();
-  private readonly casters: readonly ActiveCaster[];
+  private casters: readonly ActiveCaster[];
   private readonly random: () => number;
 
   constructor(options: SimulationOptions = { heroes: [] }) {
@@ -238,17 +239,9 @@ export class Simulation {
   creditAway(elapsedMs: number): void {
     // An offer nobody was present for; the retreat it followed already ran.
     this.rally.clear();
-    const credit = creditAwayTime(
-      {
-        wave: this.enemy.wave,
-        teamDps: teamDps(this.heroes),
-        teamMaxHp: this.vitals.maxHp,
-        enemyHpMult: this.enemyHpMult,
-        incomingMult: this.incomingMult,
-        rates: this.earnings.rates,
-      },
-      elapsedMs,
-    );
+    const fight = { enemyHpMult: this.enemyHpMult, incomingMult: this.incomingMult, rates: this.earnings.rates };
+    const team = { teamDps: teamDps(this.heroes), teamMaxHp: this.vitals.maxHp };
+    const credit = creditAwayTime({ wave: this.enemy.wave, ...team, ...fight }, elapsedMs);
     if (credit.msCredited <= 0) return;
 
     this.elapsedMs += credit.msCredited;
@@ -324,6 +317,23 @@ export class Simulation {
     const { answered, outcome } = this.rally.take(choice);
     if (outcome !== null) this.restart(outcome.wave, outcome.healthFraction);
     return answered;
+  }
+
+  /**
+   * New numbers for the same fight, rather than a new fight.
+   *
+   * What this is for, and what a rebuild costs instead, is in `retune.ts`.
+   * Everything not named by `FightTuning` survives untouched: the enemy's
+   * health, the team's, every ability cooldown, the burst window, the boss
+   * tell and the clock.
+   */
+  retune(next: FightTuning): void {
+    const tuned = retuneFight({ heroes: this.heroes, vitals: this.vitals }, next);
+    this.heroes = tuned.heroes;
+    this.vitals = tuned.vitals;
+    this.incomingMult = next.incomingMult;
+    this.casters = next.casters;
+    this.earnings.rates = next.rates;
   }
 
   /** The current read model. Callers must treat it as immutable. */

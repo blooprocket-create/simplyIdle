@@ -69,3 +69,20 @@ export function healTeam(vitals: TeamVitals, fraction: number): TeamVitals {
   if (!(fraction > 0)) return vitals;
   return { ...vitals, hp: vitals.hp.add(vitals.maxHp.mul(fraction)).min(vitals.maxHp) };
 }
+
+/**
+ * Move the team to a new maximum, keeping the share of it they had.
+ *
+ * A hero levels and the team's ceiling rises. Carrying the *fraction* rather
+ * than the points is what stops that being a heal: a team at half health stays
+ * at half health, where copying the old hp across would leave them at a
+ * smaller share and setting them to full would make levelling a free reset.
+ *
+ * A maximum of zero has no fraction to keep, so the team sits at zero rather
+ * than at `NaN`.
+ */
+export function rescaleVitals(vitals: TeamVitals, maxHp: Decimal): TeamVitals {
+  if (vitals.maxHp.lte(0)) return { hp: new Decimal(0), maxHp };
+  const share = vitals.hp.div(vitals.maxHp);
+  return { hp: maxHp.mul(share).min(maxHp).max(0), maxHp };
+}

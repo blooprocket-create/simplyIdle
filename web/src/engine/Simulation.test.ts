@@ -1307,3 +1307,132 @@ describe('the currencies a run earns', () => {
     expect(first.read().totals.essence).toBe(second.read().totals.essence);
   });
 });
+
+describe('new numbers for a fight in progress', () => {
+  /**
+   * What a retune keeps and a rebuild loses. Every figure in the first test is
+   * one a rebuild resets, measured on the same fight before this existed.
+   */
+  const caster = (uid: string) => ({
+    uid,
+    fielded: true,
+    caster: { level: 1, archetype: 'frontline_ward' as const, unique: null },
+  });
+
+  const started = () => {
+    const sim = new Simulation({
+      heroes: [hero('a', 200, 900)],
+      teamMaxHp: new Decimal(1_000),
+      incomingMult: 1,
+      startWave: 40,
+      casters: [caster('w')],
+    });
+    run(sim, 2_000, 100);
+    return sim;
+  };
+
+  const tuning = (sim: Simulation, over: Partial<Parameters<Simulation['retune']>[0]> = {}) => ({
+    heroes: [hero('a', 200, 900)],
+    teamMaxHp: sim.read().team.maxHp.toNumber(),
+    incomingMult: 1,
+    rates: FLAT_RATES,
+    casters: [caster('w')],
+    ...over,
+  });
+
+  it('keeps everything a rebuild would have thrown away', () => {
+    /*
+     * The four things measured before this: a rebuild two seconds in healed
+     * the team from 967 to full, healed the enemy from 15,688 to full, took
+     * the ward's cooldown from 8,100ms to zero, and put the clock back to nil.
+     */
+    const sim = started();
+    const before = sim.read();
+    expect(before.team.hp.lt(before.team.maxHp)).toBe(true);
+    expect(before.enemy!.hp.lt(before.enemy!.maxHp)).toBe(true);
+    expect(before.abilities[0].remainingMs).toBeGreaterThan(0);
+
+    sim.retune(tuning(sim));
+    const after = sim.read();
+    expect(after.team.hp.eq(before.team.hp)).toBe(true);
+    expect(after.enemy!.hp.eq(before.enemy!.hp)).toBe(true);
+    expect(after.abilities[0].remainingMs).toBe(before.abilities[0].remainingMs);
+    expect(after.elapsedMs).toBe(before.elapsedMs);
+    expect(after.wave).toBe(before.wave);
+    expect(after.totals.kills).toBe(before.totals.kills);
+  });
+
+  it('carries the team across a rising ceiling by share, not by points', () => {
+    /*
+     * A hero levels and the team's maximum rises. Keeping the *fraction* is
+     * what stops that being a heal — copying the points across would leave the
+     * team at a smaller share of a bigger bar, and setting them to full would
+     * make levelling a free reset mid-fight.
+     */
+    const sim = started();
+    const before = sim.read().team;
+    const share = before.hp.div(before.maxHp).toNumber();
+    expect(share).toBeLessThan(1);
+
+    sim.retune(tuning(sim, { teamMaxHp: before.maxHp.mul(2).toNumber() }));
+    const after = sim.read().team;
+    expect(after.maxHp.eq(before.maxHp.mul(2))).toBe(true);
+    expect(after.hp.div(after.maxHp).toNumber()).toBeCloseTo(share, 12);
+    expect(after.hp.gt(before.hp)).toBe(true);
+  });
+
+  it('gives the heroes new damage without restarting their swings', () => {
+    /*
+     * Replacing the entities outright would put every hero back to the start
+     * of their swing, so a player who levelled someone would lose a fraction
+     * of a second of the team's damage each time they did it.
+     */
+    const sim = started();
+    const progress = sim.read().heroes[0].swingProgress;
+    expect(progress).toBeGreaterThan(0);
+
+    sim.retune(tuning(sim, { heroes: [hero('a', 4_000, 900)] }));
+    expect(sim.read().heroes[0].swingProgress).toBe(progress);
+    expect(sim.read().heroes[0].damagePerHit.gt(200)).toBe(true);
+  });
+
+  it('pays the new rate from the next kill', () => {
+    /*
+     * Its own fight rather than `started()`, and that is the measurement
+     * talking: two hundred DPS against a wave-forty monster is eighty seconds
+     * to a kill, so the first version of this ran for twenty and compared
+     * nothing to nothing. `enemyHpMult` brings the monster within reach.
+     */
+    const winnable = () =>
+      new Simulation({
+        heroes: [hero('a', 200, 900)],
+        teamMaxHp: new Decimal(1e9),
+        enemyHpMult: 1e-9,
+        startWave: 40,
+        casters: [caster('w')],
+      });
+
+    const richer = winnable();
+    richer.retune({ ...tuning(richer), rates: { goldMult: 1_000, expMult: 1 } });
+    run(richer, 5_000, 100);
+
+    const flat = winnable();
+    run(flat, 5_000, 100);
+
+    expect(flat.read().totals.kills).toBeGreaterThan(0);
+    expect(richer.read().totals.kills).toBe(flat.read().totals.kills);
+    expect(richer.read().totals.gold.gt(flat.read().totals.gold)).toBe(true);
+  });
+
+  it('hands abilities to whoever is now carrying them', () => {
+    // A relic picked up mid-fight swaps the skill without the fight noticing
+    // anything else — and the old cooldown stands, so it is not a free cast.
+    const sim = started();
+    const held = sim.read().abilities[0].remainingMs;
+    sim.retune(tuning(sim, { casters: [] }));
+    expect(sim.read().abilities).toEqual([]);
+
+    sim.retune(tuning(sim));
+    expect(sim.read().abilities[0].remainingMs).toBe(held);
+  });
+});

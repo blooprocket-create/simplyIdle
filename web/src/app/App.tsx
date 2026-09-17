@@ -10,7 +10,7 @@ import type { PrestigePath } from '../engine/prestige/rebirth';
 import { canAffordSpark, canSummon, priceOfSummon, rosterActions, sparkExchange, summonOnce } from './playerActions';
 import { equipmentActions, migrateLegacyEquipment } from './equipmentActions';
 import { prestigeActions } from './prestigeActions';
-import { fightSignature, rosterFromSave } from './roster';
+import { fightIdentity, fightTuning, fightTuningKey, rosterFromSave } from './roster';
 import { loadSave, writeSave } from './saveStore';
 import type { SaveV3 } from '../engine/save/schema';
 import type { SummonPayment } from '../engine/roster/summonSave';
@@ -78,20 +78,25 @@ export function App() {
   const [save, setSave] = useState<SaveV3>(initialSave);
 
   /*
-   * The fight's inputs, rebuilt whenever the save moves — and the *signature*
-   * is what the loop effect actually keys on.
+   * The fight's inputs, rebuilt whenever the save moves — and **two** keys
+   * come off them, which is the whole of how an account can change under a
+   * running game.
    *
-   * The distinction is the whole of how a roster can change under a running
-   * game. Summoning a hero rebuilds this object and changes nothing the fight
-   * can observe, so the signature holds and the run carries on. Fielding one,
-   * or levelling one, changes a hero's damage or the team's health, so the
-   * signature moves and the loop is rebuilt around the new team — resuming
-   * from the run that was just flushed, rather than starting again at wave one.
+   * `fightIdentity` is who is fighting, and moving it rebuilds the loop.
+   * `fightTuningKey` is what they hit for, and moving it is handed to the
+   * running fight instead.
+   *
+   * These were one string, and everything was a rebuild. A rebuild resumes
+   * from `RunProgress` — wave, kills, deaths, burst charge, gold, exp — so
+   * levelling a hero mid-run healed the team to full, healed the *enemy* to
+   * full, cleared every ability cooldown and put the clock back to zero. All
+   * four measured; see `engine/combat/retune.ts`.
    */
   const roster = useMemo(() => rosterFromSave(save), [save]);
   const rosterRef = useRef(roster);
   rosterRef.current = roster;
-  const fightKey = useMemo(() => fightSignature(roster), [roster]);
+  const fightKey = useMemo(() => fightIdentity(roster), [roster]);
+  const tuningKey = useMemo(() => fightTuningKey(roster), [roster]);
   const cast = roster.cast;
   // Rebuilt whenever the save moves, which is what makes a summon show up.
   const profile = useMemo(() => profileFromSave(save), [save]);
@@ -356,6 +361,19 @@ export function App() {
     autoCastRef.current = autoCast;
     loopRef.current?.setAutoCastHeroActives(autoCast);
   }, [autoCast]);
+
+  /*
+   * New numbers for the fight in progress. Below the effect that builds the
+   * loop, for the reason the two above are: effects run in declaration order,
+   * and above it this would retune a loop that does not exist yet.
+   *
+   * Keyed on the string rather than the roster, because `rosterFromSave` hands
+   * back a fresh object every time the save moves — a summon that changed
+   * nothing the fight reads would otherwise retune it on every press.
+   */
+  useEffect(() => {
+    loopRef.current?.retune(fightTuning(rosterRef.current));
+  }, [tuningKey]);
 
   return (
     <div className={styles.root}>

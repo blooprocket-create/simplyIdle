@@ -106,7 +106,7 @@ export class RunEarnings {
    * here is what keeps the away window and the live loop on one chain.
    */
   constructor(
-    readonly rates: RewardRates = FLAT_RATES,
+    public rates: RewardRates = FLAT_RATES,
     resume: Purse = EMPTY_PURSE,
   ) {
     this.purse = { gold: resume.gold, exp: resume.exp };

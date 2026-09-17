@@ -1,3 +1,4 @@
+import type { FightTuning } from '../engine/combat/retune';
 import { Simulation, type SimulationOptions } from '../engine/Simulation';
 import { AWAY_THRESHOLD_MS } from '../engine/offline/awayCredit';
 import type { SimulationSnapshot } from '../engine/types';
@@ -53,6 +54,18 @@ export class GameLoop {
   /** Whether a lapsed BURST window fires itself. */
   setAutoBurst(on: boolean): void {
     this.simulation.setAutoBurst(on);
+  }
+
+  /**
+   * New numbers for the fight in progress. Publishes, so the HUD shows them.
+   *
+   * The alternative is rebuilding this loop, which restarts the run from
+   * `RunProgress` and loses everything that is not in it. See `retune.ts`.
+   */
+  retune(next: FightTuning): void {
+    this.simulation.retune(next);
+    const snapshot = this.simulation.read();
+    for (const listener of this.listeners) listener(snapshot);
   }
 
   /** Whether abilities fire themselves the moment they come up. */

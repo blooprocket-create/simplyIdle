@@ -262,6 +262,31 @@ describe('ui architecture', () => {
     expect(wired, 'what is marked available must be exactly what is wired').toEqual(available);
   });
 
+  it('never rebuilds the fight for numbers it could have handed over', () => {
+    /*
+     * The split, held. A rebuild resumes from `RunProgress` — wave, kills,
+     * deaths, burst charge, gold, exp — and carries nothing else, so it heals
+     * both sides to full, clears every ability cooldown and puts the clock
+     * back to zero. Before the split that happened whenever a hero levelled or
+     * a piece of gear was equipped, which is most presses on the roster screen.
+     *
+     * So the effect that builds the loop may depend on the *identity* key and
+     * must not depend on the tuning key — and something has to `retune`, or
+     * the numbers never arrive at all and a levelled hero fights at their old
+     * damage forever. Both halves are checked, because either alone is a rule
+     * that can be satisfied by doing nothing.
+     */
+    const shell = codeOnly(readFileSync(join(process.cwd(), 'src', 'app', 'App.tsx'), 'utf8'));
+
+    const buildDeps = /\}, \[([^\]]*fightKey[^\]]*)\]\);/.exec(shell);
+    expect(buildDeps, 'App.tsx no longer keys an effect on the fight identity').not.toBeNull();
+    expect(buildDeps![1], 'the loop is rebuilt for numbers a retune could carry').not.toContain('tuningKey');
+
+    const retuneDeps = /\}, \[([^\]]*tuningKey[^\]]*)\]\);/.exec(shell);
+    expect(retuneDeps, 'nothing in the shell reacts to the tuning key').not.toBeNull();
+    expect(shell, 'the shell never retunes the running fight').toContain('.retune(');
+  });
+
   it('hands the loop every roster field the simulation can take', () => {
     /*
      * The failure this project keeps finding, made structural.

@@ -4,7 +4,7 @@ import { equipmentTemplatesById } from '../content/equipment';
 import { migrateSave } from '../engine/save/migrate';
 import type { SaveV3 } from '../engine/save/schema';
 import { heroModelKey } from '../game/models/manifest';
-import { fightSignature, rosterFromSave } from './roster';
+import { fightIdentity, fightTuningKey, rosterFromSave } from './roster';
 
 const CONTENT = { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() };
 const NOW = 1_700_000_000_000;
@@ -129,11 +129,19 @@ describe('a team built from a save', () => {
 
 describe('what the running fight would notice', () => {
   /*
-   * The shell rebuilds the loop when this signature changes and leaves it
-   * alone when it does not. Getting that wrong in either direction is a
-   * visible bug: too eager and every summon restarts the run at wave one, too
-   * lazy and a hero the player just fielded does not fight.
+   * The shell acts when one of these two keys changes and leaves the fight
+   * alone when neither does. Getting that wrong in either direction is a
+   * visible bug: too eager and every summon disturbs the run, too lazy and a
+   * hero the player just fielded does not fight.
+   *
+   * These tests ask only "would the fight notice", so they read both keys —
+   * which of the two moves, and therefore whether the answer is a rebuild or a
+   * retune, is the block below.
    */
+  const noticed = (over: Record<string, unknown>) => {
+    const roster = rosterFromSave(saveWith(over));
+    return `${fightIdentity(roster)}|${fightTuningKey(roster)}`;
+  };
   const base = {
     playerName: 'Sig',
     playerClass: 'warrior',
@@ -147,34 +155,21 @@ describe('what the running fight would notice', () => {
   it('is unchanged by a hero arriving on the bench', () => {
     // A summon. The roster is longer, the team is the same, and the run has
     // to carry on — this is the case the whole split exists for.
-    const before = fightSignature(rosterFromSave(saveWith(base)));
-    const after = fightSignature(
-      rosterFromSave(saveWith({ ...base, heroRoster: [row(FIRST.id, 'z'), ...base.heroRoster] })),
-    );
-    expect(after).toBe(before);
+    expect(noticed({ ...base, heroRoster: [row(FIRST.id, 'z'), ...base.heroRoster] })).toBe(noticed(base));
   });
 
   it('is unchanged by a wallet or a counter moving', () => {
-    const before = fightSignature(rosterFromSave(saveWith(base)));
-    const after = fightSignature(
-      rosterFromSave(saveWith({ ...base, gold: 9_999_999, totalSummons: 412, gachaPityCounter: 17 })),
-    );
-    expect(after).toBe(before);
+    expect(noticed({ ...base, gold: 9_999_999, totalSummons: 412, gachaPityCounter: 17 })).toBe(noticed(base));
   });
 
   it('changes when a hero is fielded', () => {
-    const before = fightSignature(rosterFromSave(saveWith(base)));
-    const after = fightSignature(rosterFromSave(saveWith({ ...base, activeTeamHeroIds: ['a', 'b'] })));
-    expect(after).not.toBe(before);
+    expect(noticed({ ...base, activeTeamHeroIds: ['a', 'b'] })).not.toBe(noticed(base));
   });
 
   it('changes when a fielded hero levels or ranks up', () => {
-    const before = fightSignature(rosterFromSave(saveWith(base)));
     for (const change of [{ level: 40 }, { rank: 4 }]) {
-      const after = fightSignature(
-        rosterFromSave(saveWith({ ...base, heroRoster: [row(FIRST.id, 'a', change), row(SECOND.id, 'b')] })),
-      );
-      expect(after, JSON.stringify(change)).not.toBe(before);
+      const after = noticed({ ...base, heroRoster: [row(FIRST.id, 'a', change), row(SECOND.id, 'b')] });
+      expect(after, JSON.stringify(change)).not.toBe(noticed(base));
     }
   });
 
@@ -194,15 +189,13 @@ describe('what the running fight would notice', () => {
         ...base,
         heroRoster: [row(FIRST.id, 'a', { rank, rarity }), row(SECOND.id, 'b')],
       });
-      expect(fightSignature(rosterFromSave(saveWith(withRarity('legendary')))), `rank ${rank}`).not.toBe(
-        fightSignature(rosterFromSave(saveWith(withRarity('rare')))),
-      );
+      expect(noticed(withRarity('legendary')), `rank ${rank}`).not.toBe(noticed(withRarity('rare')));
     }
   });
 
   it('changes when the player spends a stat point, because team health moves', () => {
-    const before = fightSignature(rosterFromSave(saveWith(base)));
-    const after = fightSignature(
+    const before = fightTuningKey(rosterFromSave(saveWith(base)));
+    const after = fightTuningKey(
       rosterFromSave(
         saveWith({ ...base, statsAlloc: { strength: 0, vitality: 30, agility: 0, intelligence: 0, spirit: 0 } }),
       ),
@@ -217,8 +210,8 @@ describe('what the running fight would notice', () => {
      * figure stands in the diorama. This is also the case that isolates the
      * *cast* term — everything else here moves team health as well.
      */
-    const forwards = fightSignature(rosterFromSave(saveWith({ ...base, activeTeamHeroIds: ['a', 'b'] })));
-    const backwards = fightSignature(rosterFromSave(saveWith({ ...base, activeTeamHeroIds: ['b', 'a'] })));
+    const forwards = fightTuningKey(rosterFromSave(saveWith({ ...base, activeTeamHeroIds: ['a', 'b'] })));
+    const backwards = fightTuningKey(rosterFromSave(saveWith({ ...base, activeTeamHeroIds: ['b', 'a'] })));
     expect(backwards).not.toBe(forwards);
   });
 
@@ -232,16 +225,16 @@ describe('what the running fight would notice', () => {
      * `metaDamageLevel` and `prestigeCount` reach damage and nothing else, so
      * this is the case that isolates the term.
      */
-    const before = fightSignature(rosterFromSave(saveWith(base)));
-    const after = fightSignature(rosterFromSave(saveWith({ ...base, metaDamageLevel: 40, prestigeCount: 6 })));
+    const before = fightTuningKey(rosterFromSave(saveWith(base)));
+    const after = fightTuningKey(rosterFromSave(saveWith({ ...base, metaDamageLevel: 40, prestigeCount: 6 })));
     expect(after).not.toBe(before);
   });
 
   it('changes when the player levels, because the player fights', () => {
     // They were not a combatant at all for four phases. Their own level and
     // their spent points now move the damage the team deals.
-    const before = fightSignature(rosterFromSave(saveWith(base)));
-    const after = fightSignature(rosterFromSave(saveWith({ ...base, level: 80 })));
+    const before = fightTuningKey(rosterFromSave(saveWith(base)));
+    const after = fightTuningKey(rosterFromSave(saveWith({ ...base, level: 80 })));
     expect(after).not.toBe(before);
   });
 
@@ -250,6 +243,97 @@ describe('what the running fight would notice', () => {
     // between reads — or a key order that moved — would restart the run on
     // every render.
     const save = saveWith(base);
-    expect(fightSignature(rosterFromSave(save))).toBe(fightSignature(rosterFromSave(save)));
+    expect(fightTuningKey(rosterFromSave(save))).toBe(fightTuningKey(rosterFromSave(save)));
+  });
+});
+
+describe('what needs a rebuild and what does not', () => {
+  /*
+   * The split, and the reason for it. A rebuild resumes from `RunProgress` —
+   * wave, kills, deaths, burst charge, gold, exp — and carries nothing else,
+   * so every rebuild heals both sides to full, clears every ability cooldown
+   * and puts the clock back to zero. Before this split that happened whenever
+   * a hero levelled or a piece of gear was equipped.
+   */
+  const base = {
+    playerName: 'Sig',
+    playerClass: 'warrior',
+    characterCreated: true,
+    level: 20,
+    teamSlotsUnlocked: 6,
+    heroRoster: [row(FIRST.id, 'a'), row(SECOND.id, 'b')],
+    activeTeamHeroIds: ['a'],
+  };
+  const keys = (over: Record<string, unknown>) => {
+    const roster = rosterFromSave(saveWith(over));
+    return { identity: fightIdentity(roster), tuning: fightTuningKey(roster) };
+  };
+
+  it('retunes rather than rebuilds when a fielded hero levels', () => {
+    // The case the split exists for. Levelling changes what they hit for and
+    // nothing about who is on the field.
+    const before = keys(base);
+    const after = keys({ ...base, heroRoster: [row(FIRST.id, 'a', { level: 40 }), row(SECOND.id, 'b')] });
+    expect(after.identity).toBe(before.identity);
+    expect(after.tuning).not.toBe(before.tuning);
+  });
+
+  it('retunes rather than rebuilds when the account gets richer', () => {
+    // A prestige upgrade moves what a kill pays and, through the damage chain,
+    // what the team hits for. It moves nobody.
+    const before = keys(base);
+    const after = keys({ ...base, prestigeCount: 3, metaEconomyLevel: 4 });
+    expect(after.identity).toBe(before.identity);
+    expect(after.tuning).not.toBe(before.tuning);
+  });
+
+  it('retunes when only the damage chain moves', () => {
+    /*
+     * `rebirthDamagePath` is the one lever that moves a hero's damage and
+     * nothing else — not the team's ceiling, which reads the *survival* meta
+     * level, and not what a kill pays, which reads the *economy* path. So this
+     * is the case that actually requires `damagePerHit` in the tuning key.
+     *
+     * Every other case here moves two things at once: levelling a hero raises
+     * the team's maximum as well, so the tuning key shifts whether or not the
+     * damage is in it, and the test passed with it stripped out.
+     */
+    const before = keys(base);
+    const after = keys({ ...base, rebirthDamagePath: 5 });
+    expect(after.identity).toBe(before.identity);
+    expect(after.tuning).not.toBe(before.tuning);
+  });
+
+  it('rebuilds when a fielded hero moves rank', () => {
+    /*
+     * The renderer draws them somewhere else, so the cast has to be in the
+     * identity — and a rank move is the case that requires it there. Fielding
+     * someone moves the hero list too, so that test passed with the cast
+     * stripped out of the key entirely.
+     *
+     * A monk, because they are the **only** class with a choice:
+     * `VALID_FORMATION_ROLES_FOR_CLASS` gives them front and mid and everyone
+     * else exactly one rank, so a warrior asked to stand back is corrected to
+     * front and nothing moves at all. That is what my first version measured.
+     */
+    const monk = HERO_POOL.find(hero => hero.heroClass === 'monk')!;
+    const withMonk = { ...base, heroRoster: [row(monk.id, 'm')], activeTeamHeroIds: ['m'] };
+    const front = keys({ ...withMonk, heroFormationByUid: { m: 'front' } });
+    const mid = keys({ ...withMonk, heroFormationByUid: { m: 'mid' } });
+    expect(mid.identity).not.toBe(front.identity);
+  });
+
+  it('rebuilds when a hero is fielded', () => {
+    // The renderer's cast changes and so does the swing schedule, and neither
+    // can be handed to a running fight.
+    const before = keys(base);
+    const after = keys({ ...base, activeTeamHeroIds: ['a', 'b'] });
+    expect(after.identity).not.toBe(before.identity);
+  });
+
+  it('does neither for a summon that lands on the bench', () => {
+    const before = keys(base);
+    const after = keys({ ...base, heroRoster: [row(FIRST.id, 'z'), ...base.heroRoster] });
+    expect(after).toEqual(before);
   });
 });
