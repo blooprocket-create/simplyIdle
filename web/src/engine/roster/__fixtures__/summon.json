@@ -64,6 +64,119 @@
     "godly": 300,
     "transcendent": 600
   },
+  "milestones": [
+    {
+      "threshold": 10,
+      "rewardLabel": "5 Free Summon Charges",
+      "freeCharges": 5,
+      "sparkTokens": null,
+      "guaranteedRarity": null,
+      "grantUniqueForge": false
+    },
+    {
+      "threshold": 50,
+      "rewardLabel": "Next summon guaranteed Epic+",
+      "freeCharges": null,
+      "sparkTokens": null,
+      "guaranteedRarity": "epic",
+      "grantUniqueForge": false
+    },
+    {
+      "threshold": 100,
+      "rewardLabel": "500 Spark Tokens",
+      "freeCharges": null,
+      "sparkTokens": 500,
+      "guaranteedRarity": null,
+      "grantUniqueForge": false
+    },
+    {
+      "threshold": 250,
+      "rewardLabel": "Next summon guaranteed Legendary+",
+      "freeCharges": null,
+      "sparkTokens": null,
+      "guaranteedRarity": "legendary",
+      "grantUniqueForge": false
+    },
+    {
+      "threshold": 500,
+      "rewardLabel": "2000 Spark Tokens + Unique Gear",
+      "freeCharges": null,
+      "sparkTokens": 2000,
+      "guaranteedRarity": null,
+      "grantUniqueForge": true
+    },
+    {
+      "threshold": 1000,
+      "rewardLabel": "Next summon guaranteed Mythic+",
+      "freeCharges": null,
+      "sparkTokens": null,
+      "guaranteedRarity": "mythic",
+      "grantUniqueForge": false
+    }
+  ],
+  "costs": {
+    "gacha": 500,
+    "diamonds": 500,
+    "vipDiscountLevel": 3,
+    "vipDiscount": 0.1
+  },
+  "bannerRateUpByRarity": {
+    "legendary": 0.35,
+    "mythic": 0.45,
+    "godly": 0.55,
+    "transcendent": 0.65
+  },
+  "banners": [
+    {
+      "id": "astral-vanguard",
+      "title": "Astral Vanguard",
+      "description": "Void command mobilized for precision warfront strikes.",
+      "featuredHeroId": "h64",
+      "artEmoji": "🌌"
+    },
+    {
+      "id": "worldrend-ascendant",
+      "title": "Worldrend Ascendant",
+      "description": "Frontline cataclysm specialists break siege lines.",
+      "featuredHeroId": "h61",
+      "artEmoji": "🗻"
+    },
+    {
+      "id": "abyssal-tide",
+      "title": "Abyssal Tide",
+      "description": "Berserker leviathans surge through fractured gates.",
+      "featuredHeroId": "h62",
+      "artEmoji": "🌊"
+    },
+    {
+      "id": "sunflame-flight",
+      "title": "Sunflame Flight",
+      "description": "Skyborn marksmen dominate extreme-range execution.",
+      "featuredHeroId": "h63",
+      "artEmoji": "🦅"
+    },
+    {
+      "id": "eternal-cycle",
+      "title": "Eternal Cycle",
+      "description": "Monastic avatars reset fate with impossible tempo.",
+      "featuredHeroId": "h65",
+      "artEmoji": "♾️"
+    },
+    {
+      "id": "time-hegemony",
+      "title": "Time Hegemony",
+      "description": "Chrono-casters lock timelines around elite targets.",
+      "featuredHeroId": "h57",
+      "artEmoji": "⏰"
+    },
+    {
+      "id": "imperial-fall",
+      "title": "Imperial Fall",
+      "description": "Crown-era warlords reclaim ruined dynastic thrones.",
+      "featuredHeroId": "h52",
+      "artEmoji": "👑"
+    }
+  ],
   "earlyGame": [
     {
       "index": 0,

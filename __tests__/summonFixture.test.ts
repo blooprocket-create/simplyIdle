@@ -1,10 +1,16 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import {
+  BANNER_RATE_UP_BY_RARITY,
+  DIAMOND_SUMMON_COST,
+  FEATURED_SUMMON_BANNERS,
+  GACHA_SUMMON_COST,
   HERO_POOL,
   RARITIES,
   SPARK_TOKEN_BY_RARITY,
   SUMMON_MILESTONES,
+  VIP_SUMMON_DISCOUNT,
+  VIP_SUMMON_DISCOUNT_LEVEL,
   clampRarityToTier,
   type PlayerClass,
   type Rarity,
@@ -165,6 +171,30 @@ interface Fixture {
   rarityChances: { id: Rarity; chance: number }[];
   milestoneThresholds: number[];
   sparkTokenByRarity: Record<string, number>;
+  /**
+   * The authored constants the port has to carry as content rather than as
+   * behaviour. Recorded here rather than hand-copied into `web/src/content`,
+   * for the same reason every other number in this tree is: a transcription is
+   * a place for a typo nothing would catch, and `SUMMON_MILESTONES` in
+   * particular is six rows of rewards that only differ in one field each.
+   */
+  milestones: {
+    threshold: number;
+    rewardLabel: string;
+    freeCharges: number | null;
+    sparkTokens: number | null;
+    guaranteedRarity: Rarity | null;
+    grantUniqueForge: boolean;
+  }[];
+  costs: { gacha: number; diamonds: number; vipDiscountLevel: number; vipDiscount: number };
+  bannerRateUpByRarity: Record<string, number>;
+  /**
+   * Seven banners that nothing in the shipped game ever selects.
+   * `pickHeroWithBanner` is only ever called with `undefined`, so the featured
+   * hero and the rate-up table below it are content with no caller. Recorded
+   * anyway, because a screen is the obvious thing to give them one.
+   */
+  banners: { id: string; title: string; description: string; featuredHeroId: string; artEmoji: string }[];
   /** A long run from a fresh account: natural rolls and the milestones. */
   earlyGame: Pull[];
   /** The same, with the postgame pool unlocked, which adds transcendent. */
@@ -206,6 +236,22 @@ function build(): Fixture {
     rarityChances: RARITIES.map(entry => ({ id: entry.id, chance: entry.chance })),
     milestoneThresholds: SUMMON_MILESTONES.map(entry => entry.threshold),
     sparkTokenByRarity: { ...SPARK_TOKEN_BY_RARITY },
+    milestones: SUMMON_MILESTONES.map(entry => ({
+      threshold: entry.threshold,
+      rewardLabel: entry.rewardLabel,
+      freeCharges: entry.freeCharges ?? null,
+      sparkTokens: entry.sparkTokens ?? null,
+      guaranteedRarity: entry.guaranteedRarity ?? null,
+      grantUniqueForge: entry.grantUniqueForge === true,
+    })),
+    costs: {
+      gacha: GACHA_SUMMON_COST,
+      diamonds: DIAMOND_SUMMON_COST,
+      vipDiscountLevel: VIP_SUMMON_DISCOUNT_LEVEL,
+      vipDiscount: VIP_SUMMON_DISCOUNT,
+    },
+    bannerRateUpByRarity: { ...BANNER_RATE_UP_BY_RARITY } as Record<string, number>,
+    banners: FEATURED_SUMMON_BANNERS.map(entry => ({ ...entry })),
     // Long enough to cross the soft pity start at 20 and reach the first two
     // milestones at 10 and 50. It does *not* reach the hard threshold — soft
     // pity resolves the drought first — which is what `hardPity` is for.
