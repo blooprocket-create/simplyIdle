@@ -57,8 +57,9 @@ export function equipmentUnlocks(save: SaveV3): { mythic: boolean; transcendent:
   };
 }
 
+/** Off the typed block since Phase 10 claimed it. The bag no longer holds it. */
 function vipLevelOf(save: SaveV3): number {
-  return boundedInt(save.legacy.vipLevel, 0, SAFE_NUMBER_CAP, 0);
+  return boundedInt(save.vip.level, 0, SAFE_NUMBER_CAP, 0);
 }
 
 function forgeLevelOf(save: SaveV3): number {

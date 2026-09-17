@@ -10,6 +10,7 @@ import { RebirthSurface } from './RebirthSurface';
 import { PartySurface } from './PartySurface';
 import { RosterSurface } from './RosterSurface';
 import { SettingsSurface } from './SettingsSurface';
+import { ShopSurface } from './ShopSurface';
 import { SummonSurface } from './SummonSurface';
 import type { SurfaceProps } from './SurfaceProps';
 
@@ -36,6 +37,7 @@ export const SURFACES: Partial<Record<string, ComponentType<SurfaceProps>>> = {
   roster: RosterSurface,
   codex: CodexSurface,
   summon: SummonSurface,
+  shop: ShopSurface,
   settings: SettingsSurface,
 };
 

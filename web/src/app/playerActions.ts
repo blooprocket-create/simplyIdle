@@ -52,15 +52,15 @@ const SUMMON_POOL: readonly SummonPoolEntry[] = HERO_POOL.map(hero => ({
 }));
 
 /**
- * The account's VIP level, out of the legacy bag.
+ * The account's VIP level.
  *
- * Unclaimed, and read rather than claimed on purpose: VIP is a whole system
- * — rewards, a track, a shop — that Phase 10 owns, and claiming one field of it
- * now would put a lone typed number next to the untyped rest. What is needed
- * here is only the summon discount, and `legacy` exists to be read from.
+ * Read out of the legacy bag until Phase 10, which said in this comment that
+ * VIP was "a whole system — rewards, a track, a shop — that Phase 10 owns".
+ * That phase claimed it, so this reads the typed block. Nothing about the
+ * summon discount changed; the field it is priced off has a type now.
  */
 export function vipLevel(save: SaveV3): number {
-  return boundedInt(save.legacy.vipLevel, 0, SAFE_NUMBER_CAP, 0);
+  return boundedInt(save.vip.level, 0, SAFE_NUMBER_CAP, 0);
 }
 
 /** What one pull costs this account, in the currency it is paid with. */

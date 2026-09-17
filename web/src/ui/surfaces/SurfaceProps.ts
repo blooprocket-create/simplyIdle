@@ -13,6 +13,7 @@ import type { CraftOutcome, UpgradeOutcome } from '../../engine/equipment/equipm
 import type { FacilityId } from '../../engine/prestige/facilities';
 import type { PrestigePath } from '../../engine/prestige/rebirth';
 import type { RebirthPreview } from '../../engine/prestige/prestigeSave';
+import type { BuyOutcome, LooseOutcome } from '../../engine/shop/buyOffer';
 import type { SaveV3 } from '../../engine/save/schema';
 
 /**
@@ -121,6 +122,21 @@ export interface SurfaceProps {
     spendEssence: (path: PrestigePath) => boolean;
     priceOfFacility: (facilityId: FacilityId) => number;
     upgradeFacility: (facilityId: FacilityId) => boolean;
+    /**
+     * The shop. `buyOffer` answers what arrived rather than a boolean for the
+     * same reason `craft` does: the armoury crate hands over a *rolled* item,
+     * and a screen that could not name it would be a screen that says
+     * "something happened".
+     */
+    buyOffer: (id: string) => BuyOutcome | null;
+    buyUnits: (itemId: string, amount: number) => LooseOutcome | null;
+    /**
+     * VIP. `claimableCodex` is a query — it counts what a sweep would record
+     * without recording it — so a badge and a disabled button can both ask.
+     */
+    claimVip: (level: number) => boolean;
+    recordCodex: () => number;
+    claimableCodex: () => number;
   };
   /** The player's save, for the counters no read model carries yet. */
   save: SaveV3;

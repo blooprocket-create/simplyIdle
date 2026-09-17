@@ -376,7 +376,14 @@ export function grantDrops(request: DropRequest): { save: SaveV3; items: Equipme
   return { save, items };
 }
 
-function addInstance(equipment: SaveEquipment, item: EquipmentInstance): SaveEquipment {
+/**
+ * Put a rolled item in the bag.
+ *
+ * Exported for the shop, which buys one the same way a run wins one. The
+ * alternative was a second copy of the instance-to-stored conversion, and two
+ * copies of `fullBonus` is how a shop-bought item ends up missing a stat.
+ */
+export function addInstance(equipment: SaveEquipment, item: EquipmentInstance): SaveEquipment {
   return {
     ...equipment,
     inventory: [...equipment.inventory, item.id],

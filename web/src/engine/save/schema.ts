@@ -4,6 +4,7 @@ import type { Rarity } from '../../content/rarities';
 import type { FormationRole } from '../combat/formation';
 import type { EquipmentSource } from '../equipment/instance';
 import type { SavedUsables } from './usablesSlice';
+import type { SavedVip } from './vipSlice';
 import type { FacilityId } from '../prestige/facilities';
 
 /**
@@ -138,6 +139,16 @@ export interface SaveV3 {
 
   /** How many of each usable item is held. Claimed out of `legacy` in Phase 10. */
   usables: SavedUsables;
+
+  /**
+   * VIP, claimed out of `legacy` in Phase 10 because this is the phase with a
+   * shop to spend it in and a claim button to raise it with.
+   *
+   * Read out of the bag since Phase 8 — the summon discount is priced off it —
+   * which is the arrangement `legacy` exists for: read a field on the phase
+   * that needs it, claim it on the phase that owns it.
+   */
+  vip: SavedVip;
 
   wallet: {
     gold: number;

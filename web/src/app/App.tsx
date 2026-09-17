@@ -10,6 +10,7 @@ import type { PrestigePath } from '../engine/prestige/rebirth';
 import { canAffordSpark, canSummon, priceOfSummon, rosterActions, sparkExchange, summonOnce } from './playerActions';
 import { equipmentActions, migrateLegacyEquipment } from './equipmentActions';
 import { prestigeActions } from './prestigeActions';
+import * as shopActions from './shopActions';
 import { EMPTY_AUTOMATION_STATE, runAutomations } from './automationRunner';
 import { worthBanking } from '../engine/save/bankRun';
 import { bankInto } from './bank';
@@ -282,6 +283,30 @@ export function App() {
         const current = live();
         return applying(prestigeActions.upgradeFacility(current, facilityId, current.wallet.gold));
       },
+      buyOffer: (id: string) => {
+        const outcome = shopActions.buy({ save: live(), nowMs: Date.now(), random: Math.random }, id);
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      buyUnits: (itemId: string, amount: number) => {
+        const outcome = shopActions.buyUnits(live(), itemId, amount);
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      claimVip: (level: number) => {
+        const claim = shopActions.claimVip(live(), level);
+        if (claim === null) return false;
+        applySave(claim.save);
+        return true;
+      },
+      recordCodex: () => {
+        const swept = shopActions.recordCodex(live());
+        if (swept.recorded > 0) applySave(swept.save);
+        return swept.recorded;
+      },
+      // A query: it counts what a sweep would record without recording it, so
+      // the disabled button and any badge can both ask the same function.
+      claimableCodex: () => shopActions.claimableCodexEntries(save),
     }),
     [save, applySave, applying, live],
   );

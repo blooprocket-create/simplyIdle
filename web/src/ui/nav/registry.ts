@@ -65,6 +65,19 @@ export const REGISTRY: readonly Destination[] = [
     available: snapshot => snapshot.wave >= REBIRTH_VISIBLE_FROM_WAVE,
   },
 
+  /*
+   * The shop, filed under Power because everything in it is bought to be
+   * stronger: a gear crate, training scrolls, potions.
+   *
+   * The VIP track rides on the same surface rather than taking a destination
+   * of its own, which is where the shipped game puts it too — and it is the
+   * right place for a different reason: VIP milestones are the only source of
+   * diamonds this build has, and the diamond half of the shop is the only
+   * place to spend them. A VIP screen on its own would be a currency with no
+   * shop, and a shop with no currency.
+   */
+  { id: 'shop', group: 'power', label: 'Shop', archetype: 'ledger' },
+
   // Companion — who fights alongside them.
   { id: 'roster', group: 'companion', label: 'Roster', archetype: 'ledger' },
   // A ledger, not a dashboard: it lists the team, and a dashboard is "a few

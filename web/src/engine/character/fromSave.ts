@@ -76,9 +76,18 @@ export function tacticsLevelFromLegacy(save: SaveV3): number {
   return boundedInt(save.facilities.tactics, 0, MAX_FACILITY_LEVEL, 0);
 }
 
-/** VIP level, out of the bag. The whole VIP system is Phase 10's to claim. */
+/**
+ * VIP level, off the typed block.
+ *
+ * It was `save.legacy.vipLevel` until Phase 10 claimed the five VIP keys, and
+ * the name is kept for the same reason `tacticsLevelFromLegacy` keeps its:
+ * the callers do not churn, and it still says where the number came from.
+ *
+ * The level is *derived from the points* on the way in — see `vipSlice.ts` —
+ * so this reads a number the save cannot contradict.
+ */
 export function vipLevelFromLegacy(save: SaveV3): number {
-  return boundedInt(save.legacy.vipLevel, 0, MAX_VIP_LEVEL, 0);
+  return boundedInt(save.vip.level, 0, MAX_VIP_LEVEL, 0);
 }
 
 /**

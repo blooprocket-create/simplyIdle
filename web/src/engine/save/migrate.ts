@@ -4,6 +4,7 @@ import { VALID_FORMATION_ROLES_FOR_CLASS, type FormationRole } from '../combat/f
 import { PITY_THRESHOLD } from '../roster/summon';
 import { readEquipment } from './equipmentSlice';
 import { readUsables } from './usablesSlice';
+import { readVipFromLegacy } from './vipSlice';
 import { readFacilities } from './facilitiesSlice';
 import { roundTo4 } from '../math/safe';
 import {
@@ -293,6 +294,11 @@ export const CLAIMED_V2_KEYS: readonly string[] = [
   'autoDismantleRarityFloor',
   'guildhallFacilities',
   'usableItemCounts',
+  'vipPoints',
+  'vipLevel',
+  'vipRewardClaimedLevels',
+  'codexVipClaimedHeroIds',
+  'codexVipClaimedUniqueIds',
 ];
 
 export interface MigrateOptions {
@@ -440,6 +446,7 @@ export function migrateSave(payload: unknown, options: MigrateOptions): SaveV3 {
     stats: { alloc, unspent },
     facilities,
     usables,
+    vip: readVipFromLegacy(raw),
     equipment,
     wallet: {
       gold,
