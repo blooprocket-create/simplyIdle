@@ -5,6 +5,7 @@ import type { Cast } from '../../game/models/cast';
 import type { Destination } from '../nav/destinations';
 import type { PlayerProfile } from '../profile/playerProfile';
 import type { SummonOutcome, SummonPayment } from '../../engine/roster/summonSave';
+import type { SparkOutcome } from '../../engine/roster/sparkSave';
 import type { HeroSpend } from '../../engine/roster/rosterSave';
 import type { FormationRole } from '../../engine/combat/formation';
 import type { SaveV3 } from '../../engine/save/schema';
@@ -54,6 +55,14 @@ export interface SurfaceProps {
     summon: (pay: SummonPayment) => SummonOutcome | null;
     canSummon: (pay: SummonPayment) => boolean;
     priceOfSummon: (pay: SummonPayment) => number;
+    /**
+     * The spark exchange, which is the other way a hero arrives: the currency
+     * a *duplicate* pull pays out, spent on one at a tier the player picked.
+     * Answers what came — a hero, or a free charge for the option that grants
+     * one — and null when the option is unknown or unaffordable.
+     */
+    sparkExchange: (optionId: string) => SparkOutcome | null;
+    canAffordSpark: (optionId: string) => boolean;
     /**
      * The roster verbs. Each answers `true` when it happened and `false` when
      * the rules refused — a screen greying out a button has to be able to ask,

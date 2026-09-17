@@ -30,39 +30,265 @@
   "sparkOptions": [
     {
       "id": "spark_free_charge",
+      "label": "1 Free Summon Charge",
       "sparkCost": 50,
       "kind": "free_summon"
     },
     {
       "id": "spark_rare",
+      "label": "Choose a Rare-tier Hero",
       "sparkCost": 150,
       "kind": "targeted_hero",
       "minRarity": "rare"
     },
     {
       "id": "spark_epic",
+      "label": "Choose an Epic-tier Hero",
       "sparkCost": 500,
       "kind": "targeted_hero",
       "minRarity": "epic"
     },
     {
       "id": "spark_legendary",
+      "label": "Choose a Legendary-tier Hero",
       "sparkCost": 1500,
       "kind": "targeted_hero",
       "minRarity": "legendary"
     },
     {
       "id": "spark_mythic",
+      "label": "Choose a Mythic+ Hero",
       "sparkCost": 5000,
       "kind": "targeted_hero",
       "minRarity": "mythic"
     },
     {
       "id": "spark_transcendent_t4t5",
+      "label": "Guaranteed Tier 4/5 Transcendent Hero",
       "sparkCost": 75000,
       "kind": "guaranteed_transcendent",
       "minRarity": "transcendent",
       "minTier": 4
+    }
+  ],
+  "sparkExchanges": [
+    {
+      "name": "free-charge",
+      "optionId": "spark_free_charge",
+      "targetHeroId": null,
+      "sparkBefore": 50,
+      "sparkAfter": 0,
+      "freeChargesBefore": 0,
+      "freeChargesAfter": 1,
+      "pityAfter": 0,
+      "totalSummonsAfter": 0,
+      "randomDraws": 0,
+      "hero": null,
+      "relicBearerAfter": null
+    },
+    {
+      "name": "free-charge-one-short",
+      "optionId": "spark_free_charge",
+      "targetHeroId": null,
+      "sparkBefore": 49,
+      "sparkAfter": null,
+      "freeChargesBefore": 0,
+      "freeChargesAfter": 0,
+      "pityAfter": 0,
+      "totalSummonsAfter": 0,
+      "randomDraws": 0,
+      "hero": null,
+      "relicBearerAfter": null
+    },
+    {
+      "name": "unknown-option",
+      "optionId": "spark_nothing",
+      "targetHeroId": null,
+      "sparkBefore": 1000000,
+      "sparkAfter": null,
+      "freeChargesBefore": 0,
+      "freeChargesAfter": 0,
+      "pityAfter": 0,
+      "totalSummonsAfter": 0,
+      "randomDraws": 0,
+      "hero": null,
+      "relicBearerAfter": null
+    },
+    {
+      "name": "rare-untargeted",
+      "optionId": "spark_rare",
+      "targetHeroId": null,
+      "sparkBefore": 150,
+      "sparkAfter": 0,
+      "freeChargesBefore": 0,
+      "freeChargesAfter": 0,
+      "pityAfter": 0,
+      "totalSummonsAfter": 0,
+      "randomDraws": 2,
+      "hero": {
+        "id": "h32",
+        "uid": "h32_1768478400000_spark_9917",
+        "rarity": "rare",
+        "tier": 2,
+        "level": 1,
+        "rank": 1,
+        "teamBoost": 0.0851
+      },
+      "relicBearerAfter": null
+    },
+    {
+      "name": "epic-untargeted",
+      "optionId": "spark_epic",
+      "targetHeroId": null,
+      "sparkBefore": 500,
+      "sparkAfter": 0,
+      "freeChargesBefore": 0,
+      "freeChargesAfter": 0,
+      "pityAfter": 0,
+      "totalSummonsAfter": 0,
+      "randomDraws": 2,
+      "hero": {
+        "id": "h32",
+        "uid": "h32_1768478400000_spark_9917",
+        "rarity": "epic",
+        "tier": 2,
+        "level": 1,
+        "rank": 1,
+        "teamBoost": 0.1008
+      },
+      "relicBearerAfter": null
+    },
+    {
+      "name": "legendary-untargeted",
+      "optionId": "spark_legendary",
+      "targetHeroId": null,
+      "sparkBefore": 1500,
+      "sparkAfter": 0,
+      "freeChargesBefore": 0,
+      "freeChargesAfter": 0,
+      "pityAfter": 0,
+      "totalSummonsAfter": 0,
+      "randomDraws": 2,
+      "hero": {
+        "id": "h42",
+        "uid": "h42_1768478400000_spark_9917",
+        "rarity": "legendary",
+        "tier": 3,
+        "level": 1,
+        "rank": 1,
+        "teamBoost": 0.1326
+      },
+      "relicBearerAfter": null
+    },
+    {
+      "name": "mythic-untargeted",
+      "optionId": "spark_mythic",
+      "targetHeroId": null,
+      "sparkBefore": 5000,
+      "sparkAfter": 0,
+      "freeChargesBefore": 0,
+      "freeChargesAfter": 0,
+      "pityAfter": 0,
+      "totalSummonsAfter": 0,
+      "randomDraws": 2,
+      "hero": {
+        "id": "h42",
+        "uid": "h42_1768478400000_spark_9917",
+        "rarity": "mythic",
+        "tier": 3,
+        "level": 1,
+        "rank": 1,
+        "teamBoost": 0.1598
+      },
+      "relicBearerAfter": null
+    },
+    {
+      "name": "transcendent",
+      "optionId": "spark_transcendent_t4t5",
+      "targetHeroId": null,
+      "sparkBefore": 75000,
+      "sparkAfter": 0,
+      "freeChargesBefore": 0,
+      "freeChargesAfter": 0,
+      "pityAfter": 0,
+      "totalSummonsAfter": 0,
+      "randomDraws": 2,
+      "hero": {
+        "id": "h52",
+        "uid": "h52_1768478400000_spark_9917",
+        "rarity": "transcendent",
+        "tier": 4,
+        "level": 1,
+        "rank": 1,
+        "teamBoost": 0.2911
+      },
+      "relicBearerAfter": null
+    },
+    {
+      "name": "rare-targeted",
+      "optionId": "spark_rare",
+      "targetHeroId": "h1",
+      "sparkBefore": 150,
+      "sparkAfter": 0,
+      "freeChargesBefore": 0,
+      "freeChargesAfter": 0,
+      "pityAfter": 0,
+      "totalSummonsAfter": 0,
+      "randomDraws": 1,
+      "hero": {
+        "id": "h1",
+        "uid": "h1_1768478400000_spark_928",
+        "rarity": "rare",
+        "tier": 1,
+        "level": 1,
+        "rank": 1,
+        "teamBoost": 0.0675
+      },
+      "relicBearerAfter": null
+    },
+    {
+      "name": "rare-targeted-duplicate",
+      "optionId": "spark_rare",
+      "targetHeroId": "h1",
+      "sparkBefore": 150,
+      "sparkAfter": 0,
+      "freeChargesBefore": 0,
+      "freeChargesAfter": 0,
+      "pityAfter": 0,
+      "totalSummonsAfter": 0,
+      "randomDraws": 1,
+      "hero": {
+        "id": "h1",
+        "uid": "h1_1768478400000_spark_928",
+        "rarity": "rare",
+        "tier": 1,
+        "level": 1,
+        "rank": 1,
+        "teamBoost": 0.0675
+      },
+      "relicBearerAfter": null
+    },
+    {
+      "name": "rare-targeted-relic-moves",
+      "optionId": "spark_rare",
+      "targetHeroId": "h1",
+      "sparkBefore": 150,
+      "sparkAfter": 0,
+      "freeChargesBefore": 0,
+      "freeChargesAfter": 0,
+      "pityAfter": 0,
+      "totalSummonsAfter": 0,
+      "randomDraws": 1,
+      "hero": {
+        "id": "h1",
+        "uid": "h1_1768478400000_spark_928",
+        "rarity": "rare",
+        "tier": 1,
+        "level": 1,
+        "rank": 1,
+        "teamBoost": 0.0675
+      },
+      "relicBearerAfter": "h1_1768478400000_spark_928"
     }
   ],
   "selections": [

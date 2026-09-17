@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fixture from '../engine/roster/__fixtures__/summon.json';
+import teamFixture from '../engine/roster/__fixtures__/team-management.json';
 import { HERO_POOL, getHeroTemplate } from './heroes';
 import { RARITY_IDS, type Rarity } from './rarities';
 import {
@@ -7,6 +8,7 @@ import {
   DIAMOND_SUMMON_COST,
   FEATURED_SUMMON_BANNERS,
   GACHA_SUMMON_COST,
+  SPARK_EXCHANGE_OPTIONS,
   SPARK_TOKEN_BY_RARITY,
   SUMMON_MILESTONES,
   VIP_SUMMON_DISCOUNT,
@@ -156,5 +158,42 @@ describe('banners', () => {
       const previous = BANNER_RATE_UP_BY_RARITY[rated[index - 1]] ?? 0;
       expect(BANNER_RATE_UP_BY_RARITY[rated[index]] ?? 0, rated[index]).toBeGreaterThan(previous);
     }
+  });
+});
+
+describe('the spark exchange', () => {
+  it('carries the shipped options, prices and labels', () => {
+    expect(
+      SPARK_EXCHANGE_OPTIONS.map(option => ({
+        id: option.id,
+        label: option.label,
+        sparkCost: option.sparkCost,
+        kind: option.kind,
+        ...(option.minRarity ? { minRarity: option.minRarity } : {}),
+        ...(option.minTier ? { minTier: option.minTier } : {}),
+      })),
+    ).toEqual(teamFixture.sparkOptions);
+  });
+
+  it('names a rarity for every option that hands over a hero', () => {
+    /*
+     * `minRarity` is optional because a free charge has none, and
+     * `applySparkExchange` reads it for both hero kinds — so an option of
+     * either kind with no rarity would be a purchase that granted nothing.
+     * The type cannot say "required unless free", so this does.
+     */
+    for (const option of SPARK_EXCHANGE_OPTIONS) {
+      expect({ id: option.id, named: option.minRarity !== undefined }).toEqual({
+        id: option.id,
+        named: option.kind !== 'free_summon',
+      });
+    }
+  });
+
+  it('prices them in the order they are offered', () => {
+    // The screen lists them as authored, so an out-of-order price would put
+    // the expensive option above the cheap one with nothing saying why.
+    const costs = SPARK_EXCHANGE_OPTIONS.map(option => option.sparkCost);
+    expect(costs).toEqual([...costs].sort((a, b) => a - b));
   });
 });

@@ -3,6 +3,7 @@ import type { FormationRole } from '../engine/combat/formation';
 import {
   DIAMOND_SUMMON_COST,
   GACHA_SUMMON_COST,
+  SPARK_EXCHANGE_OPTIONS,
   SPARK_TOKEN_BY_RARITY,
   SUMMON_MILESTONES,
   summonCost,
@@ -10,6 +11,7 @@ import {
 import { boundedInt, SAFE_NUMBER_CAP } from '../engine/save/guards';
 import type { SaveContent, SaveV3 } from '../engine/save/schema';
 import { applySummon, type SummonOutcome, type SummonPayment, type SummonPoolEntry } from '../engine/roster/summonSave';
+import { applySparkExchange, type SparkOutcome } from '../engine/roster/sparkSave';
 import {
   batchLevelHeroes,
   buySlot,
@@ -82,6 +84,42 @@ export function summonOnce(attempt: SummonAttempt): SummonOutcome | null {
     sparkRates: SPARK_TOKEN_BY_RARITY,
     pay: attempt.pay,
     cost: priceOfSummon(attempt.save, attempt.pay),
+    random: attempt.random,
+    nowMs: attempt.nowMs,
+  });
+}
+
+export interface SparkAttempt {
+  save: SaveV3;
+  optionId: string;
+  /** The hero the player named, when a screen offers the choice. */
+  targetHeroId?: string;
+  /** For the new hero's uid. Passed in, because nothing below reads a clock. */
+  nowMs: number;
+  random: () => number;
+}
+
+/**
+ * Whether an exchange would go through, without drawing anything to find out.
+ *
+ * Priced off the option table rather than off a copy of the numbers, so a
+ * button that looks affordable is one the engine will honour. An unknown id
+ * answers `false` rather than throwing — a screen asking about an option that
+ * is not on offer is a screen bug, not a crash.
+ */
+export function canAffordSpark(save: SaveV3, optionId: string): boolean {
+  const option = SPARK_EXCHANGE_OPTIONS.find(entry => entry.id === optionId);
+  return option !== undefined && save.wallet.sparkTokens >= option.sparkCost;
+}
+
+/** Buy one exchange. Null when the option is unknown or unaffordable. */
+export function sparkExchange(attempt: SparkAttempt): SparkOutcome | null {
+  return applySparkExchange({
+    save: attempt.save,
+    pool: SUMMON_POOL,
+    options: SPARK_EXCHANGE_OPTIONS,
+    optionId: attempt.optionId,
+    ...(attempt.targetHeroId ? { targetHeroId: attempt.targetHeroId } : {}),
     random: attempt.random,
     nowMs: attempt.nowMs,
   });

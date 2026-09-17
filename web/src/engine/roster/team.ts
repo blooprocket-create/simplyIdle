@@ -1,5 +1,6 @@
 import { VALID_FORMATION_ROLES_FOR_CLASS, type FormationRole } from '../combat/formation';
 import type { PlayerClass } from '../../content/classes';
+import type { Rarity } from '../../content/rarities';
 import { ACTIVE_TEAM_SIZE, MIN_TEAM_SLOTS, TEAM_LOADOUT_COUNT, normalizeTeamSelection } from '../save/migrate';
 import type { SaveContent, SavedHero } from '../save/schema';
 import { HERO_LEVEL_CAP, heroGoldLevelCost } from './progression';
@@ -244,41 +245,39 @@ export function batchLevel(
   return { levelByUid, gold: purse };
 }
 
+/**
+ * What spark tokens buy.
+ *
+ * The rows themselves are content — six of them, with a player-facing label —
+ * and live in `content/summon.ts`, the same split `Milestone` and
+ * `SummonMilestone` make. This is the rule-bearing half: what an exchange
+ * costs and what kind of thing it hands over.
+ */
 export interface SparkExchangeOption {
   id: string;
   sparkCost: number;
   kind: 'free_summon' | 'targeted_hero' | 'guaranteed_transcendent';
-  minRarity?: string;
+  /** The rarity the hero arrives at, before the tier clamp. */
+  minRarity?: Rarity;
+  /** Only for `guaranteed_transcendent`: the lowest tier the pick may take. */
   minTier?: number;
 }
-
-export const SPARK_EXCHANGE_OPTIONS: readonly SparkExchangeOption[] = [
-  { id: 'spark_free_charge', sparkCost: 50, kind: 'free_summon' },
-  { id: 'spark_rare', sparkCost: 150, kind: 'targeted_hero', minRarity: 'rare' },
-  { id: 'spark_epic', sparkCost: 500, kind: 'targeted_hero', minRarity: 'epic' },
-  { id: 'spark_legendary', sparkCost: 1500, kind: 'targeted_hero', minRarity: 'legendary' },
-  { id: 'spark_mythic', sparkCost: 5000, kind: 'targeted_hero', minRarity: 'mythic' },
-  {
-    id: 'spark_transcendent_t4t5',
-    sparkCost: 75_000,
-    kind: 'guaranteed_transcendent',
-    minRarity: 'transcendent',
-    minTier: 4,
-  },
-];
 
 /**
  * Spend spark tokens on an exchange option, or refuse.
  *
  * Returns what the exchange costs and which option was bought; granting the
  * hero is the caller's, because it needs the catalogue and the dice and this
- * does not.
+ * does not. The option table is an argument for the same reason the hero pool
+ * is one everywhere else in this module's neighbours — the engine may not read
+ * the catalogue, and a module-level constant here would be it doing so.
  */
 export function spendSpark(
+  options: readonly SparkExchangeOption[],
   sparkTokens: number,
   optionId: string,
 ): { option: SparkExchangeOption; left: number } | null {
-  const option = SPARK_EXCHANGE_OPTIONS.find(entry => entry.id === optionId);
+  const option = options.find(entry => entry.id === optionId);
   if (!option) return null;
   if (sparkTokens < option.sparkCost) return null;
   return { option, left: sparkTokens - option.sparkCost };

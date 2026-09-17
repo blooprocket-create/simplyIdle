@@ -1,4 +1,5 @@
 import { HERO_TEMPLATE_COUNT } from '../../content/heroes';
+import { SPARK_EXCHANGE_OPTIONS } from '../../content/summon';
 import { HERO_LEVEL_CAP, HERO_RANK_CAP, heroGoldLevelCost, rankUpShardCost } from '../../engine/roster/progression';
 import { TEAM_SLOT_UNLOCK_RULES } from '../../engine/roster/team';
 import { formatDamage } from '../../format/bigNumber';
@@ -39,6 +40,7 @@ export function RosterSurface(props: SurfaceProps) {
 
   const gold = spendableGold(props);
   const shards = profile.wallet.heroShards;
+  const spark = profile.wallet.sparkTokens;
   const active = profile.roster.filter(hero => hero.active);
   const benched = profile.roster.filter(hero => !hero.active);
   const nextSlot = TEAM_SLOT_UNLOCK_RULES[profile.slotsUnlocked + 1];
@@ -129,6 +131,40 @@ export function RosterSurface(props: SurfaceProps) {
               </button>
             </Row>
           )}
+        </Rows>
+      </Section>
+
+      <Section title="Spark exchange">
+        {/*
+          Filed here rather than on Summon, which is a `moment` and does not
+          scroll — six priced rows do not fit one. It belongs with the wallet
+          anyway: this is the screen where gold and shards are already spent,
+          and the hero a purchase hands over lands in Reserve below, where the
+          player is already looking.
+        */}
+        <Rows>
+          <Row label="Spark tokens" hint="Paid out by duplicate summons">
+            {formatDamage(spark)}
+          </Row>
+          {/*
+            The charge count, so the one option that hands over no hero still
+            has a visible effect on the screen the player bought it from.
+          */}
+          <Row label="Free summon charges" hint="Spent before either currency">
+            {props.save.summon.freeCharges}
+          </Row>
+          {SPARK_EXCHANGE_OPTIONS.map(option => (
+            <Row key={option.id} label={option.label}>
+              <button
+                type="button"
+                className={styles.verb}
+                disabled={!actions.canAffordSpark(option.id)}
+                onClick={() => actions.sparkExchange(option.id)}
+              >
+                {formatDamage(option.sparkCost)}⚡
+              </button>
+            </Row>
+          ))}
         </Rows>
       </Section>
 

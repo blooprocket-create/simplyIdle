@@ -4,7 +4,7 @@ import { Diorama } from '../game/Diorama';
 import { detectCapabilities, profileFor } from '../game/device/DeviceProfile';
 import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
 import { startingSave } from './demoRoster';
-import { canSummon, priceOfSummon, rosterActions, summonOnce } from './playerActions';
+import { canAffordSpark, canSummon, priceOfSummon, rosterActions, sparkExchange, summonOnce } from './playerActions';
 import { fightSignature, rosterFromSave } from './roster';
 import { loadSave, writeSave } from './saveStore';
 import type { SaveV3 } from '../engine/save/schema';
@@ -160,6 +160,12 @@ export function App() {
       },
       canSummon: (pay: SummonPayment) => canSummon(save, pay),
       priceOfSummon: (pay: SummonPayment) => priceOfSummon(save, pay),
+      sparkExchange: (optionId: string) => {
+        const outcome = sparkExchange({ save, optionId, nowMs: Date.now(), random: Math.random });
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      canAffordSpark: (optionId: string) => canAffordSpark(save, optionId),
       spendOnHero: (uid: string, spend: HeroSpend) => applying(rosterActions.spendOnHero(save, uid, spend)),
       batchLevel: (uids: readonly string[], addLevels: number | 'max') =>
         applying(rosterActions.batchLevel(save, uids, addLevels)),

@@ -83,7 +83,35 @@ interface Fixture {
   generatedFrom: string;
   rosterUids: string[];
   slotUnlockRules: { targetSlots: number; requiredWave: number; goldCost: number; shardCost: number }[];
-  sparkOptions: { id: string; sparkCost: number; kind: string; minRarity?: string; minTier?: number }[];
+  sparkOptions: { id: string; label: string; sparkCost: number; kind: string; minRarity?: string; minTier?: number }[];
+  /** What an exchange actually does: what it spends, what arrives, what it draws. */
+  sparkExchanges: {
+    name: string;
+    optionId: string;
+    targetHeroId: string | null;
+    sparkBefore: number;
+    /** Null when the exchange was refused, which is how a refusal is recorded. */
+    sparkAfter: number | null;
+    freeChargesBefore: number;
+    freeChargesAfter: number;
+    /** The pity counter and summon tally, to show an exchange is not a summon. */
+    pityAfter: number;
+    totalSummonsAfter: number;
+    /** How many values the action consumed. Zero for a free charge. */
+    randomDraws: number;
+    /** The hero that arrived, or null. Recorded from the front of the roster. */
+    hero: {
+      id: string;
+      uid: string;
+      rarity: string;
+      tier: number;
+      level: number;
+      rank: number;
+      teamBoost: number;
+    } | null;
+    /** Who the hero's relic points at afterwards, when they have one. */
+    relicBearerAfter: string | null;
+  }[];
   /** Setting a team: what the selection rules keep and drop. */
   selections: { name: string; requested: string[]; slotsUnlocked: number; accepted: string[] }[];
   /** Setting a formation role, and the refusals. */
@@ -111,6 +139,131 @@ interface Fixture {
     levelsAfter: Record<string, number>;
     goldAfter: number;
   }[];
+}
+
+/**
+ * A scripted random source, so the spark exchange's picks are reproducible.
+ *
+ * The rest of this fixture runs with `Math.random` pinned at 0.5, which is
+ * fine for actions that draw nothing. The exchange draws — a hero and a uid —
+ * and a constant would put every option on the same slot of its band, which is
+ * the one thing a pick test must not do. Same LCG as `summonFixture`, for the
+ * same reason: it has to be reproducible from one seed in the rewrite's tests
+ * too, which rules out anything with hidden state.
+ */
+function scriptedRandom(seed: number): () => number {
+  let value = seed >>> 0;
+  return () => {
+    value = (Math.imul(value, 1664525) + 1013904223) >>> 0;
+    return value / 0x100000000;
+  };
+}
+
+const SPARK_SEED = 20_260_115;
+
+/** The tier-one hero the targeted and relic cases name. */
+const SPARK_TARGET_ID = HERO_POOL[0].id;
+
+/**
+ * What each exchange does, driven through the real `SPARK_EXCHANGE` action.
+ *
+ * The option table alone says what an exchange *costs*; none of the behaviour
+ * that matters is in it. Whether a free charge is a summon, whether a targeted
+ * pick draws fewer values than an untargeted one, whether the rarity a player
+ * paid for survives the tier clamp, and whether a duplicate bought here pays
+ * spark back the way a duplicate pull does — all of that is in the reducer.
+ */
+function sparkExchanges(): Fixture['sparkExchanges'] {
+  const cases: {
+    name: string;
+    optionId: string;
+    targetHeroId?: string;
+    sparkTokens: number;
+    seed?: GameState['heroUniqueGearByHeroId'];
+    roster?: HeroUnit[];
+  }[] = [
+    { name: 'free-charge', optionId: 'spark_free_charge', sparkTokens: 50 },
+    { name: 'free-charge-one-short', optionId: 'spark_free_charge', sparkTokens: 49 },
+    { name: 'unknown-option', optionId: 'spark_nothing', sparkTokens: 1_000_000 },
+    { name: 'rare-untargeted', optionId: 'spark_rare', sparkTokens: 150 },
+    { name: 'epic-untargeted', optionId: 'spark_epic', sparkTokens: 500 },
+    { name: 'legendary-untargeted', optionId: 'spark_legendary', sparkTokens: 1_500 },
+    { name: 'mythic-untargeted', optionId: 'spark_mythic', sparkTokens: 5_000 },
+    { name: 'transcendent', optionId: 'spark_transcendent_t4t5', sparkTokens: 75_000 },
+    { name: 'rare-targeted', optionId: 'spark_rare', targetHeroId: SPARK_TARGET_ID, sparkTokens: 150 },
+    {
+      // The same hero the roster already holds, so the spark a *duplicate pull*
+      // would pay can be compared against what this pays: nothing.
+      name: 'rare-targeted-duplicate',
+      optionId: 'spark_rare',
+      targetHeroId: SPARK_TARGET_ID,
+      sparkTokens: 150,
+      roster: [hero(SPARK_TARGET_ID, 'owned')],
+    },
+    {
+      // A relic already placed on a weaker copy. The arriving one is rare where
+      // the held one is common, so the preferred bearer changes.
+      name: 'rare-targeted-relic-moves',
+      optionId: 'spark_rare',
+      targetHeroId: SPARK_TARGET_ID,
+      sparkTokens: 150,
+      roster: [hero(SPARK_TARGET_ID, 'owned')],
+      seed: { [SPARK_TARGET_ID]: { rank: 3, equippedByUid: 'owned' } },
+    },
+  ];
+
+  return cases.map(entry => {
+    const before = state({
+      sparkTokens: entry.sparkTokens,
+      ...(entry.roster ? { heroRoster: entry.roster } : {}),
+      ...(entry.seed ? { heroUniqueGearByHeroId: entry.seed } : {}),
+    });
+    const random = scriptedRandom(SPARK_SEED);
+    let draws = 0;
+    const spy = jest.spyOn(Math, 'random').mockImplementation(() => {
+      draws += 1;
+      return random();
+    });
+    let after: GameState;
+    try {
+      after = apply(before, {
+        type: 'SPARK_EXCHANGE',
+        optionId: entry.optionId,
+        ...(entry.targetHeroId ? { targetHeroId: entry.targetHeroId } : {}),
+      });
+    } finally {
+      spy.mockRestore();
+    }
+
+    const refused = after.sparkTokens === before.sparkTokens && after.heroRoster.length === before.heroRoster.length;
+    const arrived = after.heroRoster.length > before.heroRoster.length ? after.heroRoster[0] : null;
+    const template = arrived ? HERO_POOL.find(candidate => candidate.id === arrived.id) : undefined;
+
+    return {
+      name: entry.name,
+      optionId: entry.optionId,
+      targetHeroId: entry.targetHeroId ?? null,
+      sparkBefore: before.sparkTokens,
+      sparkAfter: refused ? null : after.sparkTokens,
+      freeChargesBefore: before.freeSummonCharges,
+      freeChargesAfter: after.freeSummonCharges,
+      pityAfter: after.gachaPityCounter,
+      totalSummonsAfter: after.totalSummons,
+      randomDraws: draws,
+      hero: arrived
+        ? {
+            id: arrived.id,
+            uid: arrived.uid,
+            rarity: arrived.rarity,
+            tier: template?.tier ?? 0,
+            level: arrived.level,
+            rank: arrived.rank,
+            teamBoost: arrived.teamBoost,
+          }
+        : null,
+      relicBearerAfter: after.heroUniqueGearByHeroId[SPARK_TARGET_ID]?.equippedByUid ?? null,
+    };
+  });
 }
 
 function build(): Fixture {
@@ -233,11 +386,13 @@ function build(): Fixture {
     slotUnlockRules,
     sparkOptions: SPARK_EXCHANGE_OPTIONS.map(option => ({
       id: option.id,
+      label: option.label,
       sparkCost: option.sparkCost,
       kind: option.kind,
       ...(option.minRarity ? { minRarity: option.minRarity } : {}),
       ...(option.minTier ? { minTier: option.minTier } : {}),
     })),
+    sparkExchanges: sparkExchanges(),
     selections,
     formations,
     loadouts,
@@ -390,6 +545,115 @@ describe('team management fixture', () => {
     const broke = fixture.batchLevels.find(entry => entry.name === 'max-broke')!;
     expect(Object.values(broke.levelsAfter)).toEqual([1, 1, 1]);
     expect(broke.goldAfter).toBe(broke.gold);
+  });
+
+  const exchange = (name: string) => fixture.sparkExchanges.find(entry => entry.name === name)!;
+
+  it('treats a free charge as a purchase, not as a summon', () => {
+    /*
+     * The one thing a port is most likely to get wrong here, because the
+     * obvious implementation is "grant a summon". `free_summon` grants a
+     * *charge*: the pity counter does not move, the summon tally does not
+     * move, no hero arrives, and **nothing is drawn**. Routing it through the
+     * summon action would advance all three and desynchronise every recorded
+     * sequence that followed.
+     */
+    expect(exchange('free-charge')).toMatchObject({
+      sparkAfter: 0,
+      freeChargesAfter: 1,
+      pityAfter: 0,
+      totalSummonsAfter: 0,
+      randomDraws: 0,
+      hero: null,
+    });
+  });
+
+  it('refuses before drawing, for an unaffordable or unknown option', () => {
+    // One spark short of the cheapest option, and an id that is not in the
+    // table. Both leave the state alone, and neither advances the dice.
+    for (const name of ['free-charge-one-short', 'unknown-option']) {
+      expect(exchange(name)).toMatchObject({ sparkAfter: null, freeChargesAfter: 0, randomDraws: 0, hero: null });
+    }
+  });
+
+  it('draws one fewer value when the player named the hero', () => {
+    /*
+     * The draw count is the behaviour, not an implementation detail: an
+     * untargeted exchange picks a hero (one value) and then builds a uid (one
+     * more), and a targeted one skips the pick. A port that drew for the uid
+     * first, or that drew a pick it then discarded, would agree on the hero
+     * and disagree on every value after it.
+     */
+    expect(exchange('rare-untargeted').randomDraws).toBe(2);
+    expect(exchange('rare-targeted').randomDraws).toBe(1);
+    expect(exchange('rare-targeted').hero?.id).toBe(SPARK_TARGET_ID);
+  });
+
+  it('brands the uid as a spark hero, in its own namespace', () => {
+    // `<template>_<ms>_spark_<0-9999>`, which is *not* a summon's
+    // `<template>_<ms>_<0-9999>`. Two heroes acquired in the same millisecond
+    // by the two routes therefore cannot collide, and a duplicate uid is not
+    // cosmetic — the save reader drops the second row outright.
+    expect(exchange('rare-targeted').hero?.uid).toMatch(/^h1_\d+_spark_\d{1,4}$/);
+  });
+
+  it('hands over a hero at level one, rank one, boosted for their rarity', () => {
+    // The same shape a summoned hero arrives in, which is what makes them
+    // indistinguishable afterwards — a spark hero is not a lesser copy.
+    for (const name of ['rare-untargeted', 'epic-untargeted', 'transcendent']) {
+      expect(exchange(name).hero).toMatchObject({ level: 1, rank: 1 });
+    }
+    // Boost scales with the rarity that was bought, off the same template.
+    expect(exchange('epic-untargeted').hero!.teamBoost).toBeGreaterThan(exchange('rare-untargeted').hero!.teamBoost);
+  });
+
+  it('pays no spark back for a duplicate, unlike a summon', () => {
+    /*
+     * A duplicate *pull* pays `SPARK_TOKEN_BY_RARITY[rarity]` — that is where
+     * spark comes from. A duplicate bought at the exchange pays nothing, which
+     * is the rule that stops 150 spark from buying a rare and refunding part
+     * of it. The two cases below are the same option and the same target; only
+     * the roster differs.
+     */
+    expect(exchange('rare-targeted-duplicate').sparkAfter).toBe(0);
+    expect(exchange('rare-targeted-duplicate').hero!.id).toBe(exchange('rare-targeted').hero!.id);
+  });
+
+  it('re-points a unique relic at the better copy that just arrived', () => {
+    /*
+     * The relic was on a common copy at rank 3; the exchange hands over a rare
+     * one, and rarity is the first term in the preference order — so the relic
+     * moves. Easy to miss because the exchange never *drops* a relic (a summon
+     * does, on a six percent chance), so the only relic work it does is this.
+     */
+    expect(exchange('rare-targeted-relic-moves').relicBearerAfter).toBe(exchange('rare-targeted').hero!.uid);
+    // And nothing to re-point when there is no relic, rather than one invented.
+    expect(exchange('rare-targeted-duplicate').relicBearerAfter).toBeNull();
+  });
+
+  it('never has to clamp, with the shipped catalogue', () => {
+    /*
+     * Recorded rather than asserted the other way round, because it is a fact
+     * about the catalogue rather than about the code. `clampRarityToTier` runs
+     * on every exchange, and no option can reach a hero whose tier refuses the
+     * rarity it asked for: `spark_rare` and `spark_epic` draw from tiers 2-3,
+     * whose bands run common..legendary and rare..godly; `spark_mythic` draws
+     * from tiers 3-4, and tier 4 admits everything up to transcendent.
+     *
+     * So a port that dropped the clamp entirely would pass every assertion
+     * here. `sparkSave.test.ts` covers it with a pool built to force it, which
+     * is the only way to make that bite.
+     */
+    const asked: Record<string, string> = {
+      'rare-untargeted': 'rare',
+      'epic-untargeted': 'epic',
+      'legendary-untargeted': 'legendary',
+      'mythic-untargeted': 'mythic',
+      transcendent: 'transcendent',
+    };
+    for (const [name, rarity] of Object.entries(asked)) {
+      expect({ name, rarity: exchange(name).hero?.rarity }).toEqual({ name, rarity });
+    }
   });
 
   it('matches the committed fixture the rewrite is measured against', () => {

@@ -6,7 +6,7 @@ import type { SaveContent } from '../save/schema';
 import { HERO_LEVEL_CAP, heroGoldLevelCost } from './progression';
 import {
   MAX_FORMATION_ROLE_HEROES,
-  SPARK_EXCHANGE_OPTIONS,
+  type SparkExchangeOption,
   TEAM_SLOT_UNLOCK_RULES,
   batchLevel,
   loadLoadout,
@@ -300,26 +300,26 @@ describe('batch levelling', () => {
 });
 
 describe('the spark exchange', () => {
-  it('carries the shipped options and prices', () => {
-    expect(
-      SPARK_EXCHANGE_OPTIONS.map(option => ({
-        id: option.id,
-        sparkCost: option.sparkCost,
-        kind: option.kind,
-        ...(option.minRarity ? { minRarity: option.minRarity } : {}),
-        ...(option.minTier ? { minTier: option.minTier } : {}),
-      })),
-    ).toEqual(fixture.sparkOptions);
-  });
+  /*
+   * Its own two-row table rather than the catalogue's six. What is under test
+   * here is the *rule* — find the option, check the purse, subtract — and a
+   * rule proven against the shipped rows would silently stop being proven the
+   * day someone reprices one. The rows themselves are checked against the
+   * fixture in `content/summon.test.ts`, which is where they live.
+   */
+  const OPTIONS: readonly SparkExchangeOption[] = [
+    { id: 'cheap', sparkCost: 50, kind: 'free_summon' },
+    { id: 'dear', sparkCost: 1_500, kind: 'targeted_hero', minRarity: 'legendary' },
+  ];
 
   it('refuses an unknown option and an unaffordable one', () => {
-    expect(spendSpark(1e9, 'no-such-option')).toBeNull();
-    expect(spendSpark(49, 'spark_free_charge')).toBeNull();
-    expect(spendSpark(50, 'spark_free_charge')).toEqual({ option: SPARK_EXCHANGE_OPTIONS[0], left: 0 });
+    expect(spendSpark(OPTIONS, 1e9, 'no-such-option')).toBeNull();
+    expect(spendSpark(OPTIONS, 49, 'cheap')).toBeNull();
+    expect(spendSpark(OPTIONS, 50, 'cheap')).toEqual({ option: OPTIONS[0], left: 0 });
   });
 
   it('spends exactly the option’s cost', () => {
-    const result = spendSpark(2_000, 'spark_legendary')!;
+    const result = spendSpark(OPTIONS, 2_000, 'dear')!;
     expect(result.option.sparkCost).toBe(1_500);
     expect(result.left).toBe(500);
   });

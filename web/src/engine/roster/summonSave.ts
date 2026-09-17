@@ -88,7 +88,16 @@ export interface SummonOutcome {
  * receives nothing.
  */
 function freshUid(templateId: string, nowMs: number, roll: number, taken: ReadonlySet<string>): string {
-  const base = `${templateId}_${Math.floor(nowMs)}_${Math.floor(roll * 10_000)}`;
+  return uniqueUid(`${templateId}_${Math.floor(nowMs)}_${Math.floor(roll * 10_000)}`, taken);
+}
+
+/**
+ * The collision guard on its own, because the spark exchange builds a uid in
+ * its own namespace — `<template>_<ms>_spark_<n>` — and needs the same
+ * protection. Only the base differs; what happens when it is already taken
+ * does not.
+ */
+export function uniqueUid(base: string, taken: ReadonlySet<string>): string {
   if (!taken.has(base)) return base;
   for (let suffix = 1; ; suffix += 1) {
     const candidate = `${base}_${suffix}`;
@@ -130,7 +139,7 @@ function grantRelic(
  * Draws nothing. Runs before the drop chance, as shipped: a pull that adds a
  * better copy hands them the relic even when the pull itself drops nothing.
  */
-function syncRelicBearer(
+export function syncRelicBearer(
   uniqueByHeroId: Readonly<Record<string, SavedUniqueGear>>,
   heroes: readonly SavedHero[],
   templateId: string,

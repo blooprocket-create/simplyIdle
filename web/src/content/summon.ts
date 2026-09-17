@@ -1,5 +1,6 @@
 import type { Rarity } from './rarities';
 import type { Milestone } from '../engine/roster/summon';
+import type { SparkExchangeOption } from '../engine/roster/team';
 
 /**
  * What summoning costs, what it promises, and what it shows.
@@ -63,6 +64,45 @@ export const SUMMON_MILESTONES: readonly SummonMilestone[] = [
   { threshold: 250, rewardLabel: 'Next summon guaranteed Legendary+', guaranteedRarity: 'legendary' },
   { threshold: 500, rewardLabel: '2000 Spark Tokens + Unique Gear', sparkTokens: 2000, grantUnique: true },
   { threshold: 1000, rewardLabel: 'Next summon guaranteed Mythic+', guaranteedRarity: 'mythic' },
+];
+
+/**
+ * A spark exchange row, with the line the player reads.
+ *
+ * `label` is carried as authored rather than built from the fields, for the
+ * same reason `rewardLabel` is: it is the string on the button, both apps
+ * share accounts, and "Choose a Mythic+ Hero" is not something a formatter
+ * would arrive at from `{ kind: 'targeted_hero', minRarity: 'mythic' }`.
+ *
+ * The labels overpromise slightly, and are kept anyway. "Choose" is what the
+ * option is *for* — the action takes a `targetHeroId` — but the shipped screen
+ * never passes one, so every purchase is a random hero from that rarity's
+ * band. Rewording it here would make the two apps' buttons disagree.
+ */
+export interface SparkExchange extends SparkExchangeOption {
+  label: string;
+}
+
+export const SPARK_EXCHANGE_OPTIONS: readonly SparkExchange[] = [
+  { id: 'spark_free_charge', label: '1 Free Summon Charge', sparkCost: 50, kind: 'free_summon' },
+  { id: 'spark_rare', label: 'Choose a Rare-tier Hero', sparkCost: 150, kind: 'targeted_hero', minRarity: 'rare' },
+  { id: 'spark_epic', label: 'Choose an Epic-tier Hero', sparkCost: 500, kind: 'targeted_hero', minRarity: 'epic' },
+  {
+    id: 'spark_legendary',
+    label: 'Choose a Legendary-tier Hero',
+    sparkCost: 1_500,
+    kind: 'targeted_hero',
+    minRarity: 'legendary',
+  },
+  { id: 'spark_mythic', label: 'Choose a Mythic+ Hero', sparkCost: 5_000, kind: 'targeted_hero', minRarity: 'mythic' },
+  {
+    id: 'spark_transcendent_t4t5',
+    label: 'Guaranteed Tier 4/5 Transcendent Hero',
+    sparkCost: 75_000,
+    kind: 'guaranteed_transcendent',
+    minRarity: 'transcendent',
+    minTier: 4,
+  },
 ];
 
 /**
