@@ -1,6 +1,6 @@
 import { heroTemplatesById } from '../content/heroes';
-import { migrateSave } from '../engine/save/migrate';
 import type { SaveV3 } from '../engine/save/schema';
+import { readSave, writeSaveV3 } from '../engine/save/v3';
 import type { PreferenceStore } from '../ui/prefs/store';
 
 /**
@@ -25,10 +25,11 @@ export const SAVE_KEY = 'simplyidle.save.v3';
  * an empty roster means a player who has one and has emptied it, and
  * inventing heroes for them would be inventing progress.
  *
- * Anything that *is* stored goes through `migrateSave`, which is built to
- * take a payload of unknown shape — that is how it reads the shipped v2
- * saves — so a hand-edited object is its problem to bound rather than this
- * function's to reject. Text that is not JSON at all is not a save.
+ * Anything that *is* stored goes through `readSave`, which picks the v2 or v3
+ * reader by looking at the payload and bounds it either way. Both are built to
+ * take a shape they have never seen — that is how the v2 side reads the
+ * shipped saves — so a hand-edited object is their problem to bound rather
+ * than this function's to reject. Text that is not JSON at all is not a save.
  */
 export function loadSave(store: PreferenceStore, nowMs: number): SaveV3 | null {
   const raw = store.read(SAVE_KEY);
@@ -40,27 +41,33 @@ export function loadSave(store: PreferenceStore, nowMs: number): SaveV3 | null {
   } catch {
     return null;
   }
-  return migrateSave(parsed, { nowMs, content: { heroesById: heroTemplatesById() } });
+  return readSave(parsed, { nowMs, content: { heroesById: heroTemplatesById() } });
 }
 
-/*
- * There is deliberately no `writeSave` here yet.
+/**
+ * Store a save.
  *
- * The first version of this file had one, and it was a trap. `migrateSave`
- * reads the *v2* payload shape — `heroRoster`, `activeTeamHeroIds` — because
- * reading the shipped saves is what it was written for. A `SaveV3` keeps its
- * roster at `roster.heroes`, so writing one and reading it back finds no
- * roster at all and returns an empty save. Caught by a round-trip test that
- * expected the heroes it had just stored and got none.
+ * This file shipped read-only, and the note that stood here said why:
+ * `migrateSave` reads the *v2* payload shape, so writing a `SaveV3` and
+ * reading it back found no roster and returned an empty save. The first
+ * version of this file had exactly that writer, nothing called it, and a
+ * round-trip test caught it before anything did.
  *
- * Nothing called it, so no save was ever lost — but shipping a writer whose
- * output the reader silently empties is a trap primed for whoever wires
- * saving next. Writing needs a v3 reader to pair with, and that reader has to
- * bound a stored v3 payload as thoroughly as the migration bounds a v2 one,
- * because `version: 3` in local storage is a claim by whoever edited it
- * rather than a fact. That is its own piece of work.
+ * What it was waiting for was a v3 reader that bounds a stored v3 payload as
+ * thoroughly as the migration bounds a v2 one — because `version: 3` in local
+ * storage is a claim by whoever last edited that string, not a fact.
+ * `engine/save/v3.ts` is that reader, and `v3.test.ts` holds it to the
+ * property that makes this safe: reading is idempotent, so whatever the reader
+ * decides a save means, writing that meaning back cannot change it.
  *
- * Until then this path is read-only: a save that arrives is honoured, and a
- * team the player changes does not persist. `runStore.ts` keeps the run —
- * wave, kills and the meter — which is a different question.
+ * Deliberately not total in the way `loadSave` is. A store that cannot write
+ * throws nothing — `browserStore().write` swallows it, because a private
+ * window should still be a game — so this returns whether the save is actually
+ * somewhere, and a caller that cares can tell the player their progress is not
+ * being kept rather than discovering it when the tab closes.
  */
+export function writeSave(store: PreferenceStore, save: SaveV3): boolean {
+  const text = writeSaveV3(save);
+  store.write(SAVE_KEY, text);
+  return store.read(SAVE_KEY) === text;
+}
