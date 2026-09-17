@@ -3,7 +3,7 @@ import { HERO_POOL } from '../content/heroes';
 import type { PreferenceStore } from '../ui/prefs/store';
 import { migrateSave } from '../engine/save/migrate';
 import { heroTemplatesById } from '../content/heroes';
-import { loadSave, SAVE_KEY } from './saveStore';
+import { loadSave, writeSave, SAVE_KEY } from './saveStore';
 
 function fakeStore(seed?: string) {
   const cells = new Map<string, string>();
@@ -61,18 +61,18 @@ describe('loading a save', () => {
     expect(save?.roster.heroes).toEqual([]);
   });
 
-  it('does not read its own output, which is why there is no writer yet', () => {
+  it('reads back what it writes, which is what the writer was waiting for', () => {
     /*
-     * The trap this file used to contain. `migrateSave` reads the *v2*
-     * payload shape — `heroRoster` — because reading the shipped saves is
-     * what it was written for. A `SaveV3` keeps its roster at
-     * `roster.heroes`, so a v3 payload migrates to an *empty* save rather
-     * than to itself.
+     * The trap this file used to contain, now closed. `migrateSave` reads the
+     * *v2* payload shape — `heroRoster` — because reading the shipped saves is
+     * what it was written for. A `SaveV3` keeps its roster at `roster.heroes`,
+     * so migrating one returns an *empty* save rather than itself.
      *
-     * Stated as a test rather than only as a comment, so that whoever wires
-     * saving next finds out here instead of finding out from a player whose
-     * roster vanished. Adding a writer means adding a v3 reader that bounds
-     * a stored v3 payload as thoroughly as the migration bounds a v2 one.
+     * That is still true, and asserted below, because it is the reason there
+     * was no writer. What changed is that `loadSave` no longer goes straight
+     * to the migration: `readSave` picks the reader from the payload, and the
+     * v3 reader bounds a stored v3 payload as hard as the migration bounds a
+     * v2 one. `engine/save/v3.test.ts` holds it to that.
      */
     const fromV2 = migrateSave(
       { heroRoster: [{ id: FIRST.id, uid: 'a', rarity: 'epic', level: 5, rank: 1 }] },
@@ -80,8 +80,29 @@ describe('loading a save', () => {
     );
     expect(fromV2.roster.heroes).toHaveLength(1);
 
-    const { store } = fakeStore(JSON.stringify(fromV2));
-    expect(loadSave(store, NOW)?.roster.heroes).toEqual([]);
+    // The old reader alone still empties it. Kept as the standing reason the
+    // dispatcher exists rather than deleted along with the bug.
+    expect(
+      migrateSave(JSON.parse(JSON.stringify(fromV2)), { nowMs: NOW, content: { heroesById: heroTemplatesById() } })
+        .roster.heroes,
+    ).toEqual([]);
+
+    const { store } = fakeStore();
+    expect(writeSave(store, fromV2)).toBe(true);
+    expect(loadSave(store, NOW)).toEqual(fromV2);
+  });
+
+  it('reports a store that will not keep the save', () => {
+    /*
+     * A private window, or blocked site data. `browserStore().write` swallows
+     * the throw on purpose — a player who cannot save should still get a game
+     * — so the only way a caller learns their progress is going nowhere is
+     * this return value. Silently returning true would make the first honest
+     * failure a player's discovery when they close the tab.
+     */
+    const hostile: PreferenceStore = { read: () => null, write: () => {} };
+    const save = migrateSave({}, { nowMs: NOW, content: { heroesById: heroTemplatesById() } });
+    expect(writeSave(hostile, save)).toBe(false);
   });
 
   it('keeps nothing when the browser will not store anything', () => {
