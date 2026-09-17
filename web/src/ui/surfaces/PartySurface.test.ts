@@ -67,9 +67,9 @@ describe('where a hero may be moved to', () => {
   it('refuses a full rank for a hero who is on the team', () => {
     /*
      * Two is the cap, and the count is taken against the *fielded* line. Both
-     * of these monks are in the middle, so a third has nowhere to go — and the
-     * hero doing the moving is excluded from their own count, which is what
-     * makes the check meaningful for someone already standing there.
+     * of these monks are in the middle, so a third has nowhere to go. The
+     * moving hero never needs excluding from that count, because a rank they
+     * are already standing in is not a rank they can be moved to.
      */
     const line = [hero('a', 'monk', 'mid', true), hero('b', 'monk', 'mid', true), hero('c', 'monk', 'front', true)];
     expect(line.filter(entry => entry.role === 'mid')).toHaveLength(MAX_FORMATION_ROLE_HEROES);

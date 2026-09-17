@@ -267,7 +267,23 @@ Content: `RANK_CONFIGS`, `FEATURED_SUMMON_BANNERS`, `GACHA_SUMMON_COST`, `DIAMON
 
 **Engine layer done, and reachable.** Summoning with both pity systems, the template pick and tier clamp, milestones, spark tokens and the spark exchange; levelling, ranking, rebirth and recycling; team selection, formation, loadouts, slot unlocks and batch levelling.
 
-The rules were complete and *uncallable* for a while, which is its own lesson: they take a hero pool, a milestone list and a `random` as arguments, and nothing was passing them. Three layers closed that — `content/summon.ts` for the catalogue, `roster/summonSave.ts` and `roster/rosterSave.ts` for "the save before and the save after", and a closed set of verbs on `SurfaceProps` for the screens. What remains is the rest of the UI: a Party surface for formation and loadouts, and the spark exchange.
+The rules were complete and *uncallable* for a while, which is its own lesson: they take a hero pool, a milestone list and a `random` as arguments, and nothing was passing them. Four layers closed that — `content/summon.ts` for the catalogue, `roster/summonSave.ts`, `roster/sparkSave.ts` and `roster/rosterSave.ts` for "the save before and the save after", and a closed set of verbs on `SurfaceProps` for the screens. Every one of them now has a screen: Summon for pulling, Roster for levelling, ranking, recycling and the spark exchange, Party for formation and lineups.
+
+#### The spark exchange, and why it is not a summon
+
+`spendSpark` was the purse rule and nothing else — find the option, check the balance, subtract — and the half that hands over a hero did not exist. Routing that half through `applySummon` would look like reuse and would be wrong four ways: it would move the pity counter, count towards the milestone track, draw three or four values instead of one or two, and pay duplicate spark *back*. The `spark_free_charge` option does not even grant a summon; it grants a **charge**, and does not claim `firstGiven` — setting that would cost a new player the opening pull the flag exists to guarantee them.
+
+The draw order is the contract here as it is for a pull, and the recorded exchanges pin it: **two values untargeted, one when the player names a hero.** The skipped value is the *first*, so a port that drew the pick and discarded it would hand over the same hero with a different uid — and the uid is its own namespace, `<template>_<ms>_spark_<n>` rather than a summon's `<template>_<ms>_<n>`.
+
+One finding worth recording: **the tier clamp is in the path and the shipped catalogue never reaches it.** `spark_rare` and `spark_epic` draw from tiers 2-3, whose bands run `common..legendary` and `rare..godly`; `spark_mythic` draws from tiers 3-4, which reach transcendent. So deleting the clamp leaves every fixture assertion green, and the test that catches it builds a pool to force one — *retiered* rather than filtered, because the bands are index ranges and a pool of twenty tier-one heroes makes `slice(40, 60)` empty, at which point the exchange refuses instead of clamping.
+
+The rows moved to `content/summon.ts` with their labels, the same split `Milestone` and `SummonMilestone` already make, and `spendSpark` takes the table as an argument — a module-level constant in the engine was the engine reading the catalogue.
+
+#### The formation control says which half of it lands
+
+Party is where `SET_HERO_FORMATION` becomes reachable, and its buttons are gated on the rules rather than left to be refused: `placeHero` **refuses** where `fieldTeam` replays, so an ungated placement button is a button that does nothing. The gate is the shipped one including the part that reads like an oversight — a full rank refuses a fielded hero and accepts a benched one, which is what lets a second formation be arranged before it is swapped in, and is why the surface has a Reserve section at all.
+
+And the caveat is on the screen in the player's words rather than in an engine comment. `getFormationRoleForHero` returns the class's first legal rank and never reads the stored choice, so a monk moved to the middle is still counted in the front by the damage chain. The stored rank *is* read when validating team selection, which is why the control looks like it works. The bug is ported deliberately — the contract is that the numbers do not move — but a control whose caveat is invisible is a control that lies.
 
 The strongest parity claim in the rewrite so far: **118 pulls across four recorded runs, matched on rarity and hero id, from one seed.** Every function takes a `random: () => number` rather than reaching for the global, for the same reason the engine may not read the clock — and because the *draw order* is part of the behaviour, so a port with the same distribution but a different order would pass any statistical test and disagree on every pull.
 
