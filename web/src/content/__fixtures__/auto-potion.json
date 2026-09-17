@@ -1,0 +1,118 @@
+{
+  "note": "Auto-potion, measured through advanceCombatStep.",
+  "generatedFrom": "src/useGameState.ts maybeAutoUsePotion",
+  "thresholdPct": 0.35,
+  "grandPreferencePivot": 0.6,
+  "potions": [
+    {
+      "id": "small_potion",
+      "value": 0.35
+    },
+    {
+      "id": "grand_potion",
+      "value": 0.65
+    }
+  ],
+  "cases": [
+    {
+      "name": "healthy, holding both",
+      "hpRatio": 0.9,
+      "held": {
+        "small_potion": 5,
+        "grand_potion": 5
+      },
+      "spent": null,
+      "healed": 0
+    },
+    {
+      "name": "just above the threshold",
+      "hpRatio": 0.36,
+      "held": {
+        "small_potion": 5,
+        "grand_potion": 5
+      },
+      "spent": null,
+      "healed": 0
+    },
+    {
+      "name": "at the threshold",
+      "hpRatio": 0.35,
+      "held": {
+        "small_potion": 5,
+        "grand_potion": 5
+      },
+      "spent": "small_potion",
+      "healed": 3500
+    },
+    {
+      "name": "below the threshold",
+      "hpRatio": 0.3,
+      "held": {
+        "small_potion": 5,
+        "grand_potion": 5
+      },
+      "spent": "small_potion",
+      "healed": 3500
+    },
+    {
+      "name": "below the grand pivot",
+      "hpRatio": 0.2,
+      "held": {
+        "small_potion": 5,
+        "grand_potion": 5
+      },
+      "spent": "grand_potion",
+      "healed": 6500
+    },
+    {
+      "name": "below the pivot, holding only smalls",
+      "hpRatio": 0.2,
+      "held": {
+        "small_potion": 5
+      },
+      "spent": "small_potion",
+      "healed": 3500
+    },
+    {
+      "name": "above the pivot, holding only grands",
+      "hpRatio": 0.3,
+      "held": {
+        "grand_potion": 5
+      },
+      "spent": "grand_potion",
+      "healed": 6500
+    },
+    {
+      "name": "below the threshold, holding nothing",
+      "hpRatio": 0.3,
+      "held": {},
+      "spent": null,
+      "healed": 0
+    },
+    {
+      "name": "below the threshold, switched off",
+      "hpRatio": 0.3,
+      "held": {
+        "small_potion": 5,
+        "grand_potion": 5
+      },
+      "spent": null,
+      "healed": 0
+    },
+    {
+      "name": "below a threshold the player raised",
+      "hpRatio": 0.6,
+      "held": {
+        "small_potion": 5,
+        "grand_potion": 5
+      },
+      "spent": "small_potion",
+      "healed": 3500
+    }
+  ],
+  "boundary": {
+    "ratio": 0.499997131184466,
+    "atExactly": "small_potion",
+    "justBelow": null
+  }
+}
