@@ -4,6 +4,8 @@ import { CLASS_ATTACK_INTERVAL_MS } from '../content/attackSpeeds';
 import { getHeroTemplate } from '../content/heroes';
 import { getHeroContribution } from '../engine/combat/heroDamage';
 import { getIntendedFormationRole } from '../engine/combat/formation';
+import { teamHealthFromSave } from '../engine/character/fromSave';
+import type { HealthHero } from '../engine/character/stats';
 import { ACTIVE_TEAM_SIZE } from '../engine/save/migrate';
 import type { SavedHero, SaveV3 } from '../engine/save/schema';
 import { createHeroEntity, type HeroEntity } from '../engine/entities/HeroEntity';
@@ -29,6 +31,16 @@ export interface LoadedRoster {
   cast: Cast;
   /** What the surfaces read. */
   profile: PlayerProfile;
+  /**
+   * How much the team can take, derived rather than guessed.
+   *
+   * It was a flat `2000` until Phase 7, with a note in `demoRoster.ts` saying
+   * "nothing derives it yet" — and everything downstream of it was unanchored:
+   * how long a team survives, which wave is the wall, where the offline
+   * sawtooth turns over. Built from the same rows as the other three, for the
+   * same reason.
+   */
+  teamMaxHp: number;
 }
 
 /**
@@ -88,5 +100,31 @@ export function rosterFromSave(save: SaveV3): LoadedRoster {
     });
   }
 
-  return { heroes, cast, profile: profileFromSave(save) };
+  /*
+   * Health reads the roster rows rather than the `HeroEntity` list, because
+   * the two are not the same set: an entity is built only for a row whose
+   * template still exists, and health is measured off the same rows for the
+   * same reason — a hero with no template has no class, and no class has no
+   * vitality. Building it from the rows keeps the two in step by construction.
+   */
+  const healthHeroes: HealthHero[] = [];
+  for (const row of activeRows(save)) {
+    const template = getHeroTemplate(row.id);
+    if (template === undefined) continue;
+    healthHeroes.push({
+      uid: row.uid,
+      heroClass: template.heroClass,
+      rarity: row.rarity,
+      level: row.level,
+      rank: row.rank,
+      rebirthStatMult: row.rebirthStatMult,
+    });
+  }
+
+  return {
+    heroes,
+    cast,
+    profile: profileFromSave(save),
+    teamMaxHp: teamHealthFromSave(save, healthHeroes),
+  };
 }

@@ -230,15 +230,35 @@ Everything you can click in the rewrite today: spend BURST, answer a wipe, answe
 
 The phases below end at parity. They are ordered by what unblocks what, not by what is fun — the first two are unglamorous and everything else waits on them.
 
-### Phase 6 — The save round-trip *(~2 weeks)*
-A v3 reader that bounds a stored payload as hard as `migrateSave` bounds a v2 one, the writer to pair with it, and the Firebase adapter behind `ports/SavePort`. `saveStore.ts` deliberately ships without a writer today because `migrateSave` reads the *v2* shape and would silently empty a v3 payload.
+### Phase 6 — The save round-trip *(~2 weeks)* — **done, bar one binding**
+A v3 reader that bounds a stored payload as hard as `migrateSave` bounds a v2 one, the writer to pair with it, and the adapter behind `ports/SavePort`. `saveStore.ts` shipped read-only because `migrateSave` reads the *v2* shape and would silently empty a v3 payload.
 
 **Everything downstream needs this.** Without it no system below can persist what it changes, and returning accounts cannot reach their saves — which is the sole reason `/legacy` cannot be retired.
 
-### Phase 7 — The character *(~2 weeks)*
-`ALLOCATE_STAT`, `ALLOCATE_STAT_N`, `ALLOCATE_STAT_MAX`, `CREATE_CHARACTER`. With them the missing engine layer underneath: `derivedStats`, and the four multipliers `getTeamMaxHp` needs that this engine does not have — `getRankMultiplier`, `getMetaSurvivalMultiplier`, `getRebirthSurvivalMultiplier`, plus the mastery and tactics stacks. Team health is a flat `2000` until this lands, so every later balance number is unanchored.
+Delivered: `engine/save/v3.ts` (reader, writer, version dispatcher), `engine/save/legacyPayload.ts` (the trip back to v2), `ports/remoteSave.ts` (the save documents), `saveStore.writeSave`. The bounding is *shared* with the migration rather than restated, so "as hard as" is a fact about the call graph.
 
-Fixture-backed like the Phase 1 ports, against `useGameState`, before anything reads them.
+Three bugs the round-trip laws caught, none visible by reading the code:
+
+- **Unspent stat points inflated on every load.** v2 stores `unspentStatPoints` as a pool held *on top of* the level budget; a `SaveV3` has already done that sum. A level-100 character would gain 495 points by loading their own save, and again on the next load.
+- **The shipped game re-equips a relic you took off.** `equippedByUid: null` does not mean "unequipped" to `sanitizeSaveData` — it tests for a string first and falls through to `boundedBoolean(equipped, true)`, and its own writer stopped emitting that flag.
+- **Writing v3 into the shared document is silent, not loud.** The shipped reader is total, so it reads a `SaveV3` as a valid save with nothing in it and hands the player a new account.
+
+**Not done, and moved to Phase 12:** binding `SaveDocStore` to `firebase/firestore`. `users/{uid}/saveSlots/{slot}` needs a uid and the rewrite has no auth at all, so that binding would be a dependency and a file nothing could exercise, added in front of the thing it waits on. Around thirty lines once `onlineAuth` lands.
+
+### Phase 7 — The character *(~2 weeks)* — **done**
+`ALLOCATE_STAT`, `ALLOCATE_STAT_N`, `ALLOCATE_STAT_MAX`, `CREATE_CHARACTER`, and the engine layer underneath: `derivedStats`, `getMetaSurvivalMultiplier`, `getRebirthSurvivalMultiplier`, the mastery ceiling and the tactics stack. Team health was a flat `2000` with a note saying nothing derived it, which left every later balance number unanchored.
+
+Fixture-backed like the Phase 1 ports, against `useGameState`, before anything read them.
+
+Two shipped details pinned because they are easy to miss by reading quickly: heroes contribute their **class** base vitality, not their template's — `computeStats` prefers the template for display and `getTeamMaxHp` never does — and the six multipliers compose by multiplication, which is within a few percent of addition at low levels and wrong by a lot in the deep game.
+
+One deliberate divergence: `ALLOCATE_STAT_N` computes `Math.min(amount, unspent)` with no floor, so a negative amount adds points back and drives the stat below zero, repeatable. Nothing sends one today, but these are engine functions now rather than one component's private handler. The fixture records the shipped behaviour and the port clamps at zero.
+
+Class mastery and the tactics facility are **read** out of the `legacy` bag rather than claimed: claiming a key changes every stored save's meaning, and both belong to the phases that own the systems granting them.
+
+The starting team lands on **843** against the old 2000, and still climbs into the forties within a minute and sawtooths there — which the derivation was not tuned to preserve.
+
+Equipment is the one term still missing from `derivedStats`; it is Phase 9, and the function takes it as an argument so that phase adds a caller rather than editing it.
 
 ### Phase 8 — The roster *(~3 weeks)*
 Summoning and everything that shapes a team: `SUMMON_HERO` with banners, rate-ups, soft pity and milestones; `SPARK_EXCHANGE`; `LEVEL_UP_HERO_GOLD`, `BATCH_LEVEL_HEROES`, `RANK_UP_HERO` and its max/rebirth variants; `REBIRTH_HERO`, `RECYCLE_HERO`; `SET_ACTIVE_TEAM`, `SET_HERO_FORMATION`, `SAVE_TEAM_LOADOUT`, `LOAD_TEAM_LOADOUT`, `UNLOCK_TEAM_SLOT`.
@@ -266,6 +286,8 @@ Clears eight of the twelve placeholder destinations.
 The 6,090 lines nothing has touched: `onlineAuth`, `onlineSave`, `guild`, `guildWars`, `chat`, `directMessages`, `friends`, `leaderboard`, `presence`, `publicProfile`, `activityFeed`, `blockReport`, `characterNameRegistry`, `cloudMail`, `playerSearch`.
 
 Behind `ports/`, as the seam has always promised — the engine still never learns what a network is. Largest phase, and the one with real moderation and privacy surface: `blockReport` and `presence` are not features to port thoughtlessly.
+
+Starts with `onlineAuth`, because `ports/remoteSave.ts` is finished and waiting on a uid. Binding its `SaveDocStore` to `firebase/firestore` is the first thing this phase can do and the last thing Phase 6 needed.
 
 ### Phase 13 — Retire `/legacy` *(~3 days)*
 Only now. The old app comes off the web when the new one can reach a player's account and do everything they did — which is the condition Phase 5 named and could not meet. `src/` and the EAS native builds are a separate decision, taken then, on evidence.

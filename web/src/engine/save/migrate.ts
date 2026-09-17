@@ -64,8 +64,24 @@ function rarityRank(rarity: Rarity): number {
   return RARITY_IDS.indexOf(rarity);
 }
 
-function isPlayerClass(value: unknown): value is PlayerClass {
+export function isPlayerClass(value: unknown): value is PlayerClass {
   return typeof value === 'string' && (PLAYER_CLASSES as readonly string[]).includes(value);
+}
+
+/** The five allocated stats, each bounded. Shared with the v3 reader. */
+export function readStatBlock(raw: unknown): StatBlock {
+  const record = isRecord(raw) ? raw : {};
+  return {
+    strength: boundedInt(record.strength, 0, SAFE_NUMBER_CAP, 0),
+    vitality: boundedInt(record.vitality, 0, SAFE_NUMBER_CAP, 0),
+    agility: boundedInt(record.agility, 0, SAFE_NUMBER_CAP, 0),
+    intelligence: boundedInt(record.intelligence, 0, SAFE_NUMBER_CAP, 0),
+    spirit: boundedInt(record.spirit, 0, SAFE_NUMBER_CAP, 0),
+  };
+}
+
+export function statPointsSpent(alloc: StatBlock): number {
+  return alloc.strength + alloc.vitality + alloc.agility + alloc.intelligence + alloc.spirit;
 }
 
 /**
@@ -85,24 +101,17 @@ export function readStatAllocation(
   level: number,
   savedUnspent: unknown,
 ): { alloc: StatBlock; unspent: number } {
-  const record = isRecord(raw) ? raw : {};
   const levelBudget = Math.max(0, (level - 1) * STAT_POINTS_PER_LEVEL);
   const legacyUnspent = boundedInt(savedUnspent, 0, SAFE_NUMBER_CAP, 0);
-  const alloc: StatBlock = {
-    strength: boundedInt(record.strength, 0, SAFE_NUMBER_CAP, 0),
-    vitality: boundedInt(record.vitality, 0, SAFE_NUMBER_CAP, 0),
-    agility: boundedInt(record.agility, 0, SAFE_NUMBER_CAP, 0),
-    intelligence: boundedInt(record.intelligence, 0, SAFE_NUMBER_CAP, 0),
-    spirit: boundedInt(record.spirit, 0, SAFE_NUMBER_CAP, 0),
-  };
+  const alloc = readStatBlock(raw);
 
-  const spent = alloc.strength + alloc.vitality + alloc.agility + alloc.intelligence + alloc.spirit;
+  const spent = statPointsSpent(alloc);
   const effectiveBudget = Math.max(levelBudget + legacyUnspent, spent + legacyUnspent);
 
   return { alloc, unspent: Math.max(0, effectiveBudget - spent) };
 }
 
-function readHero(raw: unknown, index: number, content: SaveContent): SavedHero | null {
+export function readHero(raw: unknown, index: number, content: SaveContent): SavedHero | null {
   if (!isRecord(raw) || typeof raw.id !== 'string') return null;
   const template = content.heroesById.get(raw.id);
   if (!template) return null;
