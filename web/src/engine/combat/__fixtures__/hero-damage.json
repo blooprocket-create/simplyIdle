@@ -93,5 +93,79 @@
       "damage": 371.8032568959012
     }
   ],
-  "teamTotal": 4275.0199331220665
+  "teamTotal": 4275.0199331220665,
+  "players": [
+    {
+      "playerClass": "warrior",
+      "level": 1,
+      "alloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "damage": 24.618902702702698
+    },
+    {
+      "playerClass": "warrior",
+      "level": 90,
+      "alloc": {
+        "strength": 120,
+        "vitality": 0,
+        "agility": 40,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "damage": 354.46128108108104
+    },
+    {
+      "playerClass": "berserker",
+      "level": 30,
+      "alloc": {
+        "strength": 60,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "damage": 131.14107027027026
+    },
+    {
+      "playerClass": "mage",
+      "level": 45,
+      "alloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 80,
+        "spirit": 25
+      },
+      "damage": 208.33745135135138
+    },
+    {
+      "playerClass": "archer",
+      "level": 12,
+      "alloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 30,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "damage": 85.18183783783783
+    },
+    {
+      "playerClass": "monk",
+      "level": 250,
+      "alloc": {
+        "strength": 50,
+        "vitality": 50,
+        "agility": 50,
+        "intelligence": 50,
+        "spirit": 50
+      },
+      "damage": 414.87907297297295
+    }
+  ]
 }

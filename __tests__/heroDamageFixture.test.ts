@@ -1,6 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
-import { HERO_POOL, rarityConfig, type HeroTemplate, type HeroUnit, type Rarity } from '../src/gameConfig';
+import {
+  HERO_POOL,
+  rarityConfig,
+  type HeroTemplate,
+  type HeroUnit,
+  type PlayerClass,
+  type Rarity,
+} from '../src/gameConfig';
 import { DEFAULT_STATE, getDpsBreakdown, type GameState } from '../src/useGameState';
 
 /**
@@ -97,13 +104,46 @@ interface HeroRow {
   damage: number;
 }
 
+interface PlayerRow {
+  playerClass: PlayerClass;
+  level: number;
+  alloc: { strength: number; vitality: number; agility: number; intelligence: number; spirit: number };
+  damage: number;
+}
+
 interface Fixture {
   note: string;
   generatedFrom: string;
   heroes: HeroRow[];
   /** The old scalar for the whole sample as one team. */
   teamTotal: number;
+  /**
+   * The **player's own** damage contribution.
+   *
+   * `getDpsBreakdown` returns it as `playerBaseDps` and adds it to the hero
+   * total before any multiplier: `(playerDps + heroDps) * totalMultiplier`. The
+   * rewrite had no port of it at all — `app/roster.ts` sums heroes and stops —
+   * so a character's class, level and spent stat points did nothing to the
+   * damage the player actually deals.
+   *
+   * Sampled per class, because the formula reads `physWeight` and `magicWeight`
+   * four times between them and a port that dropped one would still look right
+   * for a warrior.
+   */
+  players: PlayerRow[];
 }
+
+const NOTHING = { strength: 0, vitality: 0, agility: 0, intelligence: 0, spirit: 0 };
+
+/** One state per class, at a spread of levels and allocations. */
+const PLAYER_SAMPLES: { playerClass: PlayerClass; level: number; alloc: typeof NOTHING }[] = [
+  { playerClass: 'warrior', level: 1, alloc: NOTHING },
+  { playerClass: 'warrior', level: 90, alloc: { ...NOTHING, strength: 120, agility: 40 } },
+  { playerClass: 'berserker', level: 30, alloc: { ...NOTHING, strength: 60 } },
+  { playerClass: 'mage', level: 45, alloc: { ...NOTHING, intelligence: 80, spirit: 25 } },
+  { playerClass: 'archer', level: 12, alloc: { ...NOTHING, agility: 30 } },
+  { playerClass: 'monk', level: 250, alloc: { strength: 50, vitality: 50, agility: 50, intelligence: 50, spirit: 50 } },
+];
 
 function build(): Fixture {
   const heroes: HeroRow[] = SAMPLES.map(sample => {
@@ -121,11 +161,23 @@ function build(): Fixture {
     };
   });
 
+  const players: PlayerRow[] = PLAYER_SAMPLES.map(sample => ({
+    ...sample,
+    // An empty roster, so the breakdown's player half stands alone.
+    damage: getDpsBreakdown({
+      ...stateWith([]),
+      playerClass: sample.playerClass,
+      level: sample.level,
+      statsAlloc: sample.alloc,
+    }).playerBaseDps,
+  }));
+
   return {
     note: 'Per-hero damage from the shipped implementation, read out one hero at a time. Owned by __tests__/heroDamageFixture.test.ts.',
     generatedFrom: 'src/useGameState.ts getDpsBreakdown',
     heroes,
     teamTotal: getDpsBreakdown(stateWith(SAMPLES.map(buildUnit))).heroBaseDps,
+    players,
   };
 }
 
@@ -136,6 +188,27 @@ describe('hero damage fixture', () => {
     expect(fixture.heroes.length).toBe(10);
     expect(new Set(fixture.heroes.map(hero => hero.heroClass)).size).toBe(5);
     expect(fixture.heroes.every(hero => hero.damage > 0)).toBe(true);
+  });
+
+  it("records the player's own damage for every class", () => {
+    /*
+     * The player is a combatant and the rewrite forgot them: `playerDps` is
+     * added to the hero total *before* any multiplier, and nothing in the port
+     * computed it. A character's class, level and spent points did nothing.
+     */
+    expect(new Set(fixture.players.map(entry => entry.playerClass)).size).toBe(5);
+    expect(fixture.players.every(entry => entry.damage > 0)).toBe(true);
+    // A level-one warrior with nothing spent still deals something, which is
+    // what makes "the player is a combatant" true from the first wave.
+    expect(fixture.players[0].damage).toBeGreaterThan(0);
+  });
+
+  it('separates the player from the team, so neither absorbs the other', () => {
+    // If `playerBaseDps` moved with the roster, sampling it against an empty
+    // one would be measuring the wrong thing.
+    const solo = getDpsBreakdown(stateWith([])).playerBaseDps;
+    const withTeam = getDpsBreakdown(stateWith(SAMPLES.map(buildUnit))).playerBaseDps;
+    expect(withTeam).toBe(solo);
   });
 
   it('the shipped total is the sum of its shipped parts', () => {
