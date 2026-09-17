@@ -225,8 +225,13 @@ describe('estimating a window', () => {
      * the divergence bands — which were loose enough that deleting the damage
      * half left the whole suite green.
      *
-     * A roster that gains nothing per kill must not reach as deep as one that
-     * does, and must not survive as long either.
+     * The wave comparison is made over a window with no death in it, because
+     * the end wave of a longer window is not monotone in team strength and
+     * cannot be: the stronger roster reaches the wall sooner, and a death
+     * costs the rest of the chapter, so it can finish a wave *below* a weaker
+     * roster that never got there. An earlier version compared end waves over
+     * thirty minutes and read that inversion as a broken feedback loop. Kills
+     * stay monotone the whole way, so that is what the longer horizon checks.
      */
     const live = conditionsFor('climbing');
     const frozen = { ...live, dpsPerHeroLevel: new Decimal(0), teamHpPerHeroLevel: new Decimal(0) };
@@ -234,15 +239,31 @@ describe('estimating a window', () => {
     expect(live.teamHpPerHeroLevel.gt(0)).toBe(true);
 
     const start = startWaveFor('climbing');
-    const growing = estimateOffline(start, 30 * 60 * 1000, live);
-    const flat = estimateOffline(start, 30 * 60 * 1000, frozen);
-    expect(growing.wave).toBeGreaterThan(flat.wave);
+    const climb = 5 * 60 * 1000;
+    const growingClimb = estimateOffline(start, climb, live);
+    const flatClimb = estimateOffline(start, climb, frozen);
+    // Pinned, not assumed: this window is a pure climb, so the wave it reaches
+    // is the damage half of the loop and nothing else.
+    expect({ growing: growingClimb.deaths, flat: flatClimb.deaths }).toEqual({ growing: 0, flat: 0 });
+    expect(growingClimb.wave).toBeGreaterThan(flatClimb.wave);
 
-    // Damage alone, so neither half can stand in for the other.
+    // And over a window long enough to contain deaths, the levelling roster
+    // keeps its lead in kills even where the sawtooth has taken the wave back.
+    const long = 30 * 60 * 1000;
+    const growing = estimateOffline(start, long, live);
+    const flat = estimateOffline(start, long, frozen);
+    expect(growing.deaths).toBeGreaterThan(0);
+    expect(growing.kills).toBeGreaterThan(flat.kills);
+
+    // Each half alone, so neither can stand in for the other. Damage shows in
+    // the climb; vitality is worth exactly nothing until something dies, which
+    // is why it has to be measured on the far side of the wall.
     const damageOnly = { ...live, teamHpPerHeroLevel: new Decimal(0) };
+    expect(estimateOffline(start, climb, damageOnly).wave).toBeGreaterThan(flatClimb.wave);
+
     const hpOnly = { ...live, dpsPerHeroLevel: new Decimal(0) };
-    expect(estimateOffline(start, 30 * 60 * 1000, damageOnly).wave).toBeGreaterThan(flat.wave);
-    expect(estimateOffline(start, 30 * 60 * 1000, hpOnly).kills).not.toBe(flat.kills);
+    expect(estimateOffline(start, climb, hpOnly).kills).toBe(flatClimb.kills);
+    expect(estimateOffline(start, long, hpOnly).kills).not.toBe(flat.kills);
   });
 
   it('stops levelling heroes at the cap', () => {
@@ -321,16 +342,22 @@ describe('how close it gets, and where it does not', () => {
    *
    * A per-scenario table rather than a classifier: a rule like "within one
    * chapter of the ceiling" sounds principled and then puts `climbing` — which
-   * is 1.00 over a minute and 1.29 over an hour — on whichever side makes the
+   * is 1.00 over a minute and 1.23 over an hour — on whichever side makes the
    * suite green. These are numbers that were measured, and improving the
    * estimator should change them.
+   *
+   * They moved in both directions when the fixture stopped being generated
+   * under whatever weekly event happened to be running that week: `fresh`
+   * tightened from 4.09 to 3.39 and `post-rebirth` widened from 3.62 to 4.06,
+   * so the bands follow. Anything that only ever widens has stopped being a
+   * measurement.
    */
   const ACCURACY: Record<string, { min: number; max: number; why: string }> = {
     'at-ceiling': { min: 0.9, max: 1.1, why: 'steady state: no wall to cross, so the averages hold' },
     'loses-ground': { min: 0.9, max: 1.1, why: 'steady state, starting just under the wall' },
     climbing: { min: 0.8, max: 1.4, why: 'clears two boss waves in an hour that the estimator stalls on' },
-    fresh: { min: 0.9, max: 4.5, why: 'climbs from wave three; every chapter boundary is a wall' },
-    'post-rebirth': { min: 0.9, max: 4.0, why: 'a maxed roster climbing from wave one, the worst case for a mean' },
+    fresh: { min: 0.9, max: 3.8, why: 'climbs from wave three; every chapter boundary is a wall' },
+    'post-rebirth': { min: 0.9, max: 4.5, why: 'a maxed roster climbing from wave one, the worst case for a mean' },
   };
 
   it('holds every scenario to its measured accuracy', () => {
