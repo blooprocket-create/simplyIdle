@@ -107,6 +107,8 @@ interface Fixture {
     slot: string;
     rarity: string;
     allowedClasses: string[];
+    /** The line under the name on an item card. Carried as authored. */
+    description: string;
     bonus: Partial<StatBlock>;
   }[];
   starterByClass: Record<string, string[]>;
@@ -552,6 +554,7 @@ function build(): Fixture {
       slot: item.slot,
       rarity: item.rarity,
       allowedClasses: [...item.allowedClasses],
+      description: item.description,
       bonus: { ...item.bonus },
     })),
     starterByClass: Object.fromEntries(CLASSES.map(cls => [cls, getStarterEquipmentForClass(cls)])),
@@ -827,9 +830,14 @@ describe('equipment fixture', () => {
   it('pays the catalogue rate for an item with no instance behind it', () => {
     /*
      * The source multiplier is applied only when the entry *has* a source —
-     * `'source' in item`. A bare catalogue id, which is what an old save's
-     * inventory is full of, pays the undiscounted rate. A port that gave
-     * everything a source would quietly pay 42% for the same item.
+     * `'source' in item` — so a bare catalogue id pays the undiscounted rate.
+     *
+     * Which no owned item ever does, and that is worth saying rather than
+     * implying: `migrateLegacyEquipmentIds` converts every bare id in a loaded
+     * inventory into an instance at `source: 'legacy'`, and character creation
+     * builds instances outright. The branch is reachable only from a state
+     * assembled in memory, which is exactly what these scenarios are. Recorded
+     * because both reducers reach it through the same fallback.
      */
     const byRarity = Object.fromEntries(fixture.scrapGains.map(entry => [entry.rarity, entry.gain]));
     expect(byRarity).toEqual({

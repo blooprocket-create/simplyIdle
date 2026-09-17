@@ -64,6 +64,7 @@
       "allowedClasses": [
         "warrior"
       ],
+      "description": "Reliable frontline steel.",
       "bonus": {
         "strength": 3,
         "vitality": 1
@@ -78,6 +79,7 @@
       "allowedClasses": [
         "warrior"
       ],
+      "description": "Crushing blows for fortress walls.",
       "bonus": {
         "strength": 4,
         "vitality": 2
@@ -92,6 +94,7 @@
       "allowedClasses": [
         "berserker"
       ],
+      "description": "Heavy strikes with reckless force.",
       "bonus": {
         "strength": 3,
         "vitality": 2
@@ -106,6 +109,7 @@
       "allowedClasses": [
         "berserker"
       ],
+      "description": "A savage weapon that feeds on chaos.",
       "bonus": {
         "strength": 6,
         "agility": 1
@@ -120,6 +124,7 @@
       "allowedClasses": [
         "archer"
       ],
+      "description": "A bow built for rapid shots.",
       "bonus": {
         "agility": 3,
         "strength": 1
@@ -134,6 +139,7 @@
       "allowedClasses": [
         "archer"
       ],
+      "description": "Pinpoint shots over impossible distance.",
       "bonus": {
         "agility": 5,
         "spirit": 1
@@ -148,6 +154,7 @@
       "allowedClasses": [
         "mage"
       ],
+      "description": "Arcane conduit for spellburst.",
       "bonus": {
         "intelligence": 4
       }
@@ -161,6 +168,7 @@
       "allowedClasses": [
         "mage"
       ],
+      "description": "Whispers forbidden equations of power.",
       "bonus": {
         "intelligence": 6,
         "spirit": 2
@@ -175,6 +183,7 @@
       "allowedClasses": [
         "monk"
       ],
+      "description": "Focuses inner current.",
       "bonus": {
         "spirit": 3,
         "intelligence": 1
@@ -189,6 +198,7 @@
       "allowedClasses": [
         "monk"
       ],
+      "description": "Silent blades guided by calm breath.",
       "bonus": {
         "agility": 3,
         "spirit": 4
@@ -203,6 +213,7 @@
       "allowedClasses": [
         "warrior"
       ],
+      "description": "A royal blade that shatters siege lines.",
       "bonus": {
         "strength": 9,
         "vitality": 4
@@ -217,6 +228,7 @@
       "allowedClasses": [
         "berserker"
       ],
+      "description": "A hunger-forged axe of catastrophic swings.",
       "bonus": {
         "strength": 10,
         "agility": 3
@@ -231,6 +243,7 @@
       "allowedClasses": [
         "archer"
       ],
+      "description": "Each arrow leaves a comet trail.",
       "bonus": {
         "agility": 9,
         "spirit": 3
@@ -245,6 +258,7 @@
       "allowedClasses": [
         "mage"
       ],
+      "description": "Converts silence into annihilation.",
       "bonus": {
         "intelligence": 10,
         "spirit": 5
@@ -259,6 +273,7 @@
       "allowedClasses": [
         "monk"
       ],
+      "description": "A sacred edge that hums with calm fury.",
       "bonus": {
         "spirit": 9,
         "agility": 4
@@ -273,6 +288,7 @@
       "allowedClasses": [
         "warrior"
       ],
+      "description": "Reinforced armor for long fights.",
       "bonus": {
         "vitality": 3,
         "spirit": 1
@@ -287,6 +303,7 @@
       "allowedClasses": [
         "warrior"
       ],
+      "description": "A legendary shell that refuses to break.",
       "bonus": {
         "vitality": 7,
         "spirit": 2
@@ -301,6 +318,7 @@
       "allowedClasses": [
         "berserker"
       ],
+      "description": "Built to absorb punishment.",
       "bonus": {
         "vitality": 4
       }
@@ -314,6 +332,7 @@
       "allowedClasses": [
         "berserker"
       ],
+      "description": "Predatory instinct wrapped in hide.",
       "bonus": {
         "vitality": 5,
         "strength": 2
@@ -328,6 +347,7 @@
       "allowedClasses": [
         "archer"
       ],
+      "description": "Light movement and clean aim.",
       "bonus": {
         "agility": 2,
         "vitality": 1
@@ -342,6 +362,7 @@
       "allowedClasses": [
         "archer"
       ],
+      "description": "A veil that makes every step unseen.",
       "bonus": {
         "agility": 5,
         "spirit": 1
@@ -356,6 +377,7 @@
       "allowedClasses": [
         "mage"
       ],
+      "description": "Runed cloth that amplifies mana.",
       "bonus": {
         "intelligence": 2,
         "spirit": 2
@@ -370,6 +392,7 @@
       "allowedClasses": [
         "mage"
       ],
+      "description": "Threads stitched from dying stars.",
       "bonus": {
         "intelligence": 7,
         "spirit": 4
@@ -384,6 +407,7 @@
       "allowedClasses": [
         "monk"
       ],
+      "description": "Flexible defense for body and mind.",
       "bonus": {
         "vitality": 2,
         "spirit": 2
@@ -398,6 +422,7 @@
       "allowedClasses": [
         "monk"
       ],
+      "description": "Balanced defense in every stance.",
       "bonus": {
         "vitality": 4,
         "spirit": 3
@@ -412,6 +437,7 @@
       "allowedClasses": [
         "warrior"
       ],
+      "description": "Imperial wallplate from a lost dynasty.",
       "bonus": {
         "vitality": 10,
         "spirit": 4
@@ -426,6 +452,7 @@
       "allowedClasses": [
         "berserker"
       ],
+      "description": "Stitched with battle oaths and scars.",
       "bonus": {
         "vitality": 9,
         "strength": 4
@@ -440,6 +467,7 @@
       "allowedClasses": [
         "archer"
       ],
+      "description": "Turns pressure fronts into cover.",
       "bonus": {
         "agility": 9,
         "vitality": 3
@@ -454,6 +482,7 @@
       "allowedClasses": [
         "mage"
       ],
+      "description": "Threaded with an unbroken night sky.",
       "bonus": {
         "intelligence": 9,
         "spirit": 5
@@ -468,6 +497,7 @@
       "allowedClasses": [
         "monk"
       ],
+      "description": "Ceremonial robes that bend impact.",
       "bonus": {
         "spirit": 8,
         "vitality": 5
@@ -482,6 +512,7 @@
       "allowedClasses": [
         "warrior"
       ],
+      "description": "Symbol of command.",
       "bonus": {
         "strength": 1,
         "vitality": 1
@@ -496,6 +527,7 @@
       "allowedClasses": [
         "warrior"
       ],
+      "description": "Inspires nearby allies to hold.",
       "bonus": {
         "vitality": 3,
         "spirit": 2
@@ -510,6 +542,7 @@
       "allowedClasses": [
         "berserker"
       ],
+      "description": "Feeds relentless fury.",
       "bonus": {
         "strength": 2
       }
@@ -523,6 +556,7 @@
       "allowedClasses": [
         "berserker"
       ],
+      "description": "A fang from something ancient and cruel.",
       "bonus": {
         "strength": 5,
         "agility": 2
@@ -537,6 +571,7 @@
       "allowedClasses": [
         "archer"
       ],
+      "description": "Sharper reflex and release.",
       "bonus": {
         "agility": 2
       }
@@ -550,6 +585,7 @@
       "allowedClasses": [
         "archer"
       ],
+      "description": "Reads wind and distance in a blink.",
       "bonus": {
         "agility": 4,
         "intelligence": 1
@@ -564,6 +600,7 @@
       "allowedClasses": [
         "mage"
       ],
+      "description": "Dense arcane focus.",
       "bonus": {
         "intelligence": 2
       }
@@ -577,6 +614,7 @@
       "allowedClasses": [
         "mage"
       ],
+      "description": "Bends moments between spells.",
       "bonus": {
         "intelligence": 5,
         "spirit": 3
@@ -591,6 +629,7 @@
       "allowedClasses": [
         "monk"
       ],
+      "description": "Calm aura under pressure.",
       "bonus": {
         "spirit": 2
       }
@@ -604,6 +643,7 @@
       "allowedClasses": [
         "monk"
       ],
+      "description": "A sacred knot with perfect tension.",
       "bonus": {
         "spirit": 5,
         "vitality": 2
@@ -618,6 +658,7 @@
       "allowedClasses": [
         "warrior"
       ],
+      "description": "A shard of old coronation steel.",
       "bonus": {
         "vitality": 6,
         "strength": 4
@@ -632,6 +673,7 @@
       "allowedClasses": [
         "berserker"
       ],
+      "description": "Feeds on momentum and pain.",
       "bonus": {
         "strength": 6,
         "agility": 3
@@ -646,6 +688,7 @@
       "allowedClasses": [
         "archer"
       ],
+      "description": "Finds weak points before they exist.",
       "bonus": {
         "agility": 7,
         "spirit": 2
@@ -660,6 +703,7 @@
       "allowedClasses": [
         "mage"
       ],
+      "description": "A hollow star that amplifies spells.",
       "bonus": {
         "intelligence": 7,
         "spirit": 4
@@ -674,6 +718,7 @@
       "allowedClasses": [
         "monk"
       ],
+      "description": "Anchors the breath in radiant rhythm.",
       "bonus": {
         "spirit": 7,
         "vitality": 3
@@ -688,6 +733,7 @@
       "allowedClasses": [
         "warrior"
       ],
+      "description": "Heavy polearm forged for siege lines.",
       "bonus": {
         "strength": 7,
         "vitality": 3
@@ -702,6 +748,7 @@
       "allowedClasses": [
         "berserker"
       ],
+      "description": "A brutal hammer that grows louder in battle.",
       "bonus": {
         "strength": 8,
         "vitality": 2
@@ -716,6 +763,7 @@
       "allowedClasses": [
         "archer"
       ],
+      "description": "Fires in controlled stormburst volleys.",
       "bonus": {
         "agility": 7,
         "strength": 2
@@ -730,6 +778,7 @@
       "allowedClasses": [
         "mage"
       ],
+      "description": "Carries a miniature tear in space.",
       "bonus": {
         "intelligence": 8,
         "spirit": 3
@@ -744,6 +793,7 @@
       "allowedClasses": [
         "monk"
       ],
+      "description": "Conducts focused strikes through breath control.",
       "bonus": {
         "spirit": 6,
         "agility": 3
@@ -758,6 +808,7 @@
       "allowedClasses": [
         "warrior"
       ],
+      "description": "Layered plating from fortress captains.",
       "bonus": {
         "vitality": 8,
         "strength": 2
@@ -772,6 +823,7 @@
       "allowedClasses": [
         "berserker"
       ],
+      "description": "Absorbs punishment and answers with force.",
       "bonus": {
         "vitality": 7,
         "strength": 3
@@ -786,6 +838,7 @@
       "allowedClasses": [
         "archer"
       ],
+      "description": "Weightless cloak tuned for sudden movement.",
       "bonus": {
         "agility": 7,
         "spirit": 2
@@ -800,6 +853,7 @@
       "allowedClasses": [
         "mage"
       ],
+      "description": "Runes orbit the wearer like satellites.",
       "bonus": {
         "intelligence": 10,
         "spirit": 4
@@ -814,6 +868,7 @@
       "allowedClasses": [
         "monk"
       ],
+      "description": "Flexes between impact and flow.",
       "bonus": {
         "vitality": 6,
         "spirit": 4
@@ -828,6 +883,7 @@
       "allowedClasses": [
         "warrior"
       ],
+      "description": "Binds old oaths into active defenses.",
       "bonus": {
         "vitality": 5,
         "spirit": 2
@@ -842,6 +898,7 @@
       "allowedClasses": [
         "berserker"
       ],
+      "description": "Marks each hit with rising fury.",
       "bonus": {
         "strength": 3,
         "vitality": 1
@@ -856,6 +913,7 @@
       "allowedClasses": [
         "archer"
       ],
+      "description": "Keeps rhythm between movement and release.",
       "bonus": {
         "agility": 6,
         "spirit": 2
@@ -870,6 +928,7 @@
       "allowedClasses": [
         "mage"
       ],
+      "description": "Condenses unstable mana into clean bursts.",
       "bonus": {
         "intelligence": 4,
         "spirit": 2
@@ -884,6 +943,7 @@
       "allowedClasses": [
         "monk"
       ],
+      "description": "Stabilizes cadence under pressure.",
       "bonus": {
         "spirit": 3,
         "vitality": 1
@@ -898,6 +958,7 @@
       "allowedClasses": [
         "warrior"
       ],
+      "description": "Dynastic steel tempered in collapsing stars.",
       "bonus": {
         "strength": 14,
         "vitality": 7
@@ -912,6 +973,7 @@
       "allowedClasses": [
         "berserker"
       ],
+      "description": "A tidal executioner axe forged under blood moons.",
       "bonus": {
         "strength": 15,
         "agility": 6
@@ -926,6 +988,7 @@
       "allowedClasses": [
         "archer"
       ],
+      "description": "Launches stellar lances through fortress walls.",
       "bonus": {
         "agility": 14,
         "spirit": 6
@@ -940,6 +1003,7 @@
       "allowedClasses": [
         "mage"
       ],
+      "description": "Writes new laws for arcane warfare.",
       "bonus": {
         "intelligence": 16,
         "spirit": 8
@@ -954,6 +1018,7 @@
       "allowedClasses": [
         "monk"
       ],
+      "description": "Every strike echoes across parallel arenas.",
       "bonus": {
         "spirit": 14,
         "agility": 7
@@ -968,6 +1033,7 @@
       "allowedClasses": [
         "warrior"
       ],
+      "description": "Throneguard plate from the final empire.",
       "bonus": {
         "vitality": 15,
         "spirit": 7
@@ -982,6 +1048,7 @@
       "allowedClasses": [
         "berserker"
       ],
+      "description": "Hides stitched from apex void predators.",
       "bonus": {
         "vitality": 14,
         "strength": 7
@@ -996,6 +1063,7 @@
       "allowedClasses": [
         "archer"
       ],
+      "description": "Bends crosswinds into phantom cover.",
       "bonus": {
         "agility": 13,
         "vitality": 6
@@ -1010,6 +1078,7 @@
       "allowedClasses": [
         "mage"
       ],
+      "description": "Orbiting runes trap enemy momentum.",
       "bonus": {
         "intelligence": 15,
         "spirit": 8
@@ -1024,6 +1093,7 @@
       "allowedClasses": [
         "monk"
       ],
+      "description": "Flows between stillness and annihilation.",
       "bonus": {
         "spirit": 13,
         "vitality": 7
@@ -1038,6 +1108,7 @@
       "allowedClasses": [
         "warrior"
       ],
+      "description": "Marks command over ruined dynasties.",
       "bonus": {
         "vitality": 9,
         "strength": 7
@@ -1052,6 +1123,7 @@
       "allowedClasses": [
         "berserker"
       ],
+      "description": "Converts battle pain into pure force.",
       "bonus": {
         "strength": 10,
         "agility": 6
@@ -1066,6 +1138,7 @@
       "allowedClasses": [
         "archer"
       ],
+      "description": "Calculates kill vectors before release.",
       "bonus": {
         "agility": 10,
         "spirit": 5
@@ -1080,6 +1153,7 @@
       "allowedClasses": [
         "mage"
       ],
+      "description": "Fractures cast limits into infinite loops.",
       "bonus": {
         "intelligence": 10,
         "spirit": 7
@@ -1094,6 +1168,7 @@
       "allowedClasses": [
         "monk"
       ],
+      "description": "Aligns breath with the eternal return.",
       "bonus": {
         "spirit": 10,
         "vitality": 6
