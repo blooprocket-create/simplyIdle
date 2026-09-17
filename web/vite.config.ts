@@ -3,9 +3,9 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  // Served under /next while the Expo app still owns the site root. Phase 5
-  // moves this to '/' at cutover.
-  base: '/next/',
+  // The site root. Phase 5 swapped the two: the Expo app now answers at
+  // /legacy and keeps its native builds, and this owns `/`.
+  base: '/',
   build: {
     target: 'es2022',
     sourcemap: true,

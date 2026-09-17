@@ -5,7 +5,15 @@
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'fs';
 
 const filePath = 'dist/index.html';
-const baseUrl = 'https://simply-idle.vercel.app';
+/*
+ * The Expo app answers at /legacy since the Phase 5 swap, so its canonical
+ * URL and preview image have to say so. Left pointing at the bare origin it
+ * would tell crawlers that the old game *is* the site root — which is now the
+ * rewrite — and its `og:image` would resolve to a path that no longer exists,
+ * because the preview files are copied next to this shell and this shell
+ * moved.
+ */
+const baseUrl = 'https://simply-idle.vercel.app/legacy';
 const previewImageSource = 'assets/social-preview.jpg';
 const previewImageFallbackSource = 'assets/social-preview.png';
 const previewImageFileName = 'social-preview.jpg';
