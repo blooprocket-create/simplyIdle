@@ -265,7 +265,9 @@ Summoning and everything that shapes a team: `SUMMON_HERO` with banners, rate-up
 
 Content: `RANK_CONFIGS`, `FEATURED_SUMMON_BANNERS`, `GACHA_SUMMON_COST`, `DIAMOND_SUMMON_COST`, `HERO_LEVEL_EXP_FORMULA`, `SPARK_TOKEN_BY_RARITY`, `SPARK_EXCHANGE_OPTIONS`, `BANNER_RATE_UP_BY_RARITY`, `SUMMON_MILESTONES`, `SOFT_PITY_*`, `VIP_SUMMON_DISCOUNT*`.
 
-**Engine layer done.** Summoning with both pity systems, the template pick and tier clamp, milestones, spark tokens and the spark exchange; levelling, ranking, rebirth and recycling; team selection, formation, loadouts, slot unlocks and batch levelling. What remains of the phase is the UI that calls it.
+**Engine layer done, and reachable.** Summoning with both pity systems, the template pick and tier clamp, milestones, spark tokens and the spark exchange; levelling, ranking, rebirth and recycling; team selection, formation, loadouts, slot unlocks and batch levelling.
+
+The rules were complete and *uncallable* for a while, which is its own lesson: they take a hero pool, a milestone list and a `random` as arguments, and nothing was passing them. Three layers closed that — `content/summon.ts` for the catalogue, `roster/summonSave.ts` and `roster/rosterSave.ts` for "the save before and the save after", and a closed set of verbs on `SurfaceProps` for the screens. What remains is the rest of the UI: a Party surface for formation and loadouts, and the spark exchange.
 
 The strongest parity claim in the rewrite so far: **118 pulls across four recorded runs, matched on rarity and hero id, from one seed.** Every function takes a `random: () => number` rather than reaching for the global, for the same reason the engine may not read the clock — and because the *draw order* is part of the behaviour, so a port with the same distribution but a different order would pass any statistical test and disagree on every pull.
 

@@ -5,6 +5,8 @@ import type { Cast } from '../../game/models/cast';
 import type { Destination } from '../nav/destinations';
 import type { PlayerProfile } from '../profile/playerProfile';
 import type { SummonOutcome, SummonPayment } from '../../engine/roster/summonSave';
+import type { HeroSpend } from '../../engine/roster/rosterSave';
+import type { FormationRole } from '../../engine/combat/formation';
 import type { SaveV3 } from '../../engine/save/schema';
 
 /**
@@ -52,6 +54,20 @@ export interface SurfaceProps {
     summon: (pay: SummonPayment) => SummonOutcome | null;
     canSummon: (pay: SummonPayment) => boolean;
     priceOfSummon: (pay: SummonPayment) => number;
+    /**
+     * The roster verbs. Each answers `true` when it happened and `false` when
+     * the rules refused — a screen greying out a button has to be able to ask,
+     * and "it worked and changed nothing" is a different answer from "it did
+     * not happen".
+     */
+    spendOnHero: (uid: string, spend: HeroSpend) => boolean;
+    batchLevel: (uids: readonly string[], addLevels: number | 'max') => boolean;
+    recycle: (uid: string) => boolean;
+    fieldTeam: (requested: readonly string[]) => boolean;
+    place: (uid: string, role: FormationRole) => boolean;
+    storeLoadout: (slot: number) => boolean;
+    recallLoadout: (slot: number) => boolean;
+    buySlot: () => boolean;
   };
   /** The player's save, for the counters no read model carries yet. */
   save: SaveV3;

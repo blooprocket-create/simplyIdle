@@ -4,11 +4,13 @@ import { Diorama } from '../game/Diorama';
 import { detectCapabilities, profileFor } from '../game/device/DeviceProfile';
 import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
 import { startingSave } from './demoRoster';
-import { canSummon, priceOfSummon, summonOnce } from './playerActions';
+import { canSummon, priceOfSummon, rosterActions, summonOnce } from './playerActions';
 import { fightSignature, rosterFromSave } from './roster';
 import { loadSave, writeSave } from './saveStore';
 import type { SaveV3 } from '../engine/save/schema';
 import type { SummonPayment } from '../engine/roster/summonSave';
+import type { HeroSpend } from '../engine/roster/rosterSave';
+import type { FormationRole } from '../engine/combat/formation';
 import { profileFromSave } from '../ui/profile/playerProfile';
 import { GameLoop } from './GameLoop';
 import { loadRun, RunSaver } from './runStore';
@@ -133,6 +135,22 @@ export function App() {
     writeSave(browserStore(), next);
   }, []);
 
+  /*
+   * A verb that changes the save, wrapped so a surface gets a yes or a no.
+   *
+   * `rosterSave.ts` answers with the next save or null, which is the right
+   * shape for an engine and the wrong one for a button: a component holding a
+   * `SaveV3` would be a component that could write one.
+   */
+  const applying = useCallback(
+    (next: SaveV3 | null): boolean => {
+      if (!next) return false;
+      applySave(next);
+      return true;
+    },
+    [applySave],
+  );
+
   const actions = useMemo(
     () => ({
       summon: (pay: SummonPayment) => {
@@ -142,8 +160,17 @@ export function App() {
       },
       canSummon: (pay: SummonPayment) => canSummon(save, pay),
       priceOfSummon: (pay: SummonPayment) => priceOfSummon(save, pay),
+      spendOnHero: (uid: string, spend: HeroSpend) => applying(rosterActions.spendOnHero(save, uid, spend)),
+      batchLevel: (uids: readonly string[], addLevels: number | 'max') =>
+        applying(rosterActions.batchLevel(save, uids, addLevels)),
+      recycle: (uid: string) => applying(rosterActions.recycle(save, uid)),
+      fieldTeam: (requested: readonly string[]) => applying(rosterActions.fieldTeam(save, requested)),
+      place: (uid: string, role: FormationRole) => applying(rosterActions.place(save, uid, role)),
+      storeLoadout: (slot: number) => applying(rosterActions.storeLoadout(save, slot)),
+      recallLoadout: (slot: number) => applying(rosterActions.recallLoadout(save, slot)),
+      buySlot: () => applying(rosterActions.buySlot(save)),
     }),
-    [save, applySave],
+    [save, applySave, applying],
   );
 
   const select = (id: string) => {

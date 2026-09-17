@@ -1,4 +1,5 @@
-import { HERO_POOL } from '../content/heroes';
+import { HERO_POOL, heroTemplatesById } from '../content/heroes';
+import type { FormationRole } from '../engine/combat/formation';
 import {
   DIAMOND_SUMMON_COST,
   GACHA_SUMMON_COST,
@@ -7,8 +8,19 @@ import {
   summonCost,
 } from '../content/summon';
 import { boundedInt, SAFE_NUMBER_CAP } from '../engine/save/guards';
-import type { SaveV3 } from '../engine/save/schema';
+import type { SaveContent, SaveV3 } from '../engine/save/schema';
 import { applySummon, type SummonOutcome, type SummonPayment, type SummonPoolEntry } from '../engine/roster/summonSave';
+import {
+  batchLevelHeroes,
+  buySlot,
+  fieldTeam,
+  placeHero,
+  recallLoadout,
+  recycleHero,
+  spendOnHero,
+  storeLoadout,
+  type HeroSpend,
+} from '../engine/roster/rosterSave';
 
 /**
  * What the player can do to their save, with the catalogue and the dice
@@ -74,3 +86,37 @@ export function summonOnce(attempt: SummonAttempt): SummonOutcome | null {
     nowMs: attempt.nowMs,
   });
 }
+
+/** The catalogue, as the save reader and the selection rules need it. */
+const CONTENT: SaveContent = { heroesById: heroTemplatesById() };
+
+/**
+ * The shard rate a recycle pays at.
+ *
+ * **Flat, because there is no weekly event system yet.** `WEEKLY_EVENTS` is
+ * Phase 11's and the rotation is not ported, so the honest multiplier is one
+ * rather than a guess at which week it is — and `recycleShards` takes it as an
+ * argument precisely so this is a caller's decision rather than an engine
+ * reading a clock.
+ */
+export const WEEKLY_SHARD_MULTIPLIER = 1;
+
+/**
+ * The roster verbs, with the catalogue supplied.
+ *
+ * Each returns the next save or **null**, which is the same contract
+ * `rosterSave.ts` sets: a screen greying out a button has to be able to ask,
+ * and "it worked and changed nothing" is a different answer from "it did not
+ * happen".
+ */
+export const rosterActions = {
+  spendOnHero: (save: SaveV3, uid: string, spend: HeroSpend) => spendOnHero(save, uid, spend),
+  batchLevel: (save: SaveV3, uids: readonly string[], addLevels: number | 'max') =>
+    batchLevelHeroes(save, CONTENT, uids, addLevels),
+  recycle: (save: SaveV3, uid: string) => recycleHero(save, uid, WEEKLY_SHARD_MULTIPLIER),
+  fieldTeam: (save: SaveV3, requested: readonly string[]) => fieldTeam(save, CONTENT, requested),
+  place: (save: SaveV3, uid: string, role: FormationRole) => placeHero(save, CONTENT, uid, role),
+  storeLoadout: (save: SaveV3, slot: number) => storeLoadout(save, slot),
+  recallLoadout: (save: SaveV3, slot: number) => recallLoadout(save, CONTENT, slot),
+  buySlot: (save: SaveV3) => buySlot(save),
+};
