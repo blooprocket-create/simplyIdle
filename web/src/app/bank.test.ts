@@ -34,6 +34,7 @@ const banked = (over: Partial<Parameters<typeof bankInto>[1]> = {}) => ({
   bossTears: 0,
   kills: 0,
   equipmentDrops: [] as number[],
+  usableDrops: [] as string[],
   ...over,
 });
 
@@ -113,5 +114,25 @@ describe('the items a run won', () => {
     const after = bankInto(save(), banked({ gold: new Decimal(250), equipmentDrops: [40] }), NOW, rolling());
     expect(after.wallet.gold).toBe(250);
     expect(after.equipment.inventory.length).toBe(1);
+  });
+});
+
+describe('the usables a run found', () => {
+  it('puts them in the bag, already resolved', () => {
+    // Unlike equipment, a usable needs nothing from the save — it comes off a
+    // weight table — so the fight resolves which item and this only grants it.
+    const after = bankInto(
+      save(),
+      banked({ usableDrops: ['gold_cache', 'gold_cache', 'small_potion'] }),
+      NOW,
+      rolling(),
+    );
+    expect(after.usables.gold_cache).toBe(2);
+    expect(after.usables.small_potion).toBe(1);
+  });
+
+  it('ignores an id the catalogue does not know', () => {
+    const after = bankInto(save(), banked({ usableDrops: ['not_a_thing'] }), NOW, rolling());
+    expect(after.usables).toEqual({});
   });
 });

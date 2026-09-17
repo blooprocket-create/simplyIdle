@@ -11,12 +11,13 @@ import { BurstMeter } from './combat/BurstMeter';
 import { applyHit, spawnEnemy, type Enemy } from './combat/encounter';
 import { FLAT_RATES, RunEarnings, type RewardRates } from './combat/rewards';
 import { seededRandom } from './rng';
-import { applyIncoming, fullHealth, type TeamVitals } from './combat/survival';
+import { applyIncoming, fullHealth, healTeam, type TeamVitals } from './combat/survival';
 import { scheduleSwings } from './combat/swingSchedule';
 import { heroViews, teamDps, type HeroEntity } from './entities/HeroEntity';
 import { creditAwayTime } from './offline/awayCredit';
 import type { RunProgress } from './save/runProgress';
 import { emptySnapshot, type HitEvent, type SimulationSnapshot } from './types';
+import { totalsView } from './views';
 
 /**
  * The coordinator. It owns the clock and delegates every rule to a subsystem —
@@ -345,9 +346,22 @@ export class Simulation {
     return this.earnings.bank();
   }
 
+  /**
+   * Restore a share of the team's maximum. A potion, from outside the fight.
+   *
+   * The team's health lives here and not on the save, so a usable item that
+   * heals has to reach the simulation rather than change a number in storage.
+   * Clamped at full by `healTeam`, and a share rather than an amount because
+   * that is what the item promises.
+   */
+  heal(fraction: number): void {
+    this.vitals = healTeam(this.vitals, fraction);
+  }
+
   /** The current read model. Callers must treat it as immutable. */
   read(): SimulationSnapshot {
     const earned = this.earnings.read();
+    const counts = { kills: this.kills, deaths: this.deaths, dealt: this.dealt, overkill: this.overkill };
     return {
       ...emptySnapshot(),
       elapsedMs: this.elapsedMs,
@@ -361,14 +375,7 @@ export class Simulation {
       burst: this.burst.view(this.elapsedMs),
       wipe: this.rally.view(this.elapsedMs),
       boss: this.boss.view(this.elapsedMs),
-      totals: {
-        kills: this.kills,
-        deaths: this.deaths,
-        dealt: this.dealt,
-        overkill: this.overkill,
-        ...earned,
-        ...this.earnings.spoils(),
-      },
+      totals: totalsView(counts, earned, this.earnings.spoils()),
     };
   }
 }

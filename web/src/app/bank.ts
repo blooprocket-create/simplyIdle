@@ -1,4 +1,5 @@
 import { grantDrops } from '../engine/equipment/equipmentSave';
+import { grantUsable } from '../engine/items/usableSave';
 import type { BankedRun } from '../engine/combat/rewards';
 import { bankRun } from '../engine/save/bankRun';
 import type { SaveV3 } from '../engine/save/schema';
@@ -20,14 +21,17 @@ import { vipLevel } from './playerActions';
  * player who just dinged an item from the level before.
  */
 export function bankInto(save: SaveV3, banked: BankedRun, nowMs: number, random: () => number): SaveV3 {
-  const banked2 = bankRun(save, banked);
+  const levelled = bankRun(save, banked);
+  // Usables come off a weight table with nothing to look up, so they are
+  // granted here rather than rolled: the fight already resolved which item.
+  const withUsables = banked.usableDrops.reduce((into, id) => grantUsable(into, id), levelled);
   return grantDrops({
-    save: banked2,
+    save: withUsables,
     content: EQUIPMENT_CONTENT,
     waves: banked.equipmentDrops,
-    unlocks: equipmentUnlocks(banked2),
-    vipLevel: vipLevel(banked2),
-    forgeLevel: banked2.facilities.forge,
+    unlocks: equipmentUnlocks(withUsables),
+    vipLevel: vipLevel(withUsables),
+    forgeLevel: withUsables.facilities.forge,
     random,
     nowMs,
   }).save;

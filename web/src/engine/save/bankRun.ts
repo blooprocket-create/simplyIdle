@@ -76,7 +76,8 @@ export function worthBanking(banked: BankedRun): boolean {
     banked.essence > 0 ||
     banked.bossTears > 0 ||
     banked.kills > 0 ||
-    banked.equipmentDrops.length > 0
+    banked.equipmentDrops.length > 0 ||
+    banked.usableDrops.length > 0
   );
 }
 

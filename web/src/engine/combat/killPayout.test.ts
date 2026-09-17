@@ -97,16 +97,16 @@ describe('where a chest is', () => {
     expect(killPayout(5, () => CHEST_TEAR_CHANCE - Number.EPSILON).bossTears).toBe(1);
   });
 
-  it('draws the chest roll only on a chest node, after the drop roll', () => {
+  it('draws both drop chances every kill, and the chest only on a node', () => {
     /*
-     * Every kill draws **once** for the equipment drop chance — that one is
-     * unconditional, as shipped. The chest roll is the second draw and comes
-     * only on a chest node.
+     * The shipped order, which a seeded generator makes load-bearing:
+     * equipment chance, usable chance, then the chest roll — and the chest
+     * roll only on a chest node. So an ordinary kill costs **two** draws and a
+     * chest node costs three, with everything missing.
      *
-     * Both halves matter to a seeded generator. Drawing the chest roll on a
-     * wave that has no chest would advance the sequence where the shipped game
-     * leaves it alone; drawing it *before* the drop roll would swap two values
-     * the shipped order hands over the other way round.
+     * Drawing the chest on a wave that has none would advance the sequence
+     * where the shipped game leaves it alone; drawing it before the two drop
+     * chances would hand over three values in the wrong order.
      */
     const counted = () => {
       draws += 1;
@@ -115,15 +115,15 @@ describe('where a chest is', () => {
     let draws = 0;
 
     killPayout(7, counted);
-    expect(draws).toBe(1);
+    expect(draws).toBe(2);
 
     draws = 0;
     killPayout(20, counted);
-    expect(draws).toBe(1);
+    expect(draws).toBe(2);
 
     draws = 0;
     killPayout(5, counted);
-    expect(draws).toBe(2);
+    expect(draws).toBe(3);
   });
 
   it('spends the first draw on the drop and the second on the chest', () => {
@@ -133,11 +133,21 @@ describe('where a chest is', () => {
       let at = 0;
       return () => values[Math.min(at++, values.length - 1)];
     };
-    const dropOnly = killPayout(5, scripted([0.01, 0.99]));
+    // Equipment wins, usable misses, chest misses.
+    const dropOnly = killPayout(5, scripted([0.01, 0.99, 0.99]));
     expect(dropOnly.equipmentDrops).toEqual([5]);
+    expect(dropOnly.usableDrops).toEqual([]);
     expect(dropOnly.bossTears).toBe(0);
 
-    const chestOnly = killPayout(5, scripted([0.99, 0.01]));
+    // Equipment misses, usable wins — which costs a draw for the item itself,
+    // so the chest roll is the *fourth* value rather than the third.
+    const usableOnly = killPayout(5, scripted([0.99, 0.01, 0.5, 0.99]));
+    expect(usableOnly.equipmentDrops).toEqual([]);
+    expect(usableOnly.usableDrops).toHaveLength(1);
+    expect(usableOnly.bossTears).toBe(0);
+
+    // Both drop chances miss, so the chest roll is the third value.
+    const chestOnly = killPayout(5, scripted([0.99, 0.99, 0.01]));
     expect(chestOnly.equipmentDrops).toEqual([]);
     expect(chestOnly.bossTears).toBe(1);
   });
@@ -151,6 +161,7 @@ describe('a run of kills', () => {
       seasonPoints: 0,
       masteryXp: 0,
       equipmentDrops: [],
+      usableDrops: [],
     });
     const run = [7, 8, 9, 10].reduce((into, wave) => addPayout(into, killPayout(wave, UNLUCKY)), EMPTY_PAYOUT);
     // Three plain kills and one boss: 12 × 3 + 92, mastery 2 × 3 + 8.

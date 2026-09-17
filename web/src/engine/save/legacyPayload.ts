@@ -1,4 +1,5 @@
 import { equipmentToLegacy } from './equipmentSlice';
+import { usablesToLegacy } from './usablesSlice';
 import { facilitiesToLegacy } from './facilitiesSlice';
 import { STAT_POINTS_PER_LEVEL, statPointsSpent } from './migrate';
 import { LEGACY_SAVE_VERSION, type SaveV3 } from './schema';
@@ -143,6 +144,7 @@ export function toLegacyPayload(save: SaveV3): Record<string, unknown> {
      * as every facility being level zero.
      */
     guildhallFacilities: facilitiesToLegacy(save.facilities),
+    usableItemCounts: usablesToLegacy(save.usables),
 
     /*
      * The summon counters, back under the names the shipped state uses.

@@ -11,6 +11,12 @@ import {
 } from '../content/summon';
 import { boundedInt, SAFE_NUMBER_CAP } from '../engine/save/guards';
 import type { SaveContent, SaveV3 } from '../engine/save/schema';
+import { useUsableItem } from '../engine/items/usableSave';
+import type { UsableScaling } from '../engine/items/usableGains';
+import { weeklyEventByWeek } from '../content/weeklyEvents';
+import { VIP_EXP_PER_LEVEL, VIP_GOLD_PER_LEVEL } from '../engine/combat/rewardRates';
+import { getAchievementLegacyMultiplier } from '../engine/combat/progressionMultipliers';
+import { achievementCountFromLegacy, weeklyEventWeekFromLegacy } from '../engine/character/fromSave';
 import { applySummon, type SummonOutcome, type SummonPayment, type SummonPoolEntry } from '../engine/roster/summonSave';
 import { applySparkExchange, type SparkOutcome } from '../engine/roster/sparkSave';
 import {
@@ -165,3 +171,36 @@ export const rosterActions = {
   buySlot: (save: SaveV3) => buySlot(save),
   toggleRelic: (save: SaveV3, uid: string) => toggleUniqueRelic(save, uid),
 };
+
+/**
+ * The scaling an item's gain is measured against, read off a save.
+ *
+ * Assembled here rather than inside the engine's item rules for the reason
+ * every chain in this port is: the multipliers come from four different
+ * places — VIP out of the legacy bag, achievements out of a count, the weekly
+ * event out of a table — and a rule module that reached for all four would be
+ * reading the save it was handed a scalar to avoid.
+ */
+export function usableScalingFor(save: SaveV3): UsableScaling {
+  const vip = vipLevel(save);
+  return {
+    level: save.progression.level,
+    highestWave: save.progression.highestWave,
+    prestigeCount: save.progression.prestigeCount,
+    vipGoldMult: 1 + vip * VIP_GOLD_PER_LEVEL,
+    achievementMult: getAchievementLegacyMultiplier(achievementCountFromLegacy(save)).toNumber(),
+    vipExpMult: 1 + vip * VIP_EXP_PER_LEVEL,
+    weeklyShardMult: weeklyEventByWeek(weeklyEventWeekFromLegacy(save)).shardMultiplier,
+  };
+}
+
+/**
+ * Use an item, and say what the fight still has to do about it.
+ *
+ * The heal cannot be applied to a save — the team's health is in the running
+ * simulation — so it comes back as a fraction for the shell to hand to the
+ * loop. Everything else is already in the save this returns.
+ */
+export function useItem(save: SaveV3, itemId: string, amount: number | 'all') {
+  return useUsableItem({ save, itemId, amount, scaling: usableScalingFor(save) });
+}

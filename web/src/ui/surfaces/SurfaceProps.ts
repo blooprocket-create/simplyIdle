@@ -59,6 +59,14 @@ export interface SurfaceProps {
   actions: {
     summon: (pay: SummonPayment) => SummonOutcome | null;
     canSummon: (pay: SummonPayment) => boolean;
+    /**
+     * Use an item from the bag.
+     *
+     * The one verb whose result is not entirely a save: a potion heals the
+     * running fight, so the shell hands that half to the loop. A surface only
+     * needs the yes or no.
+     */
+    useItem: (itemId: string, amount?: number | 'all') => boolean;
     priceOfSummon: (pay: SummonPayment) => number;
     /**
      * The spark exchange, which is the other way a hero arrives: the currency

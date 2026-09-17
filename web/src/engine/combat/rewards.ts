@@ -60,6 +60,8 @@ export interface BankedRun {
   kills: number;
   /** The waves at which a drop was won. The item is rolled when it lands. */
   equipmentDrops: readonly number[];
+  /** The usable items a run found, already resolved. */
+  usableDrops: readonly string[];
 }
 
 export interface Purse {
@@ -188,9 +190,10 @@ export class RunEarnings {
       bossTears: this.payout.bossTears,
       kills: this.killsSinceBank,
       equipmentDrops: this.payout.equipmentDrops,
+      usableDrops: this.payout.usableDrops,
     };
     this.purse = EMPTY_PURSE;
-    this.payout = { ...this.payout, essence: 0, bossTears: 0, equipmentDrops: [] };
+    this.payout = { ...this.payout, essence: 0, bossTears: 0, equipmentDrops: [], usableDrops: [] };
     this.killsSinceBank = 0;
     return banked;
   }

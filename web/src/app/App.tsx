@@ -14,6 +14,7 @@ import { EMPTY_AUTOMATION_STATE, runAutomations } from './automationRunner';
 import { worthBanking } from '../engine/save/bankRun';
 import { bankInto } from './bank';
 import { fightIdentity, fightTuning, fightTuningKey, rosterFromSave } from './roster';
+import { useItem } from './playerActions';
 import { loadSave, writeSave } from './saveStore';
 import type { SaveV3 } from '../engine/save/schema';
 import type { SummonPayment } from '../engine/roster/summonSave';
@@ -224,6 +225,18 @@ export function App() {
         return outcome;
       },
       canAffordSpark: (optionId: string) => canAffordSpark(save, optionId),
+      useItem: (itemId: string, amount: number | 'all' = 1) => {
+        /*
+         * The one action whose result is not entirely a save. A potion heals
+         * the *running fight* — the team's health is not stored — so the
+         * fraction goes to the loop and everything else goes to the save.
+         */
+        const outcome = useItem(live(), itemId, amount);
+        if (outcome === null) return false;
+        applySave(outcome.save);
+        loopRef.current?.heal(outcome.healFraction);
+        return true;
+      },
       spendOnHero: (uid: string, spend: HeroSpend) => applying(rosterActions.spendOnHero(live(), uid, spend)),
       batchLevel: (uids: readonly string[], addLevels: number | 'max') =>
         applying(rosterActions.batchLevel(live(), uids, addLevels)),

@@ -154,7 +154,7 @@ describe('nothing is dropped', () => {
     expect(result.legacy.mailbox).toBeDefined();
   });
 
-  it('has stopped leaving equipment or the guildhall in the bag', () => {
+  it('has stopped leaving equipment, the guildhall or the usables in the bag', () => {
     /*
      * This is the test above, one assertion lighter. It named `equippedItems`
      * as an example of a key still riding in `legacy`, and Phase 9 claiming
@@ -162,7 +162,9 @@ describe('nothing is dropped', () => {
      * exactly as intended rather than a regression. Phase 10 then did it a
      * second time with `guildhallFacilities`, which was the replacement
      * example. The lesson is the case below rather than a better example:
-     * name the keys that have *left*.
+     * name the keys that have *left*. `usableItemCounts` joined them when
+     * Phase 10 gave usable items rules, and adding it here cost one line
+     * rather than another rewrite — which is the point of the change.
      *
      * Kept as its own case rather than deleted, because "a key that used to be
      * in legacy and is not any more" is the one direction this migration is
@@ -175,11 +177,13 @@ describe('nothing is dropped', () => {
       'equippedItems',
       'autoDismantleRarityFloor',
       'guildhallFacilities',
+      'usableItemCounts',
     ]) {
       expect({ key, inLegacy: key in result.legacy }).toEqual({ key, inLegacy: false });
     }
     expect(result.equipment.equipped).toBeDefined();
     expect(result.facilities.tactics).toBeGreaterThanOrEqual(0);
+    expect(result.usables).toBeDefined();
   });
 
   it('partitions the payload: every key is either claimed or carried', () => {

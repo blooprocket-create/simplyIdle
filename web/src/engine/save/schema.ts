@@ -3,6 +3,7 @@ import type { EquipmentRarity, EquipmentSlot } from '../../content/equipment';
 import type { Rarity } from '../../content/rarities';
 import type { FormationRole } from '../combat/formation';
 import type { EquipmentSource } from '../equipment/instance';
+import type { SavedUsables } from './usablesSlice';
 import type { FacilityId } from '../prestige/facilities';
 
 /**
@@ -134,6 +135,9 @@ export interface SaveV3 {
     alloc: StatBlock;
     unspent: number;
   };
+
+  /** How many of each usable item is held. Claimed out of `legacy` in Phase 10. */
+  usables: SavedUsables;
 
   wallet: {
     gold: number;

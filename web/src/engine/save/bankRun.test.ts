@@ -36,6 +36,7 @@ const run = (gold: number, essence = 0, bossTears = 0, exp = 0, kills = 0, equip
   bossTears,
   kills,
   equipmentDrops,
+  usableDrops: [] as string[],
 });
 
 describe('putting a run in the wallet', () => {

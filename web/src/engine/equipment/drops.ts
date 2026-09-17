@@ -42,3 +42,8 @@ export function usableDropChance(wave: number, isBoss: boolean): number {
 export function dropsEquipment(wave: number, isBoss: boolean, random: () => number): boolean {
   return random() <= equipmentDropChance(wave, isBoss);
 }
+
+/** Whether this kill found a usable item. Drawn after the equipment drop. */
+export function dropsUsable(wave: number, isBoss: boolean, random: () => number): boolean {
+  return random() <= usableDropChance(wave, isBoss);
+}

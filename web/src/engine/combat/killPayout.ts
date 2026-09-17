@@ -1,6 +1,7 @@
 import { getActForWave } from '../../content/acts';
 import { isBossWave } from '../../content/monsters';
-import { dropsEquipment } from '../equipment/drops';
+import { dropsEquipment, dropsUsable } from '../equipment/drops';
+import { rollUsableItem } from '../../content/usableItems';
 
 /**
  * What a kill pays that is not gold or EXP.
@@ -42,6 +43,14 @@ export interface KillPayout {
   bossTears: number;
   seasonPoints: number;
   masteryXp: number;
+  /**
+   * The ids of the usable items this run found.
+   *
+   * Resolved in the fight rather than at the bank, unlike the equipment
+   * drops: the item comes off a weight table and nothing about it depends on
+   * the save, so there is nothing to wait for.
+   */
+  usableDrops: string[];
   /**
    * The waves at which this run won an equipment drop.
    *
@@ -97,7 +106,7 @@ export function bossEssence(wave: number): number {
  * would advance a seeded generator on waves the shipped game leaves it alone,
  * and every roll after the first chest would differ.
  */
-export function killPayout(wave: number, random: () => number): KillPayout {
+export function killPayout(wave: number, random: () => number, advancedUsables = false): KillPayout {
   const boss = isBossWave(wave);
   /*
    * Drawn **before** the chest roll, which is the shipped order: the drop
@@ -105,9 +114,16 @@ export function killPayout(wave: number, random: () => number): KillPayout {
    * matters to a seeded generator, and this is the half of it the fight owns.
    */
   const drop = dropsEquipment(wave, boss, random);
+  /*
+   * The usable roll is next, and the item after it — which is why a kill that
+   * finds one costs two draws here and a kill that does not costs one. The
+   * chest roll comes last, as shipped.
+   */
+  const usable = dropsUsable(wave, boss, random) ? rollUsableItem(random(), advancedUsables) : null;
   const chest = !boss && isChestNode(wave) && random() < CHEST_TEAR_CHANCE;
   return {
     equipmentDrops: drop ? [wave] : [],
+    usableDrops: usable === null ? [] : [usable.id],
     essence: boss ? bossEssence(wave) : 0,
     bossTears: (boss ? 1 : 0) + (chest ? 1 : 0),
     seasonPoints: SEASON_POINTS_PER_KILL + (boss ? SEASON_POINTS_PER_BOSS : 0),
@@ -121,6 +137,7 @@ export const EMPTY_PAYOUT: KillPayout = {
   seasonPoints: 0,
   masteryXp: 0,
   equipmentDrops: [],
+  usableDrops: [],
 };
 
 /** Two payouts, added. What a run accumulates across its kills. */
@@ -131,5 +148,6 @@ export function addPayout(into: KillPayout, next: KillPayout): KillPayout {
     seasonPoints: into.seasonPoints + next.seasonPoints,
     masteryXp: into.masteryXp + next.masteryXp,
     equipmentDrops: into.equipmentDrops.concat(next.equipmentDrops).slice(0, MAX_PENDING_DROPS),
+    usableDrops: into.usableDrops.concat(next.usableDrops).slice(0, MAX_PENDING_DROPS),
   };
 }

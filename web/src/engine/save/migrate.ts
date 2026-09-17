@@ -3,6 +3,7 @@ import { RARITY_BOOST_MULTIPLIER, RARITY_IDS, isRarity, type Rarity } from '../.
 import { VALID_FORMATION_ROLES_FOR_CLASS, type FormationRole } from '../combat/formation';
 import { PITY_THRESHOLD } from '../roster/summon';
 import { readEquipment } from './equipmentSlice';
+import { readUsables } from './usablesSlice';
 import { readFacilities } from './facilitiesSlice';
 import { roundTo4 } from '../math/safe';
 import {
@@ -291,6 +292,7 @@ export const CLAIMED_V2_KEYS: readonly string[] = [
   'equippedItems',
   'autoDismantleRarityFloor',
   'guildhallFacilities',
+  'usableItemCounts',
 ];
 
 export interface MigrateOptions {
@@ -403,6 +405,7 @@ export function migrateSave(payload: unknown, options: MigrateOptions): SaveV3 {
   });
 
   const facilities = readFacilities(raw.guildhallFacilities);
+  const usables = readUsables(raw.usableItemCounts);
 
   const legacy: Record<string, unknown> = {};
   const claimed = new Set(CLAIMED_V2_KEYS);
@@ -436,6 +439,7 @@ export function migrateSave(payload: unknown, options: MigrateOptions): SaveV3 {
     },
     stats: { alloc, unspent },
     facilities,
+    usables,
     equipment,
     wallet: {
       gold,

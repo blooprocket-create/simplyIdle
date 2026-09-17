@@ -79,6 +79,17 @@ export class GameLoop {
     return this.simulation.bank();
   }
 
+  /**
+   * A potion. Publishes, because the player pressed it and expects the bar to
+   * move — the same reason `spendBurst` does.
+   */
+  heal(fraction: number): void {
+    if (!(fraction > 0)) return;
+    this.simulation.heal(fraction);
+    const snapshot = this.simulation.read();
+    for (const listener of this.listeners) listener(snapshot);
+  }
+
   /** Whether abilities fire themselves the moment they come up. */
   setAutoCastHeroActives(on: boolean): void {
     this.simulation.setAutoCastHeroActives(on);
