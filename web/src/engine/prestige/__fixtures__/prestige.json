@@ -1,0 +1,603 @@
+{
+  "note": "Shipped prestige, the rebirth and essence trees, and the guildhall facilities. Owned by __tests__/prestigeFixture.test.ts.",
+  "generatedFrom": "src/reducers/progressionReducer.ts and economyReducer.ts via the exported reducer",
+  "constants": {
+    "rebirthBonus": 1.5,
+    "rebirthWaveThreshold": 100
+  },
+  "waveRequirement": [
+    {
+      "prestigeCount": 0,
+      "requirement": 100
+    },
+    {
+      "prestigeCount": 1,
+      "requirement": 113
+    },
+    {
+      "prestigeCount": 2,
+      "requirement": 126
+    },
+    {
+      "prestigeCount": 5,
+      "requirement": 177
+    },
+    {
+      "prestigeCount": 10,
+      "requirement": 311
+    },
+    {
+      "prestigeCount": 25,
+      "requirement": 1701
+    },
+    {
+      "prestigeCount": 50,
+      "requirement": 28901
+    }
+  ],
+  "rebirths": [
+    {
+      "name": "first-exactly-at-the-wall",
+      "prestigeCount": 0,
+      "highestWave": 100,
+      "coresGained": 1,
+      "prestigeAfter": 1,
+      "levelAfter": 1,
+      "waveAfter": 1,
+      "expAfter": 0,
+      "kept": {
+        "gold": 9000000,
+        "heroes": 0,
+        "unspentStatPoints": 7,
+        "strength": 31,
+        "essence": 44,
+        "metaDamageLevel": 6,
+        "rebirthDamagePath": 3,
+        "equipmentScrap": 2100,
+        "activeTeam": []
+      },
+      "seasonPointsAfter": 290
+    },
+    {
+      "name": "first-well-past-it",
+      "prestigeCount": 0,
+      "highestWave": 400,
+      "coresGained": 21,
+      "prestigeAfter": 1,
+      "levelAfter": 1,
+      "waveAfter": 1,
+      "expAfter": 0,
+      "kept": {
+        "gold": 9000000,
+        "heroes": 0,
+        "unspentStatPoints": 7,
+        "strength": 31,
+        "essence": 44,
+        "metaDamageLevel": 6,
+        "rebirthDamagePath": 3,
+        "equipmentScrap": 2100,
+        "activeTeam": []
+      },
+      "seasonPointsAfter": 290
+    },
+    {
+      "name": "first-one-short",
+      "prestigeCount": 0,
+      "highestWave": 99,
+      "coresGained": null,
+      "prestigeAfter": 0,
+      "levelAfter": 60,
+      "waveAfter": 50,
+      "expAfter": 500,
+      "kept": {
+        "gold": 9000000,
+        "heroes": 0,
+        "unspentStatPoints": 7,
+        "strength": 31,
+        "essence": 44,
+        "metaDamageLevel": 6,
+        "rebirthDamagePath": 3,
+        "equipmentScrap": 2100,
+        "activeTeam": []
+      },
+      "seasonPointsAfter": 40
+    },
+    {
+      "name": "fifth",
+      "prestigeCount": 5,
+      "highestWave": 400,
+      "coresGained": 16,
+      "prestigeAfter": 6,
+      "levelAfter": 1,
+      "waveAfter": 1,
+      "expAfter": 0,
+      "kept": {
+        "gold": 9000000,
+        "heroes": 0,
+        "unspentStatPoints": 7,
+        "strength": 31,
+        "essence": 44,
+        "metaDamageLevel": 6,
+        "rebirthDamagePath": 3,
+        "equipmentScrap": 2100,
+        "activeTeam": []
+      },
+      "seasonPointsAfter": 290
+    },
+    {
+      "name": "twentieth",
+      "prestigeCount": 20,
+      "highestWave": 4000,
+      "coresGained": 69,
+      "prestigeAfter": 21,
+      "levelAfter": 1,
+      "waveAfter": 1,
+      "expAfter": 0,
+      "kept": {
+        "gold": 9000000,
+        "heroes": 0,
+        "unspentStatPoints": 7,
+        "strength": 31,
+        "essence": 44,
+        "metaDamageLevel": 6,
+        "rebirthDamagePath": 3,
+        "equipmentScrap": 2100,
+        "activeTeam": []
+      },
+      "seasonPointsAfter": 290
+    }
+  ],
+  "rebirthPaths": [
+    {
+      "name": "damage-affordable",
+      "path": "damage",
+      "fromLevel": 4,
+      "cores": 1000,
+      "cost": 6,
+      "levelAfter": 5,
+      "coresAfter": 994
+    },
+    {
+      "name": "damage-exact",
+      "path": "damage",
+      "fromLevel": 4,
+      "cores": 6,
+      "cost": 6,
+      "levelAfter": 5,
+      "coresAfter": 0
+    },
+    {
+      "name": "damage-one-short",
+      "path": "damage",
+      "fromLevel": 4,
+      "cores": 5,
+      "cost": 0,
+      "levelAfter": null,
+      "coresAfter": 5
+    },
+    {
+      "name": "economy-affordable",
+      "path": "economy",
+      "fromLevel": 4,
+      "cores": 1000,
+      "cost": 6,
+      "levelAfter": 5,
+      "coresAfter": 994
+    },
+    {
+      "name": "economy-exact",
+      "path": "economy",
+      "fromLevel": 4,
+      "cores": 6,
+      "cost": 6,
+      "levelAfter": 5,
+      "coresAfter": 0
+    },
+    {
+      "name": "economy-one-short",
+      "path": "economy",
+      "fromLevel": 4,
+      "cores": 5,
+      "cost": 0,
+      "levelAfter": null,
+      "coresAfter": 5
+    },
+    {
+      "name": "survival-affordable",
+      "path": "survival",
+      "fromLevel": 4,
+      "cores": 1000,
+      "cost": 6,
+      "levelAfter": 5,
+      "coresAfter": 994
+    },
+    {
+      "name": "survival-exact",
+      "path": "survival",
+      "fromLevel": 4,
+      "cores": 6,
+      "cost": 6,
+      "levelAfter": 5,
+      "coresAfter": 0
+    },
+    {
+      "name": "survival-one-short",
+      "path": "survival",
+      "fromLevel": 4,
+      "cores": 5,
+      "cost": 0,
+      "levelAfter": null,
+      "coresAfter": 5
+    }
+  ],
+  "rebirthPathCosts": [
+    {
+      "level": 0,
+      "cost": 1
+    },
+    {
+      "level": 1,
+      "cost": 1
+    },
+    {
+      "level": 2,
+      "cost": 2
+    },
+    {
+      "level": 3,
+      "cost": 4
+    },
+    {
+      "level": 4,
+      "cost": 6
+    },
+    {
+      "level": 5,
+      "cost": 8
+    },
+    {
+      "level": 8,
+      "cost": 15
+    },
+    {
+      "level": 12,
+      "cost": 28
+    },
+    {
+      "level": 20,
+      "cost": 67
+    },
+    {
+      "level": 40,
+      "cost": 233
+    }
+  ],
+  "essenceCosts": [
+    {
+      "level": 0,
+      "cost": 32
+    },
+    {
+      "level": 1,
+      "cost": 68
+    },
+    {
+      "level": 2,
+      "cost": 128
+    },
+    {
+      "level": 5,
+      "cost": 452
+    },
+    {
+      "level": 10,
+      "cost": 1472
+    },
+    {
+      "level": 25,
+      "cost": 8132
+    },
+    {
+      "level": 50,
+      "cost": 31232
+    }
+  ],
+  "essenceUpgrades": [
+    {
+      "name": "damage-exact",
+      "path": "damage",
+      "fromLevel": 2,
+      "essence": 128,
+      "levelAfter": 3,
+      "essenceAfter": 0
+    },
+    {
+      "name": "damage-one-short",
+      "path": "damage",
+      "fromLevel": 2,
+      "essence": 127,
+      "levelAfter": null,
+      "essenceAfter": 127
+    },
+    {
+      "name": "economy-exact",
+      "path": "economy",
+      "fromLevel": 2,
+      "essence": 128,
+      "levelAfter": 3,
+      "essenceAfter": 0
+    },
+    {
+      "name": "economy-one-short",
+      "path": "economy",
+      "fromLevel": 2,
+      "essence": 127,
+      "levelAfter": null,
+      "essenceAfter": 127
+    },
+    {
+      "name": "survival-exact",
+      "path": "survival",
+      "fromLevel": 2,
+      "essence": 128,
+      "levelAfter": 3,
+      "essenceAfter": 0
+    },
+    {
+      "name": "survival-one-short",
+      "path": "survival",
+      "fromLevel": 2,
+      "essence": 127,
+      "levelAfter": null,
+      "essenceAfter": 127
+    }
+  ],
+  "facilityCosts": [
+    {
+      "facilityId": "training",
+      "level": 0,
+      "cost": 5000
+    },
+    {
+      "facilityId": "training",
+      "level": 1,
+      "cost": 12000
+    },
+    {
+      "facilityId": "training",
+      "level": 2,
+      "cost": 30000
+    },
+    {
+      "facilityId": "training",
+      "level": 3,
+      "cost": 75000
+    },
+    {
+      "facilityId": "training",
+      "level": 4,
+      "cost": 150000
+    },
+    {
+      "facilityId": "training",
+      "level": 5,
+      "cost": 300000
+    },
+    {
+      "facilityId": "training",
+      "level": 6,
+      "cost": 600000
+    },
+    {
+      "facilityId": "training",
+      "level": 7,
+      "cost": 1200000
+    },
+    {
+      "facilityId": "training",
+      "level": 10,
+      "cost": 9600000
+    },
+    {
+      "facilityId": "treasury",
+      "level": 0,
+      "cost": 4000
+    },
+    {
+      "facilityId": "treasury",
+      "level": 1,
+      "cost": 10000
+    },
+    {
+      "facilityId": "treasury",
+      "level": 2,
+      "cost": 25000
+    },
+    {
+      "facilityId": "treasury",
+      "level": 3,
+      "cost": 60000
+    },
+    {
+      "facilityId": "treasury",
+      "level": 4,
+      "cost": 120000
+    },
+    {
+      "facilityId": "treasury",
+      "level": 5,
+      "cost": 250000
+    },
+    {
+      "facilityId": "treasury",
+      "level": 6,
+      "cost": 500000
+    },
+    {
+      "facilityId": "treasury",
+      "level": 7,
+      "cost": 1000000
+    },
+    {
+      "facilityId": "treasury",
+      "level": 10,
+      "cost": 8000000
+    },
+    {
+      "facilityId": "forge",
+      "level": 0,
+      "cost": 6000
+    },
+    {
+      "facilityId": "forge",
+      "level": 1,
+      "cost": 15000
+    },
+    {
+      "facilityId": "forge",
+      "level": 2,
+      "cost": 40000
+    },
+    {
+      "facilityId": "forge",
+      "level": 3,
+      "cost": 90000
+    },
+    {
+      "facilityId": "forge",
+      "level": 4,
+      "cost": 180000
+    },
+    {
+      "facilityId": "forge",
+      "level": 5,
+      "cost": 350000
+    },
+    {
+      "facilityId": "forge",
+      "level": 6,
+      "cost": 700000
+    },
+    {
+      "facilityId": "forge",
+      "level": 7,
+      "cost": 1400000
+    },
+    {
+      "facilityId": "forge",
+      "level": 10,
+      "cost": 11200000
+    },
+    {
+      "facilityId": "tactics",
+      "level": 0,
+      "cost": 5000
+    },
+    {
+      "facilityId": "tactics",
+      "level": 1,
+      "cost": 12000
+    },
+    {
+      "facilityId": "tactics",
+      "level": 2,
+      "cost": 30000
+    },
+    {
+      "facilityId": "tactics",
+      "level": 3,
+      "cost": 75000
+    },
+    {
+      "facilityId": "tactics",
+      "level": 4,
+      "cost": 150000
+    },
+    {
+      "facilityId": "tactics",
+      "level": 5,
+      "cost": 300000
+    },
+    {
+      "facilityId": "tactics",
+      "level": 6,
+      "cost": 600000
+    },
+    {
+      "facilityId": "tactics",
+      "level": 7,
+      "cost": 1200000
+    },
+    {
+      "facilityId": "tactics",
+      "level": 10,
+      "cost": 9600000
+    }
+  ],
+  "facilityUpgrades": [
+    {
+      "name": "training-exact",
+      "facilityId": "training",
+      "fromLevel": 0,
+      "gold": 5000,
+      "levelAfter": 1,
+      "goldAfter": 0
+    },
+    {
+      "name": "training-one-short",
+      "facilityId": "training",
+      "fromLevel": 0,
+      "gold": 4999,
+      "levelAfter": 0,
+      "goldAfter": 4999
+    },
+    {
+      "name": "treasury-exact",
+      "facilityId": "treasury",
+      "fromLevel": 0,
+      "gold": 4000,
+      "levelAfter": 1,
+      "goldAfter": 0
+    },
+    {
+      "name": "treasury-one-short",
+      "facilityId": "treasury",
+      "fromLevel": 0,
+      "gold": 3999,
+      "levelAfter": 0,
+      "goldAfter": 3999
+    },
+    {
+      "name": "forge-exact",
+      "facilityId": "forge",
+      "fromLevel": 0,
+      "gold": 6000,
+      "levelAfter": 1,
+      "goldAfter": 0
+    },
+    {
+      "name": "forge-one-short",
+      "facilityId": "forge",
+      "fromLevel": 0,
+      "gold": 5999,
+      "levelAfter": 0,
+      "goldAfter": 5999
+    },
+    {
+      "name": "tactics-exact",
+      "facilityId": "tactics",
+      "fromLevel": 0,
+      "gold": 5000,
+      "levelAfter": 1,
+      "goldAfter": 0
+    },
+    {
+      "name": "tactics-one-short",
+      "facilityId": "tactics",
+      "fromLevel": 0,
+      "gold": 4999,
+      "levelAfter": 0,
+      "goldAfter": 4999
+    }
+  ]
+}
