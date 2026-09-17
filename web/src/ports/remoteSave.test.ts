@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { equipmentTemplatesById } from '../content/equipment';
 import type { PlayerClass } from '../content/classes';
 import { migrateSave } from '../engine/save/migrate';
 import type { SaveContent, SaveV3 } from '../engine/save/schema';
@@ -24,6 +25,7 @@ import {
  */
 
 const CONTENT: SaveContent = {
+  equipmentById: equipmentTemplatesById(),
   heroesById: new Map(
     fixture.heroTemplates.map(template => [
       template.id,

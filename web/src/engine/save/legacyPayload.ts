@@ -1,3 +1,4 @@
+import { equipmentToLegacy } from './equipmentSlice';
 import { STAT_POINTS_PER_LEVEL, statPointsSpent } from './migrate';
 import { LEGACY_SAVE_VERSION, type SaveV3 } from './schema';
 
@@ -121,6 +122,18 @@ export function toLegacyPayload(save: SaveV3): Record<string, unknown> {
     ),
     teamLoadouts: save.roster.loadouts.map(loadout => [...loadout]),
     teamSlotsUnlocked: save.roster.slotsUnlocked,
+
+    /*
+     * Equipment, back under the four names the shipped state uses.
+     *
+     * `slot` and `allowedClasses` are absent from each instance on purpose:
+     * the shipped sanitiser takes both off the base item and ignores whatever
+     * was stored, so writing them would be writing fields nothing reads. `id`
+     * *is* written into the body as well as being the key, because the shipped
+     * live state carries it there and a record written straight back out with
+     * no reload in between would otherwise lose it.
+     */
+    ...equipmentToLegacy(save.equipment),
 
     /*
      * The summon counters, back under the names the shipped state uses.

@@ -1,4 +1,5 @@
 import Decimal from 'break_eternity.js';
+import { equipmentTemplatesById } from '../../content/equipment';
 import { describe, expect, it } from 'vitest';
 import type { PlayerClass } from '../../content/classes';
 import { HERO_POOL } from '../../content/heroes';
@@ -25,6 +26,7 @@ function decode(value: unknown): unknown {
 }
 
 const CONTENT: SaveContent = {
+  equipmentById: equipmentTemplatesById(),
   heroesById: new Map(
     fixture.heroTemplates.map(template => [
       template.id,

@@ -1,6 +1,8 @@
 import type { PlayerClass } from '../../content/classes';
+import type { EquipmentRarity, EquipmentSlot } from '../../content/equipment';
 import type { Rarity } from '../../content/rarities';
 import type { FormationRole } from '../combat/formation';
+import type { EquipmentSource } from '../equipment/instance';
 
 /**
  * The v3 save.
@@ -43,6 +45,51 @@ export interface SavedHero {
   rank: number;
   teamBoost: number;
   rebirthStatMult: number;
+}
+
+/**
+ * One owned item, as it is stored.
+ *
+ * The display strings are carried rather than rebuilt from the catalogue,
+ * which looks redundant and is not: an item renamed in the catalogue keeps the
+ * name the player earned it under, and — more to the point — `legacyPayload.ts`
+ * has to write this back out and the engine may not read the catalogue to do
+ * it. `slot` and `allowedClasses` are absent for the opposite reason: both
+ * readers derive them from the base item and ignore anything stored, so
+ * carrying them would be carrying two answers to one question.
+ */
+export interface SavedEquipment {
+  /** The catalogue row this was rolled from. An instance with none is dropped. */
+  baseItemId: string;
+  name: string;
+  emoji: string;
+  description: string;
+  /** May differ from the base item's: an upgrade builds from a different row. */
+  rarity: EquipmentRarity;
+  bonus: StatBlock;
+  itemLevel: number;
+  /** Where it came from. Decides what it is worth taken apart. */
+  source: EquipmentSource;
+}
+
+/**
+ * Everything the player owns and wears.
+ *
+ * `inventory` holds **both shapes at once**: a bare catalogue id and an id with
+ * an instance behind it are both legal entries, because the shipped inventory
+ * is a list of ids beside a separate record keyed by the same ids. The reducers
+ * read either through one fallback. Converting the bare ones into instances is
+ * a migration with dice in it, so it lives where the dice do rather than here.
+ */
+export interface SaveEquipment {
+  /** Ids the player owns, in their stored order. No duplicates. */
+  inventory: string[];
+  /** The rolled items. Every key is also in `inventory`. */
+  instances: Record<string, SavedEquipment>;
+  /** What is worn. Every non-null id is in `inventory` and fits its slot. */
+  equipped: Record<EquipmentSlot, string | null>;
+  /** The rarity an automatic sweep takes at or below. */
+  autoDismantleFloor: EquipmentRarity;
 }
 
 export interface SavedUniqueGear {
@@ -124,6 +171,13 @@ export interface SaveV3 {
     firstGiven: boolean;
   };
 
+  /**
+   * Equipment, claimed out of `legacy` in Phase 9 because `derivedStats` has
+   * taken an equipment term as an argument since Phase 7 and nothing could
+   * supply it: the stats a player wears cannot be read out of an untyped bag.
+   */
+  equipment: SaveEquipment;
+
   roster: {
     heroes: SavedHero[];
     activeUids: string[];
@@ -149,6 +203,15 @@ export interface SaveHeroTemplate {
   baseTeamBoost: number;
 }
 
+/** The five facts the save layer needs about an equipment row. */
+export interface SaveEquipmentTemplate {
+  slot: EquipmentSlot;
+  rarity: EquipmentRarity;
+  name: string;
+  emoji: string;
+  description: string;
+}
+
 /** What the migration needs to know about content to validate a save against it. */
 export interface SaveContent {
   /**
@@ -161,4 +224,10 @@ export interface SaveContent {
    * leaves old saves, so it has to keep working.
    */
   heroesById: ReadonlyMap<string, SaveHeroTemplate>;
+  /**
+   * Equipment rows that still exist, for the same reason and with the same
+   * consequence: an instance whose base item is absent here is dropped, which
+   * is how a retired item leaves old saves.
+   */
+  equipmentById: ReadonlyMap<string, SaveEquipmentTemplate>;
 }

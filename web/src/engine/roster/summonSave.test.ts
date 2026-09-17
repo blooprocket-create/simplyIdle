@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HERO_POOL, heroTemplatesById } from '../../content/heroes';
+import { equipmentTemplatesById } from '../../content/equipment';
 import { RARITY_BOOST_MULTIPLIER } from '../../content/rarities';
 import { SPARK_TOKEN_BY_RARITY, SUMMON_MILESTONES } from '../../content/summon';
 import { readSave } from '../save/v3';
@@ -19,7 +20,7 @@ import { UNIQUE_RELIC_DROP_CHANCE, applySummon, type SummonPoolEntry } from './s
  */
 
 const NOW = 1_700_000_000_000;
-const OPTIONS = { nowMs: NOW, content: { heroesById: heroTemplatesById() } };
+const OPTIONS = { nowMs: NOW, content: { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() } };
 
 const POOL: SummonPoolEntry[] = HERO_POOL.map(hero => ({
   id: hero.id,

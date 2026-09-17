@@ -1,6 +1,6 @@
 import type { ProgressionState } from '../combat/progressionMultipliers';
 import { MAX_SAVE_COLLECTION, boundedInt, isRecord } from '../save/guards';
-import type { SaveV3 } from '../save/schema';
+import type { SaveV3, StatBlock } from '../save/schema';
 import { teamMaxHp, type HealthHero } from './stats';
 
 /**
@@ -119,10 +119,20 @@ export function progressionFromSave(save: SaveV3): ProgressionState {
   };
 }
 
-export function teamHealthFromSave(save: SaveV3, activeHeroes: readonly HealthHero[]): number {
+export function teamHealthFromSave(
+  save: SaveV3,
+  activeHeroes: readonly HealthHero[],
+  /**
+   * What the player is wearing, summed. Passed in rather than read, because
+   * resolving an owned id needs the catalogue and this module may not have it —
+   * the same seam `derivedStats` has had since Phase 7.
+   */
+  equipment?: StatBlock,
+): number {
   return teamMaxHp({
     playerClass: save.identity.playerClass,
     alloc: save.stats.alloc,
+    equipment,
     activeHeroes,
     metaSurvivalLevel: save.progression.metaSurvivalLevel,
     rebirthSurvivalPath: save.progression.rebirthSurvivalPath,

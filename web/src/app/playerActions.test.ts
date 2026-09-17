@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { heroTemplatesById } from '../content/heroes';
+import { equipmentTemplatesById } from '../content/equipment';
 import { DIAMOND_SUMMON_COST, GACHA_SUMMON_COST, VIP_SUMMON_DISCOUNT_LEVEL } from '../content/summon';
 import type { SaveV3 } from '../engine/save/schema';
 import { readSave } from '../engine/save/v3';
@@ -14,7 +15,7 @@ import { canSummon, priceOfSummon, summonOnce, vipLevel } from './playerActions'
  */
 
 const NOW = 1_700_000_000_000;
-const OPTIONS = { nowMs: NOW, content: { heroesById: heroTemplatesById() } };
+const OPTIONS = { nowMs: NOW, content: { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() } };
 
 function saveWith(over: Partial<SaveV3> = {}): SaveV3 {
   return { ...readSave({ version: 3 }, OPTIONS), ...over };

@@ -1,4 +1,5 @@
 import type { FormationRole } from '../combat/formation';
+import { readEquipment } from './equipmentSlice';
 import { VALID_FORMATION_ROLES_FOR_CLASS } from '../combat/formation';
 import {
   ACTIVE_TEAM_SIZE,
@@ -235,6 +236,22 @@ export function readSaveV3(payload: unknown, options: MigrateOptions): SaveV3 {
   const gold = boundedInt(wallet.gold, 0, SAFE_NUMBER_CAP, 0);
 
   /*
+   * The equipment slice, through the same reader the migration uses — which is
+   * the whole reason that reader is its own file. The two payloads differ only
+   * in where the four fields sit: v2 has them at the top level under the
+   * shipped names, a `SaveV3` has them under `equipment`.
+   */
+  const storedEquipment = isRecord(raw.equipment) ? raw.equipment : {};
+  const equipment = readEquipment({
+    inventoryItemIds: storedEquipment.inventory,
+    equipmentInventory: storedEquipment.instances,
+    equippedItems: storedEquipment.equipped,
+    autoDismantleRarityFloor: storedEquipment.autoDismantleFloor,
+    content,
+    level,
+  });
+
+  /*
    * `legacy` is every v2 key the typed slice does not claim, and it is kept
    * verbatim on purpose — a dormant account's equipment, mail and guild
    * membership all live in there until a later phase claims them.
@@ -281,6 +298,7 @@ export function readSaveV3(payload: unknown, options: MigrateOptions): SaveV3 {
       metaSurvivalLevel: boundedInt(progression.metaSurvivalLevel, 0, SAFE_NUMBER_CAP, 0),
     },
     stats: readStats(stats, level),
+    equipment,
     wallet: {
       gold,
       totalGold: Math.max(gold, boundedInt(wallet.totalGold, 0, SAFE_NUMBER_CAP, 0)),

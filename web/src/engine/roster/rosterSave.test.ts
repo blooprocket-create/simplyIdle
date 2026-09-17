@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { heroTemplatesById } from '../../content/heroes';
+import { equipmentTemplatesById } from '../../content/equipment';
 import type { SaveContent, SaveV3 } from '../save/schema';
 import { readSave } from '../save/v3';
 import { ACTIVE_TEAM_SIZE, MIN_TEAM_SLOTS } from '../save/migrate';
@@ -14,6 +15,7 @@ import {
   recycleHero,
   spendOnHero,
   storeLoadout,
+  toggleUniqueRelic,
 } from './rosterSave';
 
 /**
@@ -25,7 +27,7 @@ import {
  */
 
 const NOW = 1_700_000_000_000;
-const CONTENT: SaveContent = { heroesById: heroTemplatesById() };
+const CONTENT: SaveContent = { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() };
 const OPTIONS = { nowMs: NOW, content: CONTENT };
 
 /** `h1` warrior, `h3` berserker, `h5` archer, `h7` mage, `h9` monk. */
@@ -339,5 +341,59 @@ describe('buying a team slot', () => {
   it('runs out at the sixth', () => {
     const save = saveWith({ gold: 1e9, heroShards: 1e9, highestWave: 1_000, slotsUnlocked: ACTIVE_TEAM_SIZE });
     expect(buySlot(save)).toBeNull();
+  });
+});
+
+describe('toggling a hero’s unique relic', () => {
+  /** Two copies of one hero, the second strictly better than the first. */
+  function twoCopies(equippedByUid: string | null): SaveV3 {
+    const base = saveWith({});
+    const template = base.roster.heroes[0].id;
+    const weak = { ...base.roster.heroes[0], uid: 'weak', rarity: 'common' as const, level: 1 };
+    const strong = { ...base.roster.heroes[0], uid: 'strong', rarity: 'legendary' as const, level: 9 };
+    return {
+      ...base,
+      roster: {
+        ...base.roster,
+        heroes: [weak, strong],
+        activeUids: ['weak', 'strong'],
+        uniqueByHeroId: { [template]: { rank: 3, equippedByUid } },
+      },
+    };
+  }
+
+  const relicOf = (save: SaveV3) => Object.values(save.roster.uniqueByHeroId)[0];
+
+  it('equips the preferred copy whichever copy was pressed', () => {
+    /*
+     * The uid decides which *relic*, not which copy carries it: the action
+     * looks the hero up to find their template and then re-derives the bearer
+     * across every copy. Pressing on the weak one still hands it to the strong
+     * one, which is what makes the control safe — a relic can never end up on
+     * a copy that is not the best.
+     */
+    expect(relicOf(toggleUniqueRelic(twoCopies(null), 'weak')!).equippedByUid).toBe('strong');
+    expect(relicOf(toggleUniqueRelic(twoCopies(null), 'strong')!).equippedByUid).toBe('strong');
+  });
+
+  it('takes it off only when it is already on the preferred copy', () => {
+    expect(relicOf(toggleUniqueRelic(twoCopies('strong'), 'strong')!).equippedByUid).toBeNull();
+  });
+
+  it('moves it rather than removing it when it sits on a worse copy', () => {
+    /*
+     * The part a port gets wrong by tidying. A press on a relic that is on an
+     * old copy **moves** it, so the player presses once to move and again to
+     * remove. Reading the toggle as "if equipped, unequip" would take it off
+     * instead, which is the same button doing the opposite thing.
+     */
+    expect(relicOf(toggleUniqueRelic(twoCopies('weak'), 'weak')!).equippedByUid).toBe('strong');
+  });
+
+  it('refuses a hero nobody has, and a relic that has never dropped', () => {
+    // Rank zero is "not owned", not "owned and unranked".
+    expect(toggleUniqueRelic(twoCopies(null), 'nobody')).toBeNull();
+    const norelic = saveWith({});
+    expect(toggleUniqueRelic(norelic, norelic.roster.heroes[0].uid)).toBeNull();
   });
 });

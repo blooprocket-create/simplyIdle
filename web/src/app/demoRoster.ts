@@ -1,5 +1,7 @@
 import type { PlayerClass } from '../content/classes';
 import { HERO_POOL, heroTemplatesById } from '../content/heroes';
+import { equipmentTemplatesById, getEquipmentItem, starterEquipmentForClass } from '../content/equipment';
+import { createEquipmentInstance } from '../engine/equipment/instance';
 import type { FormationRole } from '../engine/combat/formation';
 import type { Rarity } from '../content/rarities';
 import { readSave } from '../engine/save/v3';
@@ -102,7 +104,59 @@ function startingTeam(): StartingHero[] {
  * literal could quietly carry a rank of zero or a formation the rules forbid,
  * which is exactly what the hand-built profile did.
  */
-export function startingSave(nowMs: number): SaveV3 {
+/**
+ * The starter set, as the shipped `CREATE_CHARACTER` builds it.
+ *
+ * Three rolled **instances**, not three catalogue ids — which matters twice
+ * over: the stats an instance carries are rolled against the player's level
+ * rather than the row's authored bonus, and `source: 'starter'` prices them at
+ * a fifth when dismantled. A save built from bare ids would hand a new player
+ * gear worth five times as much in scrap.
+ *
+ * Rolled at item level **one**, as shipped, whatever level the character is.
+ */
+function starterEquipment(playerClass: PlayerClass, nowMs: number, random: () => number) {
+  const taken = new Set<string>();
+  const instances = starterEquipmentForClass(playerClass)
+    .map(id => getEquipmentItem(id))
+    .filter((item): item is NonNullable<typeof item> => item !== undefined)
+    .map(baseItem => {
+      const instance = createEquipmentInstance({ baseItem, itemLevel: 1, source: 'starter', random, nowMs, taken });
+      taken.add(instance.id);
+      return instance;
+    });
+
+  const equipped: Record<string, string | null> = { weapon: null, armor: null, accessory: null };
+  for (const instance of instances) equipped[instance.slot] = instance.id;
+
+  return {
+    inventory: instances.map(instance => instance.id),
+    instances: Object.fromEntries(
+      instances.map(instance => [
+        instance.id,
+        {
+          baseItemId: instance.baseItemId,
+          name: instance.name,
+          emoji: instance.emoji,
+          description: instance.description,
+          rarity: instance.rarity,
+          bonus: instance.bonus,
+          itemLevel: instance.itemLevel,
+          source: instance.source,
+        },
+      ]),
+    ),
+    equipped,
+    autoDismantleFloor: 'common',
+  };
+}
+
+/**
+ * `random` is an argument for the same reason `nowMs` is: an instance's stats
+ * are rolled, and a builder that reached for `Math.random` would be one no test
+ * could pin.
+ */
+export function startingSave(nowMs: number, random: () => number = Math.random): SaveV3 {
   const team = startingTeam();
   const formationByUid: Record<string, FormationRole> = {};
   for (const hero of team) formationByUid[hero.id] = hero.role;
@@ -136,9 +190,13 @@ export function startingSave(nowMs: number): SaveV3 {
       formationByUid,
       slotsUnlocked: team.length,
     },
+    equipment: starterEquipment('warrior', nowMs, random),
   };
 
-  return readSave(payload, { nowMs, content: { heroesById: heroTemplatesById() } });
+  return readSave(payload, {
+    nowMs,
+    content: { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() },
+  });
 }
 
 /*

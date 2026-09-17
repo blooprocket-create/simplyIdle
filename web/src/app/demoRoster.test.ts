@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { heroTemplatesById } from '../content/heroes';
+import { equipmentTemplatesById } from '../content/equipment';
 import { VALID_FORMATION_ROLES_FOR_CLASS, type FormationRole } from '../engine/combat/formation';
 import { ACTIVE_TEAM_SIZE } from '../engine/save/migrate';
 import { readSave, writeSaveV3 } from '../engine/save/v3';
@@ -10,7 +11,16 @@ import { PLAYER_UID, rosterFromSave } from './roster';
  * The three shapes, from the one save. `App` composes these itself — there is
  * no `startingRoster` any more, because a save and a reader is the whole of it.
  */
-const startingRoster = (nowMs: number) => rosterFromSave(startingSave(nowMs));
+const startingRoster = (nowMs: number) => rosterFromSave(startingSave(nowMs, fixedRandom()));
+
+/** A fixed source, so a starter set's rolled stats are the same every run. */
+const fixedRandom = () => {
+  let value = 20_260_115 >>> 0;
+  return () => {
+    value = (Math.imul(value, 1664525) + 1013904223) >>> 0;
+    return value / 0x100000000;
+  };
+};
 
 /**
  * The starting save.
@@ -21,7 +31,7 @@ const startingRoster = (nowMs: number) => rosterFromSave(startingSave(nowMs));
  */
 
 const NOW = 1_700_000_000_000;
-const CONTENT = { heroesById: heroTemplatesById() };
+const CONTENT = { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() };
 
 describe('the team a new player starts on', () => {
   it('fields all six, which the old formation could not', () => {
@@ -32,7 +42,7 @@ describe('the team a new player starts on', () => {
      * cast path does not check, so the diorama drew six people standing
      * somewhere the game says they cannot stand.
      */
-    const save = startingSave(NOW);
+    const save = startingSave(NOW, fixedRandom());
     expect(save.roster.heroes).toHaveLength(ACTIVE_TEAM_SIZE);
     expect(save.roster.activeUids).toHaveLength(ACTIVE_TEAM_SIZE);
 
@@ -89,7 +99,7 @@ describe('the team a new player starts on', () => {
      * it either way. What is asserted is the sequence, which is the actual
      * claim: nothing here is being quietly corrected on the way in.
      */
-    expect(startingSave(NOW).roster.heroes.map(hero => hero.rank)).toEqual([1, 2, 3, 1, 2, 3]);
+    expect(startingSave(NOW, fixedRandom()).roster.heroes.map(hero => hero.rank)).toEqual([1, 2, 3, 1, 2, 3]);
   });
 
   it('measures the team it actually shows', () => {
@@ -107,7 +117,7 @@ describe('the team a new player starts on', () => {
     const roster = startingRoster(NOW);
     expect(roster.teamMaxHp).toBeGreaterThan(0);
 
-    const save = startingSave(NOW);
+    const save = startingSave(NOW, fixedRandom());
     const weaker = readSave(
       {
         ...save,
@@ -125,7 +135,7 @@ describe('the team a new player starts on', () => {
      * hand-built profile did with its rank of zero. Reading is idempotent, so
      * a second pass is the check.
      */
-    const save = startingSave(NOW);
+    const save = startingSave(NOW, fixedRandom());
     const again = readSave(JSON.parse(writeSaveV3(save)), { nowMs: NOW, content: CONTENT });
     expect(again).toEqual(save);
   });
@@ -144,5 +154,51 @@ describe('the team a new player starts on', () => {
     const { incomingMult } = startingRoster(NOW);
     expect(incomingMult).toBeGreaterThan(0);
     expect(incomingMult).toBeLessThan(1);
+  });
+
+  it('wears the class’s starter set, as rolled instances', () => {
+    /*
+     * Three rolled instances rather than three catalogue ids, which is what
+     * `CREATE_CHARACTER` builds. It matters twice: an instance's stats are
+     * rolled against a level rather than taken from the row's authored bonus,
+     * and `source: 'starter'` prices them at a fifth when dismantled — so a
+     * save built from bare ids would hand a new player gear worth five times
+     * as much in scrap.
+     */
+    const save = startingSave(NOW, fixedRandom());
+    expect(save.equipment.inventory).toHaveLength(3);
+    expect(Object.values(save.equipment.equipped).filter(id => id !== null)).toHaveLength(3);
+    for (const id of save.equipment.inventory) {
+      expect({ id, source: save.equipment.instances[id]?.source }).toEqual({ id, source: 'starter' });
+      expect({ id, level: save.equipment.instances[id]?.itemLevel }).toEqual({ id, level: 1 });
+    }
+  });
+
+  it('puts the starter set into the player’s stats, and so into the fight', () => {
+    /*
+     * The whole point of Phase 9, and the thing no other test in this file can
+     * see: `derivedStats` has taken an equipment term since Phase 7 and nothing
+     * supplied one. Stripping the gear off the same save has to move the
+     * numbers — the player's damage, the team's health and what they take.
+     */
+    const dressed = startingSave(NOW, fixedRandom());
+    const bare: typeof dressed = {
+      ...dressed,
+      equipment: {
+        inventory: [],
+        instances: {},
+        equipped: { weapon: null, armor: null, accessory: null },
+        autoDismantleFloor: 'common',
+      },
+    };
+
+    const withGear = rosterFromSave(dressed);
+    const without = rosterFromSave(bare);
+
+    const player = (roster: typeof withGear) => roster.heroes.find(hero => hero.uid === PLAYER_UID)!;
+    expect(player(withGear).damagePerHit.gt(player(without).damagePerHit)).toBe(true);
+    expect(withGear.teamMaxHp).toBeGreaterThan(without.teamMaxHp);
+    // More vitality and spirit is more defence, so less damage lands.
+    expect(withGear.incomingMult).toBeLessThan(without.incomingMult);
   });
 });

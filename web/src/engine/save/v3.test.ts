@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { equipmentTemplatesById } from '../../content/equipment';
 import type { PlayerClass } from '../../content/classes';
 import { MAX_SAVE_COLLECTION, SAFE_NUMBER_CAP } from './guards';
 import {
@@ -47,6 +48,7 @@ function decodeSpecials(value: unknown): unknown {
 }
 
 const CONTENT: SaveContent = {
+  equipmentById: equipmentTemplatesById(),
   heroesById: new Map(
     fixture.heroTemplates.map(template => [
       template.id,

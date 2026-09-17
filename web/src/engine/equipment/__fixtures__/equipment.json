@@ -1,0 +1,2243 @@
+{
+  "note": "Shipped equipment: the catalogue, crafting, dismantling, upgrading and wearing. Owned by __tests__/equipmentFixture.test.ts.",
+  "generatedFrom": "src/gameConfig.ts and src/reducers via the exported reducer",
+  "seed": 20260115,
+  "randomSequence": [
+    0.09281011437997222,
+    0.9917062961030751,
+    0.15858894400298595,
+    0.49808454304002225,
+    0.41007166588678956,
+    0.7757281812373549,
+    0.18694208096712828,
+    0.003389782039448619,
+    0.6130171860568225,
+    0.6676892053801566,
+    0.6106533780694008,
+    0.05019894219003618
+  ],
+  "rarities": [
+    {
+      "id": "common",
+      "label": "Common",
+      "color": "#B8B8B8",
+      "dropWeight": 60
+    },
+    {
+      "id": "rare",
+      "label": "Rare",
+      "color": "#5DA8FF",
+      "dropWeight": 26
+    },
+    {
+      "id": "epic",
+      "label": "Epic",
+      "color": "#B66BFF",
+      "dropWeight": 11
+    },
+    {
+      "id": "legendary",
+      "label": "Legendary",
+      "color": "#FFB347",
+      "dropWeight": 3
+    },
+    {
+      "id": "mythic",
+      "label": "Mythic",
+      "color": "#FF5B8A",
+      "dropWeight": 1
+    },
+    {
+      "id": "transcendent",
+      "label": "Transcendent",
+      "color": "#00D4FF",
+      "dropWeight": 0.4
+    }
+  ],
+  "catalog": [
+    {
+      "id": "w_warrior_blade",
+      "name": "Iron Vanguard Blade",
+      "emoji": "⚔️",
+      "slot": "weapon",
+      "rarity": "common",
+      "allowedClasses": [
+        "warrior"
+      ],
+      "description": "Reliable frontline steel.",
+      "bonus": {
+        "strength": 3,
+        "vitality": 1
+      }
+    },
+    {
+      "id": "w_warrior_hammer",
+      "name": "Bastion Hammer",
+      "emoji": "🔨",
+      "slot": "weapon",
+      "rarity": "rare",
+      "allowedClasses": [
+        "warrior"
+      ],
+      "description": "Crushing blows for fortress walls.",
+      "bonus": {
+        "strength": 4,
+        "vitality": 2
+      }
+    },
+    {
+      "id": "w_berserker_axe",
+      "name": "Ragecleaver Axe",
+      "emoji": "🪓",
+      "slot": "weapon",
+      "rarity": "common",
+      "allowedClasses": [
+        "berserker"
+      ],
+      "description": "Heavy strikes with reckless force.",
+      "bonus": {
+        "strength": 3,
+        "vitality": 2
+      }
+    },
+    {
+      "id": "w_berserker_chainaxe",
+      "name": "Howlchain Axe",
+      "emoji": "⛓️",
+      "slot": "weapon",
+      "rarity": "epic",
+      "allowedClasses": [
+        "berserker"
+      ],
+      "description": "A savage weapon that feeds on chaos.",
+      "bonus": {
+        "strength": 6,
+        "agility": 1
+      }
+    },
+    {
+      "id": "w_archer_bow",
+      "name": "Falcon Recurve",
+      "emoji": "🏹",
+      "slot": "weapon",
+      "rarity": "common",
+      "allowedClasses": [
+        "archer"
+      ],
+      "description": "A bow built for rapid shots.",
+      "bonus": {
+        "agility": 3,
+        "strength": 1
+      }
+    },
+    {
+      "id": "w_archer_longbow",
+      "name": "Stormline Longbow",
+      "emoji": "🎯",
+      "slot": "weapon",
+      "rarity": "rare",
+      "allowedClasses": [
+        "archer"
+      ],
+      "description": "Pinpoint shots over impossible distance.",
+      "bonus": {
+        "agility": 5,
+        "spirit": 1
+      }
+    },
+    {
+      "id": "w_mage_staff",
+      "name": "Starglass Staff",
+      "emoji": "🔮",
+      "slot": "weapon",
+      "rarity": "rare",
+      "allowedClasses": [
+        "mage"
+      ],
+      "description": "Arcane conduit for spellburst.",
+      "bonus": {
+        "intelligence": 4
+      }
+    },
+    {
+      "id": "w_mage_codex",
+      "name": "Void Codex",
+      "emoji": "📘",
+      "slot": "weapon",
+      "rarity": "epic",
+      "allowedClasses": [
+        "mage"
+      ],
+      "description": "Whispers forbidden equations of power.",
+      "bonus": {
+        "intelligence": 6,
+        "spirit": 2
+      }
+    },
+    {
+      "id": "w_monk_focus",
+      "name": "Prayer Beads",
+      "emoji": "📿",
+      "slot": "weapon",
+      "rarity": "rare",
+      "allowedClasses": [
+        "monk"
+      ],
+      "description": "Focuses inner current.",
+      "bonus": {
+        "spirit": 3,
+        "intelligence": 1
+      }
+    },
+    {
+      "id": "w_monk_katar",
+      "name": "Zen Katar",
+      "emoji": "🗡️",
+      "slot": "weapon",
+      "rarity": "epic",
+      "allowedClasses": [
+        "monk"
+      ],
+      "description": "Silent blades guided by calm breath.",
+      "bonus": {
+        "agility": 3,
+        "spirit": 4
+      }
+    },
+    {
+      "id": "w_warrior_sunbreaker",
+      "name": "Sunbreaker Claymore",
+      "emoji": "🗡️",
+      "slot": "weapon",
+      "rarity": "mythic",
+      "allowedClasses": [
+        "warrior"
+      ],
+      "description": "A royal blade that shatters siege lines.",
+      "bonus": {
+        "strength": 9,
+        "vitality": 4
+      }
+    },
+    {
+      "id": "w_berserker_worldrend",
+      "name": "Worldrend Axe",
+      "emoji": "🪓",
+      "slot": "weapon",
+      "rarity": "mythic",
+      "allowedClasses": [
+        "berserker"
+      ],
+      "description": "A hunger-forged axe of catastrophic swings.",
+      "bonus": {
+        "strength": 10,
+        "agility": 3
+      }
+    },
+    {
+      "id": "w_archer_starfall",
+      "name": "Starfall Bow",
+      "emoji": "🏹",
+      "slot": "weapon",
+      "rarity": "mythic",
+      "allowedClasses": [
+        "archer"
+      ],
+      "description": "Each arrow leaves a comet trail.",
+      "bonus": {
+        "agility": 9,
+        "spirit": 3
+      }
+    },
+    {
+      "id": "w_mage_nullspire",
+      "name": "Nullspire Staff",
+      "emoji": "🔮",
+      "slot": "weapon",
+      "rarity": "mythic",
+      "allowedClasses": [
+        "mage"
+      ],
+      "description": "Converts silence into annihilation.",
+      "bonus": {
+        "intelligence": 10,
+        "spirit": 5
+      }
+    },
+    {
+      "id": "w_monk_heavensplit",
+      "name": "Heavensplit Katar",
+      "emoji": "🗡️",
+      "slot": "weapon",
+      "rarity": "mythic",
+      "allowedClasses": [
+        "monk"
+      ],
+      "description": "A sacred edge that hums with calm fury.",
+      "bonus": {
+        "spirit": 9,
+        "agility": 4
+      }
+    },
+    {
+      "id": "a_plate",
+      "name": "Knight Plate",
+      "emoji": "🛡️",
+      "slot": "armor",
+      "rarity": "common",
+      "allowedClasses": [
+        "warrior"
+      ],
+      "description": "Reinforced armor for long fights.",
+      "bonus": {
+        "vitality": 3,
+        "spirit": 1
+      }
+    },
+    {
+      "id": "a_bulwark",
+      "name": "Bulwark Aegis",
+      "emoji": "🧿",
+      "slot": "armor",
+      "rarity": "epic",
+      "allowedClasses": [
+        "warrior"
+      ],
+      "description": "A legendary shell that refuses to break.",
+      "bonus": {
+        "vitality": 7,
+        "spirit": 2
+      }
+    },
+    {
+      "id": "a_hide",
+      "name": "Bloodhide Harness",
+      "emoji": "🧱",
+      "slot": "armor",
+      "rarity": "rare",
+      "allowedClasses": [
+        "berserker"
+      ],
+      "description": "Built to absorb punishment.",
+      "bonus": {
+        "vitality": 4
+      }
+    },
+    {
+      "id": "a_wolfmantle",
+      "name": "Wolfmantle",
+      "emoji": "🐺",
+      "slot": "armor",
+      "rarity": "epic",
+      "allowedClasses": [
+        "berserker"
+      ],
+      "description": "Predatory instinct wrapped in hide.",
+      "bonus": {
+        "vitality": 5,
+        "strength": 2
+      }
+    },
+    {
+      "id": "a_leather",
+      "name": "Ranger Leathers",
+      "emoji": "🦌",
+      "slot": "armor",
+      "rarity": "common",
+      "allowedClasses": [
+        "archer"
+      ],
+      "description": "Light movement and clean aim.",
+      "bonus": {
+        "agility": 2,
+        "vitality": 1
+      }
+    },
+    {
+      "id": "a_phantomcloak",
+      "name": "Phantom Cloak",
+      "emoji": "🕶️",
+      "slot": "armor",
+      "rarity": "epic",
+      "allowedClasses": [
+        "archer"
+      ],
+      "description": "A veil that makes every step unseen.",
+      "bonus": {
+        "agility": 5,
+        "spirit": 1
+      }
+    },
+    {
+      "id": "a_robe",
+      "name": "Astral Robe",
+      "emoji": "🧥",
+      "slot": "armor",
+      "rarity": "epic",
+      "allowedClasses": [
+        "mage"
+      ],
+      "description": "Runed cloth that amplifies mana.",
+      "bonus": {
+        "intelligence": 2,
+        "spirit": 2
+      }
+    },
+    {
+      "id": "a_starweave",
+      "name": "Starweave Mantle",
+      "emoji": "🌌",
+      "slot": "armor",
+      "rarity": "legendary",
+      "allowedClasses": [
+        "mage"
+      ],
+      "description": "Threads stitched from dying stars.",
+      "bonus": {
+        "intelligence": 7,
+        "spirit": 4
+      }
+    },
+    {
+      "id": "a_wraps",
+      "name": "Temple Wraps",
+      "emoji": "🥋",
+      "slot": "armor",
+      "rarity": "rare",
+      "allowedClasses": [
+        "monk"
+      ],
+      "description": "Flexible defense for body and mind.",
+      "bonus": {
+        "vitality": 2,
+        "spirit": 2
+      }
+    },
+    {
+      "id": "a_lotusguard",
+      "name": "Lotusguard Vest",
+      "emoji": "🌸",
+      "slot": "armor",
+      "rarity": "epic",
+      "allowedClasses": [
+        "monk"
+      ],
+      "description": "Balanced defense in every stance.",
+      "bonus": {
+        "vitality": 4,
+        "spirit": 3
+      }
+    },
+    {
+      "id": "a_warrior_aurum",
+      "name": "Aurum Bastion Plate",
+      "emoji": "🛡️",
+      "slot": "armor",
+      "rarity": "mythic",
+      "allowedClasses": [
+        "warrior"
+      ],
+      "description": "Imperial wallplate from a lost dynasty.",
+      "bonus": {
+        "vitality": 10,
+        "spirit": 4
+      }
+    },
+    {
+      "id": "a_berserker_rampart",
+      "name": "Rampart Hide",
+      "emoji": "🧱",
+      "slot": "armor",
+      "rarity": "mythic",
+      "allowedClasses": [
+        "berserker"
+      ],
+      "description": "Stitched with battle oaths and scars.",
+      "bonus": {
+        "vitality": 9,
+        "strength": 4
+      }
+    },
+    {
+      "id": "a_archer_galeveil",
+      "name": "Galeveil Cloak",
+      "emoji": "🕶️",
+      "slot": "armor",
+      "rarity": "mythic",
+      "allowedClasses": [
+        "archer"
+      ],
+      "description": "Turns pressure fronts into cover.",
+      "bonus": {
+        "agility": 9,
+        "vitality": 3
+      }
+    },
+    {
+      "id": "a_mage_starvault",
+      "name": "Starvault Mantle",
+      "emoji": "🌌",
+      "slot": "armor",
+      "rarity": "mythic",
+      "allowedClasses": [
+        "mage"
+      ],
+      "description": "Threaded with an unbroken night sky.",
+      "bonus": {
+        "intelligence": 9,
+        "spirit": 5
+      }
+    },
+    {
+      "id": "a_monk_moonward",
+      "name": "Moonward Vestments",
+      "emoji": "🌙",
+      "slot": "armor",
+      "rarity": "mythic",
+      "allowedClasses": [
+        "monk"
+      ],
+      "description": "Ceremonial robes that bend impact.",
+      "bonus": {
+        "spirit": 8,
+        "vitality": 5
+      }
+    },
+    {
+      "id": "x_warrior_signet",
+      "name": "Lioncrest Signet",
+      "emoji": "💍",
+      "slot": "accessory",
+      "rarity": "rare",
+      "allowedClasses": [
+        "warrior"
+      ],
+      "description": "Symbol of command.",
+      "bonus": {
+        "strength": 1,
+        "vitality": 1
+      }
+    },
+    {
+      "id": "x_warrior_banner",
+      "name": "Warlord Banner Pin",
+      "emoji": "🚩",
+      "slot": "accessory",
+      "rarity": "epic",
+      "allowedClasses": [
+        "warrior"
+      ],
+      "description": "Inspires nearby allies to hold.",
+      "bonus": {
+        "vitality": 3,
+        "spirit": 2
+      }
+    },
+    {
+      "id": "x_berserker_totem",
+      "name": "Blood Totem",
+      "emoji": "🩸",
+      "slot": "accessory",
+      "rarity": "epic",
+      "allowedClasses": [
+        "berserker"
+      ],
+      "description": "Feeds relentless fury.",
+      "bonus": {
+        "strength": 2
+      }
+    },
+    {
+      "id": "x_berserker_fang",
+      "name": "Rift Fang",
+      "emoji": "🦷",
+      "slot": "accessory",
+      "rarity": "legendary",
+      "allowedClasses": [
+        "berserker"
+      ],
+      "description": "A fang from something ancient and cruel.",
+      "bonus": {
+        "strength": 5,
+        "agility": 2
+      }
+    },
+    {
+      "id": "x_archer_charm",
+      "name": "Windcharm",
+      "emoji": "🍃",
+      "slot": "accessory",
+      "rarity": "rare",
+      "allowedClasses": [
+        "archer"
+      ],
+      "description": "Sharper reflex and release.",
+      "bonus": {
+        "agility": 2
+      }
+    },
+    {
+      "id": "x_archer_scope",
+      "name": "Hawkeye Scope",
+      "emoji": "🔭",
+      "slot": "accessory",
+      "rarity": "epic",
+      "allowedClasses": [
+        "archer"
+      ],
+      "description": "Reads wind and distance in a blink.",
+      "bonus": {
+        "agility": 4,
+        "intelligence": 1
+      }
+    },
+    {
+      "id": "x_mage_orb",
+      "name": "Aether Orb",
+      "emoji": "🔵",
+      "slot": "accessory",
+      "rarity": "legendary",
+      "allowedClasses": [
+        "mage"
+      ],
+      "description": "Dense arcane focus.",
+      "bonus": {
+        "intelligence": 2
+      }
+    },
+    {
+      "id": "x_mage_seal",
+      "name": "Chronoseal",
+      "emoji": "⌛",
+      "slot": "accessory",
+      "rarity": "legendary",
+      "allowedClasses": [
+        "mage"
+      ],
+      "description": "Bends moments between spells.",
+      "bonus": {
+        "intelligence": 5,
+        "spirit": 3
+      }
+    },
+    {
+      "id": "x_monk_talisman",
+      "name": "Lotus Talisman",
+      "emoji": "🪷",
+      "slot": "accessory",
+      "rarity": "epic",
+      "allowedClasses": [
+        "monk"
+      ],
+      "description": "Calm aura under pressure.",
+      "bonus": {
+        "spirit": 2
+      }
+    },
+    {
+      "id": "x_monk_knot",
+      "name": "Celestial Knot",
+      "emoji": "🪢",
+      "slot": "accessory",
+      "rarity": "legendary",
+      "allowedClasses": [
+        "monk"
+      ],
+      "description": "A sacred knot with perfect tension.",
+      "bonus": {
+        "spirit": 5,
+        "vitality": 2
+      }
+    },
+    {
+      "id": "x_warrior_kingshard",
+      "name": "Kingshard Sigil",
+      "emoji": "💠",
+      "slot": "accessory",
+      "rarity": "mythic",
+      "allowedClasses": [
+        "warrior"
+      ],
+      "description": "A shard of old coronation steel.",
+      "bonus": {
+        "vitality": 6,
+        "strength": 4
+      }
+    },
+    {
+      "id": "x_berserker_heartfire",
+      "name": "Heartfire Fang",
+      "emoji": "🔥",
+      "slot": "accessory",
+      "rarity": "mythic",
+      "allowedClasses": [
+        "berserker"
+      ],
+      "description": "Feeds on momentum and pain.",
+      "bonus": {
+        "strength": 6,
+        "agility": 3
+      }
+    },
+    {
+      "id": "x_archer_skylens",
+      "name": "Skylens Pendant",
+      "emoji": "🔭",
+      "slot": "accessory",
+      "rarity": "mythic",
+      "allowedClasses": [
+        "archer"
+      ],
+      "description": "Finds weak points before they exist.",
+      "bonus": {
+        "agility": 7,
+        "spirit": 2
+      }
+    },
+    {
+      "id": "x_mage_voidtear",
+      "name": "Voidtear Orb",
+      "emoji": "🌀",
+      "slot": "accessory",
+      "rarity": "mythic",
+      "allowedClasses": [
+        "mage"
+      ],
+      "description": "A hollow star that amplifies spells.",
+      "bonus": {
+        "intelligence": 7,
+        "spirit": 4
+      }
+    },
+    {
+      "id": "x_monk_sunsigil",
+      "name": "Sunsigil Charm",
+      "emoji": "☀️",
+      "slot": "accessory",
+      "rarity": "mythic",
+      "allowedClasses": [
+        "monk"
+      ],
+      "description": "Anchors the breath in radiant rhythm.",
+      "bonus": {
+        "spirit": 7,
+        "vitality": 3
+      }
+    },
+    {
+      "id": "w_warrior_gravemark",
+      "name": "Gravemark Halberd",
+      "emoji": "🗡️",
+      "slot": "weapon",
+      "rarity": "legendary",
+      "allowedClasses": [
+        "warrior"
+      ],
+      "description": "Heavy polearm forged for siege lines.",
+      "bonus": {
+        "strength": 7,
+        "vitality": 3
+      }
+    },
+    {
+      "id": "w_berserker_skullsplit",
+      "name": "Skullsplit Maul",
+      "emoji": "🔨",
+      "slot": "weapon",
+      "rarity": "legendary",
+      "allowedClasses": [
+        "berserker"
+      ],
+      "description": "A brutal hammer that grows louder in battle.",
+      "bonus": {
+        "strength": 8,
+        "vitality": 2
+      }
+    },
+    {
+      "id": "w_archer_duskgale",
+      "name": "Duskgale Repeater",
+      "emoji": "🏹",
+      "slot": "weapon",
+      "rarity": "legendary",
+      "allowedClasses": [
+        "archer"
+      ],
+      "description": "Fires in controlled stormburst volleys.",
+      "bonus": {
+        "agility": 7,
+        "strength": 2
+      }
+    },
+    {
+      "id": "w_mage_riftlantern",
+      "name": "Rift Lantern",
+      "emoji": "🏮",
+      "slot": "weapon",
+      "rarity": "legendary",
+      "allowedClasses": [
+        "mage"
+      ],
+      "description": "Carries a miniature tear in space.",
+      "bonus": {
+        "intelligence": 8,
+        "spirit": 3
+      }
+    },
+    {
+      "id": "w_monk_thunderstaff",
+      "name": "Thunderstaff",
+      "emoji": "⚡",
+      "slot": "weapon",
+      "rarity": "legendary",
+      "allowedClasses": [
+        "monk"
+      ],
+      "description": "Conducts focused strikes through breath control.",
+      "bonus": {
+        "spirit": 6,
+        "agility": 3
+      }
+    },
+    {
+      "id": "a_warrior_garrison",
+      "name": "Garrison Shell",
+      "emoji": "🛡️",
+      "slot": "armor",
+      "rarity": "legendary",
+      "allowedClasses": [
+        "warrior"
+      ],
+      "description": "Layered plating from fortress captains.",
+      "bonus": {
+        "vitality": 8,
+        "strength": 2
+      }
+    },
+    {
+      "id": "a_berserker_ironhide",
+      "name": "Ironhide Mantle",
+      "emoji": "🧱",
+      "slot": "armor",
+      "rarity": "legendary",
+      "allowedClasses": [
+        "berserker"
+      ],
+      "description": "Absorbs punishment and answers with force.",
+      "bonus": {
+        "vitality": 7,
+        "strength": 3
+      }
+    },
+    {
+      "id": "a_archer_shadesilk",
+      "name": "Shadesilk Cloak",
+      "emoji": "🕶️",
+      "slot": "armor",
+      "rarity": "legendary",
+      "allowedClasses": [
+        "archer"
+      ],
+      "description": "Weightless cloak tuned for sudden movement.",
+      "bonus": {
+        "agility": 7,
+        "spirit": 2
+      }
+    },
+    {
+      "id": "a_mage_orbitweave",
+      "name": "Orbitweave Robes",
+      "emoji": "🌠",
+      "slot": "armor",
+      "rarity": "mythic",
+      "allowedClasses": [
+        "mage"
+      ],
+      "description": "Runes orbit the wearer like satellites.",
+      "bonus": {
+        "intelligence": 10,
+        "spirit": 4
+      }
+    },
+    {
+      "id": "a_monk_stormveil",
+      "name": "Stormveil Wraps",
+      "emoji": "🥋",
+      "slot": "armor",
+      "rarity": "legendary",
+      "allowedClasses": [
+        "monk"
+      ],
+      "description": "Flexes between impact and flow.",
+      "bonus": {
+        "vitality": 6,
+        "spirit": 4
+      }
+    },
+    {
+      "id": "x_warrior_wardring",
+      "name": "Wardring of Oaths",
+      "emoji": "💍",
+      "slot": "accessory",
+      "rarity": "legendary",
+      "allowedClasses": [
+        "warrior"
+      ],
+      "description": "Binds old oaths into active defenses.",
+      "bonus": {
+        "vitality": 5,
+        "spirit": 2
+      }
+    },
+    {
+      "id": "x_berserker_warbrand",
+      "name": "Warbrand Token",
+      "emoji": "🔥",
+      "slot": "accessory",
+      "rarity": "rare",
+      "allowedClasses": [
+        "berserker"
+      ],
+      "description": "Marks each hit with rising fury.",
+      "bonus": {
+        "strength": 3,
+        "vitality": 1
+      }
+    },
+    {
+      "id": "x_archer_galecrest",
+      "name": "Galecrest Brooch",
+      "emoji": "🍃",
+      "slot": "accessory",
+      "rarity": "legendary",
+      "allowedClasses": [
+        "archer"
+      ],
+      "description": "Keeps rhythm between movement and release.",
+      "bonus": {
+        "agility": 6,
+        "spirit": 2
+      }
+    },
+    {
+      "id": "x_mage_starseal",
+      "name": "Starseal Prism",
+      "emoji": "🔷",
+      "slot": "accessory",
+      "rarity": "epic",
+      "allowedClasses": [
+        "mage"
+      ],
+      "description": "Condenses unstable mana into clean bursts.",
+      "bonus": {
+        "intelligence": 4,
+        "spirit": 2
+      }
+    },
+    {
+      "id": "x_monk_tidebead",
+      "name": "Tidebead Charm",
+      "emoji": "🌊",
+      "slot": "accessory",
+      "rarity": "rare",
+      "allowedClasses": [
+        "monk"
+      ],
+      "description": "Stabilizes cadence under pressure.",
+      "bonus": {
+        "spirit": 3,
+        "vitality": 1
+      }
+    },
+    {
+      "id": "tw_warrior_oblivion",
+      "name": "Oblivion Crownblade",
+      "emoji": "🗡️",
+      "slot": "weapon",
+      "rarity": "transcendent",
+      "allowedClasses": [
+        "warrior"
+      ],
+      "description": "Dynastic steel tempered in collapsing stars.",
+      "bonus": {
+        "strength": 14,
+        "vitality": 7
+      }
+    },
+    {
+      "id": "tw_berserker_abyss",
+      "name": "Abyssbreaker",
+      "emoji": "🪓",
+      "slot": "weapon",
+      "rarity": "transcendent",
+      "allowedClasses": [
+        "berserker"
+      ],
+      "description": "A tidal executioner axe forged under blood moons.",
+      "bonus": {
+        "strength": 15,
+        "agility": 6
+      }
+    },
+    {
+      "id": "tw_archer_solstice",
+      "name": "Solstice Railbow",
+      "emoji": "🏹",
+      "slot": "weapon",
+      "rarity": "transcendent",
+      "allowedClasses": [
+        "archer"
+      ],
+      "description": "Launches stellar lances through fortress walls.",
+      "bonus": {
+        "agility": 14,
+        "spirit": 6
+      }
+    },
+    {
+      "id": "tw_mage_axiom",
+      "name": "Axiom Core Staff",
+      "emoji": "🔮",
+      "slot": "weapon",
+      "rarity": "transcendent",
+      "allowedClasses": [
+        "mage"
+      ],
+      "description": "Writes new laws for arcane warfare.",
+      "bonus": {
+        "intelligence": 16,
+        "spirit": 8
+      }
+    },
+    {
+      "id": "tw_monk_resonance",
+      "name": "Resonance Edge",
+      "emoji": "🗡️",
+      "slot": "weapon",
+      "rarity": "transcendent",
+      "allowedClasses": [
+        "monk"
+      ],
+      "description": "Every strike echoes across parallel arenas.",
+      "bonus": {
+        "spirit": 14,
+        "agility": 7
+      }
+    },
+    {
+      "id": "ta_warrior_imperium",
+      "name": "Imperium Bulwark",
+      "emoji": "🛡️",
+      "slot": "armor",
+      "rarity": "transcendent",
+      "allowedClasses": [
+        "warrior"
+      ],
+      "description": "Throneguard plate from the final empire.",
+      "bonus": {
+        "vitality": 15,
+        "spirit": 7
+      }
+    },
+    {
+      "id": "ta_berserker_howl",
+      "name": "Howlplate Mantle",
+      "emoji": "🧱",
+      "slot": "armor",
+      "rarity": "transcendent",
+      "allowedClasses": [
+        "berserker"
+      ],
+      "description": "Hides stitched from apex void predators.",
+      "bonus": {
+        "vitality": 14,
+        "strength": 7
+      }
+    },
+    {
+      "id": "ta_archer_aether",
+      "name": "Aetherveil Cloak",
+      "emoji": "🕶️",
+      "slot": "armor",
+      "rarity": "transcendent",
+      "allowedClasses": [
+        "archer"
+      ],
+      "description": "Bends crosswinds into phantom cover.",
+      "bonus": {
+        "agility": 13,
+        "vitality": 6
+      }
+    },
+    {
+      "id": "ta_mage_singularity",
+      "name": "Singularity Robes",
+      "emoji": "🌌",
+      "slot": "armor",
+      "rarity": "transcendent",
+      "allowedClasses": [
+        "mage"
+      ],
+      "description": "Orbiting runes trap enemy momentum.",
+      "bonus": {
+        "intelligence": 15,
+        "spirit": 8
+      }
+    },
+    {
+      "id": "ta_monk_equilibrium",
+      "name": "Equilibrium Vestments",
+      "emoji": "🌙",
+      "slot": "armor",
+      "rarity": "transcendent",
+      "allowedClasses": [
+        "monk"
+      ],
+      "description": "Flows between stillness and annihilation.",
+      "bonus": {
+        "spirit": 13,
+        "vitality": 7
+      }
+    },
+    {
+      "id": "tx_warrior_crown",
+      "name": "Crownfall Sigil",
+      "emoji": "💠",
+      "slot": "accessory",
+      "rarity": "transcendent",
+      "allowedClasses": [
+        "warrior"
+      ],
+      "description": "Marks command over ruined dynasties.",
+      "bonus": {
+        "vitality": 9,
+        "strength": 7
+      }
+    },
+    {
+      "id": "tx_berserker_heart",
+      "name": "Heartfire Core",
+      "emoji": "🔥",
+      "slot": "accessory",
+      "rarity": "transcendent",
+      "allowedClasses": [
+        "berserker"
+      ],
+      "description": "Converts battle pain into pure force.",
+      "bonus": {
+        "strength": 10,
+        "agility": 6
+      }
+    },
+    {
+      "id": "tx_archer_horizon",
+      "name": "Horizon Lens",
+      "emoji": "🔭",
+      "slot": "accessory",
+      "rarity": "transcendent",
+      "allowedClasses": [
+        "archer"
+      ],
+      "description": "Calculates kill vectors before release.",
+      "bonus": {
+        "agility": 10,
+        "spirit": 5
+      }
+    },
+    {
+      "id": "tx_mage_paradox",
+      "name": "Paradox Prism",
+      "emoji": "🌀",
+      "slot": "accessory",
+      "rarity": "transcendent",
+      "allowedClasses": [
+        "mage"
+      ],
+      "description": "Fractures cast limits into infinite loops.",
+      "bonus": {
+        "intelligence": 10,
+        "spirit": 7
+      }
+    },
+    {
+      "id": "tx_monk_cycle",
+      "name": "Cycle Knot",
+      "emoji": "♾️",
+      "slot": "accessory",
+      "rarity": "transcendent",
+      "allowedClasses": [
+        "monk"
+      ],
+      "description": "Aligns breath with the eternal return.",
+      "bonus": {
+        "spirit": 10,
+        "vitality": 6
+      }
+    }
+  ],
+  "starterByClass": {
+    "warrior": [
+      "w_warrior_blade",
+      "a_plate",
+      "x_warrior_signet"
+    ],
+    "berserker": [
+      "w_berserker_axe",
+      "a_hide",
+      "x_berserker_warbrand"
+    ],
+    "archer": [
+      "w_archer_bow",
+      "a_leather",
+      "x_archer_charm"
+    ],
+    "mage": [
+      "w_mage_staff",
+      "a_robe",
+      "x_mage_starseal"
+    ],
+    "monk": [
+      "w_monk_focus",
+      "a_wraps",
+      "x_monk_tidebead"
+    ]
+  },
+  "craftCosts": {
+    "weapon": {
+      "scrap": 130,
+      "gold": 1800
+    },
+    "armor": {
+      "scrap": 120,
+      "gold": 1500
+    },
+    "accessory": {
+      "scrap": 100,
+      "gold": 1200
+    }
+  },
+  "rarityRolls": [
+    {
+      "name": "ungated",
+      "mythic": true,
+      "transcendent": true,
+      "byRoll": [
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "rare",
+        "rare",
+        "rare",
+        "rare",
+        "rare",
+        "epic",
+        "epic",
+        "epic",
+        "common"
+      ],
+      "firstRollByRarity": {
+        "common": 0,
+        "rare": 0.59175,
+        "epic": 0.84815,
+        "legendary": 0.95665,
+        "mythic": 0.9862,
+        "transcendent": 0.9961
+      }
+    },
+    {
+      "name": "no-transcendent",
+      "mythic": true,
+      "transcendent": false,
+      "byRoll": [
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "rare",
+        "rare",
+        "rare",
+        "rare",
+        "rare",
+        "rare",
+        "epic",
+        "epic",
+        "mythic"
+      ],
+      "firstRollByRarity": {
+        "common": 0,
+        "rare": 0.5941,
+        "epic": 0.8515,
+        "legendary": 0.9604,
+        "mythic": 0.9901,
+        "transcendent": null
+      }
+    },
+    {
+      "name": "no-mythic",
+      "mythic": false,
+      "transcendent": false,
+      "byRoll": [
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "rare",
+        "rare",
+        "rare",
+        "rare",
+        "rare",
+        "epic",
+        "epic",
+        "legendary"
+      ],
+      "firstRollByRarity": {
+        "common": 0,
+        "rare": 0.60005,
+        "epic": 0.86005,
+        "legendary": 0.97005,
+        "mythic": null,
+        "transcendent": null
+      }
+    },
+    {
+      "name": "plain",
+      "mythic": true,
+      "transcendent": true,
+      "byRoll": [
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "common",
+        "rare",
+        "rare",
+        "rare",
+        "rare",
+        "rare",
+        "epic",
+        "epic",
+        "epic",
+        "common"
+      ],
+      "firstRollByRarity": {
+        "common": 0,
+        "rare": 0.59175,
+        "epic": 0.84815,
+        "legendary": 0.95665,
+        "mythic": 0.9862,
+        "transcendent": 0.9961
+      }
+    }
+  ],
+  "levelScaling": [
+    {
+      "playerLevel": 1,
+      "baseItemId": "w_warrior_blade",
+      "bonus": {
+        "strength": 2,
+        "vitality": 1,
+        "agility": 1,
+        "intelligence": 1
+      },
+      "bonusSum": 5
+    },
+    {
+      "playerLevel": 20,
+      "baseItemId": "w_warrior_blade",
+      "bonus": {
+        "strength": 4,
+        "vitality": 2,
+        "agility": 2,
+        "intelligence": 2,
+        "spirit": 1
+      },
+      "bonusSum": 11
+    },
+    {
+      "playerLevel": 200,
+      "baseItemId": "w_warrior_blade",
+      "bonus": {
+        "strength": 24,
+        "vitality": 12,
+        "agility": 13,
+        "intelligence": 11,
+        "spirit": 10
+      },
+      "bonusSum": 70
+    }
+  ],
+  "crafts": [
+    {
+      "name": "warrior-weapon",
+      "playerClass": "warrior",
+      "slot": "weapon",
+      "level": 30,
+      "forgeLevel": 0,
+      "scrapBefore": 135,
+      "goldBefore": 1807,
+      "item": {
+        "id": "eq_craft_1768478400000_5pj4iz",
+        "baseItemId": "w_warrior_blade",
+        "rarity": "common",
+        "itemLevel": 30,
+        "source": "craft",
+        "bonus": {
+          "strength": 5,
+          "vitality": 2,
+          "agility": 3,
+          "intelligence": 2,
+          "spirit": 2
+        }
+      },
+      "scrapAfter": 5,
+      "goldAfter": 7,
+      "draws": 8
+    },
+    {
+      "name": "warrior-armor",
+      "playerClass": "warrior",
+      "slot": "armor",
+      "level": 30,
+      "forgeLevel": 0,
+      "scrapBefore": 125,
+      "goldBefore": 1507,
+      "item": {
+        "id": "eq_craft_1768478400000_5pj4iz",
+        "baseItemId": "a_plate",
+        "rarity": "common",
+        "itemLevel": 30,
+        "source": "craft",
+        "bonus": {
+          "strength": 3,
+          "vitality": 4,
+          "agility": 3,
+          "intelligence": 1,
+          "spirit": 2
+        }
+      },
+      "scrapAfter": 5,
+      "goldAfter": 7,
+      "draws": 8
+    },
+    {
+      "name": "warrior-accessory",
+      "playerClass": "warrior",
+      "slot": "accessory",
+      "level": 30,
+      "forgeLevel": 0,
+      "scrapBefore": 105,
+      "goldBefore": 1207,
+      "item": {
+        "id": "eq_craft_1768478400000_5pj4iz",
+        "baseItemId": "tx_warrior_crown",
+        "rarity": "transcendent",
+        "itemLevel": 30,
+        "source": "craft",
+        "bonus": {
+          "strength": 42,
+          "vitality": 31,
+          "agility": 33,
+          "intelligence": 19,
+          "spirit": 25
+        }
+      },
+      "scrapAfter": 5,
+      "goldAfter": 7,
+      "draws": 8
+    },
+    {
+      "name": "berserker-weapon",
+      "playerClass": "berserker",
+      "slot": "weapon",
+      "level": 30,
+      "forgeLevel": 0,
+      "scrapBefore": 135,
+      "goldBefore": 1807,
+      "item": {
+        "id": "eq_craft_1768478400000_5pj4iz",
+        "baseItemId": "w_berserker_axe",
+        "rarity": "common",
+        "itemLevel": 30,
+        "source": "craft",
+        "bonus": {
+          "strength": 6,
+          "vitality": 4,
+          "agility": 3,
+          "intelligence": 2,
+          "spirit": 3
+        }
+      },
+      "scrapAfter": 5,
+      "goldAfter": 7,
+      "draws": 8
+    },
+    {
+      "name": "berserker-armor",
+      "playerClass": "berserker",
+      "slot": "armor",
+      "level": 30,
+      "forgeLevel": 0,
+      "scrapBefore": 125,
+      "goldBefore": 1507,
+      "item": {
+        "id": "eq_craft_1768478400000_5pj4iz",
+        "baseItemId": "ta_berserker_howl",
+        "rarity": "transcendent",
+        "itemLevel": 30,
+        "source": "craft",
+        "bonus": {
+          "strength": 50,
+          "vitality": 73,
+          "agility": 38,
+          "intelligence": 21,
+          "spirit": 31
+        }
+      },
+      "scrapAfter": 5,
+      "goldAfter": 7,
+      "draws": 8
+    },
+    {
+      "name": "berserker-accessory",
+      "playerClass": "berserker",
+      "slot": "accessory",
+      "level": 30,
+      "forgeLevel": 0,
+      "scrapBefore": 105,
+      "goldBefore": 1207,
+      "item": {
+        "id": "eq_craft_1768478400000_5pj4iz",
+        "baseItemId": "tx_berserker_heart",
+        "rarity": "transcendent",
+        "itemLevel": 30,
+        "source": "craft",
+        "bonus": {
+          "strength": 39,
+          "vitality": 37,
+          "agility": 31,
+          "intelligence": 16,
+          "spirit": 27
+        }
+      },
+      "scrapAfter": 5,
+      "goldAfter": 7,
+      "draws": 8
+    },
+    {
+      "name": "archer-weapon",
+      "playerClass": "archer",
+      "slot": "weapon",
+      "level": 30,
+      "forgeLevel": 0,
+      "scrapBefore": 135,
+      "goldBefore": 1807,
+      "item": {
+        "id": "eq_craft_1768478400000_5pj4iz",
+        "baseItemId": "w_archer_bow",
+        "rarity": "common",
+        "itemLevel": 30,
+        "source": "craft",
+        "bonus": {
+          "strength": 5,
+          "vitality": 2,
+          "agility": 4,
+          "intelligence": 1,
+          "spirit": 2
+        }
+      },
+      "scrapAfter": 5,
+      "goldAfter": 7,
+      "draws": 8
+    },
+    {
+      "name": "archer-armor",
+      "playerClass": "archer",
+      "slot": "armor",
+      "level": 30,
+      "forgeLevel": 0,
+      "scrapBefore": 125,
+      "goldBefore": 1507,
+      "item": {
+        "id": "eq_craft_1768478400000_5pj4iz",
+        "baseItemId": "a_leather",
+        "rarity": "common",
+        "itemLevel": 30,
+        "source": "craft",
+        "bonus": {
+          "strength": 2,
+          "vitality": 2,
+          "agility": 3,
+          "intelligence": 1,
+          "spirit": 2
+        }
+      },
+      "scrapAfter": 5,
+      "goldAfter": 7,
+      "draws": 8
+    },
+    {
+      "name": "archer-accessory",
+      "playerClass": "archer",
+      "slot": "accessory",
+      "level": 30,
+      "forgeLevel": 0,
+      "scrapBefore": 105,
+      "goldBefore": 1207,
+      "item": {
+        "id": "eq_craft_1768478400000_5pj4iz",
+        "baseItemId": "tx_archer_horizon",
+        "rarity": "transcendent",
+        "itemLevel": 30,
+        "source": "craft",
+        "bonus": {
+          "strength": 35,
+          "vitality": 24,
+          "agility": 53,
+          "intelligence": 11,
+          "spirit": 18
+        }
+      },
+      "scrapAfter": 5,
+      "goldAfter": 7,
+      "draws": 8
+    },
+    {
+      "name": "mage-weapon",
+      "playerClass": "mage",
+      "slot": "weapon",
+      "level": 30,
+      "forgeLevel": 0,
+      "scrapBefore": 135,
+      "goldBefore": 1807,
+      "item": {
+        "id": "eq_craft_1768478400000_5pj4iz",
+        "baseItemId": "tw_mage_axiom",
+        "rarity": "transcendent",
+        "itemLevel": 30,
+        "source": "craft",
+        "bonus": {
+          "strength": 35,
+          "vitality": 50,
+          "agility": 18,
+          "intelligence": 98,
+          "spirit": 65
+        }
+      },
+      "scrapAfter": 5,
+      "goldAfter": 7,
+      "draws": 8
+    },
+    {
+      "name": "mage-armor",
+      "playerClass": "mage",
+      "slot": "armor",
+      "level": 30,
+      "forgeLevel": 0,
+      "scrapBefore": 125,
+      "goldBefore": 1507,
+      "item": {
+        "id": "eq_craft_1768478400000_5pj4iz",
+        "baseItemId": "ta_mage_singularity",
+        "rarity": "transcendent",
+        "itemLevel": 30,
+        "source": "craft",
+        "bonus": {
+          "strength": 22,
+          "vitality": 70,
+          "agility": 17,
+          "intelligence": 62,
+          "spirit": 62
+        }
+      },
+      "scrapAfter": 5,
+      "goldAfter": 7,
+      "draws": 8
+    },
+    {
+      "name": "mage-accessory",
+      "playerClass": "mage",
+      "slot": "accessory",
+      "level": 30,
+      "forgeLevel": 0,
+      "scrapBefore": 105,
+      "goldBefore": 1207,
+      "item": {
+        "id": "eq_craft_1768478400000_5pj4iz",
+        "baseItemId": "tx_mage_paradox",
+        "rarity": "transcendent",
+        "itemLevel": 30,
+        "source": "craft",
+        "bonus": {
+          "strength": 17,
+          "vitality": 34,
+          "agility": 13,
+          "intelligence": 47,
+          "spirit": 49
+        }
+      },
+      "scrapAfter": 5,
+      "goldAfter": 7,
+      "draws": 8
+    },
+    {
+      "name": "monk-weapon",
+      "playerClass": "monk",
+      "slot": "weapon",
+      "level": 30,
+      "forgeLevel": 0,
+      "scrapBefore": 135,
+      "goldBefore": 1807,
+      "item": {
+        "id": "eq_craft_1768478400000_5pj4iz",
+        "baseItemId": "tw_monk_resonance",
+        "rarity": "transcendent",
+        "itemLevel": 30,
+        "source": "craft",
+        "bonus": {
+          "strength": 53,
+          "vitality": 50,
+          "agility": 28,
+          "intelligence": 57,
+          "spirit": 45
+        }
+      },
+      "scrapAfter": 5,
+      "goldAfter": 7,
+      "draws": 8
+    },
+    {
+      "name": "monk-armor",
+      "playerClass": "monk",
+      "slot": "armor",
+      "level": 30,
+      "forgeLevel": 0,
+      "scrapBefore": 125,
+      "goldBefore": 1507,
+      "item": {
+        "id": "eq_craft_1768478400000_5pj4iz",
+        "baseItemId": "ta_monk_equilibrium",
+        "rarity": "transcendent",
+        "itemLevel": 30,
+        "source": "craft",
+        "bonus": {
+          "strength": 33,
+          "vitality": 68,
+          "agility": 25,
+          "intelligence": 35,
+          "spirit": 42
+        }
+      },
+      "scrapAfter": 5,
+      "goldAfter": 7,
+      "draws": 8
+    },
+    {
+      "name": "monk-accessory",
+      "playerClass": "monk",
+      "slot": "accessory",
+      "level": 30,
+      "forgeLevel": 0,
+      "scrapBefore": 105,
+      "goldBefore": 1207,
+      "item": {
+        "id": "eq_craft_1768478400000_5pj4iz",
+        "baseItemId": "tx_monk_cycle",
+        "rarity": "transcendent",
+        "itemLevel": 30,
+        "source": "craft",
+        "bonus": {
+          "strength": 27,
+          "vitality": 37,
+          "agility": 22,
+          "intelligence": 29,
+          "spirit": 35
+        }
+      },
+      "scrapAfter": 5,
+      "goldAfter": 7,
+      "draws": 8
+    },
+    {
+      "name": "too-poor",
+      "playerClass": "warrior",
+      "slot": "weapon",
+      "level": 30,
+      "forgeLevel": 0,
+      "scrapBefore": 129,
+      "goldBefore": 1800,
+      "item": null,
+      "scrapAfter": 129,
+      "goldAfter": 1800,
+      "draws": 0
+    },
+    {
+      "name": "inventory-full",
+      "playerClass": "warrior",
+      "slot": "weapon",
+      "level": 30,
+      "forgeLevel": 0,
+      "scrapBefore": 130,
+      "goldBefore": 1800,
+      "item": null,
+      "scrapAfter": 130,
+      "goldAfter": 1800,
+      "draws": 0
+    },
+    {
+      "name": "forge-ten",
+      "playerClass": "warrior",
+      "slot": "weapon",
+      "level": 30,
+      "forgeLevel": 10,
+      "scrapBefore": 130,
+      "goldBefore": 1800,
+      "item": {
+        "id": "eq_craft_1768478400000_5pj4iz",
+        "baseItemId": "w_warrior_blade",
+        "rarity": "common",
+        "itemLevel": 30,
+        "source": "craft",
+        "bonus": {
+          "strength": 6,
+          "vitality": 3,
+          "agility": 3,
+          "intelligence": 3,
+          "spirit": 3
+        }
+      },
+      "scrapAfter": 0,
+      "goldAfter": 0,
+      "draws": 8
+    }
+  ],
+  "scrapGains": [
+    {
+      "name": "catalog-common",
+      "rarity": "common",
+      "source": null,
+      "gain": 10
+    },
+    {
+      "name": "catalog-rare",
+      "rarity": "rare",
+      "source": null,
+      "gain": 24
+    },
+    {
+      "name": "catalog-epic",
+      "rarity": "epic",
+      "source": null,
+      "gain": 60
+    },
+    {
+      "name": "catalog-legendary",
+      "rarity": "legendary",
+      "source": null,
+      "gain": 160
+    },
+    {
+      "name": "catalog-mythic",
+      "rarity": "mythic",
+      "source": null,
+      "gain": 360
+    },
+    {
+      "name": "catalog-transcendent",
+      "rarity": "transcendent",
+      "source": null,
+      "gain": 760
+    }
+  ],
+  "equips": [
+    {
+      "name": "own-class",
+      "itemId": "w_warrior_blade",
+      "playerClass": "warrior",
+      "inInventory": true,
+      "equippedAfter": {
+        "weapon": "w_warrior_blade",
+        "armor": null,
+        "accessory": null
+      }
+    },
+    {
+      "name": "wrong-class",
+      "itemId": "w_mage_staff",
+      "playerClass": "warrior",
+      "inInventory": true,
+      "equippedAfter": {
+        "weapon": null,
+        "armor": null,
+        "accessory": null
+      }
+    },
+    {
+      "name": "not-owned",
+      "itemId": "w_warrior_hammer",
+      "playerClass": "warrior",
+      "inInventory": false,
+      "equippedAfter": {
+        "weapon": null,
+        "armor": null,
+        "accessory": null
+      }
+    },
+    {
+      "name": "not-in-catalog",
+      "itemId": "w_nonexistent",
+      "playerClass": "warrior",
+      "inInventory": true,
+      "equippedAfter": {
+        "weapon": null,
+        "armor": null,
+        "accessory": null
+      }
+    },
+    {
+      "name": "replaces-the-slot",
+      "itemId": "w_warrior_hammer",
+      "playerClass": "warrior",
+      "inInventory": true,
+      "equippedAfter": {
+        "weapon": "w_warrior_hammer",
+        "armor": null,
+        "accessory": null
+      }
+    }
+  ],
+  "dismantles": [
+    {
+      "name": "benched",
+      "itemId": "w_warrior_hammer",
+      "equipped": false,
+      "scrapBefore": 100,
+      "scrapAfter": 124,
+      "inventoryAfter": [
+        "w_warrior_blade"
+      ]
+    },
+    {
+      "name": "worn",
+      "itemId": "w_warrior_blade",
+      "equipped": true,
+      "scrapBefore": 100,
+      "scrapAfter": 100,
+      "inventoryAfter": [
+        "w_warrior_blade",
+        "w_warrior_hammer"
+      ]
+    }
+  ],
+  "autoDismantles": [
+    {
+      "name": "floor-common",
+      "floor": "common",
+      "inventory": [
+        "w_warrior_blade",
+        "w_warrior_hammer",
+        "a_plate",
+        "x_warrior_signet"
+      ],
+      "equipped": [
+        "w_warrior_blade"
+      ],
+      "scrapBefore": 0,
+      "scrapAfter": 10,
+      "inventoryAfter": [
+        "w_warrior_blade",
+        "w_warrior_hammer",
+        "x_warrior_signet"
+      ]
+    },
+    {
+      "name": "floor-epic",
+      "floor": "epic",
+      "inventory": [
+        "w_warrior_blade",
+        "w_warrior_hammer",
+        "a_plate",
+        "x_warrior_signet"
+      ],
+      "equipped": [
+        "w_warrior_blade"
+      ],
+      "scrapBefore": 0,
+      "scrapAfter": 58,
+      "inventoryAfter": [
+        "w_warrior_blade"
+      ]
+    }
+  ],
+  "upgrades": [
+    {
+      "name": "common-to-rare",
+      "fromItemId": "w_warrior_blade",
+      "scrapBefore": 100000,
+      "essenceBefore": 500,
+      "goldBefore": 5000000,
+      "result": {
+        "baseItemId": "w_warrior_hammer",
+        "rarity": "rare",
+        "itemLevel": 1,
+        "source": "upgrade"
+      },
+      "scrapAfter": 99920,
+      "essenceAfter": 500,
+      "goldAfter": 4998600,
+      "equippedAfter": {
+        "weapon": null,
+        "armor": null,
+        "accessory": null
+      },
+      "draws": 7
+    },
+    {
+      "name": "common-to-rare-worn",
+      "fromItemId": "w_warrior_blade",
+      "scrapBefore": 100000,
+      "essenceBefore": 500,
+      "goldBefore": 5000000,
+      "result": {
+        "baseItemId": "w_warrior_hammer",
+        "rarity": "rare",
+        "itemLevel": 1,
+        "source": "upgrade"
+      },
+      "scrapAfter": 99920,
+      "essenceAfter": 500,
+      "goldAfter": 4998600,
+      "equippedAfter": {
+        "weapon": "eq_upgrade_1768478400000_zp91rf",
+        "armor": null,
+        "accessory": null
+      },
+      "draws": 7
+    },
+    {
+      "name": "too-poor",
+      "fromItemId": "w_warrior_blade",
+      "scrapBefore": 0,
+      "essenceBefore": 0,
+      "goldBefore": 0,
+      "result": null,
+      "scrapAfter": 0,
+      "essenceAfter": 0,
+      "goldAfter": 0,
+      "equippedAfter": {
+        "weapon": null,
+        "armor": null,
+        "accessory": null
+      },
+      "draws": 1
+    }
+  ],
+  "conversions": [
+    {
+      "name": "essence-one",
+      "kind": "CONVERT_SCRAP_TO_ESSENCE",
+      "count": null,
+      "metaLevels": {
+        "damage": 0,
+        "economy": 0,
+        "survival": 0
+      },
+      "scrapBefore": 1000,
+      "scrapAfter": 400,
+      "essenceAfter": 1,
+      "shardsAfter": 0
+    },
+    {
+      "name": "essence-three",
+      "kind": "CONVERT_SCRAP_TO_ESSENCE",
+      "count": 3,
+      "metaLevels": {
+        "damage": 0,
+        "economy": 0,
+        "survival": 0
+      },
+      "scrapBefore": 5000,
+      "scrapAfter": 3200,
+      "essenceAfter": 3,
+      "shardsAfter": 0
+    },
+    {
+      "name": "essence-over-asked",
+      "kind": "CONVERT_SCRAP_TO_ESSENCE",
+      "count": 99,
+      "metaLevels": {
+        "damage": 0,
+        "economy": 0,
+        "survival": 0
+      },
+      "scrapBefore": 1500,
+      "scrapAfter": 300,
+      "essenceAfter": 2,
+      "shardsAfter": 0
+    },
+    {
+      "name": "essence-meta-priced",
+      "kind": "CONVERT_SCRAP_TO_ESSENCE",
+      "count": 1,
+      "metaLevels": {
+        "damage": 5,
+        "economy": 5,
+        "survival": 5
+      },
+      "scrapBefore": 2000,
+      "scrapAfter": 800,
+      "essenceAfter": 1,
+      "shardsAfter": 0
+    },
+    {
+      "name": "essence-too-poor",
+      "kind": "CONVERT_SCRAP_TO_ESSENCE",
+      "count": 1,
+      "metaLevels": {
+        "damage": 0,
+        "economy": 0,
+        "survival": 0
+      },
+      "scrapBefore": 599,
+      "scrapAfter": 599,
+      "essenceAfter": 0,
+      "shardsAfter": 0
+    },
+    {
+      "name": "shards-one",
+      "kind": "CONVERT_SCRAP_TO_SHARDS",
+      "count": null,
+      "metaLevels": {
+        "damage": 0,
+        "economy": 0,
+        "survival": 0
+      },
+      "scrapBefore": 1000,
+      "scrapAfter": 820,
+      "essenceAfter": 0,
+      "shardsAfter": 140
+    },
+    {
+      "name": "shards-over-asked",
+      "kind": "CONVERT_SCRAP_TO_SHARDS",
+      "count": 99,
+      "metaLevels": {
+        "damage": 0,
+        "economy": 0,
+        "survival": 0
+      },
+      "scrapBefore": 500,
+      "scrapAfter": 140,
+      "essenceAfter": 0,
+      "shardsAfter": 280
+    },
+    {
+      "name": "shards-too-poor",
+      "kind": "CONVERT_SCRAP_TO_SHARDS",
+      "count": 1,
+      "metaLevels": {
+        "damage": 0,
+        "economy": 0,
+        "survival": 0
+      },
+      "scrapBefore": 179,
+      "scrapAfter": 179,
+      "essenceAfter": 0,
+      "shardsAfter": 0
+    }
+  ],
+  "worn": [
+    {
+      "name": "nothing",
+      "equipped": {
+        "weapon": null,
+        "armor": null,
+        "accessory": null
+      },
+      "bonus": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      }
+    },
+    {
+      "name": "starter-warrior",
+      "equipped": {
+        "weapon": "w_warrior_blade",
+        "armor": "a_plate",
+        "accessory": "x_warrior_signet"
+      },
+      "bonus": {
+        "strength": 4,
+        "vitality": 5,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 1
+      }
+    },
+    {
+      "name": "weapon-only",
+      "equipped": {
+        "weapon": "w_warrior_hammer",
+        "armor": null,
+        "accessory": null
+      },
+      "bonus": {
+        "strength": 4,
+        "vitality": 2,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      }
+    },
+    {
+      "name": "missing-item",
+      "equipped": {
+        "weapon": "w_nonexistent",
+        "armor": null,
+        "accessory": null
+      },
+      "bonus": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      }
+    }
+  ]
+}

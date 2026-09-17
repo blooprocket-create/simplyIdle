@@ -356,7 +356,41 @@ What this does *not* settle is what a genuinely new player should start with. Th
 ### Phase 9 — Equipment *(~2 weeks)*
 `EQUIP_ITEM`, `TOGGLE_EQUIP_HERO`, `CRAFT_EQUIPMENT`, `DISMANTLE_EQUIPMENT`, `UPGRADE_EQUIPMENT_RARITY`, `CONVERT_SCRAP_TO_ESSENCE`, `CONVERT_SCRAP_TO_SHARDS`, `TOGGLE_HERO_UNIQUE_WEAPON`. Content: `EQUIPMENT_CATALOG`, `EQUIPMENT_RARITIES`.
 
-Unlocks `equipBest` and `dismantle`.
+**Done, and on a screen.** The catalogue's seventy-five items and six rarities, the rarity roll and its tier gates, the stat roll, the scrap rates, the forge's prices, all eight actions, the save slice, and an Equipment surface that reaches every one of them. `TOGGLE_EQUIP_HERO` is the exception and is *not* about equipment at all: it fields or benches one hero, which `fieldTeam` already did in Phase 8.
+
+The strongest claim here is the stat roll: **every crafted item the fixture recorded is reproduced bonus for bonus**, across all fifteen class-and-slot combinations plus a forge level and three player levels, from one seed. A craft draws eight values in a fixed order — the rarity, the pick, the instance id, then one per stat — and the id comes *before* the bonus, which is the whole reason `createEquipmentInstance` is one function rather than two calls at a seam.
+
+#### Five shipped behaviours ported deliberately
+
+| | |
+| --- | --- |
+| **A roll of exactly 1 returns `common`** | The subtractions leave ~7e-15 above zero for the full table, so the loop ends and the trailing fallback fires: the best possible roll gives the worst item. The gated pools do *not* do it, which is what shows it to be float residue rather than a guard. |
+| **A locked tier pushes every boundary up** | The filter removes weight from the *denominator*, so legendary starts at 0.97 with mythic locked against 0.9566 without — and then runs to the ceiling, which is the actual effect. |
+| **An unaffordable upgrade still draws a value** | `getEquipmentUpgradePlan` picks its target before the purse is checked. A summon, a spark exchange and a craft all refuse before touching the dice; this one does not. |
+| **The last stat takes the remainder** | Rounding each share independently never spends the budget exactly. And the authored stats are floored at one *afterwards*, which can push the total above it — that floor is why an item always shows the stats its description promises. |
+| **The relic toggle re-derives its bearer** | `TOGGLE_HERO_UNIQUE_WEAPON` takes a uid to find the *template*, then equips the preferred copy — so pressing on a weak copy hands the relic to the best one, and a relic sitting on an old copy **moves** rather than coming off. Two presses to remove. |
+
+#### A finding from the catalogue rather than the code
+
+I wrote that the upgrade plan's per-step multipliers never bite. **They bite constantly.** Every class has five items per slot across six rarities, so every class-and-slot pair is missing exactly one — the warrior's weapons have no epic, the mage's armour has neither common nor rare. A warrior upgrading a rare weapon lands on legendary, two steps, at 1.55× the scrap. A port that took one step and refused on an empty pool would refuse the most ordinary upgrade in the game — and the same gap is why a craft's rolled rarity is a *preference*: with no item at that rarity the pick falls back to the whole class and slot, so one craft in six hands over something other than what was rolled.
+
+A second one from the catalogue: **a starter set is not three commons.** No accessory is common, so every class starts with a rare there — and the mage with an *epic*, the strongest starter item in the game. That falls out of "sort by rarity and take the first" rather than being chosen.
+
+#### The equipment term, connected
+
+`derivedStats` has taken an equipment argument since Phase 7 with a note saying "Phase 9 adds a caller rather than editing it". That caller is `app/roster.ts`, and it feeds **all three** places the player's stats reach the fight at once — their damage, the team's defence and the team's health — because the shipped `derivedStats` is one function and all three read it. It joins the fight signature for free, since the signature is derived from the built roster rather than from a list of save fields.
+
+The starting save wears its class's starter set as three rolled **instances**, which is what `CREATE_CHARACTER` builds: an instance's stats are rolled against a level rather than taken from the row's authored bonus, and `source: 'starter'` prices them at a fifth when dismantled.
+
+And a pre-instance inventory is converted at the **app layer**, at load, because the shipped `migrateLegacyEquipmentIds` draws *and* reads the catalogue and the engine's reader may do neither. Not cosmetic: a bare row carries its authored three or four points where the instance it becomes is rolled against the player's level — at level 100, an order of magnitude more.
+
+#### The automation line above was wrong, again, and differently
+
+It said this phase unlocks `equipBest` and `dismantle`. Both flags stay `available: false`, and the reason is worth recording because it is the same reason `summon` and `recycle` are still off.
+
+`equipBest` is misnamed: `AUTO_EQUIP_BEST_HEROES` has nothing to do with equipment — it sorts the roster and fields the strongest, which is a Phase 8 roster verb. And `dismantle` runs off the shipped combat tick, so in this build it would run off a snapshot subscription in the shell.
+
+Which is the actual blocker, and it is structural: **every remaining automation touches the save rather than the simulation**, and `ui/architecture.test.ts` gates automations by requiring the shell to call `loopRef.setAuto…` for each one marked available. That gate is exactly right for `burst`, which is an in-fight behaviour, and has no shape for an automation that spends currency or rearranges a roster. Widening it once, for all four, belongs with Phase 10 — where `summon` and `recycle` already wait, and for the same reason. Forcing one through now would mean satisfying the test's regex rather than its intent.
 
 ### Phase 10 — The economy *(~3 weeks)*
 Shops and everything spendable: `BUY_GOLD_SHOP_ITEM`, `BUY_DIAMOND_SHOP_ITEM`, `BUY_PREMIUM_COOLANT`, `USE_USABLE_ITEM`, `SIMULATE_DOLLAR_PURCHASE`; skills via `BUY_SKILL` and `CAST_HERO_ACTIVE`; prestige via `REBIRTH`, `SPEND_REBIRTH_CORE`, `SPEND_ESSENCE_UPGRADE`, `UPGRADE_FACILITY`; VIP via `CLAIM_VIP_REWARD`, `CLAIM_CODEX_HERO_VIP`, `CLAIM_CODEX_UNIQUE_VIP`. Content: `USABLE_ITEMS`, `SKILLS`, `REBIRTH_BONUS`, `REBIRTH_WAVE_THRESHOLD`, `COST_SCALE`, `GIFT_AMOUNTS`.

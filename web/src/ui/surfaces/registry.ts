@@ -4,6 +4,7 @@ import { AchievementsSurface } from './AchievementsSurface';
 import { CampaignSurface } from './CampaignSurface';
 import { CharacterSurface } from './CharacterSurface';
 import { CodexSurface } from './CodexSurface';
+import { EquipmentSurface } from './EquipmentSurface';
 import { PartySurface } from './PartySurface';
 import { RosterSurface } from './RosterSurface';
 import { SettingsSurface } from './SettingsSurface';
@@ -25,6 +26,7 @@ import type { SurfaceProps } from './SurfaceProps';
 export const SURFACES: Partial<Record<string, ComponentType<SurfaceProps>>> = {
   achievements: AchievementsSurface,
   character: CharacterSurface,
+  equipment: EquipmentSurface,
   party: PartySurface,
   campaign: CampaignSurface,
   roster: RosterSurface,
