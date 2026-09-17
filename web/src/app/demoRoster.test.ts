@@ -3,8 +3,14 @@ import { heroTemplatesById } from '../content/heroes';
 import { VALID_FORMATION_ROLES_FOR_CLASS, type FormationRole } from '../engine/combat/formation';
 import { ACTIVE_TEAM_SIZE } from '../engine/save/migrate';
 import { readSave, writeSaveV3 } from '../engine/save/v3';
-import { demoSimulationOptions, startingRoster, startingSave } from './demoRoster';
+import { demoSimulationOptions, startingSave } from './demoRoster';
 import { rosterFromSave } from './roster';
+
+/**
+ * The three shapes, from the one save. `App` composes these itself — there is
+ * no `startingRoster` any more, because a save and a reader is the whole of it.
+ */
+const startingRoster = (nowMs: number) => rosterFromSave(startingSave(nowMs));
 
 /**
  * The starting save.

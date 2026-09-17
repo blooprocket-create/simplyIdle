@@ -1,11 +1,15 @@
 import Decimal from 'break_eternity.js';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Diorama } from '../game/Diorama';
 import { detectCapabilities, profileFor } from '../game/device/DeviceProfile';
 import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
-import { demoSimulationOptions, startingRoster } from './demoRoster';
+import { demoSimulationOptions, startingSave } from './demoRoster';
+import { canSummon, priceOfSummon, summonOnce } from './playerActions';
 import { rosterFromSave } from './roster';
-import { loadSave } from './saveStore';
+import { loadSave, writeSave } from './saveStore';
+import type { SaveV3 } from '../engine/save/schema';
+import type { SummonPayment } from '../engine/roster/summonSave';
+import { profileFromSave } from '../ui/profile/playerProfile';
 import { GameLoop } from './GameLoop';
 import { loadRun, RunSaver } from './runStore';
 import { browserStore } from '../ui/prefs/store';
@@ -45,25 +49,33 @@ export function App() {
   // Built once: the profile is what does *not* change per frame, which is the
   // whole reason it is a separate read model from the snapshot.
   /*
-   * The player's team, from their save when they have one.
-   *
-   * Read once, because none of it changes per frame — which is the whole
-   * reason it is a separate read model from the snapshot. A player with no
-   * save gets the starting team instead; both branches return the same
-   * shape, so nothing downstream knows which it got.
+   * The player's save, read once and then owned here.
    *
    * A lazy `useState` rather than a `useMemo`, because reading a save and
    * reading a clock are both impure and `useMemo` is allowed to re-run or
-   * throw its result away. This runs exactly once, which is also what makes
-   * it safe in the loop effect's dependencies below.
+   * throw its result away. A player with no save gets the starting one, which
+   * is a `SaveV3` like any other — so nothing downstream knows which it got.
    */
-  const [roster] = useState(() => {
+  const [initialSave] = useState(() => {
     const nowMs = Date.now();
-    const save = loadSave(browserStore(), nowMs);
-    return save === null ? startingRoster(nowMs) : rosterFromSave(save);
+    return loadSave(browserStore(), nowMs) ?? startingSave(nowMs);
   });
+  const [save, setSave] = useState<SaveV3>(initialSave);
+
+  /*
+   * The fight's inputs, from the save the session *began* with, and
+   * deliberately not re-derived when the save changes.
+   *
+   * They are in the loop effect's dependencies, so rebuilding them tears down
+   * the diorama and restarts the run from wave one — which is what summoning a
+   * hero would do if the whole roster were one value. A summon adds to the
+   * bench; fielding them is a different verb and will need the loop to be told
+   * rather than rebuilt.
+   */
+  const [roster] = useState(() => rosterFromSave(initialSave));
   const cast = roster.cast;
-  const profile = roster.profile;
+  // Rebuilt whenever the save moves, which is what makes a summon show up.
+  const profile = useMemo(() => profileFromSave(save), [save]);
   /*
    * Detected once and shared with the renderer, rather than detected again
    * inside it. Two detections could disagree — `matchMedia` is live, and a
@@ -100,6 +112,33 @@ export function App() {
    */
   const autoBurst = automation.active.has('burst');
   const autoBurstRef = useRef(autoBurst);
+
+  /*
+   * Change the save, and write it down.
+   *
+   * Written synchronously rather than on a timer, because the things that
+   * change it are single deliberate acts — a summon, a level-up — and losing
+   * one to a closed tab is losing something the player paid for. The *run* is
+   * throttled instead; see `RunSaver`, which is recording sixty frames a
+   * second rather than one press.
+   */
+  const applySave = useCallback((next: SaveV3) => {
+    setSave(next);
+    writeSave(browserStore(), next);
+  }, []);
+
+  const actions = useMemo(
+    () => ({
+      summon: (pay: SummonPayment) => {
+        const outcome = summonOnce({ save, pay, nowMs: Date.now(), random: Math.random });
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      canSummon: (pay: SummonPayment) => canSummon(save, pay),
+      priceOfSummon: (pay: SummonPayment) => priceOfSummon(save, pay),
+    }),
+    [save, applySave],
+  );
 
   const select = (id: string) => {
     if (id === 'more') {
@@ -205,6 +244,8 @@ export function App() {
         device={device}
         pinnedIds={pinnedIds}
         automation={automation}
+        actions={actions}
+        save={save}
         onDismiss={() => setOpenId(null)}
       />
       {railOpen && (

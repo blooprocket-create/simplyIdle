@@ -1,8 +1,8 @@
 import { HERO_TEMPLATE_COUNT } from '../../content/heroes';
-import type { Rarity } from '../../content/rarities';
 import { CLASS_COPY } from '../copy/classes';
+import { RARITY_TONE } from '../copy/rarities';
 import type { SurfaceProps } from './SurfaceProps';
-import { Card, Cards, Empty, Row, Rows, Section, Tag, type Tone } from './parts/parts';
+import { Card, Cards, Empty, Row, Rows, Section, Tag } from './parts/parts';
 
 /**
  * Every hero the player owns. A `ledger`: the one archetype that really runs
@@ -12,25 +12,6 @@ import { Card, Cards, Empty, Row, Rows, Section, Tag, type Tone } from './parts/
  * strongest — because a roster that sorts differently depending on which
  * screen you opened it from is a roster nobody can learn.
  */
-
-/**
- * Rarity as a tone. Deliberately coarse: the token sheet has a closed set of
- * meanings and eight rarities may not each claim one, so they group.
- *
- * Keyed off the rarity rather than the hero's tier — an earlier version used
- * tier, which is a different axis, so every tag came out the same colour
- * while the label underneath said otherwise.
- */
-const RARITY_TONE: Record<Rarity, Tone> = {
-  common: 'neutral',
-  uncommon: 'neutral',
-  rare: 'good',
-  epic: 'good',
-  legendary: 'gold',
-  mythic: 'gold',
-  godly: 'warn',
-  transcendent: 'warn',
-};
 
 export function RosterSurface({ profile }: SurfaceProps) {
   if (profile.roster.length === 0) {

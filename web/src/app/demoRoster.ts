@@ -4,7 +4,6 @@ import type { FormationRole } from '../engine/combat/formation';
 import type { Rarity } from '../content/rarities';
 import { readSave } from '../engine/save/v3';
 import type { SaveV3 } from '../engine/save/schema';
-import { rosterFromSave, type LoadedRoster } from './roster';
 
 /**
  * The team a player starts on, and what they see before they have a save.
@@ -140,11 +139,6 @@ export function startingSave(nowMs: number): SaveV3 {
   };
 
   return readSave(payload, { nowMs, content: { heroesById: heroTemplatesById() } });
-}
-
-/** The starting save, in the three shapes the app needs it in. */
-export function startingRoster(nowMs: number): LoadedRoster {
-  return rosterFromSave(startingSave(nowMs));
 }
 
 /**
