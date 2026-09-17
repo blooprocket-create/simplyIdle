@@ -1,0 +1,60 @@
+/* The reveal. A `moment` takes the screen, so this is the thing on it. */
+.reveal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+  text-align: center;
+}
+
+.portrait {
+  font-size: 56px;
+  line-height: 1;
+}
+
+.name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.aside {
+  color: var(--ink-dim);
+  font-size: 11px;
+}
+
+/* The two prices, side by side. Not a card grid: a `moment` does not scroll. */
+.buys {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: center;
+}
+
+.buy {
+  flex: 1 1 0;
+  padding: var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--raised);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.buy:disabled {
+  color: var(--ink-dim);
+  cursor: not-allowed;
+}
+
+.buy:focus-visible {
+  outline: 2px solid var(--ready);
+  outline-offset: 2px;
+}
+
+/* A pull that costs nothing reads differently from one that costs money. */
+.free {
+  border-color: var(--ready);
+  color: var(--ready);
+}

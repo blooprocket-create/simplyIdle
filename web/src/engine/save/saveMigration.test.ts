@@ -76,6 +76,18 @@ describe('the codec for numbers JSON cannot hold', () => {
     const serialized = JSON.stringify(fixture.cases.find(entry => entry.name === 'hostile'));
     expect(serialized).toContain('__NaN__');
   });
+
+  it('has a case whose summon counters are not all zero', () => {
+    /*
+     * Same reasoning, for the slice Phase 8 claimed. Every other case carries
+     * a pity counter of zero and no milestones, so the round-trip law and the
+     * comparison below would both hold for a reader that returned constants.
+     */
+    const midGacha = fixture.cases.find(entry => entry.name === 'mid-gacha');
+    expect(midGacha?.expected.summon.pityCounter).toBeGreaterThan(0);
+    expect(midGacha?.expected.summon.claimedMilestones.length).toBeGreaterThan(0);
+    expect(midGacha?.expected.summon.guaranteedMinRarity).not.toBeNull();
+  });
 });
 
 describe('migrating every fixture case', () => {
@@ -90,6 +102,7 @@ describe('migrating every fixture case', () => {
         progression: result.progression,
         stats: result.stats,
         wallet: result.wallet,
+        summon: result.summon,
         roster: result.roster,
         lastActiveAt: result.awayAtMs,
       }).toEqual({
@@ -98,6 +111,7 @@ describe('migrating every fixture case', () => {
         progression: entry.expected.progression,
         stats: entry.expected.stats,
         wallet: entry.expected.wallet,
+        summon: entry.expected.summon,
         roster: entry.expected.roster,
         lastActiveAt: entry.expected.lastActiveAt,
       });

@@ -230,22 +230,128 @@ Everything you can click in the rewrite today: spend BURST, answer a wipe, answe
 
 The phases below end at parity. They are ordered by what unblocks what, not by what is fun — the first two are unglamorous and everything else waits on them.
 
-### Phase 6 — The save round-trip *(~2 weeks)*
-A v3 reader that bounds a stored payload as hard as `migrateSave` bounds a v2 one, the writer to pair with it, and the Firebase adapter behind `ports/SavePort`. `saveStore.ts` deliberately ships without a writer today because `migrateSave` reads the *v2* shape and would silently empty a v3 payload.
+### Phase 6 — The save round-trip *(~2 weeks)* — **done, bar one binding**
+A v3 reader that bounds a stored payload as hard as `migrateSave` bounds a v2 one, the writer to pair with it, and the adapter behind `ports/SavePort`. `saveStore.ts` shipped read-only because `migrateSave` reads the *v2* shape and would silently empty a v3 payload.
 
 **Everything downstream needs this.** Without it no system below can persist what it changes, and returning accounts cannot reach their saves — which is the sole reason `/legacy` cannot be retired.
 
-### Phase 7 — The character *(~2 weeks)*
-`ALLOCATE_STAT`, `ALLOCATE_STAT_N`, `ALLOCATE_STAT_MAX`, `CREATE_CHARACTER`. With them the missing engine layer underneath: `derivedStats`, and the four multipliers `getTeamMaxHp` needs that this engine does not have — `getRankMultiplier`, `getMetaSurvivalMultiplier`, `getRebirthSurvivalMultiplier`, plus the mastery and tactics stacks. Team health is a flat `2000` until this lands, so every later balance number is unanchored.
+Delivered: `engine/save/v3.ts` (reader, writer, version dispatcher), `engine/save/legacyPayload.ts` (the trip back to v2), `ports/remoteSave.ts` (the save documents), `saveStore.writeSave`. The bounding is *shared* with the migration rather than restated, so "as hard as" is a fact about the call graph.
 
-Fixture-backed like the Phase 1 ports, against `useGameState`, before anything reads them.
+Three bugs the round-trip laws caught, none visible by reading the code:
+
+- **Unspent stat points inflated on every load.** v2 stores `unspentStatPoints` as a pool held *on top of* the level budget; a `SaveV3` has already done that sum. A level-100 character would gain 495 points by loading their own save, and again on the next load.
+- **The shipped game re-equips a relic you took off.** `equippedByUid: null` does not mean "unequipped" to `sanitizeSaveData` — it tests for a string first and falls through to `boundedBoolean(equipped, true)`, and its own writer stopped emitting that flag.
+- **Writing v3 into the shared document is silent, not loud.** The shipped reader is total, so it reads a `SaveV3` as a valid save with nothing in it and hands the player a new account.
+
+**Not done, and moved to Phase 12:** binding `SaveDocStore` to `firebase/firestore`. `users/{uid}/saveSlots/{slot}` needs a uid and the rewrite has no auth at all, so that binding would be a dependency and a file nothing could exercise, added in front of the thing it waits on. Around thirty lines once `onlineAuth` lands.
+
+### Phase 7 — The character *(~2 weeks)* — **done**
+`ALLOCATE_STAT`, `ALLOCATE_STAT_N`, `ALLOCATE_STAT_MAX`, `CREATE_CHARACTER`, and the engine layer underneath: `derivedStats`, `getMetaSurvivalMultiplier`, `getRebirthSurvivalMultiplier`, the mastery ceiling and the tactics stack. Team health was a flat `2000` with a note saying nothing derived it, which left every later balance number unanchored.
+
+Fixture-backed like the Phase 1 ports, against `useGameState`, before anything read them.
+
+Two shipped details pinned because they are easy to miss by reading quickly: heroes contribute their **class** base vitality, not their template's — `computeStats` prefers the template for display and `getTeamMaxHp` never does — and the six multipliers compose by multiplication, which is within a few percent of addition at low levels and wrong by a lot in the deep game.
+
+One deliberate divergence: `ALLOCATE_STAT_N` computes `Math.min(amount, unspent)` with no floor, so a negative amount adds points back and drives the stat below zero, repeatable. Nothing sends one today, but these are engine functions now rather than one component's private handler. The fixture records the shipped behaviour and the port clamps at zero.
+
+Class mastery and the tactics facility are **read** out of the `legacy` bag rather than claimed: claiming a key changes every stored save's meaning, and both belong to the phases that own the systems granting them.
+
+The starting team lands on **843** against the old 2000, and still climbs into the forties within a minute and sawtooths there — which the derivation was not tuned to preserve.
+
+Equipment is the one term still missing from `derivedStats`; it is Phase 9, and the function takes it as an argument so that phase adds a caller rather than editing it.
 
 ### Phase 8 — The roster *(~3 weeks)*
 Summoning and everything that shapes a team: `SUMMON_HERO` with banners, rate-ups, soft pity and milestones; `SPARK_EXCHANGE`; `LEVEL_UP_HERO_GOLD`, `BATCH_LEVEL_HEROES`, `RANK_UP_HERO` and its max/rebirth variants; `REBIRTH_HERO`, `RECYCLE_HERO`; `SET_ACTIVE_TEAM`, `SET_HERO_FORMATION`, `SAVE_TEAM_LOADOUT`, `LOAD_TEAM_LOADOUT`, `UNLOCK_TEAM_SLOT`.
 
 Content: `RANK_CONFIGS`, `FEATURED_SUMMON_BANNERS`, `GACHA_SUMMON_COST`, `DIAMOND_SUMMON_COST`, `HERO_LEVEL_EXP_FORMULA`, `SPARK_TOKEN_BY_RARITY`, `SPARK_EXCHANGE_OPTIONS`, `BANNER_RATE_UP_BY_RARITY`, `SUMMON_MILESTONES`, `SOFT_PITY_*`, `VIP_SUMMON_DISCOUNT*`.
 
-Unlocks the `summon`, `recycle` and `tempo` automations, which have been declared and unavailable since Phase 4.
+**Engine layer done, and reachable.** Summoning with both pity systems, the template pick and tier clamp, milestones, spark tokens and the spark exchange; levelling, ranking, rebirth and recycling; team selection, formation, loadouts, slot unlocks and batch levelling.
+
+The rules were complete and *uncallable* for a while, which is its own lesson: they take a hero pool, a milestone list and a `random` as arguments, and nothing was passing them. Four layers closed that — `content/summon.ts` for the catalogue, `roster/summonSave.ts`, `roster/sparkSave.ts` and `roster/rosterSave.ts` for "the save before and the save after", and a closed set of verbs on `SurfaceProps` for the screens. Every one of them now has a screen: Summon for pulling, Roster for levelling, ranking, recycling and the spark exchange, Party for formation and lineups.
+
+#### The spark exchange, and why it is not a summon
+
+`spendSpark` was the purse rule and nothing else — find the option, check the balance, subtract — and the half that hands over a hero did not exist. Routing that half through `applySummon` would look like reuse and would be wrong four ways: it would move the pity counter, count towards the milestone track, draw three or four values instead of one or two, and pay duplicate spark *back*. The `spark_free_charge` option does not even grant a summon; it grants a **charge**, and does not claim `firstGiven` — setting that would cost a new player the opening pull the flag exists to guarantee them.
+
+The draw order is the contract here as it is for a pull, and the recorded exchanges pin it: **two values untargeted, one when the player names a hero.** The skipped value is the *first*, so a port that drew the pick and discarded it would hand over the same hero with a different uid — and the uid is its own namespace, `<template>_<ms>_spark_<n>` rather than a summon's `<template>_<ms>_<n>`.
+
+One finding worth recording: **the tier clamp is in the path and the shipped catalogue never reaches it.** `spark_rare` and `spark_epic` draw from tiers 2-3, whose bands run `common..legendary` and `rare..godly`; `spark_mythic` draws from tiers 3-4, which reach transcendent. So deleting the clamp leaves every fixture assertion green, and the test that catches it builds a pool to force one — *retiered* rather than filtered, because the bands are index ranges and a pool of twenty tier-one heroes makes `slice(40, 60)` empty, at which point the exchange refuses instead of clamping.
+
+The rows moved to `content/summon.ts` with their labels, the same split `Milestone` and `SummonMilestone` already make, and `spendSpark` takes the table as an argument — a module-level constant in the engine was the engine reading the catalogue.
+
+#### The formation control says which half of it lands
+
+Party is where `SET_HERO_FORMATION` becomes reachable, and its buttons are gated on the rules rather than left to be refused: `placeHero` **refuses** where `fieldTeam` replays, so an ungated placement button is a button that does nothing. The gate is the shipped one including the part that reads like an oversight — a full rank refuses a fielded hero and accepts a benched one, which is what lets a second formation be arranged before it is swapped in, and is why the surface has a Reserve section at all.
+
+And the caveat is on the screen in the player's words rather than in an engine comment. `getFormationRoleForHero` returns the class's first legal rank and never reads the stored choice, so a monk moved to the middle is still counted in the front by the damage chain. The stored rank *is* read when validating team selection, which is why the control looks like it works. The bug is ported deliberately — the contract is that the numbers do not move — but a control whose caveat is invisible is a control that lies.
+
+The strongest parity claim in the rewrite so far: **118 pulls across four recorded runs, matched on rarity and hero id, from one seed.** Every function takes a `random: () => number` rather than reaching for the global, for the same reason the engine may not read the clock — and because the *draw order* is part of the behaviour, so a port with the same distribution but a different order would pass any statistical test and disagree on every pull.
+
+Thirteen shipped behaviours ported deliberately rather than tidied. The ones worth knowing: soft and hard pity draw from **different** tables; the pre-postgame pool sums to 0.999, so one pull in a thousand is silently *common* rather than the best outcome; `calculateShardReward` floors level at `max(1, level - 1)`, so a level-one hero recycles for what a level-two does; batch levelling spends in **roster order**, not the order the caller asked in; and a batch recycle rounds once at the end, so a sweep pays strictly less than the same heroes one at a time.
+
+#### The automation line above was wrong
+
+It said this phase unlocks `summon`, `recycle` and `tempo`. It unlocks none of them, for two different reasons, and the flags stay `available: false`.
+
+`summon` and `recycle` have their rules now, and `available` is a claim that **the shell wires the flag to the running simulation** — `ui/architecture.test.ts` enforces that correspondence directly and caught an attempt to flip them on the strength of the rules alone. The wiring waits on the currencies they move: an automatic summon spends **boss tears** and an automatic recycle pays into **hero shards**, and the simulation earns neither. Nor could it usefully — both are spent as well as earned, and a counter that only ever goes up is not something an automation can draw on. They get switched on in **Phase 10**, with spending.
+
+`tempo` cannot get rules here at all. Auto-tempo raises `combatTempo` when `combatHeat` is zero, and this engine has neither — heat does not exist in it, and `tempo` survives only as a scalar the offline estimator multiplies by. It waits on whichever phase builds heat.
+
+#### A slice of Phase 10, pulled forward: the wallet
+
+The simulation had **no economy at all**. `Simulation` tracked kills, deaths and damage; `awayCredit.ts` carried a note saying "it has no economy yet, so no gold or EXP is awarded here"; and `demoRoster.ts` handed the profile a hardcoded `gold: 8_421_000` in the same spirit as the flat team health Phase 7 replaced. Meanwhile the offline estimator had been computing a window's gold correctly *and throwing the figure away*. So a player who stayed earned nothing and a player who left was told nothing.
+
+That blocks this phase rather than the next one: levelling is priced in gold (`heroGoldLevelCost`, `batchLevel`), so is a team slot (`TEAM_SLOT_UNLOCK_RULES`), and a roster screen that shows what a level costs against a balance that does not exist cannot be built. So gold and EXP land here, in `engine/combat/rewards.ts`, and the plan says so rather than leaving the reordering implied.
+
+What landed is **earning, not spending**: `killReward`, a `RunEarnings` tally on the simulation, `gold` and `exp` on `SimulationSnapshot.totals`, the estimator's figures claimed instead of dropped, and the purse persisted in `RunProgress` — as text, because `Decimal.toString()` outlives the JSON number the shipped save used and the wave curve is explicitly built to pass that point. `ui/profile/playerProfile.ts` gains `heldGold`, which adds the run to the banked balance; before it, the Character screen's gold sat frozen at whatever the save said while the fight went on earning.
+
+Two things worth knowing, both ported rather than tidied:
+
+- **The kill reward is rounded up, once, over the whole chain.** The shipped `killMonster` wraps its entire product in a single `Math.ceil`, so a wave-one monster worth 8 gold on the curve and 8.48 after its affix pays **9**. The offline estimator deliberately does *not* round, because it extrapolates repeats and a per-kill ceiling would apply to kills it never simulated — so `RunEarnings.creditAway` takes a block whole rather than re-deriving it from a count.
+- **Gold is not linear in kills.** Over the same minute the estimator credits 15% more kills than the live loop and **3.5x** the gold, because the curve grows at 1.14 a wave and the last few waves are most of the purse. The away test asserts the relationship that does hold — a sum of `k` increasing prices sits between `k` times the first and `k` times the last — rather than a ratio that would look like a flake.
+
+`Simulation.ts` was six lines under its 300-line cap, so `teamDps` moved to `entities/HeroEntity.ts`, beside the `nominalDps` it sums. That is what the cap is for: summing a roster's damage is a rule about heroes, and it was living in the coordinator only because it was two lines long.
+
+#### The damage multiplier chain was built and not connected
+
+Found while working out what a running fight can observe about a roster. `engine/combat/` carries `synergy.ts`, `formation.ts`, `heroPassives.ts`, `uniqueRelics.ts` and `progressionMultipliers.ts` — every one ported, every one pinned against a fixture generated from the shipped source. **None of them was called by anything the player ran.** `app/roster.ts` built a hero's damage from `getHeroContribution` and stopped.
+
+So the live fight was missing the whole stack the shipped game applies on top of base damage: team synergy, the formation bonus, hero passives, unique relics, the prestige and meta levels, class mastery, VIP, the achievement bonus and the team boost. It was the same shape as the wallet — rules complete, caller missing — and it was measurable: rarity reached the fight through exactly one channel, `getRankStatMultiplier(rank, rarity)`, which is **1 at rank one whatever the rarity**, so a rank-one legendary and a rank-one common fought identically.
+
+**The player was not fighting either.** `getDpsBreakdown` adds `playerDps` to the hero total before any multiplier, and nothing in the port computed it — a character's class, level and every stat point they had ever spent did nothing. On a fresh account the player is *most* of the damage: 24.6 against about 9 for a level-one common hero.
+
+Three things closed it. `playerDamage.ts` ports the player's own contribution, with its own constants — the shipped formula is not the hero formula and reads the class weights four times rather than once. `teamPower.ts` composes the fourteen factors in the shipped sequence, written out by hand because float multiplication is not associative and `multiplyProgression` reproduces only the progression subset's order. And `heroes.ts` finally carries `passiveTrait` and `activeSkillArchetype`, which it had left behind for four phases on the grounds that nothing read them — two of the fourteen multipliers did, and were unreachable from a real roster for want of two strings a hero.
+
+The player is now a seventh combatant with their own entity, cast member and swing cadence, not a bonus applied to the team. `PLAYER_ATTACK_INTERVAL_MS` was written for exactly that and had sat unused.
+
+Measured on the starting team: DPS goes from 365 to 1,094, of which the player is 222 — more than any single hero. The demo reaches wave 45 in a minute against wave 36, and still meets its first wall at wave 41.
+
+The **mitigation** chain went the same way, and it was wrong in both directions before it was right. `Simulation` defaults `incomingMult` to zero, which made the app's team literally invulnerable — they stalled around wave 59 with the wipe offer unreachable — so the demo handed it a flat `1`. That is a team taking a monster's damage *raw*: no defence, no formation, no synergy, no hero passives, no relics. Against the shipped chain that is up to **ten times** too much, since a deep account's multiplier is 0.10 and even a bare level-one warrior's is 0.97.
+
+Nothing anchored it. Every other multiplier fixture reads through `getDpsBreakdown`, which reports damage only — the synergy fixture's own note says "Iron Mandala moves incoming… none of which the breakdown reports" — so `mitigationFixture` measures the composed scalar off the real combat step instead, the way the offline fixture measures the same quantity.
+
+**Defence and health are not the same stack**, which is the trap: both scale by meta survival, the rebirth path, formation, synergy and the tactics facility, and health *also* takes class mastery while defence does not. Sharing one function between them would have handed the player a mastery bonus the shipped game does not give.
+
+And the port was off by exactly 0.8 on every scenario with a warrior in it, which turned out not to be mitigation at all: **hero active skills are a fifth unported system**, `autoCastHeroActivesEnabled` is on by default, and every `frontline_ward` hero auto-casts a damage-reduction buff. The fixture switches them off and says why, so the rewrite is measured against the chain rather than against a system it does not have. They belong with `CAST_HERO_ACTIVE` in Phase 10.
+
+Team health, by contrast, was already complete: `teamMaxHp` applies formation and synergy itself.
+
+#### The starting team is a save now, and that fixed four disagreements
+
+`demoRoster.ts` bolted four independently written things together — heroes with hand-written DPS, a cast, a `PlayerProfile` built by hand, and a team health figure derived from *different heroes again* — and each told a different story about the same six people. Building one `SaveV3` and running it through `rosterFromSave` makes that impossible rather than merely fixed, for the reason that function's own comment already gave: a save has three readers, which is three chances to disagree.
+
+What was wrong:
+
+- **The formation was illegal.** Picking one hero of each class gives three whose intended rank is `front` plus a spare that was usually a fourth, and a rank holds two — so the shipped selection rules fielded **four of the six**. The cast path does not check, so the diorama drew all six standing somewhere the game says they cannot stand. The sixth is now a *second archer* rather than an arbitrary spare, and the monk spends their one choice on mid, which is what makes a legal two-two-two.
+- **Health measured a different team.** The profile listed them at levels 40–75 with mixed rarities; the health derivation assumed six **level-one commons** and came out at 843 for a team the screens described as veterans. Everything downstream of health — how long they survive, which wave is the wall, where the offline sawtooth turns over — was measured against the wrong one.
+- **Damage rested on a presentation decision.** `100 + index * 18`, chosen so the cast bars would visibly run at different rates. Nothing derived it.
+- **Every third hero had rank zero.** There is no rank zero; the reader clamps it, so the only symptom was a roster row that would not move.
+
+The starting save is built as a raw payload and read through `readSave`, so it is a save *by construction* — bounded by the same reader every stored save goes through, and subject to the idempotence `v3.test.ts` holds that reader to. A literal could quietly carry exactly the rank of zero the hand-built profile did. `teamBoost` is deliberately left out of the payload, because the reader floors it at the hero's own authored base boost.
+
+It costs the demo 365 DPS against 870, and buys it 3,826 health against 843, both derived from the six heroes actually shown. The demo is **better** for it: over ten minutes it reaches wave 48 against the old wave 43, wiping twice instead of eight times, and both versions meet their first wall at wave 41.
+
+What this does *not* settle is what a genuinely new player should start with. The save still carries the showcase numbers — level 42, 1,482 kills, a seeded wallet — because those are contents rather than structure, and choosing them is a design question for Phase 10 rather than a port. It is now one number in one place to change.
 
 ### Phase 9 — Equipment *(~2 weeks)*
 `EQUIP_ITEM`, `TOGGLE_EQUIP_HERO`, `CRAFT_EQUIPMENT`, `DISMANTLE_EQUIPMENT`, `UPGRADE_EQUIPMENT_RARITY`, `CONVERT_SCRAP_TO_ESSENCE`, `CONVERT_SCRAP_TO_SHARDS`, `TOGGLE_HERO_UNIQUE_WEAPON`. Content: `EQUIPMENT_CATALOG`, `EQUIPMENT_RARITIES`.
@@ -257,6 +363,8 @@ Shops and everything spendable: `BUY_GOLD_SHOP_ITEM`, `BUY_DIAMOND_SHOP_ITEM`, `
 
 **All nine `auto*` flags finally have systems** — `usePotion`, `useCoolant` and `castHeroActives` land here, and the earn-then-choose gate built in Phase 4 stops being a policy with one subject.
 
+Gold and EXP arrived early, in Phase 8 — see the note there. What is left for this phase on the currency side is the part that actually needed the shops: **spending**, the seven other currencies, and the multiplier chain itself. `RewardRates` carries that chain as one measured scalar today, exactly as `OfflineConditions` does, so assembling it here means replacing a number rather than rewriting the callers.
+
 ### Phase 11 — The loops *(~3 weeks)*
 The reasons to log in: `CLAIM_MISSION`; `START_EXPEDITION`, `COMPLETE_EXPEDITION`, `REFRESH_EXPEDITION_CONTRACTS`; `RUN_RIFT_DUNGEON`, `RUN_TREASURY_RAID`; the four minigames and the bounty draft; `APPLY_DAILY_LOGIN`, `APPLY_WEEKLY_ROLLOVER`, `CLAIM_WEEKLY_TRACK`; mail (`APPEND_MAIL_MESSAGES`, `CLAIM_MAIL_ATTACHMENT`, `CLAIM_ALL_MAIL_ATTACHMENTS`); `MARK_STORY_BEAT_SEEN`. Content: `MISSION_BOARD_GOALS`, `WEEKLY_EVENTS`, `WEEKLY_TRACK_MILESTONES`, `STORY_BEATS`.
 
@@ -266,6 +374,8 @@ Clears eight of the twelve placeholder destinations.
 The 6,090 lines nothing has touched: `onlineAuth`, `onlineSave`, `guild`, `guildWars`, `chat`, `directMessages`, `friends`, `leaderboard`, `presence`, `publicProfile`, `activityFeed`, `blockReport`, `characterNameRegistry`, `cloudMail`, `playerSearch`.
 
 Behind `ports/`, as the seam has always promised — the engine still never learns what a network is. Largest phase, and the one with real moderation and privacy surface: `blockReport` and `presence` are not features to port thoughtlessly.
+
+Starts with `onlineAuth`, because `ports/remoteSave.ts` is finished and waiting on a uid. Binding its `SaveDocStore` to `firebase/firestore` is the first thing this phase can do and the last thing Phase 6 needed.
 
 ### Phase 13 — Retire `/legacy` *(~3 days)*
 Only now. The old app comes off the web when the new one can reach a player's account and do everything they did — which is the condition Phase 5 named and could not meet. `src/` and the EAS native builds are a separate decision, taken then, on evidence.

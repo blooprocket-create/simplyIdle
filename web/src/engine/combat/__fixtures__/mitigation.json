@@ -1,0 +1,195 @@
+{
+  "note": "Mitigation from the shipped implementation, measured off advanceCombatStep. Owned by __tests__/mitigationFixture.test.ts.",
+  "generatedFrom": "src/useGameState.ts advanceCombatStep and computeStats",
+  "nowMs": 1768478400000,
+  "weeklyEventId": "double_shard_drops",
+  "rows": [
+    {
+      "name": "bare",
+      "note": "A level-one warrior alone: defence from their own stats and nothing else.",
+      "playerClass": "warrior",
+      "level": 1,
+      "alloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "wave": 3,
+      "heroes": [],
+      "teamDefense": 3,
+      "damageReduction": 0.02912621359223301,
+      "teamMaxHp": 130,
+      "incomingMult": 0.9708737864065773,
+      "sliceMs": 10
+    },
+    {
+      "name": "one-hero",
+      "note": "A single fielded hero, which adds their vitality and spirit and turns formation on.",
+      "playerClass": "warrior",
+      "level": 20,
+      "alloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "wave": 12,
+      "heroes": [
+        {
+          "templateId": "h1",
+          "uid": "u0",
+          "level": 30,
+          "rank": 2,
+          "rarity": "rare"
+        }
+      ],
+      "teamDefense": 12.303526,
+      "damageReduction": 0.10955600806336213,
+      "teamMaxHp": 445,
+      "incomingMult": 0.7958432222299194,
+      "sliceMs": 10
+    },
+    {
+      "name": "full-team",
+      "note": "Six across classes, so synergy and every formation rank are live.",
+      "playerClass": "mage",
+      "level": 60,
+      "alloc": {
+        "strength": 0,
+        "vitality": 40,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 20
+      },
+      "wave": 45,
+      "heroes": [
+        {
+          "templateId": "h1",
+          "uid": "u0",
+          "level": 60,
+          "rank": 3,
+          "rarity": "epic"
+        },
+        {
+          "templateId": "h3",
+          "uid": "u1",
+          "level": 55,
+          "rank": 2,
+          "rarity": "rare"
+        },
+        {
+          "templateId": "h5",
+          "uid": "u2",
+          "level": 70,
+          "rank": 4,
+          "rarity": "legendary"
+        },
+        {
+          "templateId": "h7",
+          "uid": "u3",
+          "level": 50,
+          "rank": 1,
+          "rarity": "uncommon"
+        },
+        {
+          "templateId": "h9",
+          "uid": "u4",
+          "level": 65,
+          "rank": 3,
+          "rarity": "epic"
+        },
+        {
+          "templateId": "h6",
+          "uid": "u5",
+          "level": 58,
+          "rank": 2,
+          "rarity": "rare"
+        }
+      ],
+      "teamDefense": 141.76332561283203,
+      "damageReduction": 0.5863723344038402,
+      "teamMaxHp": 4421,
+      "incomingMult": 0.32273346410305864,
+      "sliceMs": 10
+    },
+    {
+      "name": "deep-survival",
+      "note": "Meta survival, the rebirth path and the tactics facility, which scale defence rather than reduce damage.",
+      "playerClass": "warrior",
+      "level": 200,
+      "alloc": {
+        "strength": 0,
+        "vitality": 300,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "wave": 140,
+      "heroes": [
+        {
+          "templateId": "h1",
+          "uid": "u0",
+          "level": 200,
+          "rank": 6,
+          "rarity": "legendary"
+        },
+        {
+          "templateId": "h9",
+          "uid": "u1",
+          "level": 190,
+          "rank": 5,
+          "rarity": "epic"
+        }
+      ],
+      "metaSurvivalLevel": 20,
+      "rebirthSurvivalPath": 8,
+      "tacticsLevel": 15,
+      "classPassiveUnlocked": true,
+      "teamDefense": 969.3044084380801,
+      "damageReduction": 0.8,
+      "teamMaxHp": 31069,
+      "incomingMult": 0.12629137683456002,
+      "sliceMs": 10
+    },
+    {
+      "name": "relics-and-buff",
+      "note": "Unique relics on fielded heroes and an active damage-reduction buff.",
+      "playerClass": "monk",
+      "level": 80,
+      "alloc": {
+        "strength": 0,
+        "vitality": 60,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "wave": 66,
+      "heroes": [
+        {
+          "templateId": "h9",
+          "uid": "u0",
+          "level": 90,
+          "rank": 4,
+          "rarity": "legendary"
+        },
+        {
+          "templateId": "h10",
+          "uid": "u1",
+          "level": 85,
+          "rank": 3,
+          "rarity": "epic"
+        }
+      ],
+      "relicRank": 8,
+      "damageReductionBuffPct": 0.25,
+      "teamDefense": 77.50367518200001,
+      "damageReduction": 0.4366313829983131,
+      "teamMaxHp": 2445,
+      "incomingMult": 0.2265304362610816,
+      "sliceMs": 10
+    }
+  ]
+}

@@ -1,15 +1,9 @@
-import Decimal from 'break_eternity.js';
-
-import { CLASS_ATTACK_INTERVAL_MS } from '../content/attackSpeeds';
 import type { PlayerClass } from '../content/classes';
-import { getIntendedFormationRole, type FormationHero } from '../engine/combat/formation';
-import { createHeroEntity, type HeroEntity } from '../engine/entities/HeroEntity';
-import { heroModelKey } from '../game/models/manifest';
-import { silhouetteFor } from '../game/models/silhouette';
-import type { Cast } from '../game/models/cast';
-import { emptyProfile, rosterOrder, type PlayerProfile, type RosterEntry } from '../ui/profile/playerProfile';
-import { HERO_POOL, getHeroTemplate } from '../content/heroes';
-import type { LoadedRoster } from './roster';
+import { HERO_POOL, heroTemplatesById } from '../content/heroes';
+import type { FormationRole } from '../engine/combat/formation';
+import type { Rarity } from '../content/rarities';
+import { readSave } from '../engine/save/v3';
+import type { SaveV3 } from '../engine/save/schema';
 
 /**
  * The team a player starts on, and what they see before they have a save.
@@ -20,174 +14,145 @@ import type { LoadedRoster } from './roster';
  * not a placeholder but an answer the cutover owed anyway: what does someone
  * who has never played see?
  *
- * The shape it produces — heroes for the simulation and a matching cast for
- * the diorama, from one source — is the shape `rosterFromSave` produces too,
- * which is why the shell can take either without knowing which it got.
- */
-
-/**
- * Six heroes taken from the catalogue rather than written out here.
+ * **It is a save.** That is the change here, and it fixed three separate
+ * disagreements rather than tidying one. The file used to bolt four
+ * independently written things together — heroes with hand-written DPS, a
+ * cast, a `PlayerProfile` built by hand, and a team health figure derived from
+ * *different heroes again* — and each told a different story about the same six
+ * people:
  *
- * An earlier version listed six names by hand, which drifted the moment the
- * catalogue landed: the name came from this file and the emoji and tier came
- * from `content/heroes.ts` under the same id, so a mage was displayed with a
- * warrior's shield. Reading both from one place makes that impossible rather
- * than merely fixed.
+ * - The profile listed them at levels 40 to 75 with mixed rarities. The health
+ *   derivation assumed six **level-one commons**, and so came out at 843 for a
+ *   team the screens described as veterans.
+ * - Their damage was `100 + index * 18`, chosen so the cast bars would visibly
+ *   run at different rates. Nothing derived it, so the demo's whole balance
+ *   rested on a presentation decision.
+ * - The profile gave them `rank: index % 3`, which starts at **zero**. There is
+ *   no rank zero; the save reader clamps it to one.
  *
- * One of each class, so the silhouettes, the formation ranks and the roster's
- * rarity tones all have something to show.
- */
-const DEMO_UIDS: readonly string[] = pickOnePerClass();
-
-function pickOnePerClass(): string[] {
-  const seen = new Set<PlayerClass>();
-  const picked: string[] = [];
-  for (const hero of HERO_POOL) {
-    if (seen.has(hero.heroClass)) continue;
-    seen.add(hero.heroClass);
-    picked.push(hero.id);
-  }
-  // A sixth, so a rank holds two and the formation is not all singletons.
-  const spare = HERO_POOL.find(hero => !picked.includes(hero.id));
-  if (spare) picked.push(spare.id);
-  return picked;
-}
-
-interface DemoHero {
-  uid: string;
-  name: string;
-  heroClass: PlayerClass;
-  emoji: string;
-  tier: number;
-  baseTeamBoost: number;
-  dps: number;
-}
-
-const DEMO: readonly DemoHero[] = DEMO_UIDS.map((id, index) => {
-  const template = getHeroTemplate(id);
-  if (!template) throw new Error(`demo roster names a hero the catalogue does not have: ${id}`);
-  return {
-    uid: template.id,
-    name: template.name,
-    heroClass: template.heroClass,
-    emoji: template.emoji,
-    tier: template.tier,
-    baseTeamBoost: template.baseTeamBoost,
-    // Spread apart so the cast bars visibly run at different rates.
-    dps: 100 + index * 18,
-  };
-});
-
-export function demoHeroes(): HeroEntity[] {
-  return DEMO.map(hero => createHeroEntity(hero.uid, new Decimal(hero.dps), CLASS_ATTACK_INTERVAL_MS[hero.heroClass]));
-}
-
-export function demoCast(): Cast {
-  return DEMO.map(hero => {
-    const formation: FormationHero = { uid: hero.uid, heroClass: hero.heroClass };
-    return {
-      uid: hero.uid,
-      name: hero.name,
-      // The rank the player asked for, not the one the shipped bug awards.
-      // Where a hero *stands* is presentation; reproducing the monk formation
-      // bug in the renderer as well would put a monk in the wrong place on
-      // screen, which is a second wrong rather than parity.
-      role: getIntendedFormationRole(formation),
-      modelKey: heroModelKey(hero.uid),
-      silhouette: silhouetteFor(hero.uid, hero.heroClass),
-    };
-  });
-}
-
-/**
- * The same six heroes, as the read model the surfaces take.
+ * And the formation was illegal. Picking one hero per class gives three whose
+ * intended rank is `front` plus a spare that was usually a fourth, and a rank
+ * holds two — so the shipped rules would field only **four** of the six. The
+ * cast path does not check, so the diorama drew all six standing somewhere the
+ * game says they cannot stand.
  *
- * Scaffolding like the rest of this file, and the same shape a real save
- * produces — which is the point. `profileFromSave` already builds this from a
- * migrated `SaveV3` and is tested against the shipped fixtures; what is
- * missing is somewhere to get a save from, since the shipped one lives behind
- * Firebase auth rather than in local storage. `saveStore.ts` is now that
- * somewhere for a local save; the surfaces do not change either way, because
- * only which function the app calls does.
+ * Building one save and running it through `rosterFromSave` makes all of that
+ * impossible rather than merely fixed, for the reason that function's own
+ * comment gives: a save has three readers, which is three chances to disagree.
+ *
+ * What it costs: the starting team now deals 365 DPS rather than 870 and has
+ * 3,826 health rather than 843, because both are derived from the six heroes
+ * actually shown. The demo is *better* for it — over ten minutes it reaches
+ * wave 48 against the old wave 43, wiping twice instead of eight times, and
+ * both versions meet their first wall at wave 41.
  */
-export function demoProfile(): PlayerProfile {
-  const roster: RosterEntry[] = DEMO.map((hero, index) => {
-    const formation: FormationHero = { uid: hero.uid, heroClass: hero.heroClass };
-    return {
-      uid: hero.uid,
-      templateId: hero.uid,
-      name: hero.name,
-      emoji: hero.emoji,
-      heroClass: hero.heroClass,
-      tier: hero.tier,
-      rarity: DEMO_RARITY[index % DEMO_RARITY.length],
-      level: 40 + index * 7,
-      rank: index % 3,
-      teamBoost: hero.baseTeamBoost,
-      role: getIntendedFormationRole(formation),
-      active: true,
-    };
-  });
-
-  return {
-    ...emptyProfile(),
-    name: 'Wanderer',
-    playerClass: 'warrior',
-    created: true,
-    level: 42,
-    exp: 1_200,
-    wave: 1,
-    highestWave: 37,
-    totalKills: 1_482,
-    stats: { alloc: { strength: 12, vitality: 8, agility: 5, intelligence: 2, spirit: 3 }, unspent: 4 },
-    wallet: {
-      ...emptyProfile().wallet,
-      gold: 8_421_000,
-      totalGold: 41_900_000,
-      diamonds: 312,
-      heroShards: 1_840,
-      essence: 26,
-    },
-    roster: rosterOrder(roster),
-    slotsUnlocked: 6,
-  };
-}
 
 /** Enough spread to show the roster's rarity tones actually differ. */
-const DEMO_RARITY = ['legendary', 'epic', 'rare', 'mythic', 'uncommon', 'common'] as const;
+const STARTING_RARITY: readonly Rarity[] = ['legendary', 'epic', 'rare', 'mythic', 'uncommon', 'common'];
 
-/**
- * What the demo hands the loop, beyond the heroes.
- *
- * `incomingMult` defaults to zero in `Simulation`, which is right for a test
- * that wants to isolate damage dealt — and wrong for the app, where it made
- * the team literally invulnerable: they stalled out around wave 59 and sat
- * there forever, never dying, so the wipe offer could not be reached at all.
- * A shell demonstrating a game with no failure state is demonstrating the
- * wrong game.
- *
- * The health is a flat number rather than anything derived, because nothing
- * derives it yet — vitality reaches the simulation when the save does. It is
- * chosen so the demo climbs into the forties and then starts losing, which is
- * the sawtooth the whole offline model is built around.
- */
-export function demoSimulationOptions(): { teamMaxHp: Decimal; incomingMult: number } {
-  return { teamMaxHp: new Decimal(2_000), incomingMult: 1 };
+interface StartingHero {
+  id: string;
+  role: FormationRole;
 }
 
 /**
- * The team a player with no save starts on.
+ * Six heroes who can legally stand together.
  *
- * This file was written as scaffolding — "a team and a player to look at
- * until there is a save to load them from" — and `saveStore.ts` is now that
- * somewhere. What is left is not scaffolding but the answer to a real
- * question the cutover has to answer anyway: what does someone who has never
- * played see? One of each class and a spare, taken from the catalogue,
- * derived rather than authored, and identical on every load.
+ * Taken from the catalogue rather than written out here — an earlier version
+ * listed six names by hand, which drifted the moment the catalogue landed: the
+ * name came from this file and the emoji and tier came from `content/heroes.ts`
+ * under the same id, so a mage was displayed with a warrior's shield.
  *
- * Bundled into the same shape `rosterFromSave` returns, so the shell asks
- * one question and does not care which branch answered it.
+ * The *shape* of the team is the part that had to be chosen rather than
+ * discovered. `warrior` and `berserker` may only stand at the front, `mage`
+ * only at mid and `archer` only at back; `monk` may take either front or mid.
+ * A rank holds two. So one of each class cannot be fielded together — three of
+ * the five want the front — and the sixth is a **second archer** rather than
+ * an arbitrary spare, which is what makes a legal two-two-two.
+ *
+ * The monk goes to mid rather than to their intended front for the same
+ * reason: they are the only hero here with a choice, and spending it is what
+ * leaves room for both front-rankers.
  */
-export function startingRoster(): LoadedRoster {
-  return { heroes: demoHeroes(), cast: demoCast(), profile: demoProfile() };
+function startingTeam(): StartingHero[] {
+  const firstOf = (heroClass: PlayerClass, exclude: readonly string[] = []): string => {
+    const found = HERO_POOL.find(hero => hero.heroClass === heroClass && !exclude.includes(hero.id));
+    if (!found) throw new Error(`the catalogue has no ${heroClass} left to start with`);
+    return found.id;
+  };
+
+  const archer = firstOf('archer');
+  return [
+    { id: firstOf('warrior'), role: 'front' },
+    { id: firstOf('berserker'), role: 'front' },
+    { id: firstOf('monk'), role: 'mid' },
+    { id: firstOf('mage'), role: 'mid' },
+    { id: archer, role: 'back' },
+    { id: firstOf('archer', [archer]), role: 'back' },
+  ];
 }
+
+/**
+ * The starting save.
+ *
+ * Built as a raw payload and read through `readSave`, rather than returned as a
+ * `SaveV3` literal. That is not ceremony: it means the starting save is a save
+ * *by construction* — bounded by the same reader every stored save goes
+ * through, and subject to the idempotence `v3.test.ts` holds that reader to. A
+ * literal could quietly carry a rank of zero or a formation the rules forbid,
+ * which is exactly what the hand-built profile did.
+ */
+export function startingSave(nowMs: number): SaveV3 {
+  const team = startingTeam();
+  const formationByUid: Record<string, FormationRole> = {};
+  for (const hero of team) formationByUid[hero.id] = hero.role;
+
+  const payload = {
+    version: 3,
+    awayAtMs: nowMs,
+    identity: { name: 'Wanderer', playerClass: 'warrior', created: true },
+    progression: { level: 42, exp: 1_200, wave: 1, highestWave: 37, totalKills: 1_482 },
+    stats: { alloc: { strength: 12, vitality: 8, agility: 5, intelligence: 2, spirit: 3 }, unspent: 4 },
+    wallet: { gold: 8_421_000, totalGold: 41_900_000, diamonds: 312, heroShards: 1_840, essence: 26 },
+    roster: {
+      heroes: team.map((hero, index) => ({
+        id: hero.id,
+        // One instance of each template, so the uid and the template id are the
+        // same string here. A summoned duplicate would not be.
+        uid: hero.id,
+        rarity: STARTING_RARITY[index % STARTING_RARITY.length],
+        level: 40 + index * 7,
+        // Ranks run from one. `index % 3` gave a rank of zero to every third
+        // hero, which the reader clamps — visible only as a roster row that
+        // would not move.
+        rank: (index % 3) + 1,
+        // `teamBoost` is deliberately absent. The reader floors it at the
+        // hero's own authored base boost, so stating it here would either
+        // duplicate the catalogue or contradict it — and a save that
+        // under-reports a boost is repaired upward rather than trusted.
+        rebirthStatMult: 1,
+      })),
+      activeUids: team.map(hero => hero.id),
+      formationByUid,
+      slotsUnlocked: team.length,
+    },
+  };
+
+  return readSave(payload, { nowMs, content: { heroesById: heroTemplatesById() } });
+}
+
+/*
+ * `demoSimulationOptions` used to live here, handing the loop a flat
+ * `incomingMult: 1`.
+ *
+ * Its note explained the first half of the problem — `incomingMult` defaults
+ * to *zero* in `Simulation`, which is right for a test isolating damage dealt
+ * and made the app's team literally invulnerable, stalling around wave 59 with
+ * the wipe offer unreachable. A shell demonstrating a game with no failure
+ * state is demonstrating the wrong game.
+ *
+ * One was the fix and it was still wrong the other way: the shipped chain
+ * reduces incoming damage by up to ninety percent, so a flat one is a team
+ * taking as much as ten times what it should. `rosterFromSave` derives it now,
+ * from the same save as everything else.
+ */

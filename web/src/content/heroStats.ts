@@ -1,4 +1,6 @@
 import type { PlayerClass } from './classes';
+import type { HeroPassiveTraitId } from '../engine/combat/heroPassives';
+import type { HeroActiveSkillArchetypeId } from './uniqueEffects';
 
 /**
  * Per-hero stat derivation: class profile x tier x an individual variance
@@ -30,6 +32,23 @@ export interface HeroTemplate {
   emoji: string;
   baseTeamBoost: number;
   tier: 1 | 2 | 3 | 4 | 5;
+  /**
+   * The two authored fields `heroes.ts` used to leave behind.
+   *
+   * Its note said they "describe verbs no phase has built yet" and that
+   * carrying data nothing reads is how the previous config reached four
+   * thousand lines. That was right at the time and is not now:
+   * `getHeroPassiveMultipliers` reads the trait and `getUniqueRelicMultipliers`
+   * reads the archetype, both are fixture-tested, and both were uncallable
+   * from a real roster because the catalogue did not carry the fields they
+   * take.
+   *
+   * Transcribed from `__fixtures__/unique-relics.json`, which already records
+   * every hero's pair from the shipped source — so the sixty-five rows are
+   * generated and then checked against the same file rather than typed.
+   */
+  passiveTrait: HeroPassiveTraitId;
+  activeSkillArchetype: HeroActiveSkillArchetypeId;
 }
 
 export const HERO_CLASS_STAT_PROFILE: Record<PlayerClass, HeroStatProfile> = {

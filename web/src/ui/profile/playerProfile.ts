@@ -1,8 +1,10 @@
+import Decimal from 'break_eternity.js';
 import type { PlayerClass } from '../../content/classes';
 import { getHeroTemplate } from '../../content/heroes';
 import type { Rarity } from '../../content/rarities';
 import { getIntendedFormationRole, type FormationRole } from '../../engine/combat/formation';
 import type { SaveV3, StatBlock } from '../../engine/save/schema';
+import type { SimulationSnapshot } from '../../engine/types';
 
 /**
  * Everything a surface needs that is not per-frame.
@@ -150,4 +152,28 @@ export function rosterOrder(roster: readonly RosterEntry[]): RosterEntry[] {
       b.level - a.level ||
       (a.uid < b.uid ? -1 : a.uid > b.uid ? 1 : 0),
   );
+}
+
+/**
+ * What the player holds, counting the run they are standing in.
+ *
+ * Two read models, and the wallet is the one place they have to be added
+ * together. `profile.wallet` is the save's balance — everything banked up to
+ * the moment the run began — and `snapshot.totals.gold` is what this run has
+ * earned since. Neither is the answer on its own: showing the balance alone
+ * froze the Character screen's gold at whatever the save said while the fight
+ * went on earning, and showing the run alone would tell a returning player
+ * they were broke.
+ *
+ * Nothing banks the run into the save yet, so there is no double count. When
+ * spending lands and the two are reconciled, this is the seam to revisit —
+ * and it is a function rather than an expression in the JSX so that the seam
+ * has a name and a test.
+ *
+ * EXP is deliberately not given the same treatment. `profile.exp` is progress
+ * toward the next player level, and adding a run's EXP to it without running
+ * the level-up ladder would show a bar past full rather than a level gained.
+ */
+export function heldGold(profile: PlayerProfile, snapshot: SimulationSnapshot): Decimal {
+  return new Decimal(profile.wallet.gold).add(snapshot.totals.gold);
 }

@@ -56,3 +56,16 @@ export function createHeroEntity(uid: string, damagePerSecond: Decimal, interval
 export function nominalDps(hero: HeroEntity): Decimal {
   return hero.damagePerHit.mul(1_000).div(hero.timer.intervalMs);
 }
+
+/**
+ * What a roster averages out to, together.
+ *
+ * Lived in `Simulation` as a two-line private until the coordinator's line cap
+ * objected, which is what the cap is for: summing a roster's damage is a rule
+ * about heroes and belongs beside the one it sums. `awayCredit` already asks
+ * for a team's DPS as one number, so the concept had a name before it had a
+ * home.
+ */
+export function teamDps(heroes: readonly HeroEntity[]): Decimal {
+  return heroes.reduce((total, hero) => total.add(nominalDps(hero)), new Decimal(0));
+}

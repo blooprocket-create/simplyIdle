@@ -1,9 +1,11 @@
+import Decimal from 'break_eternity.js';
 import { describe, expect, it } from 'vitest';
 import type { PlayerClass } from '../../content/classes';
 import { HERO_POOL } from '../../content/heroes';
 import { migrateSave } from '../../engine/save/migrate';
 import type { SaveContent } from '../../engine/save/schema';
-import { emptyProfile, profileFromSave, rosterOrder, type RosterEntry } from './playerProfile';
+import { emptySnapshot } from '../../engine/types';
+import { emptyProfile, heldGold, profileFromSave, rosterOrder, type RosterEntry } from './playerProfile';
 import fixture from '../../engine/save/__fixtures__/v2-saves.json';
 
 /** Mirrors the migration suite's decoder; the fixture holds NaN and Infinity. */
@@ -167,6 +169,31 @@ describe('player profile', () => {
     expect(empty.playerClass).toBeNull();
     expect(empty.roster).toEqual([]);
     expect(empty.wave).toBeGreaterThanOrEqual(1);
+  });
+
+  it('counts the run into what the player holds', () => {
+    /*
+     * The Character screen's gold froze at whatever the save said while the
+     * fight went on earning: the balance and the run are two read models, and
+     * the wallet is where they have to be added.
+     */
+    const profile = { ...emptyProfile(), wallet: { ...emptyProfile().wallet, gold: 8_421_000 } };
+    const earning = { ...emptySnapshot(), totals: { ...emptySnapshot().totals, gold: new Decimal(579_000) } };
+
+    expect(heldGold(profile, earning).toString()).toBe('9000000');
+    // A run that has earned nothing shows the balance rather than nothing, and
+    // an empty balance shows the run rather than zero.
+    expect(heldGold(profile, emptySnapshot()).toString()).toBe('8421000');
+    expect(heldGold(emptyProfile(), earning).toString()).toBe('579000');
+  });
+
+  it('holds a purse the save format could not have carried', () => {
+    // The banked side is a JSON number and the run's side is a `Decimal`, so
+    // the sum has to be taken as a `Decimal` — doing it the other way round
+    // caps the answer at the point the campaign is designed to pass.
+    const huge = { ...emptySnapshot(), totals: { ...emptySnapshot().totals, gold: new Decimal('1e400') } };
+    expect(heldGold(emptyProfile(), huge).isFinite()).toBe(true);
+    expect(heldGold(emptyProfile(), huge).toString()).toBe('1e400');
   });
 
   it('sorts a roster deterministically whatever order it arrives in', () => {

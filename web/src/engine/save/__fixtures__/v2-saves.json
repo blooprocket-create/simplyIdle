@@ -529,6 +529,14 @@
           },
           "unspent": 0
         },
+        "summon": {
+          "pityCounter": 0,
+          "totalSummons": 0,
+          "freeCharges": 0,
+          "claimedMilestones": [],
+          "guaranteedMinRarity": null,
+          "firstGiven": false
+        },
         "wallet": {
           "gold": 0,
           "totalGold": 0,
@@ -880,6 +888,14 @@
           },
           "unspent": 62
         },
+        "summon": {
+          "pityCounter": 0,
+          "totalSummons": 0,
+          "freeCharges": 0,
+          "claimedMilestones": [],
+          "guaranteedMinRarity": null,
+          "firstGiven": false
+        },
         "wallet": {
           "gold": 918273645,
           "totalGold": 4000000000,
@@ -1053,6 +1069,14 @@
           },
           "unspent": 190
         },
+        "summon": {
+          "pityCounter": 0,
+          "totalSummons": 0,
+          "freeCharges": 0,
+          "claimedMilestones": [],
+          "guaranteedMinRarity": null,
+          "firstGiven": false
+        },
         "wallet": {
           "gold": 1000,
           "totalGold": 1000,
@@ -1153,6 +1177,14 @@
             "spirit": 0
           },
           "unspent": 45
+        },
+        "summon": {
+          "pityCounter": 0,
+          "totalSummons": 0,
+          "freeCharges": 0,
+          "claimedMilestones": [],
+          "guaranteedMinRarity": null,
+          "firstGiven": false
         },
         "wallet": {
           "gold": 0,
@@ -1266,6 +1298,14 @@
           },
           "unspent": 45
         },
+        "summon": {
+          "pityCounter": 0,
+          "totalSummons": 0,
+          "freeCharges": 0,
+          "claimedMilestones": [],
+          "guaranteedMinRarity": null,
+          "firstGiven": false
+        },
         "wallet": {
           "gold": 0,
           "totalGold": 0,
@@ -1360,6 +1400,14 @@
           },
           "unspent": 40
         },
+        "summon": {
+          "pityCounter": 0,
+          "totalSummons": 0,
+          "freeCharges": 0,
+          "claimedMilestones": [],
+          "guaranteedMinRarity": null,
+          "firstGiven": false
+        },
         "wallet": {
           "gold": 0,
           "totalGold": 0,
@@ -1431,6 +1479,14 @@
           },
           "unspent": 4495
         },
+        "summon": {
+          "pityCounter": 0,
+          "totalSummons": 0,
+          "freeCharges": 0,
+          "claimedMilestones": [],
+          "guaranteedMinRarity": null,
+          "firstGiven": false
+        },
         "wallet": {
           "gold": 1e+30,
           "totalGold": 1e+30,
@@ -1441,6 +1497,117 @@
           "rebirthCores": 0,
           "equipmentScrap": 0,
           "sparkTokens": 0
+        },
+        "roster": {
+          "heroes": [],
+          "activeUids": [],
+          "loadouts": [
+            [],
+            [],
+            []
+          ],
+          "slotsUnlocked": 4,
+          "formationByUid": {},
+          "uniqueByHeroId": {}
+        },
+        "lastActiveAt": 1768478400000
+      }
+    },
+    {
+      "name": "mid-gacha",
+      "note": "An account part way through the summon systems, so the counters are not all zero.",
+      "payload": {
+        "playerName": "Puller",
+        "playerClass": "archer",
+        "characterCreated": true,
+        "level": 60,
+        "wave": 140,
+        "highestWaveReached": 152,
+        "bossTears": 9400,
+        "diamonds": 2100,
+        "sparkTokens": 780,
+        "gachaPityCounter": 17,
+        "totalSummons": 137,
+        "freeSummonCharges": 3,
+        "claimedSummonMilestones": [
+          10,
+          50,
+          100
+        ],
+        "guaranteedMinRarity": "epic",
+        "firstSummonGiven": true,
+        "summonHistory": [
+          {
+            "id": "hist_a",
+            "heroName": "Ashen Vanguard",
+            "heroEmoji": "🛡️",
+            "rarity": "epic",
+            "ts": 1,
+            "pityTriggered": false
+          },
+          {
+            "id": "hist_b",
+            "heroName": "Tidecaller",
+            "heroEmoji": "🌊",
+            "rarity": "rare",
+            "ts": 2,
+            "pityTriggered": false
+          }
+        ]
+      },
+      "expected": {
+        "identity": {
+          "name": "Puller",
+          "playerClass": "archer",
+          "created": true
+        },
+        "progression": {
+          "level": 60,
+          "exp": 0,
+          "totalExp": 0,
+          "wave": 140,
+          "highestWave": 152,
+          "totalKills": 0,
+          "prestigeCount": 0,
+          "rebirthDamagePath": 0,
+          "rebirthEconomyPath": 0,
+          "rebirthSurvivalPath": 0,
+          "metaDamageLevel": 0,
+          "metaEconomyLevel": 0,
+          "metaSurvivalLevel": 0
+        },
+        "stats": {
+          "alloc": {
+            "strength": 0,
+            "vitality": 0,
+            "agility": 0,
+            "intelligence": 0,
+            "spirit": 0
+          },
+          "unspent": 295
+        },
+        "summon": {
+          "pityCounter": 17,
+          "totalSummons": 137,
+          "freeCharges": 3,
+          "claimedMilestones": [
+            10,
+            50,
+            100
+          ],
+          "guaranteedMinRarity": "epic",
+          "firstGiven": true
+        },
+        "wallet": {
+          "gold": 0,
+          "totalGold": 0,
+          "diamonds": 2100,
+          "heroShards": 0,
+          "bossTears": 9400,
+          "essence": 0,
+          "rebirthCores": 0,
+          "equipmentScrap": 0,
+          "sparkTokens": 780
         },
         "roster": {
           "heroes": [],
@@ -1570,6 +1737,14 @@
           },
           "unspent": 0
         },
+        "summon": {
+          "pityCounter": 0,
+          "totalSummons": 0,
+          "freeCharges": 0,
+          "claimedMilestones": [],
+          "guaranteedMinRarity": null,
+          "firstGiven": false
+        },
         "wallet": {
           "gold": 0,
           "totalGold": 10,
@@ -1659,6 +1834,14 @@
             "spirit": 0
           },
           "unspent": 0
+        },
+        "summon": {
+          "pityCounter": 0,
+          "totalSummons": 0,
+          "freeCharges": 0,
+          "claimedMilestones": [],
+          "guaranteedMinRarity": null,
+          "firstGiven": false
         },
         "wallet": {
           "gold": 0,

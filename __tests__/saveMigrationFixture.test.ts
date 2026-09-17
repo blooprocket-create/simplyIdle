@@ -286,6 +286,34 @@ function buildCases(): Case[] {
       },
     },
     {
+      name: 'mid-gacha',
+      note: 'An account part way through the summon systems, so the counters are not all zero.',
+      payload: {
+        playerName: 'Puller',
+        playerClass: 'archer',
+        characterCreated: true,
+        level: 60,
+        wave: 140,
+        highestWaveReached: 152,
+        bossTears: 9_400,
+        diamonds: 2_100,
+        sparkTokens: 780,
+        gachaPityCounter: 17,
+        totalSummons: 137,
+        freeSummonCharges: 3,
+        claimedSummonMilestones: [10, 50, 100],
+        guaranteedMinRarity: 'epic',
+        firstSummonGiven: true,
+        // Unclaimed, so it has to survive in `legacy` untouched — including
+        // the hero names the typed slice deliberately does not learn how to
+        // rebuild.
+        summonHistory: [
+          { id: 'hist_a', heroName: 'Ashen Vanguard', heroEmoji: '🛡️', rarity: 'epic', ts: 1, pityTriggered: false },
+          { id: 'hist_b', heroName: 'Tidecaller', heroEmoji: '🌊', rarity: 'rare', ts: 2, pityTriggered: false },
+        ],
+      },
+    },
+    {
       name: 'hostile',
       note: 'Every field wrong at once: NaN, Infinity, negatives, wrong types, unknown ids, duplicate uids.',
       payload: {
@@ -354,6 +382,14 @@ function project(payload: Record<string, unknown>) {
       metaSurvivalLevel: restored.metaSurvivalLevel,
     },
     stats: { alloc: restored.statsAlloc, unspent: restored.unspentStatPoints },
+    summon: {
+      pityCounter: restored.gachaPityCounter,
+      totalSummons: restored.totalSummons,
+      freeCharges: restored.freeSummonCharges,
+      claimedMilestones: restored.claimedSummonMilestones,
+      guaranteedMinRarity: restored.guaranteedMinRarity ?? null,
+      firstGiven: restored.firstSummonGiven,
+    },
     wallet: {
       gold: restored.gold,
       totalGold: restored.totalGold,

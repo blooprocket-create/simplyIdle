@@ -31,6 +31,8 @@ interface SurfaceHostProps {
   device: { profile: DeviceProfile; capabilities: DeviceCapabilities };
   pinnedIds: readonly string[];
   automation: SurfaceProps['automation'];
+  actions: SurfaceProps['actions'];
+  save: SurfaceProps['save'];
   onDismiss: () => void;
 }
 
@@ -42,6 +44,8 @@ export function SurfaceHost({
   device,
   pinnedIds,
   automation,
+  actions,
+  save,
   onDismiss,
 }: SurfaceHostProps) {
   if (!destination) return null;
@@ -79,7 +83,17 @@ export function SurfaceHost({
           {surface === undefined ? (
             <PlaceholderSurface destination={destination} />
           ) : (
-            createElement(surface, { destination, snapshot, profile, cast, device, pinnedIds, automation })
+            createElement(surface, {
+              destination,
+              snapshot,
+              profile,
+              cast,
+              device,
+              pinnedIds,
+              automation,
+              actions,
+              save,
+            })
           )}
         </div>
       </section>

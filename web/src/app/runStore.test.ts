@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import Decimal from 'break_eternity.js';
 import { OFFLINE_CAP_MS, OFFLINE_MIN_MS } from '../engine/save/awayClock';
-import { writeRunProgress } from '../engine/save/runProgress';
+import { emptyRun, writeRunProgress, type RunProgress } from '../engine/save/runProgress';
 import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
 import type { PreferenceStore } from '../ui/prefs/store';
 import { loadRun, RunSaver, RUN_KEY, SAVE_INTERVAL_MS } from './runStore';
@@ -25,8 +25,13 @@ function snapshotAt(wave: number, kills = 0): SimulationSnapshot {
   return {
     ...emptySnapshot(),
     wave,
-    totals: { kills, deaths: 0, dealt: new Decimal(0), overkill: new Decimal(0) },
+    totals: { ...emptySnapshot().totals, kills },
   };
+}
+
+/** A stored run, with only what each case is about spelled out. */
+function stored(run: Partial<RunProgress>): string {
+  return writeRunProgress({ ...emptyRun(0), ...run });
 }
 
 const NOW = 1_700_000_000_000;
@@ -44,9 +49,7 @@ describe('loading a run', () => {
 
   it('credits the time between the mark and now', () => {
     const away = 90 * 60 * 1000;
-    const { store } = fakeStore(
-      writeRunProgress({ wave: 60, kills: 9, deaths: 2, burstCharge: 4, awayAtMs: NOW - away }),
-    );
+    const { store } = fakeStore(stored({ wave: 60, kills: 9, deaths: 2, burstCharge: 4, awayAtMs: NOW - away }));
 
     const restored = loadRun(store, NOW);
     expect(restored.resume?.wave).toBe(60);
@@ -56,7 +59,7 @@ describe('loading a run', () => {
 
   it('caps an absence rather than simulating a fortnight', () => {
     const { store } = fakeStore(
-      writeRunProgress({ wave: 60, kills: 0, deaths: 0, burstCharge: 0, awayAtMs: NOW - OFFLINE_CAP_MS * 40 }),
+      stored({ wave: 60, kills: 0, deaths: 0, burstCharge: 0, awayAtMs: NOW - OFFLINE_CAP_MS * 40 }),
     );
     expect(loadRun(store, NOW).awayMs).toBe(OFFLINE_CAP_MS);
     expect(loadRun(store, NOW).verdict).toBe('below-threshold');
@@ -64,7 +67,7 @@ describe('loading a run', () => {
 
   it('credits a refresh with nothing', () => {
     const { store } = fakeStore(
-      writeRunProgress({ wave: 60, kills: 0, deaths: 0, burstCharge: 0, awayAtMs: NOW - OFFLINE_MIN_MS / 2 }),
+      stored({ wave: 60, kills: 0, deaths: 0, burstCharge: 0, awayAtMs: NOW - OFFLINE_MIN_MS / 2 }),
     );
     expect(loadRun(store, NOW).awayMs).toBe(0);
   });
@@ -78,21 +81,37 @@ describe('loading a run', () => {
      * exactly this, and reading is what advances it.
      */
     const away = 2 * 60 * 60 * 1000;
-    const { store } = fakeStore(
-      writeRunProgress({ wave: 60, kills: 0, deaths: 0, burstCharge: 0, awayAtMs: NOW - away }),
-    );
+    const { store } = fakeStore(stored({ wave: 60, kills: 0, deaths: 0, burstCharge: 0, awayAtMs: NOW - away }));
 
     expect(loadRun(store, NOW).awayMs).toBe(away);
     expect(loadRun(store, NOW).awayMs).toBe(0);
     expect(loadRun(store, NOW + 1_000).awayMs).toBe(0);
   });
 
+  it('brings the purse back with the climb', () => {
+    /*
+     * The run's earnings are the one thing here that cannot be re-derived: the
+     * wave a player is standing on says nothing about the route they took to
+     * it, so gold dropped on reload is gold gone. It is also the field most
+     * likely to be past 2^53, which is why it round-trips as text.
+     */
+    const gold = new Decimal('3.5e42');
+    const { store } = fakeStore(stored({ wave: 60, gold, exp: new Decimal(9_100) }));
+    const restored = loadRun(store, NOW);
+    /*
+     * Compared against the `Decimal` itself rather than against `'3.5e42'`,
+     * which is not what it says: break_eternity holds a mantissa and an
+     * exponent as doubles, so this one prints as `3.5000000000000004e42`. The
+     * round trip is exact — the literal was not.
+     */
+    expect(restored.resume?.gold).toEqual(gold);
+    expect(restored.resume?.exp.toString()).toBe('9100');
+  });
+
   it('keeps the run when a rolled-back clock makes the absence negative', () => {
     // A device clock moved backwards credits nothing, but must not throw the
     // climb away — the player did not do anything wrong.
-    const { store } = fakeStore(
-      writeRunProgress({ wave: 77, kills: 3, deaths: 1, burstCharge: 2, awayAtMs: NOW + 60_000 }),
-    );
+    const { store } = fakeStore(stored({ wave: 77, kills: 3, deaths: 1, burstCharge: 2, awayAtMs: NOW + 60_000 }));
     const restored = loadRun(store, NOW);
     expect(restored.verdict).toBe('clock-rolled-back');
     expect(restored.awayMs).toBe(0);
@@ -133,6 +152,15 @@ describe('saving a run while it plays', () => {
     saver.flush(snapshotAt(31, 500), NOW + 10);
     expect(cells.get(RUN_KEY)).toContain('"wave":31');
     expect(cells.get(RUN_KEY)).toContain('"kills":500');
+  });
+
+  it('writes down what the run has earned', () => {
+    // Written as text rather than as a JSON number, so a purse past 2^53
+    // survives the write instead of becoming `null`.
+    const { store, cells } = fakeStore();
+    const rich = { ...snapshotAt(31, 500), totals: { ...emptySnapshot().totals, gold: new Decimal('1e120') } };
+    new RunSaver(store).flush(rich, NOW);
+    expect(cells.get(RUN_KEY)).toContain('"gold":"1e120"');
   });
 
   it('survives a store that refuses to keep anything', () => {

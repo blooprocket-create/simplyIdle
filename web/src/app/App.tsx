@@ -1,10 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import Decimal from 'break_eternity.js';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Diorama } from '../game/Diorama';
 import { detectCapabilities, profileFor } from '../game/device/DeviceProfile';
 import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
-import { demoSimulationOptions, startingRoster } from './demoRoster';
-import { rosterFromSave } from './roster';
-import { loadSave } from './saveStore';
+import { startingSave } from './demoRoster';
+import { canAffordSpark, canSummon, priceOfSummon, rosterActions, sparkExchange, summonOnce } from './playerActions';
+import { fightSignature, rosterFromSave } from './roster';
+import { loadSave, writeSave } from './saveStore';
+import type { SaveV3 } from '../engine/save/schema';
+import type { SummonPayment } from '../engine/roster/summonSave';
+import type { HeroSpend } from '../engine/roster/rosterSave';
+import type { FormationRole } from '../engine/combat/formation';
+import { profileFromSave } from '../ui/profile/playerProfile';
 import { GameLoop } from './GameLoop';
 import { loadRun, RunSaver } from './runStore';
 import { browserStore } from '../ui/prefs/store';
@@ -38,30 +45,45 @@ export function App() {
   // The loop is held so the one player-driven verb can reach the simulation.
   // Nothing else in the shell writes to it.
   const loopRef = useRef<GameLoop | null>(null);
+  // The renderer, held so the loop effect can hand it a cast without owning it.
+  const dioramaRef = useRef<Diorama | null>(null);
 
   const open = useMemo(() => REGISTRY.find(destination => destination.id === openId) ?? null, [openId]);
   const knownIds = useMemo(() => new Set(REGISTRY.map(destination => destination.id)), []);
   // Built once: the profile is what does *not* change per frame, which is the
   // whole reason it is a separate read model from the snapshot.
   /*
-   * The player's team, from their save when they have one.
-   *
-   * Read once, because none of it changes per frame — which is the whole
-   * reason it is a separate read model from the snapshot. A player with no
-   * save gets the starting team instead; both branches return the same
-   * shape, so nothing downstream knows which it got.
+   * The player's save, read once and then owned here.
    *
    * A lazy `useState` rather than a `useMemo`, because reading a save and
    * reading a clock are both impure and `useMemo` is allowed to re-run or
-   * throw its result away. This runs exactly once, which is also what makes
-   * it safe in the loop effect's dependencies below.
+   * throw its result away. A player with no save gets the starting one, which
+   * is a `SaveV3` like any other — so nothing downstream knows which it got.
    */
-  const [roster] = useState(() => {
-    const save = loadSave(browserStore(), Date.now());
-    return save === null ? startingRoster() : rosterFromSave(save);
+  const [initialSave] = useState(() => {
+    const nowMs = Date.now();
+    return loadSave(browserStore(), nowMs) ?? startingSave(nowMs);
   });
+  const [save, setSave] = useState<SaveV3>(initialSave);
+
+  /*
+   * The fight's inputs, rebuilt whenever the save moves — and the *signature*
+   * is what the loop effect actually keys on.
+   *
+   * The distinction is the whole of how a roster can change under a running
+   * game. Summoning a hero rebuilds this object and changes nothing the fight
+   * can observe, so the signature holds and the run carries on. Fielding one,
+   * or levelling one, changes a hero's damage or the team's health, so the
+   * signature moves and the loop is rebuilt around the new team — resuming
+   * from the run that was just flushed, rather than starting again at wave one.
+   */
+  const roster = useMemo(() => rosterFromSave(save), [save]);
+  const rosterRef = useRef(roster);
+  rosterRef.current = roster;
+  const fightKey = useMemo(() => fightSignature(roster), [roster]);
   const cast = roster.cast;
-  const profile = roster.profile;
+  // Rebuilt whenever the save moves, which is what makes a summon show up.
+  const profile = useMemo(() => profileFromSave(save), [save]);
   /*
    * Detected once and shared with the renderer, rather than detected again
    * inside it. Two detections could disagree — `matchMedia` is live, and a
@@ -99,6 +121,64 @@ export function App() {
   const autoBurst = automation.active.has('burst');
   const autoBurstRef = useRef(autoBurst);
 
+  /*
+   * Change the save, and write it down.
+   *
+   * Written synchronously rather than on a timer, because the things that
+   * change it are single deliberate acts — a summon, a level-up — and losing
+   * one to a closed tab is losing something the player paid for. The *run* is
+   * throttled instead; see `RunSaver`, which is recording sixty frames a
+   * second rather than one press.
+   */
+  const applySave = useCallback((next: SaveV3) => {
+    setSave(next);
+    writeSave(browserStore(), next);
+  }, []);
+
+  /*
+   * A verb that changes the save, wrapped so a surface gets a yes or a no.
+   *
+   * `rosterSave.ts` answers with the next save or null, which is the right
+   * shape for an engine and the wrong one for a button: a component holding a
+   * `SaveV3` would be a component that could write one.
+   */
+  const applying = useCallback(
+    (next: SaveV3 | null): boolean => {
+      if (!next) return false;
+      applySave(next);
+      return true;
+    },
+    [applySave],
+  );
+
+  const actions = useMemo(
+    () => ({
+      summon: (pay: SummonPayment) => {
+        const outcome = summonOnce({ save, pay, nowMs: Date.now(), random: Math.random });
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      canSummon: (pay: SummonPayment) => canSummon(save, pay),
+      priceOfSummon: (pay: SummonPayment) => priceOfSummon(save, pay),
+      sparkExchange: (optionId: string) => {
+        const outcome = sparkExchange({ save, optionId, nowMs: Date.now(), random: Math.random });
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      canAffordSpark: (optionId: string) => canAffordSpark(save, optionId),
+      spendOnHero: (uid: string, spend: HeroSpend) => applying(rosterActions.spendOnHero(save, uid, spend)),
+      batchLevel: (uids: readonly string[], addLevels: number | 'max') =>
+        applying(rosterActions.batchLevel(save, uids, addLevels)),
+      recycle: (uid: string) => applying(rosterActions.recycle(save, uid)),
+      fieldTeam: (requested: readonly string[]) => applying(rosterActions.fieldTeam(save, requested)),
+      place: (uid: string, role: FormationRole) => applying(rosterActions.place(save, uid, role)),
+      storeLoadout: (slot: number) => applying(rosterActions.storeLoadout(save, slot)),
+      recallLoadout: (slot: number) => applying(rosterActions.recallLoadout(save, slot)),
+      buySlot: () => applying(rosterActions.buySlot(save)),
+    }),
+    [save, applySave, applying],
+  );
+
   const select = (id: string) => {
     if (id === 'more') {
       setRailOpen(true);
@@ -108,12 +188,44 @@ export function App() {
     setOpenId(id);
   };
 
+  /*
+   * The renderer, which outlives a team change.
+   *
+   * Split from the loop below for exactly that reason: disposing a Babylon
+   * engine and building another costs hundreds of milliseconds, and a player
+   * who swapped a hero would pay it every time. The diorama takes a new cast
+   * through `setCast`; it does not need to be rebuilt to draw different people.
+   *
+   * Its dependencies are a subset of the loop's, so any run of this effect is
+   * followed by a run of that one — which is what guarantees a freshly built
+   * diorama is handed a cast before it draws.
+   */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const diorama = new Diorama(canvas, { profile: device.profile });
-    diorama.setCast(cast);
+    dioramaRef.current = diorama;
+
+    const onResize = () => diorama.resize();
+    window.addEventListener('resize', onResize);
+
+    return () => {
+      window.removeEventListener('resize', onResize);
+      dioramaRef.current = null;
+      diorama.dispose();
+    };
+  }, [device.profile]);
+
+  useEffect(() => {
+    const diorama = dioramaRef.current;
+    if (!diorama) return;
+
+    // Read through a ref rather than taken as a dependency: the object is
+    // rebuilt on every save change, and only the signature says whether the
+    // fight would notice.
+    const roster = rosterRef.current;
+    diorama.setCast(roster.cast);
 
     /*
      * The run, and how long the player was gone.
@@ -129,12 +241,19 @@ export function App() {
     const saver = new RunSaver(store);
     /*
      * Seeded from the ref rather than the value, so a toggle does not belong
-     * in this effect's deps — it would tear down the diorama and restart the
-     * fight from wave one every time the player flipped a switch.
+     * in this effect's deps — it would restart the fight from wave one every
+     * time the player flipped a switch.
      */
     const loop = new GameLoop({
       heroes: roster.heroes,
-      ...demoSimulationOptions(),
+      // Derived from whichever roster answered — a save's or the starting one.
+      // Both go through the same `teamMaxHp`, so a returning player and a new
+      // one are measured by one rule rather than two.
+      teamMaxHp: new Decimal(roster.teamMaxHp),
+      // The whole mitigation chain, derived. It used to be a flat `1` handed
+      // over by `demoSimulationOptions` — the team taking a monster's damage
+      // raw, which against the shipped chain is up to ten times too much.
+      incomingMult: roster.incomingMult,
       autoBurst: autoBurstRef.current,
       resume: restored.resume ?? undefined,
       awayMs: restored.awayMs,
@@ -148,9 +267,6 @@ export function App() {
     });
     loop.start();
 
-    const onResize = () => diorama.resize();
-    window.addEventListener('resize', onResize);
-
     /*
      * `pagehide` rather than `beforeunload`: on iOS a backgrounded tab is
      * frozen and may never unload at all, so `beforeunload` is the one event
@@ -162,14 +278,18 @@ export function App() {
 
     return () => {
       window.removeEventListener('pagehide', onHide);
-      window.removeEventListener('resize', onResize);
+      /*
+       * Flushed on the way out, which is what makes a rebuild continue rather
+       * than restart: the next run of this effect reads it straight back
+       * through `loadRun`. The mark is restamped by that read, so the gap
+       * between the two — a few milliseconds — credits nothing.
+       */
       saver.flush(loop.read(), Date.now());
       unsubscribe();
       loop.stop();
       loopRef.current = null;
-      diorama.dispose();
     };
-  }, [cast, device.profile, roster]);
+  }, [fightKey, device.profile]);
 
   /*
    * The one place a preference reaches the simulation, and deliberately below
@@ -199,6 +319,8 @@ export function App() {
         device={device}
         pinnedIds={pinnedIds}
         automation={automation}
+        actions={actions}
+        save={save}
         onDismiss={() => setOpenId(null)}
       />
       {railOpen && (

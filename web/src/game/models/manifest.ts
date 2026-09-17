@@ -43,6 +43,18 @@ export function heroModelKey(heroId: string): ModelKey {
 }
 
 /**
+ * The player's own figure.
+ *
+ * Keyed by class rather than by account, because that is the only thing about
+ * them a pack could author: there are five players to model, not one per save.
+ * A pack with no entry falls back to the class silhouette, which is what the
+ * heroes of that class already fall back to.
+ */
+export function playerModelKey(playerClass: string): ModelKey {
+  return `player/${playerClass}`;
+}
+
+/**
  * Keyed by who the monster is, not by which wave it turned up on.
  *
  * `spawnEnemy` ids an encounter `w1`, `w2`, `w3`… — fine for the simulation,

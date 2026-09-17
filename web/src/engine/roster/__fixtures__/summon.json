@@ -1,0 +1,2223 @@
+{
+  "note": "Shipped summoning, measured against a scripted random source. Owned by __tests__/summonFixture.test.ts.",
+  "generatedFrom": "src/reducers/rosterReducer.ts SUMMON_HERO via the exported reducer",
+  "seed": 20260115,
+  "randomSequence": [
+    0.09281011437997222,
+    0.9917062961030751,
+    0.15858894400298595,
+    0.49808454304002225,
+    0.41007166588678956,
+    0.7757281812373549,
+    0.18694208096712828,
+    0.003389782039448619
+  ],
+  "rarityChances": [
+    {
+      "id": "common",
+      "chance": 0.499
+    },
+    {
+      "id": "uncommon",
+      "chance": 0.25
+    },
+    {
+      "id": "rare",
+      "chance": 0.13
+    },
+    {
+      "id": "epic",
+      "chance": 0.07
+    },
+    {
+      "id": "legendary",
+      "chance": 0.03
+    },
+    {
+      "id": "mythic",
+      "chance": 0.015
+    },
+    {
+      "id": "godly",
+      "chance": 0.005
+    },
+    {
+      "id": "transcendent",
+      "chance": 0.001
+    }
+  ],
+  "milestoneThresholds": [
+    10,
+    50,
+    100,
+    250,
+    500,
+    1000
+  ],
+  "sparkTokenByRarity": {
+    "common": 1,
+    "uncommon": 3,
+    "rare": 8,
+    "epic": 20,
+    "legendary": 50,
+    "mythic": 120,
+    "godly": 300,
+    "transcendent": 600
+  },
+  "milestones": [
+    {
+      "threshold": 10,
+      "rewardLabel": "5 Free Summon Charges",
+      "freeCharges": 5,
+      "sparkTokens": null,
+      "guaranteedRarity": null,
+      "grantUniqueForge": false
+    },
+    {
+      "threshold": 50,
+      "rewardLabel": "Next summon guaranteed Epic+",
+      "freeCharges": null,
+      "sparkTokens": null,
+      "guaranteedRarity": "epic",
+      "grantUniqueForge": false
+    },
+    {
+      "threshold": 100,
+      "rewardLabel": "500 Spark Tokens",
+      "freeCharges": null,
+      "sparkTokens": 500,
+      "guaranteedRarity": null,
+      "grantUniqueForge": false
+    },
+    {
+      "threshold": 250,
+      "rewardLabel": "Next summon guaranteed Legendary+",
+      "freeCharges": null,
+      "sparkTokens": null,
+      "guaranteedRarity": "legendary",
+      "grantUniqueForge": false
+    },
+    {
+      "threshold": 500,
+      "rewardLabel": "2000 Spark Tokens + Unique Gear",
+      "freeCharges": null,
+      "sparkTokens": 2000,
+      "guaranteedRarity": null,
+      "grantUniqueForge": true
+    },
+    {
+      "threshold": 1000,
+      "rewardLabel": "Next summon guaranteed Mythic+",
+      "freeCharges": null,
+      "sparkTokens": null,
+      "guaranteedRarity": "mythic",
+      "grantUniqueForge": false
+    }
+  ],
+  "costs": {
+    "gacha": 500,
+    "diamonds": 500,
+    "vipDiscountLevel": 3,
+    "vipDiscount": 0.1
+  },
+  "bannerRateUpByRarity": {
+    "legendary": 0.35,
+    "mythic": 0.45,
+    "godly": 0.55,
+    "transcendent": 0.65
+  },
+  "banners": [
+    {
+      "id": "astral-vanguard",
+      "title": "Astral Vanguard",
+      "description": "Void command mobilized for precision warfront strikes.",
+      "featuredHeroId": "h64",
+      "artEmoji": "🌌"
+    },
+    {
+      "id": "worldrend-ascendant",
+      "title": "Worldrend Ascendant",
+      "description": "Frontline cataclysm specialists break siege lines.",
+      "featuredHeroId": "h61",
+      "artEmoji": "🗻"
+    },
+    {
+      "id": "abyssal-tide",
+      "title": "Abyssal Tide",
+      "description": "Berserker leviathans surge through fractured gates.",
+      "featuredHeroId": "h62",
+      "artEmoji": "🌊"
+    },
+    {
+      "id": "sunflame-flight",
+      "title": "Sunflame Flight",
+      "description": "Skyborn marksmen dominate extreme-range execution.",
+      "featuredHeroId": "h63",
+      "artEmoji": "🦅"
+    },
+    {
+      "id": "eternal-cycle",
+      "title": "Eternal Cycle",
+      "description": "Monastic avatars reset fate with impossible tempo.",
+      "featuredHeroId": "h65",
+      "artEmoji": "♾️"
+    },
+    {
+      "id": "time-hegemony",
+      "title": "Time Hegemony",
+      "description": "Chrono-casters lock timelines around elite targets.",
+      "featuredHeroId": "h57",
+      "artEmoji": "⏰"
+    },
+    {
+      "id": "imperial-fall",
+      "title": "Imperial Fall",
+      "description": "Crown-era warlords reclaim ruined dynastic thrones.",
+      "featuredHeroId": "h52",
+      "artEmoji": "👑"
+    }
+  ],
+  "earlyGame": [
+    {
+      "index": 0,
+      "rarity": "common",
+      "heroId": "h30",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 1,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 1,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 1,
+      "rarity": "common",
+      "heroId": "h24",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 2,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 2,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 2,
+      "rarity": "uncommon",
+      "heroId": "h21",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 3,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 3,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 3,
+      "rarity": "uncommon",
+      "heroId": "h12",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 4,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 4,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 4,
+      "rarity": "uncommon",
+      "heroId": "h12",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 5,
+      "pityTriggered": false,
+      "sparkTokens": 3,
+      "freeSummonCharges": 0,
+      "totalSummons": 5,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 5,
+      "rarity": "common",
+      "heroId": "h16",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 6,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 6,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 6,
+      "rarity": "common",
+      "heroId": "h21",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 7,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 7,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 7,
+      "rarity": "common",
+      "heroId": "h9",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 8,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 8,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 8,
+      "rarity": "rare",
+      "heroId": "h35",
+      "tier": 2,
+      "randomDraws": 4,
+      "pityCounter": 9,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 9,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 9,
+      "rarity": "common",
+      "heroId": "h9",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 10,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 5,
+      "totalSummons": 10,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 10,
+      "rarity": "rare",
+      "heroId": "h49",
+      "tier": 3,
+      "randomDraws": 4,
+      "pityCounter": 11,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 4,
+      "totalSummons": 11,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 11,
+      "rarity": "epic",
+      "heroId": "h34",
+      "tier": 2,
+      "randomDraws": 4,
+      "pityCounter": 12,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 3,
+      "totalSummons": 12,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 12,
+      "rarity": "common",
+      "heroId": "h9",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 13,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 2,
+      "totalSummons": 13,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 13,
+      "rarity": "uncommon",
+      "heroId": "h19",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 14,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 1,
+      "totalSummons": 14,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 14,
+      "rarity": "uncommon",
+      "heroId": "h26",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 15,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 15,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 15,
+      "rarity": "common",
+      "heroId": "h29",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 16,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 16,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 16,
+      "rarity": "uncommon",
+      "heroId": "h7",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 17,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 17,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 17,
+      "rarity": "uncommon",
+      "heroId": "h10",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 18,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 18,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 18,
+      "rarity": "common",
+      "heroId": "h1",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 19,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 19,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 19,
+      "rarity": "common",
+      "heroId": "h16",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 20,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 20,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 20,
+      "rarity": "legendary",
+      "heroId": "h43",
+      "tier": 3,
+      "randomDraws": 5,
+      "pityCounter": 0,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 21,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 21,
+      "rarity": "common",
+      "heroId": "h9",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 1,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 22,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 22,
+      "rarity": "uncommon",
+      "heroId": "h17",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 2,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 23,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 23,
+      "rarity": "common",
+      "heroId": "h6",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 3,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 24,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 24,
+      "rarity": "common",
+      "heroId": "h23",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 4,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 25,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 25,
+      "rarity": "common",
+      "heroId": "h7",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 5,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 26,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 26,
+      "rarity": "common",
+      "heroId": "h16",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 6,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 27,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 27,
+      "rarity": "uncommon",
+      "heroId": "h21",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 7,
+      "pityTriggered": false,
+      "sparkTokens": 3,
+      "freeSummonCharges": 0,
+      "totalSummons": 28,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 28,
+      "rarity": "uncommon",
+      "heroId": "h4",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 8,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 29,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 29,
+      "rarity": "common",
+      "heroId": "h22",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 9,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 30,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 30,
+      "rarity": "epic",
+      "heroId": "h31",
+      "tier": 2,
+      "randomDraws": 4,
+      "pityCounter": 10,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 31,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 31,
+      "rarity": "common",
+      "heroId": "h23",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 11,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 32,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 32,
+      "rarity": "common",
+      "heroId": "h19",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 12,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 33,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 33,
+      "rarity": "common",
+      "heroId": "h8",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 13,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 34,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 34,
+      "rarity": "common",
+      "heroId": "h17",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 14,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 35,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 35,
+      "rarity": "rare",
+      "heroId": "h45",
+      "tier": 3,
+      "randomDraws": 4,
+      "pityCounter": 15,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 36,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 36,
+      "rarity": "uncommon",
+      "heroId": "h29",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 16,
+      "pityTriggered": false,
+      "sparkTokens": 3,
+      "freeSummonCharges": 0,
+      "totalSummons": 37,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 37,
+      "rarity": "common",
+      "heroId": "h10",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 17,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 38,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 38,
+      "rarity": "common",
+      "heroId": "h19",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 18,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 39,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 39,
+      "rarity": "uncommon",
+      "heroId": "h6",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 19,
+      "pityTriggered": false,
+      "sparkTokens": 3,
+      "freeSummonCharges": 0,
+      "totalSummons": 40,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 40,
+      "rarity": "common",
+      "heroId": "h16",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 20,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 41,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 41,
+      "rarity": "rare",
+      "heroId": "h34",
+      "tier": 2,
+      "randomDraws": 5,
+      "pityCounter": 21,
+      "pityTriggered": false,
+      "sparkTokens": 8,
+      "freeSummonCharges": 0,
+      "totalSummons": 42,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 42,
+      "rarity": "common",
+      "heroId": "h10",
+      "tier": 1,
+      "randomDraws": 5,
+      "pityCounter": 22,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 43,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 43,
+      "rarity": "common",
+      "heroId": "h5",
+      "tier": 1,
+      "randomDraws": 5,
+      "pityCounter": 23,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 44,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 44,
+      "rarity": "common",
+      "heroId": "h4",
+      "tier": 1,
+      "randomDraws": 5,
+      "pityCounter": 24,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 45,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 45,
+      "rarity": "legendary",
+      "heroId": "h53",
+      "tier": 4,
+      "randomDraws": 5,
+      "pityCounter": 0,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 46,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 46,
+      "rarity": "common",
+      "heroId": "h27",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 1,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 47,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 47,
+      "rarity": "rare",
+      "heroId": "h38",
+      "tier": 2,
+      "randomDraws": 4,
+      "pityCounter": 2,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 48,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 48,
+      "rarity": "rare",
+      "heroId": "h35",
+      "tier": 2,
+      "randomDraws": 4,
+      "pityCounter": 3,
+      "pityTriggered": false,
+      "sparkTokens": 8,
+      "freeSummonCharges": 0,
+      "totalSummons": 49,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 49,
+      "rarity": "common",
+      "heroId": "h1",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 4,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 50,
+      "claimedMilestones": [
+        10,
+        50
+      ],
+      "guaranteedMinRarity": "epic"
+    },
+    {
+      "index": 50,
+      "rarity": "epic",
+      "heroId": "h44",
+      "tier": 3,
+      "randomDraws": 4,
+      "pityCounter": 5,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 51,
+      "claimedMilestones": [
+        10,
+        50
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 51,
+      "rarity": "common",
+      "heroId": "h15",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 6,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 52,
+      "claimedMilestones": [
+        10,
+        50
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 52,
+      "rarity": "uncommon",
+      "heroId": "h3",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 7,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 53,
+      "claimedMilestones": [
+        10,
+        50
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 53,
+      "rarity": "common",
+      "heroId": "h13",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 8,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 54,
+      "claimedMilestones": [
+        10,
+        50
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 54,
+      "rarity": "uncommon",
+      "heroId": "h13",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 9,
+      "pityTriggered": false,
+      "sparkTokens": 3,
+      "freeSummonCharges": 0,
+      "totalSummons": 55,
+      "claimedMilestones": [
+        10,
+        50
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 55,
+      "rarity": "common",
+      "heroId": "h17",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 10,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 56,
+      "claimedMilestones": [
+        10,
+        50
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 56,
+      "rarity": "common",
+      "heroId": "h18",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 11,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 57,
+      "claimedMilestones": [
+        10,
+        50
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 57,
+      "rarity": "uncommon",
+      "heroId": "h7",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 12,
+      "pityTriggered": false,
+      "sparkTokens": 3,
+      "freeSummonCharges": 0,
+      "totalSummons": 58,
+      "claimedMilestones": [
+        10,
+        50
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 58,
+      "rarity": "common",
+      "heroId": "h25",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 13,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 59,
+      "claimedMilestones": [
+        10,
+        50
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 59,
+      "rarity": "uncommon",
+      "heroId": "h19",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 14,
+      "pityTriggered": false,
+      "sparkTokens": 3,
+      "freeSummonCharges": 0,
+      "totalSummons": 60,
+      "claimedMilestones": [
+        10,
+        50
+      ],
+      "guaranteedMinRarity": null
+    }
+  ],
+  "postgame": [
+    {
+      "index": 0,
+      "rarity": "common",
+      "heroId": "h30",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 1,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 1,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 1,
+      "rarity": "common",
+      "heroId": "h24",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 2,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 2,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 2,
+      "rarity": "uncommon",
+      "heroId": "h21",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 3,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 3,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 3,
+      "rarity": "uncommon",
+      "heroId": "h12",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 4,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 4,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 4,
+      "rarity": "uncommon",
+      "heroId": "h12",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 5,
+      "pityTriggered": false,
+      "sparkTokens": 3,
+      "freeSummonCharges": 0,
+      "totalSummons": 5,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 5,
+      "rarity": "common",
+      "heroId": "h16",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 6,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 6,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 6,
+      "rarity": "common",
+      "heroId": "h21",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 7,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 7,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 7,
+      "rarity": "common",
+      "heroId": "h9",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 8,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 8,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 8,
+      "rarity": "rare",
+      "heroId": "h35",
+      "tier": 2,
+      "randomDraws": 4,
+      "pityCounter": 9,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 9,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 9,
+      "rarity": "common",
+      "heroId": "h9",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 10,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 5,
+      "totalSummons": 10,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 10,
+      "rarity": "rare",
+      "heroId": "h49",
+      "tier": 3,
+      "randomDraws": 4,
+      "pityCounter": 11,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 4,
+      "totalSummons": 11,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 11,
+      "rarity": "epic",
+      "heroId": "h34",
+      "tier": 2,
+      "randomDraws": 4,
+      "pityCounter": 12,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 3,
+      "totalSummons": 12,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 12,
+      "rarity": "common",
+      "heroId": "h9",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 13,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 2,
+      "totalSummons": 13,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 13,
+      "rarity": "uncommon",
+      "heroId": "h19",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 14,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 1,
+      "totalSummons": 14,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 14,
+      "rarity": "uncommon",
+      "heroId": "h26",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 15,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 15,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 15,
+      "rarity": "common",
+      "heroId": "h29",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 16,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 16,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 16,
+      "rarity": "uncommon",
+      "heroId": "h7",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 17,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 17,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 17,
+      "rarity": "uncommon",
+      "heroId": "h10",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 18,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 18,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 18,
+      "rarity": "common",
+      "heroId": "h1",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 19,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 19,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 19,
+      "rarity": "common",
+      "heroId": "h16",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 20,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 20,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 20,
+      "rarity": "legendary",
+      "heroId": "h43",
+      "tier": 3,
+      "randomDraws": 5,
+      "pityCounter": 0,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 21,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 21,
+      "rarity": "common",
+      "heroId": "h9",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 1,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 22,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 22,
+      "rarity": "uncommon",
+      "heroId": "h17",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 2,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 23,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 23,
+      "rarity": "common",
+      "heroId": "h6",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 3,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 24,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 24,
+      "rarity": "common",
+      "heroId": "h23",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 4,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 25,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 25,
+      "rarity": "common",
+      "heroId": "h7",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 5,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 26,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 26,
+      "rarity": "common",
+      "heroId": "h16",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 6,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 27,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 27,
+      "rarity": "uncommon",
+      "heroId": "h21",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 7,
+      "pityTriggered": false,
+      "sparkTokens": 3,
+      "freeSummonCharges": 0,
+      "totalSummons": 28,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 28,
+      "rarity": "uncommon",
+      "heroId": "h4",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 8,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 29,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 29,
+      "rarity": "common",
+      "heroId": "h22",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 9,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 30,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 30,
+      "rarity": "epic",
+      "heroId": "h31",
+      "tier": 2,
+      "randomDraws": 4,
+      "pityCounter": 10,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 31,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 31,
+      "rarity": "common",
+      "heroId": "h23",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 11,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 32,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 32,
+      "rarity": "common",
+      "heroId": "h19",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 12,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 33,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 33,
+      "rarity": "common",
+      "heroId": "h8",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 13,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 34,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 34,
+      "rarity": "common",
+      "heroId": "h17",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 14,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 35,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 35,
+      "rarity": "rare",
+      "heroId": "h45",
+      "tier": 3,
+      "randomDraws": 4,
+      "pityCounter": 15,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 36,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 36,
+      "rarity": "uncommon",
+      "heroId": "h29",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 16,
+      "pityTriggered": false,
+      "sparkTokens": 3,
+      "freeSummonCharges": 0,
+      "totalSummons": 37,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 37,
+      "rarity": "common",
+      "heroId": "h10",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 17,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 38,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 38,
+      "rarity": "common",
+      "heroId": "h19",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 18,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 0,
+      "totalSummons": 39,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 39,
+      "rarity": "uncommon",
+      "heroId": "h6",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 19,
+      "pityTriggered": false,
+      "sparkTokens": 3,
+      "freeSummonCharges": 0,
+      "totalSummons": 40,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    }
+  ],
+  "hardPity": [
+    {
+      "index": 0,
+      "rarity": "legendary",
+      "heroId": "h60",
+      "tier": 4,
+      "randomDraws": 4,
+      "pityCounter": 0,
+      "pityTriggered": true,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 1,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 1,
+      "rarity": "common",
+      "heroId": "h24",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 1,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 2,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 2,
+      "rarity": "uncommon",
+      "heroId": "h21",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 2,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 3,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 3,
+      "rarity": "uncommon",
+      "heroId": "h12",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 3,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 4,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 4,
+      "rarity": "uncommon",
+      "heroId": "h12",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 4,
+      "pityTriggered": false,
+      "sparkTokens": 3,
+      "freeSummonCharges": 0,
+      "totalSummons": 5,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 5,
+      "rarity": "common",
+      "heroId": "h16",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 5,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 6,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    }
+  ],
+  "softPity": [
+    {
+      "index": 0,
+      "rarity": "mythic",
+      "heroId": "h44",
+      "tier": 3,
+      "randomDraws": 5,
+      "pityCounter": 0,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 1,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 1,
+      "rarity": "rare",
+      "heroId": "h34",
+      "tier": 2,
+      "randomDraws": 4,
+      "pityCounter": 1,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 2,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 2,
+      "rarity": "uncommon",
+      "heroId": "h19",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 2,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 3,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 3,
+      "rarity": "common",
+      "heroId": "h24",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 3,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 4,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 4,
+      "rarity": "common",
+      "heroId": "h27",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 4,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 5,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 5,
+      "rarity": "uncommon",
+      "heroId": "h25",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 5,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 6,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 6,
+      "rarity": "uncommon",
+      "heroId": "h26",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 6,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 7,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 7,
+      "rarity": "common",
+      "heroId": "h6",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 7,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 8,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 8,
+      "rarity": "common",
+      "heroId": "h16",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 8,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 0,
+      "totalSummons": 9,
+      "claimedMilestones": [],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 9,
+      "rarity": "common",
+      "heroId": "h10",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 9,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 5,
+      "totalSummons": 10,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 10,
+      "rarity": "epic",
+      "heroId": "h49",
+      "tier": 3,
+      "randomDraws": 4,
+      "pityCounter": 10,
+      "pityTriggered": false,
+      "sparkTokens": 0,
+      "freeSummonCharges": 4,
+      "totalSummons": 11,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    },
+    {
+      "index": 11,
+      "rarity": "common",
+      "heroId": "h16",
+      "tier": 1,
+      "randomDraws": 4,
+      "pityCounter": 11,
+      "pityTriggered": false,
+      "sparkTokens": 1,
+      "freeSummonCharges": 3,
+      "totalSummons": 12,
+      "claimedMilestones": [
+        10
+      ],
+      "guaranteedMinRarity": null
+    }
+  ],
+  "tierClamp": [
+    {
+      "rarity": "common",
+      "tier": 1,
+      "clamped": "common"
+    },
+    {
+      "rarity": "uncommon",
+      "tier": 1,
+      "clamped": "uncommon"
+    },
+    {
+      "rarity": "rare",
+      "tier": 1,
+      "clamped": "rare"
+    },
+    {
+      "rarity": "epic",
+      "tier": 1,
+      "clamped": "epic"
+    },
+    {
+      "rarity": "legendary",
+      "tier": 1,
+      "clamped": "legendary"
+    },
+    {
+      "rarity": "mythic",
+      "tier": 1,
+      "clamped": "legendary"
+    },
+    {
+      "rarity": "godly",
+      "tier": 1,
+      "clamped": "legendary"
+    },
+    {
+      "rarity": "transcendent",
+      "tier": 1,
+      "clamped": "legendary"
+    },
+    {
+      "rarity": "common",
+      "tier": 2,
+      "clamped": "common"
+    },
+    {
+      "rarity": "uncommon",
+      "tier": 2,
+      "clamped": "uncommon"
+    },
+    {
+      "rarity": "rare",
+      "tier": 2,
+      "clamped": "rare"
+    },
+    {
+      "rarity": "epic",
+      "tier": 2,
+      "clamped": "epic"
+    },
+    {
+      "rarity": "legendary",
+      "tier": 2,
+      "clamped": "legendary"
+    },
+    {
+      "rarity": "mythic",
+      "tier": 2,
+      "clamped": "legendary"
+    },
+    {
+      "rarity": "godly",
+      "tier": 2,
+      "clamped": "legendary"
+    },
+    {
+      "rarity": "transcendent",
+      "tier": 2,
+      "clamped": "legendary"
+    },
+    {
+      "rarity": "common",
+      "tier": 3,
+      "clamped": "rare"
+    },
+    {
+      "rarity": "uncommon",
+      "tier": 3,
+      "clamped": "rare"
+    },
+    {
+      "rarity": "rare",
+      "tier": 3,
+      "clamped": "rare"
+    },
+    {
+      "rarity": "epic",
+      "tier": 3,
+      "clamped": "epic"
+    },
+    {
+      "rarity": "legendary",
+      "tier": 3,
+      "clamped": "legendary"
+    },
+    {
+      "rarity": "mythic",
+      "tier": 3,
+      "clamped": "mythic"
+    },
+    {
+      "rarity": "godly",
+      "tier": 3,
+      "clamped": "godly"
+    },
+    {
+      "rarity": "transcendent",
+      "tier": 3,
+      "clamped": "godly"
+    },
+    {
+      "rarity": "common",
+      "tier": 4,
+      "clamped": "epic"
+    },
+    {
+      "rarity": "uncommon",
+      "tier": 4,
+      "clamped": "epic"
+    },
+    {
+      "rarity": "rare",
+      "tier": 4,
+      "clamped": "epic"
+    },
+    {
+      "rarity": "epic",
+      "tier": 4,
+      "clamped": "epic"
+    },
+    {
+      "rarity": "legendary",
+      "tier": 4,
+      "clamped": "legendary"
+    },
+    {
+      "rarity": "mythic",
+      "tier": 4,
+      "clamped": "mythic"
+    },
+    {
+      "rarity": "godly",
+      "tier": 4,
+      "clamped": "godly"
+    },
+    {
+      "rarity": "transcendent",
+      "tier": 4,
+      "clamped": "transcendent"
+    },
+    {
+      "rarity": "common",
+      "tier": 5,
+      "clamped": "epic"
+    },
+    {
+      "rarity": "uncommon",
+      "tier": 5,
+      "clamped": "epic"
+    },
+    {
+      "rarity": "rare",
+      "tier": 5,
+      "clamped": "epic"
+    },
+    {
+      "rarity": "epic",
+      "tier": 5,
+      "clamped": "epic"
+    },
+    {
+      "rarity": "legendary",
+      "tier": 5,
+      "clamped": "legendary"
+    },
+    {
+      "rarity": "mythic",
+      "tier": 5,
+      "clamped": "mythic"
+    },
+    {
+      "rarity": "godly",
+      "tier": 5,
+      "clamped": "godly"
+    },
+    {
+      "rarity": "transcendent",
+      "tier": 5,
+      "clamped": "transcendent"
+    }
+  ]
+}

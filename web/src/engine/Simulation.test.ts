@@ -4,6 +4,7 @@ import { getAttackIntervalMs } from '../content/attackSpeeds';
 import { MAX_ATTACKS_PER_STEP } from './combat/attackTimer';
 import { TELL_HIT_UID } from './combat/burst';
 import { chapterStartWave, retreatWave } from './combat/chapters';
+import { FLAT_RATES, killReward } from './combat/rewards';
 import { bossMechanicForWave } from '../content/bossMechanics';
 import { AWAY_THRESHOLD_MS } from './offline/awayCredit';
 import { estimateOffline, retreatWave as estimateRetreatWave } from './offline/estimate';
@@ -428,6 +429,73 @@ describe('the monster hits back', () => {
   });
 });
 
+describe('what a run earns', () => {
+  /*
+   * Before this the simulation tracked kills, deaths and damage and nothing
+   * else: a player who stayed earned nothing and a player who left was told
+   * nothing, while the offline estimator had been pricing windows in gold the
+   * whole time and throwing the figure away.
+   */
+  const earning = () => new Simulation({ heroes: team(), startWave: 1, teamMaxHp: new Decimal(1e9) });
+
+  it('pays exactly the waves it killed, in order', () => {
+    /*
+     * An identity rather than a bound. Nothing dies here — `incomingMult`
+     * defaults to zero — so the run kills waves one through `kills` and the
+     * total has to be the sum of their prices. That catches the off-by-one
+     * directly: crediting after the respawn pays the wrong wave every time,
+     * and on a boss it is the difference between 213 gold and 31.
+     */
+    const sim = earning();
+    run(sim, 30_000, 100);
+    const read = sim.read();
+
+    expect(read.totals.deaths).toBe(0);
+    expect(read.totals.kills).toBeGreaterThan(10);
+    expect(read.wave).toBe(read.totals.kills + 1);
+
+    let expected = new Decimal(0);
+    for (let wave = 1; wave <= read.totals.kills; wave += 1) expected = expected.add(killReward(wave, FLAT_RATES).gold);
+    expect(read.totals.gold.toString()).toBe(expected.toString());
+  });
+
+  it('charges a boss at the boss wave rather than at what replaces it', () => {
+    // Read after the respawn, a boss kill pays the ordinary wave behind it.
+    const sim = earning();
+    while (sim.read().wave < 10) sim.advance(100);
+    const before = sim.read().totals.gold;
+    while (sim.read().wave === 10) sim.advance(100);
+
+    expect(sim.read().totals.gold.sub(before).toString()).toBe(killReward(10, FLAT_RATES).gold.toString());
+    expect(killReward(10, FLAT_RATES).gold.gt(killReward(11, FLAT_RATES).gold.mul(5))).toBe(true);
+  });
+
+  it('scales with the rates it was given', () => {
+    const flat = earning();
+    const doubled = new Simulation({
+      heroes: team(),
+      startWave: 1,
+      teamMaxHp: new Decimal(1e9),
+      rates: { goldMult: 2, expMult: 2 },
+    });
+    run(flat, 10_000, 100);
+    run(doubled, 10_000, 100);
+
+    expect(doubled.read().totals.kills).toBe(flat.read().totals.kills);
+    expect(doubled.read().totals.gold.gt(flat.read().totals.gold)).toBe(true);
+    // Not exactly twice: each kill is rounded up on its own, so doubling a
+    // fractional reward and doubling its ceiling are different sums.
+    expect(doubled.read().totals.gold.lte(flat.read().totals.gold.mul(2))).toBe(true);
+  });
+
+  it('pays nothing for a team that kills nothing', () => {
+    const idle = new Simulation({ heroes: [], startWave: 10 });
+    run(idle, 30_000, 100);
+    expect(idle.read().totals.gold.toString()).toBe('0');
+    expect(idle.read().totals.exp.toString()).toBe('0');
+  });
+});
+
 describe('time the tab spent hidden', () => {
   it('is credited rather than dropped', () => {
     /*
@@ -496,6 +564,76 @@ describe('time the tab spent hidden', () => {
     // Open, not merely full: a window timestamped while the tab was hidden
     // would arrive already lapsed and the player would have nothing to press.
     expect(sim.read().burst.windowOpen).toBe(true);
+  });
+
+  it('pays for the waves it credits, not only counts them', () => {
+    /*
+     * The other half of the gap. `awayCredit.ts` carried a note saying the
+     * live loop "has no economy yet, so no gold or EXP is awarded here" — and
+     * the estimator it calls had been computing both and having them dropped
+     * on the floor. A player who closed the tab came back to a longer climb
+     * and an unchanged purse.
+     */
+    const options = { heroes: [hero('h', 1e6, 700)], startWave: 1, teamMaxHp: new Decimal(1e6), incomingMult: 1 };
+    const sim = new Simulation(options);
+    sim.creditAway(60_000);
+
+    expect(sim.read().totals.kills).toBeGreaterThan(0);
+    expect(sim.read().totals.gold.gt(0)).toBe(true);
+    expect(sim.read().totals.exp.gt(0)).toBe(true);
+  });
+
+  it('pays what the waves it credits are worth, which is not what the kill count suggests', () => {
+    /*
+     * The kill-count check above bounds the away run within 2x of the lived
+     * one. **Gold cannot be bounded the same way**, and the measurement is
+     * worth writing down rather than discovering as a flaky test: over the
+     * same minute the estimator credits 84 kills to the live loop's 73 — 15%
+     * more — and 6,574,701 gold to its 1,864,101, which is 3.5x. Gold grows at
+     * 1.14 a wave, so the last few waves are most of the purse and a slightly
+     * longer climb is a much larger number.
+     *
+     * So what is checked is the relationship that does hold: a sum of `k`
+     * increasing prices sits between `k` times the first and `k` times the
+     * last. That catches a purse priced at the wrong waves, or not priced at
+     * all, without pretending to a precision the estimator does not claim.
+     */
+    const options = { heroes: [hero('h', 1e5, 700)], startWave: 1, teamMaxHp: new Decimal(1e9), incomingMult: 1 };
+    const away = new Simulation(options);
+    away.creditAway(60_000);
+    const read = away.read();
+
+    expect(read.totals.deaths).toBe(0);
+    expect(read.totals.gold.gte(killReward(1, FLAT_RATES).gold.mul(read.totals.kills))).toBe(true);
+    expect(read.totals.gold.lte(killReward(read.wave, FLAT_RATES).gold.mul(read.totals.kills))).toBe(true);
+  });
+
+  it('prices the hidden window on the same chain the live loop is charging', () => {
+    /*
+     * The rates reach the estimator rather than being applied to the total it
+     * returns, because it prices a window wave by wave inside its own round
+     * model. A build that credited the away window at flat rates would pay a
+     * player less for leaving than for staying, with nothing on screen to say
+     * why.
+     */
+    const options = { heroes: [hero('h', 1e6, 700)], startWave: 1, teamMaxHp: new Decimal(1e6), incomingMult: 1 };
+    const flat = new Simulation(options);
+    const rich = new Simulation({ ...options, rates: { goldMult: 10, expMult: 10 } });
+    flat.creditAway(60_000);
+    rich.creditAway(60_000);
+
+    // The fight is untouched by the rates, so the two credit the same climb.
+    expect(rich.read().wave).toBe(flat.read().wave);
+    expect(rich.read().totals.kills).toBe(flat.read().totals.kills);
+    /*
+     * A ratio rather than an equality, because the two are not the same
+     * arithmetic: the rate is applied per wave inside the round model, so ten
+     * scaled waves summed and one sum scaled by ten differ in the last place
+     * — 863,106,144.6200001 against 863,106,144.62. That difference is the
+     * point rather than a nuisance, and rounding it away with `toString` would
+     * be asserting something that is not true.
+     */
+    expect(rich.read().totals.gold.div(flat.read().totals.gold).toNumber()).toBeCloseTo(10, 9);
   });
 
   it('charges nothing for a gap that credited no kills', () => {
@@ -809,7 +947,15 @@ describe('the boss mechanic, as the simulation runs it', () => {
 });
 
 describe('a run picked up where it was left', () => {
-  const stored = { wave: 63, kills: 412, deaths: 7, burstCharge: 15, awayAtMs: 0 };
+  const stored = {
+    wave: 63,
+    kills: 412,
+    deaths: 7,
+    burstCharge: 15,
+    gold: new Decimal(1_250_000),
+    exp: new Decimal(88_400),
+    awayAtMs: 0,
+  };
 
   it('starts where the run stopped, with what it had banked', () => {
     /*
@@ -823,6 +969,15 @@ describe('a run picked up where it was left', () => {
     expect(read.totals.kills).toBe(412);
     expect(read.totals.deaths).toBe(7);
     expect(read.burst.charge).toBe(15);
+  });
+
+  it('resumes the purse, and adds to it rather than starting it over', () => {
+    // Gold is the one resumed field with nothing to re-derive it from: the
+    // wave says where the run is, not what it earned getting there.
+    const sim = new Simulation({ heroes: team(), resume: stored });
+    expect(sim.read().totals.gold.toString()).toBe('1250000');
+    run(sim, 30_000, 100);
+    expect(sim.read().totals.gold.gt(1_250_000)).toBe(true);
   });
 
   it('hands back the window the player had, not a wait for it', () => {
@@ -840,6 +995,7 @@ describe('a run picked up where it was left', () => {
     expect(fresh.wave).toBe(9);
     expect(fresh.totals.kills).toBe(0);
     expect(fresh.burst.charge).toBe(0);
+    expect(fresh.totals.gold.toString()).toBe('0');
   });
 
   it("arms the resumed wave's boss mechanic, not the one it started on", () => {
