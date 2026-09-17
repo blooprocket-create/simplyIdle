@@ -3,6 +3,7 @@ import Decimal from 'break_eternity.js';
 import { equipmentTemplatesById } from '../../content/equipment';
 import { heroTemplatesById } from '../../content/heroes';
 import { upgradeFacility } from '../prestige/prestigeSave';
+import { expForLevel, STAT_POINTS_PER_LEVEL } from './migrate';
 import { readSave } from './v3';
 import type { SaveV3 } from './schema';
 import { bankRun, worthBanking } from './bankRun';
@@ -28,10 +29,12 @@ function save(wallet: Record<string, number> = {}): SaveV3 {
   );
 }
 
-const run = (gold: number, essence = 0, bossTears = 0) => ({
+const run = (gold: number, essence = 0, bossTears = 0, exp = 0, kills = 0) => ({
   gold: new Decimal(gold),
+  exp: new Decimal(exp),
   essence,
   bossTears,
+  kills,
 });
 
 describe('putting a run in the wallet', () => {
@@ -57,7 +60,7 @@ describe('putting a run in the wallet', () => {
 
   it('clamps a balance past what a saved number can hold', () => {
     // Gold outgrows a double on a deep account, and the wallet is JSON.
-    const banked = bankRun(save(), { gold: new Decimal('1e400'), essence: 0, bossTears: 0 });
+    const banked = bankRun(save(), { ...run(0), gold: new Decimal('1e400') });
     expect(Number.isFinite(banked.wallet.gold)).toBe(true);
     expect(banked.wallet.gold).toBe(Number.MAX_SAFE_INTEGER);
   });
@@ -104,5 +107,71 @@ describe('the hole banking closes', () => {
     // wallet floored at zero and the next press went through anyway.
     const current = bankRun(save(), run(10));
     expect(upgradeFacility(current, 'training', current.wallet.gold)).toBeNull();
+  });
+});
+
+describe('levelling, banked', () => {
+  const withRoster = (over: Record<string, unknown> = {}) =>
+    readSave(
+      {
+        version: 3,
+        identity: { name: 'P', playerClass: 'warrior', created: true },
+        progression: { level: 1, exp: 0 },
+        wallet: { gold: 0 },
+        roster: {
+          heroes: [
+            { id: 'h1', uid: 'fielded', level: 10, rank: 1, rarity: 'common' },
+            { id: 'h1', uid: 'benched', level: 10, rank: 1, rarity: 'common' },
+          ],
+          activeUids: ['fielded'],
+          ...over,
+        },
+      },
+      { nowMs: 0, content: CONTENT },
+    );
+
+  const levelOf = (next: SaveV3, uid: string) => next.roster.heroes.find(hero => hero.uid === uid)!.level;
+
+  it('levels the player and pays the stat points', () => {
+    const banked = bankRun(withRoster(), { ...run(0), exp: new Decimal(expForLevel(1) + expForLevel(2)) });
+    expect(banked.progression.level).toBe(3);
+    expect(banked.stats.unspent).toBe(2 * STAT_POINTS_PER_LEVEL);
+    expect(banked.progression.exp).toBe(0);
+  });
+
+  it('levels the fielded heroes and leaves the bench alone', () => {
+    // The shipped rule, and the only one that makes fielding a choice.
+    const banked = bankRun(withRoster(), { ...run(0), kills: 7 });
+    expect(levelOf(banked, 'fielded')).toBe(17);
+    expect(levelOf(banked, 'benched')).toBe(10);
+  });
+
+  it('lands in the same place whether banked once or in instalments', () => {
+    /*
+     * The property that lets banking happen on any cadence at all. An idle
+     * player banks every few seconds and a busy one banks on every press, and
+     * the two must not drift — `applyExp` carries its remainder and
+     * `heroLevelAfter` takes a count rather than looping.
+     */
+    const total = expForLevel(1) + expForLevel(2) + 25;
+    const once = bankRun(withRoster(), { ...run(0), exp: new Decimal(total), kills: 9 });
+
+    let drip = withRoster();
+    for (let i = 0; i < 9; i += 1) {
+      drip = bankRun(drip, { ...run(0), exp: new Decimal(Math.floor(total / 9)), kills: 1 });
+    }
+    drip = bankRun(drip, { ...run(0), exp: new Decimal(total - Math.floor(total / 9) * 9), kills: 0 });
+
+    expect(drip.progression.level).toBe(once.progression.level);
+    expect(drip.progression.exp).toBe(once.progression.exp);
+    expect(drip.stats.unspent).toBe(once.stats.unspent);
+    expect(levelOf(drip, 'fielded')).toBe(levelOf(once, 'fielded'));
+  });
+
+  it('counts a run that only killed as worth banking', () => {
+    // A team deep enough to out-level its gold still has to level.
+    expect(worthBanking({ ...run(0), kills: 1 })).toBe(true);
+    expect(worthBanking({ ...run(0), exp: new Decimal(1) })).toBe(true);
+    expect(worthBanking(run(0))).toBe(false);
   });
 });

@@ -300,6 +300,16 @@ describe('ui architecture', () => {
     const unbanked = writes.filter(line => /(?<![.\w])save\b(?!\s*:)/.test(line));
     expect(unbanked, 'a verb reads `save` instead of banking the run first').toEqual([]);
     expect(shell, 'nothing in the shell banks the run').toContain('loopRef.current?.bank()');
+
+    /*
+     * And a player at rest presses no verbs. Without a bank on the run
+     * saver's own cadence, an idle account earns gold that stays in the run
+     * forever and heroes who never level — the two progressions this banking
+     * carries. `saver.tick` already answers whether it wrote, so the throttle
+     * is shared rather than invented a second time.
+     */
+    const idleBank = shell.split('\n').filter(line => line.includes('saver.tick(') && line.includes('live()'));
+    expect(idleBank, 'nothing banks while the player is idle').not.toEqual([]);
   });
 
   it('never rebuilds the fight for numbers it could have handed over', () => {

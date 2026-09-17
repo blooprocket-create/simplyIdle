@@ -188,7 +188,7 @@ describe("a run's earnings", () => {
      * simulated.
      */
     const run = new RunEarnings();
-    run.creditAway(new Decimal('1.5'), new Decimal('0.25'));
+    run.creditAway(new Decimal('1.5'), new Decimal('0.25'), 0);
     expect({ gold: run.read().gold.toString(), exp: run.read().exp.toString() }).toEqual({
       gold: '1.5',
       exp: '0.25',

@@ -1475,25 +1475,52 @@ describe('banking a run', () => {
     expect(sim.read().totals.bossTears).toBe(0);
   });
 
-  it('keeps what the account has nowhere to put', () => {
-    /*
-     * EXP, season points and mastery XP stay in the run, and deliberately —
-     * nothing converts run EXP into a player level and the other two live in
-     * the legacy bag untyped. Zeroing them here would lose them outright,
-     * which is worse than leaving them uncounted. The phase that gives them a
-     * home is the phase that banks them.
-     */
+  it('hands over the EXP and the kills, which now have somewhere to go', () => {
+    // Both were held back when banking arrived, because the account had no
+    // home for them. It has one now: the EXP buys player levels and the kills
+    // level every fielded hero.
     const sim = winnable();
     run(sim, 3_000, 100);
     const before = sim.read().totals;
     expect(before.exp.gt(0)).toBe(true);
+    expect(before.kills).toBeGreaterThan(0);
+
+    const banked = sim.bank();
+    expect(banked.exp.eq(before.exp)).toBe(true);
+    expect(banked.kills).toBe(before.kills);
+    expect(sim.read().totals.exp.eq(0)).toBe(true);
+  });
+
+  it('keeps what the account still has nowhere to put', () => {
+    /*
+     * Season points and mastery XP stay in the run, and deliberately: both
+     * sit in the legacy bag untyped, and zeroing them here would lose them
+     * outright, which is worse than leaving them uncounted.
+     */
+    const sim = winnable();
+    run(sim, 3_000, 100);
+    const before = sim.read().totals;
     expect(before.seasonPoints).toBeGreaterThan(0);
 
     sim.bank();
     const after = sim.read().totals;
-    expect(after.exp.eq(before.exp)).toBe(true);
     expect(after.seasonPoints).toBe(before.seasonPoints);
     expect(after.masteryXp).toBe(before.masteryXp);
+  });
+
+  it('counts unbanked kills without resetting the run own tally', () => {
+    // `totals.kills` is the run's lifetime count and a HUD reads it; what a
+    // bank takes is how many have gone unpaid. The two must not be the same
+    // number, or banking would make the run look like it had just started.
+    const sim = winnable();
+    run(sim, 3_000, 100);
+    const lifetime = sim.read().totals.kills;
+    expect(sim.bank().kills).toBe(lifetime);
+    expect(sim.read().totals.kills).toBe(lifetime);
+
+    run(sim, 3_000, 100);
+    expect(sim.read().totals.kills).toBeGreaterThan(lifetime);
+    expect(sim.bank().kills).toBe(sim.read().totals.kills - lifetime);
   });
 
   it('banks nothing twice', () => {

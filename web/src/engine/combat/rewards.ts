@@ -53,8 +53,11 @@ export const FLAT_RATES: RewardRates = { goldMult: 1, expMult: 1 };
 /** What a bank moves out of the run. See `RunEarnings.bank` for what does not. */
 export interface BankedRun {
   gold: Decimal;
+  exp: Decimal;
   essence: number;
   bossTears: number;
+  /** Kills since the last bank. Every fielded hero gains a level for each. */
+  kills: number;
 }
 
 export interface Purse {
@@ -122,6 +125,15 @@ export class RunEarnings {
   private payout: KillPayout = EMPTY_PAYOUT;
 
   /**
+   * Kills the account has not been paid for yet.
+   *
+   * Separate from `totals.kills`, which is the run's lifetime count and must
+   * not reset — a hero levels once per kill, so what matters here is how many
+   * have gone unbanked rather than how many there have been.
+   */
+  private killsSinceBank = 0;
+
+  /**
    * Credit one kill, at the wave that died rather than the one replacing it.
    *
    * `random` is the chest roll and nothing else — an argument rather than a
@@ -134,6 +146,7 @@ export class RunEarnings {
     const reward = killReward(wave, this.rates);
     this.purse = { gold: this.purse.gold.add(reward.gold), exp: this.purse.exp.add(reward.exp) };
     this.payout = addPayout(this.payout, killPayout(wave, random));
+    this.killsSinceBank += 1;
   }
 
   /** What the run has earned that is not gold or EXP. */
@@ -156,21 +169,26 @@ export class RunEarnings {
    * they were simply never arriving. Both are one bug: a coin has to belong to
    * the wallet or to the run, and never to both or to neither.
    *
-   * **EXP, season points and mastery XP stay in the run**, and deliberately:
-   * the account has nowhere to put them yet. Player levelling reads
-   * `save.progression.level` and nothing converts EXP into it; season points
-   * and mastery live in the legacy bag untyped. Zeroing them here would lose
-   * them, which is worse than leaving them uncounted — so they keep
-   * accumulating and the phase that gives them a home banks them.
+   * EXP and the kill count come too, and go to the two levellings: the
+   * player's, off the EXP curve, and every fielded hero's, one per kill. That
+   * is a change from the commit that introduced this method, which left EXP in
+   * the run because the account had nowhere to put it. It has one now.
+   *
+   * **Season points and mastery XP still stay**, for that same reason: both
+   * sit in the legacy bag untyped, and zeroing them here would lose them
+   * outright, which is worse than leaving them uncounted.
    */
   bank(): BankedRun {
     const banked = {
       gold: this.purse.gold,
+      exp: this.purse.exp,
       essence: this.payout.essence,
       bossTears: this.payout.bossTears,
+      kills: this.killsSinceBank,
     };
-    this.purse = { gold: new Decimal(0), exp: this.purse.exp };
+    this.purse = EMPTY_PURSE;
     this.payout = { ...this.payout, essence: 0, bossTears: 0 };
+    this.killsSinceBank = 0;
     return banked;
   }
 
@@ -181,8 +199,12 @@ export class RunEarnings {
    * by simulating rounds and extrapolating repeats, so re-deriving it from a
    * kill count would silently drop everything the extrapolation accounted for.
    */
-  creditAway(gold: Decimal, exp: Decimal): void {
+  creditAway(gold: Decimal, exp: Decimal, kills: number): void {
     this.purse = { gold: this.purse.gold.add(gold), exp: this.purse.exp.add(exp) };
+    // Offline kills level heroes too — the shipped estimator runs `killMonster`
+    // in a loop, so a player who closed the tab comes back to a team that
+    // fought rather than to one that waited.
+    this.killsSinceBank += Math.max(0, Math.floor(kills));
   }
 
   read(): Purse {

@@ -77,6 +77,7 @@ export function App() {
     return stored === null ? startingSave(nowMs) : migrateLegacyEquipment(stored, nowMs, Math.random);
   });
   const [save, setSave] = useState<SaveV3>(initialSave);
+  const saveRef = useRef(save);
 
   /*
    * The fight's inputs, rebuilt whenever the save moves — and **two** keys
@@ -150,6 +151,13 @@ export function App() {
    * second rather than one press.
    */
   const applySave = useCallback((next: SaveV3) => {
+    /*
+     * The ref leads the state, and deliberately. `live()` banks and then hands
+     * the result to a verb, and React has not re-rendered by then — a second
+     * bank in the same tick reading `save` would see the balance before the
+     * first one moved it. Writing the ref here makes it the current answer.
+     */
+    saveRef.current = next;
     setSave(next);
     writeSave(browserStore(), next);
   }, []);
@@ -186,11 +194,11 @@ export function App() {
    */
   const live = useCallback((): SaveV3 => {
     const banked = loopRef.current?.bank();
-    if (banked === undefined || !worthBanking(banked)) return save;
-    const next = bankRun(save, banked);
+    if (banked === undefined || !worthBanking(banked)) return saveRef.current;
+    const next = bankRun(saveRef.current, banked);
     applySave(next);
     return next;
-  }, [save, applySave]);
+  }, [applySave]);
 
   const actions = useMemo(
     () => ({
@@ -350,7 +358,13 @@ export function App() {
     const unsubscribe = loop.subscribe(next => {
       diorama.render(next);
       setSnapshot(next);
-      saver.tick(next, Date.now());
+      /*
+       * Banked on the same throttle the run is saved on, so an idle player
+       * levels too. Without this a player who never pressed anything would
+       * earn gold that stayed in the run forever and heroes who never
+       * levelled — every verb banks, and a player at rest presses no verbs.
+       */
+      if (saver.tick(next, Date.now())) live();
     });
     loop.start();
 
@@ -376,7 +390,7 @@ export function App() {
       loop.stop();
       loopRef.current = null;
     };
-  }, [fightKey, device.profile]);
+  }, [fightKey, device.profile, live]);
 
   /*
    * The one place a preference reaches the simulation, and deliberately below

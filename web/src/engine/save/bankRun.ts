@@ -1,5 +1,6 @@
 import type Decimal from 'break_eternity.js';
 import type { BankedRun } from '../combat/rewards';
+import { applyExp, heroLevelAfter } from '../progression/levelUp';
 import type { SaveV3 } from './schema';
 
 /**
@@ -20,9 +21,18 @@ import type { SaveV3 } from './schema';
  * it because it is a lifetime tally that unlocks achievements, and a player
  * whose earnings were banked in a hundred instalments must reach the same
  * figure as one whose were banked in one.
+ *
+ * **Levelling rides on the same moment**, for that same reason: the player off
+ * the EXP curve and every fielded hero once per kill. Doing it here rather
+ * than per kill is what keeps the arithmetic instalment-proof — `applyExp`
+ * carries its remainder and `heroLevelAfter` takes a count, so a hundred small
+ * banks and one large one land in the same place.
  */
 export function bankRun(save: SaveV3, banked: BankedRun): SaveV3 {
   const gold = toNumber(banked.gold);
+  const gain = applyExp(save.progression.level, save.progression.exp, toNumber(banked.exp));
+  const fielded = new Set(save.roster.activeUids);
+
   return {
     ...save,
     wallet: {
@@ -32,12 +42,35 @@ export function bankRun(save: SaveV3, banked: BankedRun): SaveV3 {
       essence: save.wallet.essence + banked.essence,
       bossTears: save.wallet.bossTears + banked.bossTears,
     },
+    /*
+     * The player levels off the EXP curve, and the stat points come with it —
+     * five a level, unspent, because where they go is the player's decision
+     * and not this function's.
+     */
+    progression: {
+      ...save.progression,
+      level: gain.level,
+      exp: gain.exp,
+      totalExp: save.progression.totalExp + toNumber(banked.exp),
+    },
+    stats: { ...save.stats, unspent: save.stats.unspent + gain.statPoints },
+    roster: {
+      ...save.roster,
+      /*
+       * And every *fielded* hero gains a level per kill. The bench gains
+       * nothing, which is the shipped rule and also the only one that makes
+       * the choice of who to field a choice at all.
+       */
+      heroes: save.roster.heroes.map(hero =>
+        fielded.has(hero.uid) ? { ...hero, level: heroLevelAfter(hero.level, banked.kills) } : hero,
+      ),
+    },
   };
 }
 
 /** Whether there is anything to move. Saves a render for a run that idled. */
 export function worthBanking(banked: BankedRun): boolean {
-  return banked.gold.gt(0) || banked.essence > 0 || banked.bossTears > 0;
+  return banked.gold.gt(0) || banked.exp.gt(0) || banked.essence > 0 || banked.bossTears > 0 || banked.kills > 0;
 }
 
 /**
