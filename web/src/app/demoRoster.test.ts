@@ -5,7 +5,8 @@ import { VALID_FORMATION_ROLES_FOR_CLASS, type FormationRole } from '../engine/c
 import { ACTIVE_TEAM_SIZE } from '../engine/save/migrate';
 import { readSave, writeSaveV3 } from '../engine/save/v3';
 import { startingSave } from './demoRoster';
-import { PLAYER_UID, rosterFromSave } from './roster';
+import { uniqueSkillFor } from '../content/heroSkills';
+import { fightSignature, PLAYER_UID, rosterFromSave } from './roster';
 
 /**
  * The three shapes, from the one save. `App` composes these itself — there is
@@ -200,5 +201,87 @@ describe('the team a new player starts on', () => {
     expect(withGear.teamMaxHp).toBeGreaterThan(without.teamMaxHp);
     // More vitality and spirit is more defence, so less damage lands.
     expect(withGear.incomingMult).toBeLessThan(without.incomingMult);
+  });
+
+  it('gives every fielded hero an ability, and the player none', () => {
+    /*
+     * The fifth unported system, reaching the fight. Every hero on the team
+     * casts; the player is not in this list because they have no archetype —
+     * abilities are a hero thing, and the player's verb is BURST.
+     */
+    const save = startingSave(NOW, fixedRandom());
+    const { casters, cast } = rosterFromSave(save);
+    expect(casters.map(entry => entry.uid)).toEqual(save.roster.activeUids);
+    expect(casters.every(entry => entry.fielded)).toBe(true);
+    expect(casters.some(entry => entry.uid === PLAYER_UID)).toBe(false);
+    // And the player *is* in the cast, so the two lists differing is the point
+    // rather than an omission.
+    expect(cast.some(member => member.uid === PLAYER_UID)).toBe(true);
+  });
+
+  it('casts the archetype without a relic and the unique skill with one', () => {
+    /*
+     * A relic swaps the ability rather than strengthening it — and only for
+     * the copy actually carrying it. A relic in the armoury, or on a different
+     * copy of the same hero, leaves them on their archetype.
+     */
+    const save = startingSave(NOW, fixedRandom());
+    const first = save.roster.heroes[0];
+    expect(rosterFromSave(save).casters[0].caster.unique).toBeNull();
+
+    const armed: typeof save = {
+      ...save,
+      roster: {
+        ...save.roster,
+        uniqueByHeroId: { [first.id]: { rank: 4, equippedByUid: first.uid } },
+      },
+    };
+    const armedCaster = rosterFromSave(armed).casters.find(entry => entry.uid === first.uid)!;
+    expect(armedCaster.caster.unique?.rank).toBe(4);
+
+    // The same relic, in the armoury rather than carried.
+    const shelved: typeof save = {
+      ...save,
+      roster: { ...save.roster, uniqueByHeroId: { [first.id]: { rank: 4, equippedByUid: null } } },
+    };
+    expect(rosterFromSave(shelved).casters.find(entry => entry.uid === first.uid)!.caster.unique).toBeNull();
+  });
+
+  it('rebuilds the fight when an ability changes', () => {
+    /*
+     * Varied on `casters` directly rather than through a save, and that is a
+     * correction: my first version equipped a relic and asserted the signature
+     * moved, which it did — but a carried relic also multiplies its bearer's
+     * damage, and damage was already in the signature. The test passed with
+     * the caster list stripped out of `fightSignature` entirely, which is
+     * exactly the regression it was supposed to catch.
+     *
+     * `fightSignature` is a pure function of a `LoadedRoster`, so the honest
+     * way to ask whether abilities are in it is to move an ability and nothing
+     * else. The loop is keyed on this string: a hero who picked up a relic
+     * casts a different skill, and a fight that was not rebuilt goes on
+     * casting the old one.
+     */
+    const save = startingSave(NOW, fixedRandom());
+    const roster = rosterFromSave(save);
+    // Two reads of the same save agree, so a difference below is the change
+    // and not the building of it.
+    expect(fightSignature(rosterFromSave(startingSave(NOW, fixedRandom())))).toBe(fightSignature(roster));
+
+    const [first, ...rest] = roster.casters;
+    const skill = uniqueSkillFor(save.roster.heroes.find(hero => hero.uid === first.uid)!.id)!;
+    expect(skill).toBeDefined();
+    const armed = {
+      ...roster,
+      casters: [{ ...first, caster: { ...first.caster, unique: { skill, rank: 4 } } }, ...rest],
+    };
+    expect(fightSignature(armed)).not.toBe(fightSignature(roster));
+
+    // And the rank alone moves it, because a rank is twelve percent of power.
+    const higher = {
+      ...roster,
+      casters: [{ ...first, caster: { ...first.caster, unique: { skill, rank: 5 } } }, ...rest],
+    };
+    expect(fightSignature(higher)).not.toBe(fightSignature(armed));
   });
 });

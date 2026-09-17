@@ -1,5 +1,6 @@
 import Decimal from 'break_eternity.js';
-import { createAttackTimer, type AttackTimer } from '../combat/attackTimer';
+import { createAttackTimer, swingProgress, type AttackTimer } from '../combat/attackTimer';
+import type { HeroView } from '../types';
 
 /**
  * A hero as the simulation moves them: a swing timer, a hit, and a target.
@@ -68,4 +69,21 @@ export function nominalDps(hero: HeroEntity): Decimal {
  */
 export function teamDps(heroes: readonly HeroEntity[]): Decimal {
   return heroes.reduce((total, hero) => total.add(nominalDps(hero)), new Decimal(0));
+}
+
+/**
+ * The roster as the read model shows it.
+ *
+ * Lived inside `Simulation.read` until the coordinator's line cap objected —
+ * the same trade `teamDps` made above, and for the same reason: turning a
+ * hero into what a cast bar needs is a rule about heroes, not about the
+ * simulation that happens to own the list.
+ */
+export function heroViews(heroes: readonly HeroEntity[]): HeroView[] {
+  return heroes.map(hero => ({
+    uid: hero.uid,
+    swingProgress: swingProgress(hero.timer),
+    damagePerHit: hero.damagePerHit,
+    targetId: hero.targetId,
+  }));
 }

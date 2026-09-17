@@ -262,6 +262,46 @@ describe('ui architecture', () => {
     expect(wired, 'what is marked available must be exactly what is wired').toEqual(available);
   });
 
+  it('hands the loop every roster field the simulation can take', () => {
+    /*
+     * The failure this project keeps finding, made structural.
+     *
+     * Five systems in a row were ported, tested, and then never called: the
+     * clock existed, the reader read it, and the fight ran without it. Hero
+     * abilities were the fifth, and they were found by accident — a mitigation
+     * fixture came out 0.8 off on every scenario with a warrior in it.
+     *
+     * A field can only reach the fight one way: `rosterFromSave` puts it on
+     * `LoadedRoster`, `SimulationOptions` names it, and `App.tsx` passes it to
+     * the loop. The first two are typed and the third is not — an omitted
+     * optional is not a type error — so that third step is the one that can
+     * silently not happen, and this is the test for it.
+     *
+     * Derived from the two interfaces rather than listed, so the next field
+     * anyone adds to both is covered on the day it is added rather than on the
+     * day someone remembers to extend a list here.
+     */
+    const read = (...parts: string[]) => readFileSync(join(process.cwd(), 'src', ...parts), 'utf8');
+    const fieldsOf = (source: string, name: string) => {
+      const body = new RegExp(`export interface ${name} \\{(.*?)\\n\\}`, 's').exec(codeOnly(source));
+      expect(body, `${name} is no longer an interface this test can read`).not.toBeNull();
+      return [...body![1].matchAll(/^ {2}(\w+)\??:/gm)].map(match => match[1]);
+    };
+
+    const provided = fieldsOf(read('app', 'roster.ts'), 'LoadedRoster');
+    const accepted = fieldsOf(read('engine', 'Simulation.ts'), 'SimulationOptions');
+    const shared = provided.filter(field => accepted.includes(field)).sort();
+
+    // If this ever empties out, the test has stopped meaning anything rather
+    // than started passing.
+    expect(shared.length, 'the roster and the simulation share no field at all').toBeGreaterThan(2);
+
+    const shell = codeOnly(read('app', 'App.tsx'));
+    for (const field of shared) {
+      expect(shell, `App.tsx builds roster.${field} and never hands it to the loop`).toContain(`roster.${field}`);
+    }
+  });
+
   it('lets the player read an act mechanic outside the fight that uses it', () => {
     /*
      * The gap this closes. For a while nothing but the fight itself imported

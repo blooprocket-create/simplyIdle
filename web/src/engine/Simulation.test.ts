@@ -6,6 +6,7 @@ import { TELL_HIT_UID } from './combat/burst';
 import { chapterStartWave, retreatWave } from './combat/chapters';
 import { FLAT_RATES, killReward } from './combat/rewards';
 import { bossMechanicForWave } from '../content/bossMechanics';
+import { MENDING_PULSE_BASE_HEAL, MENDING_PULSE_LEVEL_SCALE } from '../content/heroSkills';
 import { AWAY_THRESHOLD_MS } from './offline/awayCredit';
 import { estimateOffline, retreatWave as estimateRetreatWave } from './offline/estimate';
 import { Simulation } from './Simulation';
@@ -1003,5 +1004,133 @@ describe('a run picked up where it was left', () => {
     // resuming onto a boss must arrive with that boss's mechanic live.
     const onBoss = new Simulation({ heroes: team(), resume: { ...stored, wave: 30 } });
     expect(onBoss.read().boss?.name).toBe(bossMechanicForWave(30).name);
+  });
+});
+
+describe('abilities reach the fight', () => {
+  /**
+   * The fifth unported system, connected. Every phase before this one ran the
+   * fight with no abilities at all and passed a temporary buff of zero, with a
+   * note saying a buff needs a clock to expire by.
+   */
+  const caster = (uid: string, archetype: 'frontline_ward' | 'battle_chant' | 'mending_pulse') => ({
+    uid,
+    fielded: true,
+    caster: { level: 1, archetype, unique: null },
+  });
+
+  it('a guard makes the team take less', () => {
+    /*
+     * `frontline_ward` is twenty percent off incoming damage, and it is the
+     * exact buff that made Phase 8's mitigation port look 0.8 off — because it
+     * fires on its own and nobody had built it.
+     */
+    const bare = new Simulation({ heroes: [], teamMaxHp: new Decimal(1e9), incomingMult: 1, startWave: 40 });
+    const warded = new Simulation({
+      heroes: [],
+      teamMaxHp: new Decimal(1e9),
+      incomingMult: 1,
+      startWave: 40,
+      casters: [caster('w', 'frontline_ward')],
+    });
+    run(bare, 3_000, 100);
+    run(warded, 3_000, 100);
+    expect(warded.read().team.hp.gt(bare.read().team.hp)).toBe(true);
+  });
+
+  it('a chant makes the team hit harder', () => {
+    /*
+     * Measured at wave 40 rather than wave 1, and that is not arbitrary.
+     * `dealt` is damage that *landed*, capped by what the enemy had left —
+     * everything past the killing blow is `overkill`. Against a wave-one
+     * monster a team of three thousand DPS overkills on every swing, so an
+     * eighteen percent buff shows up entirely as overkill and `dealt` does not
+     * move at all. My first version asserted on wave one and failed for that
+     * reason, which is the discrete model's own accounting working.
+     */
+    const bare = new Simulation({ heroes: team(), teamMaxHp: new Decimal(1e9), startWave: 40 });
+    const chanted = new Simulation({
+      heroes: team(),
+      teamMaxHp: new Decimal(1e9),
+      startWave: 40,
+      casters: [caster('c', 'battle_chant')],
+    });
+    run(bare, 5_000, 100);
+    run(chanted, 5_000, 100);
+    expect(chanted.read().totals.dealt.gt(bare.read().totals.dealt)).toBe(true);
+  });
+
+  it('a heal brings the team back up, and wastes the pulse it opens on', () => {
+    /*
+     * Ten seconds rather than two, and the length is the test.
+     *
+     * A cooldown starts *ready*, so the first pulse fires on the opening step
+     * — at which point the team is still at full and the heal clips to their
+     * maximum and is gone. `mending_pulse` waits six seconds, so a two-second
+     * run sees exactly one cast and that cast is the wasted one: my first
+     * version ran for two seconds and passed with `healTeam` stubbed out to
+     * return its argument, which is no test at all.
+     *
+     * Ten seconds sees two casts, and the second one lands on a team that has
+     * taken two hundred damage. So the gap is exactly one pulse — 8.04% of a
+     * thousand — and asserting the number rather than the direction is what
+     * pins down that the first one was thrown away.
+     */
+    const bare = new Simulation({ heroes: [], teamMaxHp: new Decimal(1_000), incomingMult: 1, startWave: 40 });
+    const mended = new Simulation({
+      heroes: [],
+      teamMaxHp: new Decimal(1_000),
+      incomingMult: 1,
+      startWave: 40,
+      casters: [caster('m', 'mending_pulse')],
+    });
+    run(bare, 10_000, 100);
+    run(mended, 10_000, 100);
+
+    const gained = mended.read().team.hp.sub(bare.read().team.hp).toNumber();
+    const onePulse = (MENDING_PULSE_BASE_HEAL + MENDING_PULSE_LEVEL_SCALE) * 1_000;
+    expect(gained).toBeCloseTo(onePulse, 6);
+    // Both are below full, so neither reading is the cap in disguise.
+    expect(mended.read().team.hp.lt(1_000)).toBe(true);
+  });
+
+  it('runs the fight unchanged for a team whose casters are all benched', () => {
+    /*
+     * The sixty-four tests above this block are the real control here: they
+     * were written before abilities existed, and a simulation that cast for a
+     * team with none would have moved every number in them.
+     *
+     * So this one asserts the part they cannot — the `fielded` guard, reached
+     * through the simulation rather than the clock. A benched hero keeps their
+     * ability and does not use it, which is why the flag exists rather than
+     * the roster simply leaving them out: the same list answers "who could
+     * cast" for the ability bar and "who does" for the fight.
+     *
+     * An earlier version compared `casters: []` against passing none at all,
+     * which reads like a control and is not one — both sides run the same code
+     * with the same empty list, so a buff leaking into a fight with no casters
+     * moved the two together and the test stayed green.
+     */
+    const bare = new Simulation({ heroes: team(), teamMaxHp: new Decimal(1e9), startWave: 40 });
+    const benched = new Simulation({
+      heroes: team(),
+      teamMaxHp: new Decimal(1e9),
+      startWave: 40,
+      casters: [{ ...caster('b', 'battle_chant'), fielded: false }],
+    });
+    run(bare, 5_000, 100);
+    run(benched, 5_000, 100);
+    expect(benched.read().totals.dealt.eq(bare.read().totals.dealt)).toBe(true);
+
+    // And the same team fielded *does* move it, so the reading above is the
+    // guard holding rather than the scenario having nothing to show.
+    const fielded = new Simulation({
+      heroes: team(),
+      teamMaxHp: new Decimal(1e9),
+      startWave: 40,
+      casters: [caster('b', 'battle_chant')],
+    });
+    run(fielded, 5_000, 100);
+    expect(fielded.read().totals.dealt.gt(bare.read().totals.dealt)).toBe(true);
   });
 });

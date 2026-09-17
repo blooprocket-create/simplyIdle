@@ -12,6 +12,8 @@ import {
   teamHealthFromSave,
 } from '../engine/character/fromSave';
 import { incomingMultiplier, teamDefense } from '../engine/combat/mitigation';
+import type { ActiveCaster } from '../engine/combat/HeroActiveClock';
+import { uniqueSkillFor } from '../content/heroSkills';
 import { wornStats } from '../engine/equipment/equipmentSave';
 import { EQUIPMENT_CONTENT } from './equipmentActions';
 import type { HealthHero } from '../engine/character/stats';
@@ -50,6 +52,15 @@ export interface LoadedRoster {
    * same reason.
    */
   teamMaxHp: number;
+  /**
+   * Whose abilities are in the fight, in team order.
+   *
+   * The fifth unported system, connected. Built from the same rows as the
+   * other four for the same reason — a hero's archetype and their relic's rank
+   * both live on the save, and reading them anywhere else is a second list to
+   * keep in step.
+   */
+  casters: ActiveCaster[];
   /**
    * What fraction of a monster's damage actually lands.
    *
@@ -163,9 +174,26 @@ export function rosterFromSave(save: SaveV3): LoadedRoster {
    * vitality. Building it from the rows keeps the two in step by construction.
    */
   const healthHeroes: HealthHero[] = [];
+  const casters: ActiveCaster[] = [];
   for (const row of activeRows(save)) {
     const template = getHeroTemplate(row.id);
     if (template === undefined) continue;
+    /*
+     * A hero casts their relic's skill only when they are *carrying* it —
+     * equipped, and equipped by this copy. A relic in the armoury, or on a
+     * different copy of the same hero, leaves them on their archetype.
+     */
+    const gear = save.roster.uniqueByHeroId[row.id];
+    const skill = uniqueSkillFor(row.id);
+    casters.push({
+      uid: row.uid,
+      fielded: true,
+      caster: {
+        level: row.level,
+        archetype: template.activeSkillArchetype,
+        unique: skill !== null && gear?.equippedByUid === row.uid ? { skill, rank: gear.rank } : null,
+      },
+    });
     healthHeroes.push({
       uid: row.uid,
       heroClass: template.heroClass,
@@ -264,6 +292,7 @@ export function rosterFromSave(save: SaveV3): LoadedRoster {
   return {
     heroes,
     cast,
+    casters,
     profile: profileFromSave(save),
     teamMaxHp: teamHealthFromSave(save, healthHeroes, equipment),
     incomingMult: incomingMultiplier({
@@ -306,6 +335,15 @@ export function fightSignature(roster: LoadedRoster): string {
   return JSON.stringify([
     roster.teamMaxHp,
     roster.incomingMult,
+    // Abilities join it too: a hero who just picked up their relic casts a
+    // different skill, and a hero who levelled heals for more.
+    roster.casters.map(entry => [
+      entry.uid,
+      entry.caster.level,
+      entry.caster.archetype,
+      entry.caster.unique?.skill.type ?? null,
+      entry.caster.unique?.rank ?? null,
+    ]),
     roster.heroes.map(hero => [hero.uid, hero.damagePerHit.toString(), hero.timer.intervalMs]),
     roster.cast.map(member => [member.uid, member.role, member.modelKey, member.silhouette]),
   ]);

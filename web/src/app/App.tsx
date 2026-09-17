@@ -291,6 +291,7 @@ export function App() {
       // over by `demoSimulationOptions` — the team taking a monster's damage
       // raw, which against the shipped chain is up to ten times too much.
       incomingMult: roster.incomingMult,
+      casters: roster.casters,
       autoBurst: autoBurstRef.current,
       resume: restored.resume ?? undefined,
       awayMs: restored.awayMs,

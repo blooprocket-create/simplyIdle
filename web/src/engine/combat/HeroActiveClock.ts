@@ -19,6 +19,13 @@ import { applyCastDamage, castEffect, type CasterView, type CastEffect, type Fig
  * milliseconds, exactly as every other engine part does.
  */
 
+/** One hero's ability, as the fight sees it. */
+export interface ActiveCaster {
+  uid: string;
+  caster: CasterView;
+  fielded: boolean;
+}
+
 export interface CastRecord {
   uid: string;
   effect: CastEffect;
@@ -125,11 +132,7 @@ export class HeroActiveClock {
    * `casters` is walked in team order, so a heal that lands before a burst
    * does so deterministically rather than by map iteration order.
    */
-  step(
-    elapsedMs: number,
-    casters: readonly { uid: string; caster: CasterView; fielded: boolean }[],
-    fight: FightView,
-  ): StepResult {
+  step(elapsedMs: number, casters: readonly ActiveCaster[], fight: FightView): StepResult {
     this.damageBuffMs = Math.max(0, this.damageBuffMs - elapsedMs);
     this.damageReductionMs = Math.max(0, this.damageReductionMs - elapsedMs);
     // A lapsed buff's magnitude is cleared with it, so a stale percentage

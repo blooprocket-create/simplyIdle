@@ -56,3 +56,16 @@ export function applyIncoming(vitals: TeamVitals, wave: number, incomingMult: nu
   if (hp.lte(0)) return { vitals: { ...vitals, hp: new Decimal(0) }, taken, died: true };
   return { vitals: { ...vitals, hp }, taken, died: false };
 }
+
+/**
+ * Restore a fraction of the team's maximum, never past full.
+ *
+ * A fraction rather than an amount, because that is what an ability gives:
+ * `mending_pulse` heals eight percent of the team's maximum whatever that
+ * number is, so a heal expressed in points would have to be recomputed
+ * wherever the maximum changed.
+ */
+export function healTeam(vitals: TeamVitals, fraction: number): TeamVitals {
+  if (!(fraction > 0)) return vitals;
+  return { ...vitals, hp: vitals.hp.add(vitals.maxHp.mul(fraction)).min(vitals.maxHp) };
+}
