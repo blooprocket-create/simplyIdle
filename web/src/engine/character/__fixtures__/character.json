@@ -1,0 +1,452 @@
+{
+  "note": "Shipped character stats and team health, measured. Owned by __tests__/characterFixture.test.ts.",
+  "generatedFrom": "src/useGameState.ts derivedStats / getTeamMaxHp via computeStats and advanceCombatStep",
+  "nowMs": 1768478400000,
+  "scenarios": [
+    {
+      "name": "class-warrior",
+      "note": "A fresh warrior with one level-one common. Isolates the class base stats.",
+      "playerClass": "warrior",
+      "statsAlloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "combined": {
+        "strength": 9,
+        "vitality": 8,
+        "agility": 5,
+        "intelligence": 3,
+        "spirit": 4
+      },
+      "teamMaxHp": 245,
+      "heroLevel": 2,
+      "teamDefense": 5.5226000000000015
+    },
+    {
+      "name": "class-berserker",
+      "note": "A fresh berserker with one level-one common. Isolates the class base stats.",
+      "playerClass": "berserker",
+      "statsAlloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "combined": {
+        "strength": 8,
+        "vitality": 10,
+        "agility": 4,
+        "intelligence": 2,
+        "spirit": 4
+      },
+      "teamMaxHp": 266,
+      "heroLevel": 2,
+      "teamDefense": 6.158600000000001
+    },
+    {
+      "name": "class-archer",
+      "note": "A fresh archer with one level-one common. Isolates the class base stats.",
+      "playerClass": "archer",
+      "statsAlloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "combined": {
+        "strength": 6,
+        "vitality": 5,
+        "agility": 10,
+        "intelligence": 4,
+        "spirit": 4
+      },
+      "teamMaxHp": 213,
+      "heroLevel": 2,
+      "teamDefense": 4.568600000000001
+    },
+    {
+      "name": "class-mage",
+      "note": "A fresh mage with one level-one common. Isolates the class base stats.",
+      "playerClass": "mage",
+      "statsAlloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "combined": {
+        "strength": 2,
+        "vitality": 4,
+        "agility": 5,
+        "intelligence": 11,
+        "spirit": 8
+      },
+      "teamMaxHp": 203,
+      "heroLevel": 2,
+      "teamDefense": 4.8866000000000005
+    },
+    {
+      "name": "class-monk",
+      "note": "A fresh monk with one level-one common. Isolates the class base stats.",
+      "playerClass": "monk",
+      "statsAlloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "combined": {
+        "strength": 5,
+        "vitality": 8,
+        "agility": 6,
+        "intelligence": 7,
+        "spirit": 9
+      },
+      "teamMaxHp": 245,
+      "heroLevel": 2,
+      "teamDefense": 6.317600000000001
+    },
+    {
+      "name": "allocated-vitality",
+      "note": "Forty points into vitality, which is the stat team health is built on.",
+      "playerClass": "warrior",
+      "statsAlloc": {
+        "strength": 0,
+        "vitality": 40,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "combined": {
+        "strength": 9,
+        "vitality": 48,
+        "agility": 5,
+        "intelligence": 3,
+        "spirit": 4
+      },
+      "teamMaxHp": 669,
+      "heroLevel": 2,
+      "teamDefense": 18.2426
+    },
+    {
+      "name": "allocated-spread",
+      "note": "Points in every stat, so a derivation that reads the wrong key is visible.",
+      "playerClass": "warrior",
+      "statsAlloc": {
+        "strength": 11,
+        "vitality": 7,
+        "agility": 5,
+        "intelligence": 3,
+        "spirit": 2
+      },
+      "combined": {
+        "strength": 20,
+        "vitality": 15,
+        "agility": 10,
+        "intelligence": 6,
+        "spirit": 6
+      },
+      "teamMaxHp": 319,
+      "heroLevel": 2,
+      "teamDefense": 8.066600000000001
+    },
+    {
+      "name": "six-heroes",
+      "note": "A full team at rank five epic, so the per-hero rank multiplier carries weight.",
+      "playerClass": "warrior",
+      "statsAlloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "combined": {
+        "strength": 9,
+        "vitality": 8,
+        "agility": 5,
+        "intelligence": 3,
+        "spirit": 4
+      },
+      "teamMaxHp": 9176,
+      "heroLevel": 140,
+      "teamDefense": 294.3282661353217
+    },
+    {
+      "name": "benched-heroes",
+      "note": "Six owned, two active. Only the active pair may count toward health.",
+      "playerClass": "warrior",
+      "statsAlloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "combined": {
+        "strength": 9,
+        "vitality": 8,
+        "agility": 5,
+        "intelligence": 3,
+        "spirit": 4
+      },
+      "teamMaxHp": 3152,
+      "heroLevel": 140,
+      "teamDefense": 99.35793810432006
+    },
+    {
+      "name": "meta-survival",
+      "note": "Essence survival levels, a flat 5% each with no cap.",
+      "playerClass": "warrior",
+      "statsAlloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "combined": {
+        "strength": 9,
+        "vitality": 8,
+        "agility": 5,
+        "intelligence": 3,
+        "spirit": 4
+      },
+      "teamMaxHp": 392,
+      "heroLevel": 2,
+      "teamDefense": 8.836160000000003
+    },
+    {
+      "name": "rebirth-survival",
+      "note": "The rebirth survival path, 7% each and multiplied against the essence track.",
+      "playerClass": "warrior",
+      "statsAlloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "combined": {
+        "strength": 9,
+        "vitality": 8,
+        "agility": 5,
+        "intelligence": 3,
+        "spirit": 4
+      },
+      "teamMaxHp": 639,
+      "heroLevel": 2,
+      "teamDefense": 14.402940800000005
+    },
+    {
+      "name": "mastery-under-cap",
+      "note": "Class mastery below its 25% ceiling, where it still grows in 2% steps of four levels.",
+      "playerClass": "warrior",
+      "statsAlloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "combined": {
+        "strength": 9,
+        "vitality": 8,
+        "agility": 5,
+        "intelligence": 3,
+        "spirit": 4
+      },
+      "teamMaxHp": 265,
+      "heroLevel": 2,
+      "teamDefense": 5.5226000000000015
+    },
+    {
+      "name": "mastery-past-cap",
+      "note": "Mastery far past the ceiling. The 25% cap is the point of the scenario.",
+      "playerClass": "warrior",
+      "statsAlloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "combined": {
+        "strength": 9,
+        "vitality": 8,
+        "agility": 5,
+        "intelligence": 3,
+        "spirit": 4
+      },
+      "teamMaxHp": 306,
+      "heroLevel": 2,
+      "teamDefense": 5.5226000000000015
+    },
+    {
+      "name": "tactics-facility",
+      "note": "The tactics facility, which multiplies health as well as damage.",
+      "playerClass": "warrior",
+      "statsAlloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "combined": {
+        "strength": 9,
+        "vitality": 8,
+        "agility": 5,
+        "intelligence": 3,
+        "spirit": 4
+      },
+      "teamMaxHp": 331,
+      "heroLevel": 2,
+      "teamDefense": 7.455510000000003
+    },
+    {
+      "name": "rebirth-stat-mult",
+      "note": "Heroes carrying a rebirth stat multiplier, which scales their vitality before the roster sum.",
+      "playerClass": "warrior",
+      "statsAlloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "combined": {
+        "strength": 9,
+        "vitality": 8,
+        "agility": 5,
+        "intelligence": 3,
+        "spirit": 4
+      },
+      "teamMaxHp": 14946,
+      "heroLevel": 140,
+      "teamDefense": 485.92306728000017
+    },
+    {
+      "name": "everything",
+      "note": "Every multiplier at once, so an omission that cancels against another cannot hide.",
+      "playerClass": "warrior",
+      "statsAlloc": {
+        "strength": 40,
+        "vitality": 120,
+        "agility": 20,
+        "intelligence": 10,
+        "spirit": 30
+      },
+      "combined": {
+        "strength": 49,
+        "vitality": 128,
+        "agility": 25,
+        "intelligence": 13,
+        "spirit": 34
+      },
+      "teamMaxHp": 574912,
+      "heroLevel": 999,
+      "teamDefense": 15185.822148399337
+    }
+  ],
+  "allocation": {
+    "one": {
+      "alloc": {
+        "strength": 3,
+        "vitality": 4,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "unspent": 9
+    },
+    "n": {
+      "alloc": {
+        "strength": 3,
+        "vitality": 7,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "unspent": 6
+    },
+    "nOverPool": {
+      "alloc": {
+        "strength": 3,
+        "vitality": 13,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "unspent": 0
+    },
+    "nZero": {
+      "alloc": {
+        "strength": 3,
+        "vitality": 3,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "unspent": 10
+    },
+    "nNegative": {
+      "alloc": {
+        "strength": 3,
+        "vitality": -2,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "unspent": 15
+    },
+    "max": {
+      "alloc": {
+        "strength": 3,
+        "vitality": 3,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 10
+      },
+      "unspent": 0
+    },
+    "oneWhenEmpty": {
+      "alloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "unspent": 0
+    },
+    "maxWhenEmpty": {
+      "alloc": {
+        "strength": 0,
+        "vitality": 0,
+        "agility": 0,
+        "intelligence": 0,
+        "spirit": 0
+      },
+      "unspent": 0
+    }
+  },
+  "character": {
+    "created": {
+      "characterCreated": true,
+      "playerName": "Wanderer",
+      "playerClass": "mage",
+      "unspentStatPoints": 10
+    },
+    "nameLength": 24,
+    "blankNameRejected": true,
+    "secondAttemptIgnored": true
+  }
+}

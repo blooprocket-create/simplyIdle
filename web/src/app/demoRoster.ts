@@ -3,6 +3,7 @@ import Decimal from 'break_eternity.js';
 import { CLASS_ATTACK_INTERVAL_MS } from '../content/attackSpeeds';
 import type { PlayerClass } from '../content/classes';
 import { getIntendedFormationRole, type FormationHero } from '../engine/combat/formation';
+import { EMPTY_STATS, teamMaxHp, type HealthHero } from '../engine/character/stats';
 import { createHeroEntity, type HeroEntity } from '../engine/entities/HeroEntity';
 import { heroModelKey } from '../game/models/manifest';
 import { silhouetteFor } from '../game/models/silhouette';
@@ -166,13 +167,50 @@ const DEMO_RARITY = ['legendary', 'epic', 'rare', 'mythic', 'uncommon', 'common'
  * A shell demonstrating a game with no failure state is demonstrating the
  * wrong game.
  *
- * The health is a flat number rather than anything derived, because nothing
- * derives it yet — vitality reaches the simulation when the save does. It is
- * chosen so the demo climbs into the forties and then starts losing, which is
- * the sawtooth the whole offline model is built around.
+ * Health used to be here too, as a flat 2000 with a note saying nothing
+ * derived it yet. Phase 7 derives it; see `startingTeamMaxHp` below, and
+ * `LoadedRoster.teamMaxHp` for the save-backed path it now shares.
  */
-export function demoSimulationOptions(): { teamMaxHp: Decimal; incomingMult: number } {
-  return { teamMaxHp: new Decimal(2_000), incomingMult: 1 };
+export function demoSimulationOptions(): { incomingMult: number } {
+  return { incomingMult: 1 };
+}
+
+/**
+ * The starting team's health, derived rather than chosen.
+ *
+ * Six level-one commons and a warrior with nothing spent, run through the same
+ * `teamMaxHp` a save goes through — so a new player and a returning one are
+ * measured by one rule and not two.
+ *
+ * It lands on 843 against the flat 2000 this file used to hand out, and the
+ * demo still does what that constant was chosen to make it do: climb into the
+ * forties within a minute and then sawtooth there. That is worth stating,
+ * because the derivation was not tuned to preserve it — six heroes across six
+ * classes pick up the formation and synergy multipliers, and those are most of
+ * the difference between 250 and 843.
+ */
+export function startingTeamMaxHp(): number {
+  return teamMaxHp({
+    // No character has been created yet, so there is no class to read. The
+    // shipped `derivedStats` defaults a null class to warrior, and following
+    // it here keeps the no-save path on the same rule as every other path.
+    playerClass: null,
+    alloc: EMPTY_STATS,
+    activeHeroes: DEMO.map(
+      (hero): HealthHero => ({
+        uid: hero.uid,
+        heroClass: hero.heroClass,
+        rarity: 'common',
+        level: 1,
+        rank: 1,
+        rebirthStatMult: 1,
+      }),
+    ),
+    metaSurvivalLevel: 0,
+    rebirthSurvivalPath: 0,
+    classMasteryXp: 0,
+    tacticsFacilityLevel: 0,
+  });
 }
 
 /**
@@ -189,5 +227,5 @@ export function demoSimulationOptions(): { teamMaxHp: Decimal; incomingMult: num
  * one question and does not care which branch answered it.
  */
 export function startingRoster(): LoadedRoster {
-  return { heroes: demoHeroes(), cast: demoCast(), profile: demoProfile() };
+  return { heroes: demoHeroes(), cast: demoCast(), profile: demoProfile(), teamMaxHp: startingTeamMaxHp() };
 }

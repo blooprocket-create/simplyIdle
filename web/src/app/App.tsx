@@ -1,3 +1,4 @@
+import Decimal from 'break_eternity.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Diorama } from '../game/Diorama';
 import { detectCapabilities, profileFor } from '../game/device/DeviceProfile';
@@ -134,6 +135,10 @@ export function App() {
      */
     const loop = new GameLoop({
       heroes: roster.heroes,
+      // Derived from whichever roster answered — a save's or the starting one.
+      // Both go through the same `teamMaxHp`, so a returning player and a new
+      // one are measured by one rule rather than two.
+      teamMaxHp: new Decimal(roster.teamMaxHp),
       ...demoSimulationOptions(),
       autoBurst: autoBurstRef.current,
       resume: restored.resume ?? undefined,
