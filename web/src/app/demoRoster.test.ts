@@ -285,3 +285,66 @@ describe('the team a new player starts on', () => {
     expect(fightSignature(higher)).not.toBe(fightSignature(armed));
   });
 });
+
+describe('what the starting team earns', () => {
+  /*
+   * `SimulationOptions.rates` existed from Phase 8 and nothing supplied it, so
+   * every kill paid a flat 1x while thirteen factors sat computed and unread.
+   * These are the tests for the other end of that wire.
+   */
+  it('derives both chains rather than leaving them flat', () => {
+    const { rates } = rosterFromSave(startingSave(NOW, fixedRandom()));
+    // Not 1x, because there is no neutral week — every event in the table
+    // moves something, and a new save is on one of them.
+    expect(rates.goldMult).not.toBe(1);
+    expect(rates.expMult).not.toBe(1);
+    expect(rates.goldMult).toBeGreaterThan(0);
+    expect(rates.expMult).toBeGreaterThan(0);
+  });
+
+  it('runs gold and EXP down different chains, from a real save', () => {
+    /*
+     * The finding, end to end. A rebirth economy path multiplies gold and
+     * leaves EXP exactly where it was; the training facility does the reverse.
+     * Measured through `rosterFromSave` rather than the chain directly, so
+     * this covers the save reading as well as the arithmetic.
+     */
+    const base = startingSave(NOW, fixedRandom());
+    const flat = rosterFromSave(base).rates;
+    const withProgression = (over: Partial<typeof base.progression>) =>
+      rosterFromSave({ ...base, progression: { ...base.progression, ...over } }).rates;
+
+    for (const over of [{ rebirthEconomyPath: 5 }, { metaEconomyLevel: 5 }]) {
+      expect(withProgression(over).goldMult).toBeGreaterThan(flat.goldMult);
+      expect(withProgression(over).expMult).toBe(flat.expMult);
+    }
+
+    /*
+     * And the *damage* levels move neither, which is the half that a port
+     * sharing one state between the two chains gets wrong — and the half a
+     * test on the starting save alone cannot see, because both meta levels
+     * begin at zero and reading the wrong one looks identical.
+     */
+    for (const over of [{ rebirthDamagePath: 5 }, { metaDamageLevel: 5 }]) {
+      expect(withProgression(over).goldMult).toBe(flat.goldMult);
+      expect(withProgression(over).expMult).toBe(flat.expMult);
+    }
+
+    const studied = rosterFromSave({ ...base, facilities: { ...base.facilities, training: 5 } }).rates;
+    expect(studied.expMult).toBeGreaterThan(flat.expMult);
+    expect(studied.goldMult).toBe(flat.goldMult);
+  });
+
+  it('rebuilds the fight when what a kill pays changes', () => {
+    /*
+     * Varied on the training facility, which reaches EXP and *nothing else* —
+     * not damage, not health, not defence. My first version raised
+     * `prestigeCount`, which moved the signature whether or not the rates were
+     * in it, because prestige multiplies damage too and damage was already
+     * there. The same over-determination the caster test had.
+     */
+    const base = startingSave(NOW, fixedRandom());
+    const studied: typeof base = { ...base, facilities: { ...base.facilities, training: 5 } };
+    expect(fightSignature(rosterFromSave(studied))).not.toBe(fightSignature(rosterFromSave(base)));
+  });
+});

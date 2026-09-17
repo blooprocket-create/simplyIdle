@@ -9,9 +9,12 @@ import {
   classPassiveUnlockedFromLegacy,
   progressionFromSave,
   tacticsLevelFromLegacy,
+  economyFromSave,
   teamHealthFromSave,
 } from '../engine/character/fromSave';
 import { incomingMultiplier, teamDefense } from '../engine/combat/mitigation';
+import { rewardRatesFrom } from '../engine/combat/rewardRates';
+import type { RewardRates } from '../engine/combat/rewards';
 import type { ActiveCaster } from '../engine/combat/HeroActiveClock';
 import { uniqueSkillFor } from '../content/heroSkills';
 import { wornStats } from '../engine/equipment/equipmentSave';
@@ -61,6 +64,18 @@ export interface LoadedRoster {
    * keep in step.
    */
   casters: ActiveCaster[];
+  /**
+   * The gold and EXP chains, as the two scalars the fight and the away
+   * estimator both take.
+   *
+   * `SimulationOptions.rates` has existed since Phase 8 and **nothing ever
+   * supplied it**, so every player has earned at 1x while thirteen factors sat
+   * computed and unread. Built here because the same rows already feed the
+   * damage chain — hero passives, relics and synergy all answer for gold and
+   * EXP as well as for damage, and reading them twice is two chances to
+   * disagree.
+   */
+  rates: RewardRates;
   /**
    * What fraction of a monster's damage actually lands.
    *
@@ -293,6 +308,7 @@ export function rosterFromSave(save: SaveV3): LoadedRoster {
     heroes,
     cast,
     casters,
+    rates: rewardRatesFrom({ team: powered, relics: relicBearers(save, activeUids), economy: economyFromSave(save) }),
     profile: profileFromSave(save),
     teamMaxHp: teamHealthFromSave(save, healthHeroes, equipment),
     incomingMult: incomingMultiplier({
@@ -344,6 +360,9 @@ export function fightSignature(roster: LoadedRoster): string {
       entry.caster.unique?.skill.type ?? null,
       entry.caster.unique?.rank ?? null,
     ]),
+    // And what a kill pays, so a rebirth or a new weekly event rebuilds the
+    // fight rather than going on paying the old rate.
+    [roster.rates.goldMult, roster.rates.expMult],
     roster.heroes.map(hero => [hero.uid, hero.damagePerHit.toString(), hero.timer.intervalMs]),
     roster.cast.map(member => [member.uid, member.role, member.modelKey, member.silhouette]),
   ]);

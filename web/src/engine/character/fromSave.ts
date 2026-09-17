@@ -1,3 +1,4 @@
+import type { EconomyState } from '../combat/rewardRates';
 import type { ProgressionState } from '../combat/progressionMultipliers';
 import { MAX_SAVE_COLLECTION, boundedInt, isRecord } from '../save/guards';
 import type { SaveV3, StatBlock } from '../save/schema';
@@ -36,6 +37,12 @@ const MAX_FACILITY_LEVEL = 999;
 
 /** The shipped VIP track tops out at ten. */
 const MAX_VIP_LEVEL = 10;
+/*
+ * Weeks since the epoch, bounded the way the shipped sanitiser bounds it. The
+ * table wraps with a modulo, so the ceiling is about refusing a corrupt save
+ * rather than about the calendar.
+ */
+const MAX_WEEKLY_EVENT_WEEK = 1_000_000;
 
 /**
  * Mastery experience for the class the player is actually playing.
@@ -117,6 +124,34 @@ export function progressionFromSave(save: SaveV3): ProgressionState {
     classMasteryXp: masteryXpFromLegacy(save),
     classPassiveUnlocked: classPassiveUnlockedFromLegacy(save),
     damageBuffPct: 0,
+  };
+}
+
+/** Which weekly event is running, out of the bag. Its rotation is Phase 11's. */
+export function weeklyEventWeekFromLegacy(save: SaveV3): number {
+  return boundedInt(save.legacy.weeklyEventWeek, 0, MAX_WEEKLY_EVENT_WEEK, 0);
+}
+
+/**
+ * The account half of the reward chain.
+ *
+ * Beside `progressionFromSave` rather than inside it, because the two chains
+ * share only four of their factors: gold reads the *economy* meta level and
+ * rebirth path where damage reads the damage ones, and the treasury and
+ * training facilities where damage reads tactics. Widening one state to serve
+ * both is how a port ends up multiplying gold by the damage path.
+ */
+export function economyFromSave(save: SaveV3): EconomyState {
+  return {
+    prestigeCount: save.progression.prestigeCount,
+    achievementCount: achievementCountFromLegacy(save),
+    metaEconomyLevel: save.progression.metaEconomyLevel,
+    rebirthEconomyPath: save.progression.rebirthEconomyPath,
+    classMasteryXp: masteryXpFromLegacy(save),
+    vipLevel: vipLevelFromLegacy(save),
+    trainingFacilityLevel: boundedInt(save.facilities.training, 0, MAX_FACILITY_LEVEL, 0),
+    treasuryFacilityLevel: boundedInt(save.facilities.treasury, 0, MAX_FACILITY_LEVEL, 0),
+    weeklyEventWeek: weeklyEventWeekFromLegacy(save),
   };
 }
 

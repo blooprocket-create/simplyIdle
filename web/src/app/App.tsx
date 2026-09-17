@@ -295,6 +295,10 @@ export function App() {
       // raw, which against the shipped chain is up to ten times too much.
       incomingMult: roster.incomingMult,
       casters: roster.casters,
+      // The gold and EXP chains. This option has existed since Phase 8 with
+      // nothing supplying it, so every kill paid a flat 1x; `ui/architecture`
+      // now refuses a `LoadedRoster` field the loop takes and the shell drops.
+      rates: roster.rates,
       autoBurst: autoBurstRef.current,
       autoCast: autoCastRef.current,
       // The one place the real generator enters the fight. The engine's own
