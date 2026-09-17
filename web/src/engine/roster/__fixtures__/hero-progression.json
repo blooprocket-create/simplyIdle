@@ -1,0 +1,1545 @@
+{
+  "note": "Shipped hero progression costs and rewards. Owned by __tests__/heroProgressionFixture.test.ts.",
+  "generatedFrom": "src/gameConfig.ts and src/reducers/rosterReducer.ts",
+  "heroLevelCap": 999,
+  "goldLevelCost": [
+    {
+      "level": 1,
+      "cost": 100
+    },
+    {
+      "level": 2,
+      "cost": 108
+    },
+    {
+      "level": 3,
+      "cost": 116
+    },
+    {
+      "level": 10,
+      "cost": 199
+    },
+    {
+      "level": 50,
+      "cost": 4342
+    },
+    {
+      "level": 80,
+      "cost": 43699
+    },
+    {
+      "level": 81,
+      "cost": 47195
+    },
+    {
+      "level": 200,
+      "cost": 448050887
+    },
+    {
+      "level": 998,
+      "cost": 2.1061253743428715e+35
+    },
+    {
+      "level": 999,
+      "cost": 2.2746154042903014e+35
+    }
+  ],
+  "rankUpShardCost": [
+    {
+      "rarity": "common",
+      "targetRank": 1,
+      "cost": 0
+    },
+    {
+      "rarity": "common",
+      "targetRank": 2,
+      "cost": 11
+    },
+    {
+      "rarity": "common",
+      "targetRank": 3,
+      "cost": 30
+    },
+    {
+      "rarity": "common",
+      "targetRank": 5,
+      "cost": 140
+    },
+    {
+      "rarity": "common",
+      "targetRank": 6,
+      "cost": 302
+    },
+    {
+      "rarity": "common",
+      "targetRank": 9,
+      "cost": 1406
+    },
+    {
+      "rarity": "common",
+      "targetRank": 10,
+      "cost": 2002
+    },
+    {
+      "rarity": "common",
+      "targetRank": 11,
+      "cost": 9007199254740991
+    },
+    {
+      "rarity": "uncommon",
+      "targetRank": 1,
+      "cost": 0
+    },
+    {
+      "rarity": "uncommon",
+      "targetRank": 2,
+      "cost": 14
+    },
+    {
+      "rarity": "uncommon",
+      "targetRank": 3,
+      "cost": 37
+    },
+    {
+      "rarity": "uncommon",
+      "targetRank": 5,
+      "cost": 175
+    },
+    {
+      "rarity": "uncommon",
+      "targetRank": 6,
+      "cost": 378
+    },
+    {
+      "rarity": "uncommon",
+      "targetRank": 9,
+      "cost": 1758
+    },
+    {
+      "rarity": "uncommon",
+      "targetRank": 10,
+      "cost": 2502
+    },
+    {
+      "rarity": "uncommon",
+      "targetRank": 11,
+      "cost": 9007199254740991
+    },
+    {
+      "rarity": "rare",
+      "targetRank": 1,
+      "cost": 0
+    },
+    {
+      "rarity": "rare",
+      "targetRank": 2,
+      "cost": 19
+    },
+    {
+      "rarity": "rare",
+      "targetRank": 3,
+      "cost": 51
+    },
+    {
+      "rarity": "rare",
+      "targetRank": 5,
+      "cost": 237
+    },
+    {
+      "rarity": "rare",
+      "targetRank": 6,
+      "cost": 514
+    },
+    {
+      "rarity": "rare",
+      "targetRank": 9,
+      "cost": 2390
+    },
+    {
+      "rarity": "rare",
+      "targetRank": 10,
+      "cost": 3402
+    },
+    {
+      "rarity": "rare",
+      "targetRank": 11,
+      "cost": 9007199254740991
+    },
+    {
+      "rarity": "epic",
+      "targetRank": 1,
+      "cost": 0
+    },
+    {
+      "rarity": "epic",
+      "targetRank": 2,
+      "cost": 27
+    },
+    {
+      "rarity": "epic",
+      "targetRank": 3,
+      "cost": 73
+    },
+    {
+      "rarity": "epic",
+      "targetRank": 5,
+      "cost": 342
+    },
+    {
+      "rarity": "epic",
+      "targetRank": 6,
+      "cost": 740
+    },
+    {
+      "rarity": "epic",
+      "targetRank": 9,
+      "cost": 3444
+    },
+    {
+      "rarity": "epic",
+      "targetRank": 10,
+      "cost": 4903
+    },
+    {
+      "rarity": "epic",
+      "targetRank": 11,
+      "cost": 9007199254740991
+    },
+    {
+      "rarity": "legendary",
+      "targetRank": 1,
+      "cost": 0
+    },
+    {
+      "rarity": "legendary",
+      "targetRank": 2,
+      "cost": 40
+    },
+    {
+      "rarity": "legendary",
+      "targetRank": 3,
+      "cost": 109
+    },
+    {
+      "rarity": "legendary",
+      "targetRank": 5,
+      "cost": 516
+    },
+    {
+      "rarity": "legendary",
+      "targetRank": 6,
+      "cost": 1117
+    },
+    {
+      "rarity": "legendary",
+      "targetRank": 9,
+      "cost": 5202
+    },
+    {
+      "rarity": "legendary",
+      "targetRank": 10,
+      "cost": 7404
+    },
+    {
+      "rarity": "legendary",
+      "targetRank": 11,
+      "cost": 9007199254740991
+    },
+    {
+      "rarity": "mythic",
+      "targetRank": 1,
+      "cost": 0
+    },
+    {
+      "rarity": "mythic",
+      "targetRank": 2,
+      "cost": 58
+    },
+    {
+      "rarity": "mythic",
+      "targetRank": 3,
+      "cost": 157
+    },
+    {
+      "rarity": "mythic",
+      "targetRank": 5,
+      "cost": 739
+    },
+    {
+      "rarity": "mythic",
+      "targetRank": 6,
+      "cost": 1600
+    },
+    {
+      "rarity": "mythic",
+      "targetRank": 9,
+      "cost": 7451
+    },
+    {
+      "rarity": "mythic",
+      "targetRank": 10,
+      "cost": 10606
+    },
+    {
+      "rarity": "mythic",
+      "targetRank": 11,
+      "cost": 9007199254740991
+    },
+    {
+      "rarity": "godly",
+      "targetRank": 1,
+      "cost": 0
+    },
+    {
+      "rarity": "godly",
+      "targetRank": 2,
+      "cost": 85
+    },
+    {
+      "rarity": "godly",
+      "targetRank": 3,
+      "cost": 230
+    },
+    {
+      "rarity": "godly",
+      "targetRank": 5,
+      "cost": 1088
+    },
+    {
+      "rarity": "godly",
+      "targetRank": 6,
+      "cost": 2355
+    },
+    {
+      "rarity": "godly",
+      "targetRank": 9,
+      "cost": 10965
+    },
+    {
+      "rarity": "godly",
+      "targetRank": 10,
+      "cost": 15609
+    },
+    {
+      "rarity": "godly",
+      "targetRank": 11,
+      "cost": 9007199254740991
+    },
+    {
+      "rarity": "transcendent",
+      "targetRank": 1,
+      "cost": 0
+    },
+    {
+      "rarity": "transcendent",
+      "targetRank": 2,
+      "cost": 124
+    },
+    {
+      "rarity": "transcendent",
+      "targetRank": 3,
+      "cost": 336
+    },
+    {
+      "rarity": "transcendent",
+      "targetRank": 5,
+      "cost": 1590
+    },
+    {
+      "rarity": "transcendent",
+      "targetRank": 6,
+      "cost": 3442
+    },
+    {
+      "rarity": "transcendent",
+      "targetRank": 9,
+      "cost": 16025
+    },
+    {
+      "rarity": "transcendent",
+      "targetRank": 10,
+      "cost": 22813
+    },
+    {
+      "rarity": "transcendent",
+      "targetRank": 11,
+      "cost": 9007199254740991
+    }
+  ],
+  "rankConfigs": [
+    {
+      "rankNumber": 1,
+      "shardCostToRankUp": 0,
+      "statMultiplier": 1
+    },
+    {
+      "rankNumber": 2,
+      "shardCostToRankUp": 10,
+      "statMultiplier": 1.05
+    },
+    {
+      "rankNumber": 3,
+      "shardCostToRankUp": 25,
+      "statMultiplier": 1.1
+    },
+    {
+      "rankNumber": 4,
+      "shardCostToRankUp": 50,
+      "statMultiplier": 1.15
+    },
+    {
+      "rankNumber": 5,
+      "shardCostToRankUp": 100,
+      "statMultiplier": 1.2
+    },
+    {
+      "rankNumber": 6,
+      "shardCostToRankUp": 200,
+      "statMultiplier": 1.25
+    },
+    {
+      "rankNumber": 7,
+      "shardCostToRankUp": 350,
+      "statMultiplier": 1.3
+    },
+    {
+      "rankNumber": 8,
+      "shardCostToRankUp": 525,
+      "statMultiplier": 1.35
+    },
+    {
+      "rankNumber": 9,
+      "shardCostToRankUp": 750,
+      "statMultiplier": 1.4
+    },
+    {
+      "rankNumber": 10,
+      "shardCostToRankUp": 1000,
+      "statMultiplier": 1.45
+    }
+  ],
+  "shardReward": [
+    {
+      "rarity": "common",
+      "level": 1,
+      "shards": 5
+    },
+    {
+      "rarity": "common",
+      "level": 2,
+      "shards": 5
+    },
+    {
+      "rarity": "common",
+      "level": 3,
+      "shards": 6
+    },
+    {
+      "rarity": "common",
+      "level": 10,
+      "shards": 11
+    },
+    {
+      "rarity": "common",
+      "level": 50,
+      "shards": 41
+    },
+    {
+      "rarity": "common",
+      "level": 80,
+      "shards": 64
+    },
+    {
+      "rarity": "common",
+      "level": 81,
+      "shards": 65
+    },
+    {
+      "rarity": "common",
+      "level": 200,
+      "shards": 154
+    },
+    {
+      "rarity": "common",
+      "level": 998,
+      "shards": 752
+    },
+    {
+      "rarity": "common",
+      "level": 999,
+      "shards": 753
+    },
+    {
+      "rarity": "uncommon",
+      "level": 1,
+      "shards": 17
+    },
+    {
+      "rarity": "uncommon",
+      "level": 2,
+      "shards": 17
+    },
+    {
+      "rarity": "uncommon",
+      "level": 3,
+      "shards": 19
+    },
+    {
+      "rarity": "uncommon",
+      "level": 10,
+      "shards": 35
+    },
+    {
+      "rarity": "uncommon",
+      "level": 50,
+      "shards": 125
+    },
+    {
+      "rarity": "uncommon",
+      "level": 80,
+      "shards": 192
+    },
+    {
+      "rarity": "uncommon",
+      "level": 81,
+      "shards": 195
+    },
+    {
+      "rarity": "uncommon",
+      "level": 200,
+      "shards": 462
+    },
+    {
+      "rarity": "uncommon",
+      "level": 998,
+      "shards": 2258
+    },
+    {
+      "rarity": "uncommon",
+      "level": 999,
+      "shards": 2260
+    },
+    {
+      "rarity": "rare",
+      "level": 1,
+      "shards": 46
+    },
+    {
+      "rarity": "rare",
+      "level": 2,
+      "shards": 46
+    },
+    {
+      "rarity": "rare",
+      "level": 3,
+      "shards": 52
+    },
+    {
+      "rarity": "rare",
+      "level": 10,
+      "shards": 93
+    },
+    {
+      "rarity": "rare",
+      "level": 50,
+      "shards": 334
+    },
+    {
+      "rarity": "rare",
+      "level": 80,
+      "shards": 514
+    },
+    {
+      "rarity": "rare",
+      "level": 81,
+      "shards": 520
+    },
+    {
+      "rarity": "rare",
+      "level": 200,
+      "shards": 1234
+    },
+    {
+      "rarity": "rare",
+      "level": 998,
+      "shards": 6021
+    },
+    {
+      "rarity": "rare",
+      "level": 999,
+      "shards": 6028
+    },
+    {
+      "rarity": "epic",
+      "level": 1,
+      "shards": 114
+    },
+    {
+      "rarity": "epic",
+      "level": 2,
+      "shards": 114
+    },
+    {
+      "rarity": "epic",
+      "level": 3,
+      "shards": 130
+    },
+    {
+      "rarity": "epic",
+      "level": 10,
+      "shards": 234
+    },
+    {
+      "rarity": "epic",
+      "level": 50,
+      "shards": 835
+    },
+    {
+      "rarity": "epic",
+      "level": 80,
+      "shards": 1285
+    },
+    {
+      "rarity": "epic",
+      "level": 81,
+      "shards": 1300
+    },
+    {
+      "rarity": "epic",
+      "level": 200,
+      "shards": 3085
+    },
+    {
+      "rarity": "epic",
+      "level": 998,
+      "shards": 15054
+    },
+    {
+      "rarity": "epic",
+      "level": 999,
+      "shards": 15069
+    },
+    {
+      "rarity": "legendary",
+      "level": 1,
+      "shards": 287
+    },
+    {
+      "rarity": "legendary",
+      "level": 2,
+      "shards": 287
+    },
+    {
+      "rarity": "legendary",
+      "level": 3,
+      "shards": 325
+    },
+    {
+      "rarity": "legendary",
+      "level": 10,
+      "shards": 587
+    },
+    {
+      "rarity": "legendary",
+      "level": 50,
+      "shards": 2087
+    },
+    {
+      "rarity": "legendary",
+      "level": 80,
+      "shards": 3212
+    },
+    {
+      "rarity": "legendary",
+      "level": 81,
+      "shards": 3250
+    },
+    {
+      "rarity": "legendary",
+      "level": 200,
+      "shards": 7712
+    },
+    {
+      "rarity": "legendary",
+      "level": 998,
+      "shards": 37637
+    },
+    {
+      "rarity": "legendary",
+      "level": 999,
+      "shards": 37675
+    },
+    {
+      "rarity": "mythic",
+      "level": 1,
+      "shards": 690
+    },
+    {
+      "rarity": "mythic",
+      "level": 2,
+      "shards": 690
+    },
+    {
+      "rarity": "mythic",
+      "level": 3,
+      "shards": 780
+    },
+    {
+      "rarity": "mythic",
+      "level": 10,
+      "shards": 1409
+    },
+    {
+      "rarity": "mythic",
+      "level": 50,
+      "shards": 5010
+    },
+    {
+      "rarity": "mythic",
+      "level": 80,
+      "shards": 7710
+    },
+    {
+      "rarity": "mythic",
+      "level": 81,
+      "shards": 7800
+    },
+    {
+      "rarity": "mythic",
+      "level": 200,
+      "shards": 18510
+    },
+    {
+      "rarity": "mythic",
+      "level": 998,
+      "shards": 90329
+    },
+    {
+      "rarity": "mythic",
+      "level": 999,
+      "shards": 90420
+    },
+    {
+      "rarity": "godly",
+      "level": 1,
+      "shards": 1724
+    },
+    {
+      "rarity": "godly",
+      "level": 2,
+      "shards": 1724
+    },
+    {
+      "rarity": "godly",
+      "level": 3,
+      "shards": 1950
+    },
+    {
+      "rarity": "godly",
+      "level": 10,
+      "shards": 3524
+    },
+    {
+      "rarity": "godly",
+      "level": 50,
+      "shards": 12525
+    },
+    {
+      "rarity": "godly",
+      "level": 80,
+      "shards": 19275
+    },
+    {
+      "rarity": "godly",
+      "level": 81,
+      "shards": 19500
+    },
+    {
+      "rarity": "godly",
+      "level": 200,
+      "shards": 46275
+    },
+    {
+      "rarity": "godly",
+      "level": 998,
+      "shards": 225824
+    },
+    {
+      "rarity": "godly",
+      "level": 999,
+      "shards": 226049
+    },
+    {
+      "rarity": "transcendent",
+      "level": 1,
+      "shards": 3679
+    },
+    {
+      "rarity": "transcendent",
+      "level": 2,
+      "shards": 3679
+    },
+    {
+      "rarity": "transcendent",
+      "level": 3,
+      "shards": 4160
+    },
+    {
+      "rarity": "transcendent",
+      "level": 10,
+      "shards": 7519
+    },
+    {
+      "rarity": "transcendent",
+      "level": 50,
+      "shards": 26720
+    },
+    {
+      "rarity": "transcendent",
+      "level": 80,
+      "shards": 41120
+    },
+    {
+      "rarity": "transcendent",
+      "level": 81,
+      "shards": 41600
+    },
+    {
+      "rarity": "transcendent",
+      "level": 200,
+      "shards": 98720
+    },
+    {
+      "rarity": "transcendent",
+      "level": 998,
+      "shards": 481759
+    },
+    {
+      "rarity": "transcendent",
+      "level": 999,
+      "shards": 482239
+    }
+  ],
+  "rebirthPlans": [
+    {
+      "rarity": "common",
+      "level": 1,
+      "rebirthStatMult": 1,
+      "estimatedRebirths": 0,
+      "shardCost": 320,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.75,
+      "statGainPct": 75
+    },
+    {
+      "rarity": "common",
+      "level": 1,
+      "rebirthStatMult": 1.15,
+      "estimatedRebirths": 1,
+      "shardCost": 390,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.8745,
+      "statGainPct": 63
+    },
+    {
+      "rarity": "common",
+      "level": 1,
+      "rebirthStatMult": 1.3225,
+      "estimatedRebirths": 2,
+      "shardCost": 460,
+      "essenceCost": 2,
+      "nextStatMultiplier": 2.0224,
+      "statGainPct": 52.92
+    },
+    {
+      "rarity": "common",
+      "level": 1,
+      "rebirthStatMult": 1.75,
+      "estimatedRebirths": 4,
+      "shardCost": 601,
+      "essenceCost": 3,
+      "nextStatMultiplier": 2.4035,
+      "statGainPct": 37.34
+    },
+    {
+      "rarity": "common",
+      "level": 1,
+      "rebirthStatMult": 3.05,
+      "estimatedRebirths": 7,
+      "shardCost": 812,
+      "essenceCost": 4,
+      "nextStatMultiplier": 3.725,
+      "statGainPct": 22.13
+    },
+    {
+      "rarity": "common",
+      "level": 1,
+      "rebirthStatMult": 8,
+      "estimatedRebirths": 14,
+      "shardCost": 1305,
+      "essenceCost": 8,
+      "nextStatMultiplier": 8.5225,
+      "statGainPct": 6.53
+    },
+    {
+      "rarity": "common",
+      "level": 80,
+      "rebirthStatMult": 1,
+      "estimatedRebirths": 0,
+      "shardCost": 320,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.75,
+      "statGainPct": 75
+    },
+    {
+      "rarity": "common",
+      "level": 80,
+      "rebirthStatMult": 1.15,
+      "estimatedRebirths": 1,
+      "shardCost": 390,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.8745,
+      "statGainPct": 63
+    },
+    {
+      "rarity": "common",
+      "level": 80,
+      "rebirthStatMult": 1.3225,
+      "estimatedRebirths": 2,
+      "shardCost": 460,
+      "essenceCost": 2,
+      "nextStatMultiplier": 2.0224,
+      "statGainPct": 52.92
+    },
+    {
+      "rarity": "common",
+      "level": 80,
+      "rebirthStatMult": 1.75,
+      "estimatedRebirths": 4,
+      "shardCost": 601,
+      "essenceCost": 3,
+      "nextStatMultiplier": 2.4035,
+      "statGainPct": 37.34
+    },
+    {
+      "rarity": "common",
+      "level": 80,
+      "rebirthStatMult": 3.05,
+      "estimatedRebirths": 7,
+      "shardCost": 812,
+      "essenceCost": 4,
+      "nextStatMultiplier": 3.725,
+      "statGainPct": 22.13
+    },
+    {
+      "rarity": "common",
+      "level": 80,
+      "rebirthStatMult": 8,
+      "estimatedRebirths": 14,
+      "shardCost": 1305,
+      "essenceCost": 8,
+      "nextStatMultiplier": 8.5225,
+      "statGainPct": 6.53
+    },
+    {
+      "rarity": "common",
+      "level": 200,
+      "rebirthStatMult": 1,
+      "estimatedRebirths": 0,
+      "shardCost": 320,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.75,
+      "statGainPct": 75
+    },
+    {
+      "rarity": "common",
+      "level": 200,
+      "rebirthStatMult": 1.15,
+      "estimatedRebirths": 1,
+      "shardCost": 390,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.8745,
+      "statGainPct": 63
+    },
+    {
+      "rarity": "common",
+      "level": 200,
+      "rebirthStatMult": 1.3225,
+      "estimatedRebirths": 2,
+      "shardCost": 460,
+      "essenceCost": 2,
+      "nextStatMultiplier": 2.0224,
+      "statGainPct": 52.92
+    },
+    {
+      "rarity": "common",
+      "level": 200,
+      "rebirthStatMult": 1.75,
+      "estimatedRebirths": 4,
+      "shardCost": 601,
+      "essenceCost": 3,
+      "nextStatMultiplier": 2.4035,
+      "statGainPct": 37.34
+    },
+    {
+      "rarity": "common",
+      "level": 200,
+      "rebirthStatMult": 3.05,
+      "estimatedRebirths": 7,
+      "shardCost": 812,
+      "essenceCost": 4,
+      "nextStatMultiplier": 3.725,
+      "statGainPct": 22.13
+    },
+    {
+      "rarity": "common",
+      "level": 200,
+      "rebirthStatMult": 8,
+      "estimatedRebirths": 14,
+      "shardCost": 1305,
+      "essenceCost": 8,
+      "nextStatMultiplier": 8.5225,
+      "statGainPct": 6.53
+    },
+    {
+      "rarity": "common",
+      "level": 999,
+      "rebirthStatMult": 1,
+      "estimatedRebirths": 0,
+      "shardCost": 320,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.75,
+      "statGainPct": 75
+    },
+    {
+      "rarity": "common",
+      "level": 999,
+      "rebirthStatMult": 1.15,
+      "estimatedRebirths": 1,
+      "shardCost": 390,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.8745,
+      "statGainPct": 63
+    },
+    {
+      "rarity": "common",
+      "level": 999,
+      "rebirthStatMult": 1.3225,
+      "estimatedRebirths": 2,
+      "shardCost": 460,
+      "essenceCost": 2,
+      "nextStatMultiplier": 2.0224,
+      "statGainPct": 52.92
+    },
+    {
+      "rarity": "common",
+      "level": 999,
+      "rebirthStatMult": 1.75,
+      "estimatedRebirths": 4,
+      "shardCost": 601,
+      "essenceCost": 3,
+      "nextStatMultiplier": 2.4035,
+      "statGainPct": 37.34
+    },
+    {
+      "rarity": "common",
+      "level": 999,
+      "rebirthStatMult": 3.05,
+      "estimatedRebirths": 7,
+      "shardCost": 812,
+      "essenceCost": 4,
+      "nextStatMultiplier": 3.725,
+      "statGainPct": 22.13
+    },
+    {
+      "rarity": "common",
+      "level": 999,
+      "rebirthStatMult": 8,
+      "estimatedRebirths": 14,
+      "shardCost": 1305,
+      "essenceCost": 8,
+      "nextStatMultiplier": 8.5225,
+      "statGainPct": 6.53
+    },
+    {
+      "rarity": "epic",
+      "level": 1,
+      "rebirthStatMult": 1,
+      "estimatedRebirths": 0,
+      "shardCost": 320,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.75,
+      "statGainPct": 75
+    },
+    {
+      "rarity": "epic",
+      "level": 1,
+      "rebirthStatMult": 1.15,
+      "estimatedRebirths": 1,
+      "shardCost": 390,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.8745,
+      "statGainPct": 63
+    },
+    {
+      "rarity": "epic",
+      "level": 1,
+      "rebirthStatMult": 1.3225,
+      "estimatedRebirths": 2,
+      "shardCost": 460,
+      "essenceCost": 2,
+      "nextStatMultiplier": 2.0224,
+      "statGainPct": 52.92
+    },
+    {
+      "rarity": "epic",
+      "level": 1,
+      "rebirthStatMult": 1.75,
+      "estimatedRebirths": 4,
+      "shardCost": 601,
+      "essenceCost": 3,
+      "nextStatMultiplier": 2.4035,
+      "statGainPct": 37.34
+    },
+    {
+      "rarity": "epic",
+      "level": 1,
+      "rebirthStatMult": 3.05,
+      "estimatedRebirths": 7,
+      "shardCost": 812,
+      "essenceCost": 4,
+      "nextStatMultiplier": 3.725,
+      "statGainPct": 22.13
+    },
+    {
+      "rarity": "epic",
+      "level": 1,
+      "rebirthStatMult": 8,
+      "estimatedRebirths": 14,
+      "shardCost": 1305,
+      "essenceCost": 8,
+      "nextStatMultiplier": 8.5225,
+      "statGainPct": 6.53
+    },
+    {
+      "rarity": "epic",
+      "level": 80,
+      "rebirthStatMult": 1,
+      "estimatedRebirths": 0,
+      "shardCost": 1798,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.75,
+      "statGainPct": 75
+    },
+    {
+      "rarity": "epic",
+      "level": 80,
+      "rebirthStatMult": 1.15,
+      "estimatedRebirths": 1,
+      "shardCost": 2193,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.8745,
+      "statGainPct": 63
+    },
+    {
+      "rarity": "epic",
+      "level": 80,
+      "rebirthStatMult": 1.3225,
+      "estimatedRebirths": 2,
+      "shardCost": 2589,
+      "essenceCost": 2,
+      "nextStatMultiplier": 2.0224,
+      "statGainPct": 52.92
+    },
+    {
+      "rarity": "epic",
+      "level": 80,
+      "rebirthStatMult": 1.75,
+      "estimatedRebirths": 4,
+      "shardCost": 3380,
+      "essenceCost": 3,
+      "nextStatMultiplier": 2.4035,
+      "statGainPct": 37.34
+    },
+    {
+      "rarity": "epic",
+      "level": 80,
+      "rebirthStatMult": 3.05,
+      "estimatedRebirths": 7,
+      "shardCost": 4566,
+      "essenceCost": 4,
+      "nextStatMultiplier": 3.725,
+      "statGainPct": 22.13
+    },
+    {
+      "rarity": "epic",
+      "level": 80,
+      "rebirthStatMult": 8,
+      "estimatedRebirths": 14,
+      "shardCost": 7335,
+      "essenceCost": 8,
+      "nextStatMultiplier": 8.5225,
+      "statGainPct": 6.53
+    },
+    {
+      "rarity": "epic",
+      "level": 200,
+      "rebirthStatMult": 1,
+      "estimatedRebirths": 0,
+      "shardCost": 1798,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.75,
+      "statGainPct": 75
+    },
+    {
+      "rarity": "epic",
+      "level": 200,
+      "rebirthStatMult": 1.15,
+      "estimatedRebirths": 1,
+      "shardCost": 2193,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.8745,
+      "statGainPct": 63
+    },
+    {
+      "rarity": "epic",
+      "level": 200,
+      "rebirthStatMult": 1.3225,
+      "estimatedRebirths": 2,
+      "shardCost": 2589,
+      "essenceCost": 2,
+      "nextStatMultiplier": 2.0224,
+      "statGainPct": 52.92
+    },
+    {
+      "rarity": "epic",
+      "level": 200,
+      "rebirthStatMult": 1.75,
+      "estimatedRebirths": 4,
+      "shardCost": 3380,
+      "essenceCost": 3,
+      "nextStatMultiplier": 2.4035,
+      "statGainPct": 37.34
+    },
+    {
+      "rarity": "epic",
+      "level": 200,
+      "rebirthStatMult": 3.05,
+      "estimatedRebirths": 7,
+      "shardCost": 4566,
+      "essenceCost": 4,
+      "nextStatMultiplier": 3.725,
+      "statGainPct": 22.13
+    },
+    {
+      "rarity": "epic",
+      "level": 200,
+      "rebirthStatMult": 8,
+      "estimatedRebirths": 14,
+      "shardCost": 7335,
+      "essenceCost": 8,
+      "nextStatMultiplier": 8.5225,
+      "statGainPct": 6.53
+    },
+    {
+      "rarity": "epic",
+      "level": 999,
+      "rebirthStatMult": 1,
+      "estimatedRebirths": 0,
+      "shardCost": 1798,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.75,
+      "statGainPct": 75
+    },
+    {
+      "rarity": "epic",
+      "level": 999,
+      "rebirthStatMult": 1.15,
+      "estimatedRebirths": 1,
+      "shardCost": 2193,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.8745,
+      "statGainPct": 63
+    },
+    {
+      "rarity": "epic",
+      "level": 999,
+      "rebirthStatMult": 1.3225,
+      "estimatedRebirths": 2,
+      "shardCost": 2589,
+      "essenceCost": 2,
+      "nextStatMultiplier": 2.0224,
+      "statGainPct": 52.92
+    },
+    {
+      "rarity": "epic",
+      "level": 999,
+      "rebirthStatMult": 1.75,
+      "estimatedRebirths": 4,
+      "shardCost": 3380,
+      "essenceCost": 3,
+      "nextStatMultiplier": 2.4035,
+      "statGainPct": 37.34
+    },
+    {
+      "rarity": "epic",
+      "level": 999,
+      "rebirthStatMult": 3.05,
+      "estimatedRebirths": 7,
+      "shardCost": 4566,
+      "essenceCost": 4,
+      "nextStatMultiplier": 3.725,
+      "statGainPct": 22.13
+    },
+    {
+      "rarity": "epic",
+      "level": 999,
+      "rebirthStatMult": 8,
+      "estimatedRebirths": 14,
+      "shardCost": 7335,
+      "essenceCost": 8,
+      "nextStatMultiplier": 8.5225,
+      "statGainPct": 6.53
+    },
+    {
+      "rarity": "transcendent",
+      "level": 1,
+      "rebirthStatMult": 1,
+      "estimatedRebirths": 0,
+      "shardCost": 5150,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.75,
+      "statGainPct": 75
+    },
+    {
+      "rarity": "transcendent",
+      "level": 1,
+      "rebirthStatMult": 1.15,
+      "estimatedRebirths": 1,
+      "shardCost": 6283,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.8745,
+      "statGainPct": 63
+    },
+    {
+      "rarity": "transcendent",
+      "level": 1,
+      "rebirthStatMult": 1.3225,
+      "estimatedRebirths": 2,
+      "shardCost": 7416,
+      "essenceCost": 2,
+      "nextStatMultiplier": 2.0224,
+      "statGainPct": 52.92
+    },
+    {
+      "rarity": "transcendent",
+      "level": 1,
+      "rebirthStatMult": 1.75,
+      "estimatedRebirths": 4,
+      "shardCost": 9682,
+      "essenceCost": 3,
+      "nextStatMultiplier": 2.4035,
+      "statGainPct": 37.34
+    },
+    {
+      "rarity": "transcendent",
+      "level": 1,
+      "rebirthStatMult": 3.05,
+      "estimatedRebirths": 7,
+      "shardCost": 13081,
+      "essenceCost": 4,
+      "nextStatMultiplier": 3.725,
+      "statGainPct": 22.13
+    },
+    {
+      "rarity": "transcendent",
+      "level": 1,
+      "rebirthStatMult": 8,
+      "estimatedRebirths": 14,
+      "shardCost": 21012,
+      "essenceCost": 8,
+      "nextStatMultiplier": 8.5225,
+      "statGainPct": 6.53
+    },
+    {
+      "rarity": "transcendent",
+      "level": 80,
+      "rebirthStatMult": 1,
+      "estimatedRebirths": 0,
+      "shardCost": 57567,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.75,
+      "statGainPct": 75
+    },
+    {
+      "rarity": "transcendent",
+      "level": 80,
+      "rebirthStatMult": 1.15,
+      "estimatedRebirths": 1,
+      "shardCost": 70231,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.8745,
+      "statGainPct": 63
+    },
+    {
+      "rarity": "transcendent",
+      "level": 80,
+      "rebirthStatMult": 1.3225,
+      "estimatedRebirths": 2,
+      "shardCost": 82896,
+      "essenceCost": 2,
+      "nextStatMultiplier": 2.0224,
+      "statGainPct": 52.92
+    },
+    {
+      "rarity": "transcendent",
+      "level": 80,
+      "rebirthStatMult": 1.75,
+      "estimatedRebirths": 4,
+      "shardCost": 108225,
+      "essenceCost": 3,
+      "nextStatMultiplier": 2.4035,
+      "statGainPct": 37.34
+    },
+    {
+      "rarity": "transcendent",
+      "level": 80,
+      "rebirthStatMult": 3.05,
+      "estimatedRebirths": 7,
+      "shardCost": 146220,
+      "essenceCost": 4,
+      "nextStatMultiplier": 3.725,
+      "statGainPct": 22.13
+    },
+    {
+      "rarity": "transcendent",
+      "level": 80,
+      "rebirthStatMult": 8,
+      "estimatedRebirths": 14,
+      "shardCost": 234873,
+      "essenceCost": 8,
+      "nextStatMultiplier": 8.5225,
+      "statGainPct": 6.53
+    },
+    {
+      "rarity": "transcendent",
+      "level": 200,
+      "rebirthStatMult": 1,
+      "estimatedRebirths": 0,
+      "shardCost": 57567,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.75,
+      "statGainPct": 75
+    },
+    {
+      "rarity": "transcendent",
+      "level": 200,
+      "rebirthStatMult": 1.15,
+      "estimatedRebirths": 1,
+      "shardCost": 70231,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.8745,
+      "statGainPct": 63
+    },
+    {
+      "rarity": "transcendent",
+      "level": 200,
+      "rebirthStatMult": 1.3225,
+      "estimatedRebirths": 2,
+      "shardCost": 82896,
+      "essenceCost": 2,
+      "nextStatMultiplier": 2.0224,
+      "statGainPct": 52.92
+    },
+    {
+      "rarity": "transcendent",
+      "level": 200,
+      "rebirthStatMult": 1.75,
+      "estimatedRebirths": 4,
+      "shardCost": 108225,
+      "essenceCost": 3,
+      "nextStatMultiplier": 2.4035,
+      "statGainPct": 37.34
+    },
+    {
+      "rarity": "transcendent",
+      "level": 200,
+      "rebirthStatMult": 3.05,
+      "estimatedRebirths": 7,
+      "shardCost": 146220,
+      "essenceCost": 4,
+      "nextStatMultiplier": 3.725,
+      "statGainPct": 22.13
+    },
+    {
+      "rarity": "transcendent",
+      "level": 200,
+      "rebirthStatMult": 8,
+      "estimatedRebirths": 14,
+      "shardCost": 234873,
+      "essenceCost": 8,
+      "nextStatMultiplier": 8.5225,
+      "statGainPct": 6.53
+    },
+    {
+      "rarity": "transcendent",
+      "level": 999,
+      "rebirthStatMult": 1,
+      "estimatedRebirths": 0,
+      "shardCost": 57567,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.75,
+      "statGainPct": 75
+    },
+    {
+      "rarity": "transcendent",
+      "level": 999,
+      "rebirthStatMult": 1.15,
+      "estimatedRebirths": 1,
+      "shardCost": 70231,
+      "essenceCost": 1,
+      "nextStatMultiplier": 1.8745,
+      "statGainPct": 63
+    },
+    {
+      "rarity": "transcendent",
+      "level": 999,
+      "rebirthStatMult": 1.3225,
+      "estimatedRebirths": 2,
+      "shardCost": 82896,
+      "essenceCost": 2,
+      "nextStatMultiplier": 2.0224,
+      "statGainPct": 52.92
+    },
+    {
+      "rarity": "transcendent",
+      "level": 999,
+      "rebirthStatMult": 1.75,
+      "estimatedRebirths": 4,
+      "shardCost": 108225,
+      "essenceCost": 3,
+      "nextStatMultiplier": 2.4035,
+      "statGainPct": 37.34
+    },
+    {
+      "rarity": "transcendent",
+      "level": 999,
+      "rebirthStatMult": 3.05,
+      "estimatedRebirths": 7,
+      "shardCost": 146220,
+      "essenceCost": 4,
+      "nextStatMultiplier": 3.725,
+      "statGainPct": 22.13
+    },
+    {
+      "rarity": "transcendent",
+      "level": 999,
+      "rebirthStatMult": 8,
+      "estimatedRebirths": 14,
+      "shardCost": 234873,
+      "essenceCost": 8,
+      "nextStatMultiplier": 8.5225,
+      "statGainPct": 6.53
+    }
+  ]
+}
