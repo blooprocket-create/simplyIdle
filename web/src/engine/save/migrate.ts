@@ -2,6 +2,7 @@ import type { PlayerClass } from '../../content/classes';
 import { RARITY_BOOST_MULTIPLIER, RARITY_IDS, isRarity, type Rarity } from '../../content/rarities';
 import { VALID_FORMATION_ROLES_FOR_CLASS, type FormationRole } from '../combat/formation';
 import { PITY_THRESHOLD } from '../roster/summon';
+import { readEquipment } from './equipmentSlice';
 import { roundTo4 } from '../math/safe';
 import {
   MAX_SAVE_COLLECTION,
@@ -284,6 +285,10 @@ export const CLAIMED_V2_KEYS: readonly string[] = [
   'teamLoadouts',
   'teamSlotsUnlocked',
   'lastActiveAt',
+  'inventoryItemIds',
+  'equipmentInventory',
+  'equippedItems',
+  'autoDismantleRarityFloor',
 ];
 
 export interface MigrateOptions {
@@ -386,6 +391,15 @@ export function migrateSave(payload: unknown, options: MigrateOptions): SaveV3 {
   const gold = boundedInt(raw.gold, 0, SAFE_NUMBER_CAP, 0);
   const exp = boundedInt(raw.exp, 0, Math.max(0, expForLevel(level) - 1), 0);
 
+  const equipment = readEquipment({
+    inventoryItemIds: raw.inventoryItemIds,
+    equipmentInventory: raw.equipmentInventory,
+    equippedItems: raw.equippedItems,
+    autoDismantleRarityFloor: raw.autoDismantleRarityFloor,
+    content,
+    level,
+  });
+
   const legacy: Record<string, unknown> = {};
   const claimed = new Set(CLAIMED_V2_KEYS);
   for (const [key, value] of Object.entries(raw)) {
@@ -417,6 +431,7 @@ export function migrateSave(payload: unknown, options: MigrateOptions): SaveV3 {
       metaSurvivalLevel: boundedInt(raw.metaSurvivalLevel, 0, SAFE_NUMBER_CAP, 0),
     },
     stats: { alloc, unspent },
+    equipment,
     wallet: {
       gold,
       totalGold: Math.max(gold, boundedInt(raw.totalGold, 0, SAFE_NUMBER_CAP, 0)),

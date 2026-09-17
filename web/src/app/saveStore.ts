@@ -1,4 +1,5 @@
 import { heroTemplatesById } from '../content/heroes';
+import { equipmentTemplatesById } from '../content/equipment';
 import type { SaveV3 } from '../engine/save/schema';
 import { readSave, writeSaveV3 } from '../engine/save/v3';
 import type { PreferenceStore } from '../ui/prefs/store';
@@ -41,7 +42,10 @@ export function loadSave(store: PreferenceStore, nowMs: number): SaveV3 | null {
   } catch {
     return null;
   }
-  return readSave(parsed, { nowMs, content: { heroesById: heroTemplatesById() } });
+  return readSave(parsed, {
+    nowMs,
+    content: { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() },
+  });
 }
 
 /**

@@ -1,4 +1,5 @@
 import { HERO_POOL, heroTemplatesById } from '../content/heroes';
+import { equipmentTemplatesById } from '../content/equipment';
 import type { FormationRole } from '../engine/combat/formation';
 import {
   DIAMOND_SUMMON_COST,
@@ -126,7 +127,7 @@ export function sparkExchange(attempt: SparkAttempt): SparkOutcome | null {
 }
 
 /** The catalogue, as the save reader and the selection rules need it. */
-const CONTENT: SaveContent = { heroesById: heroTemplatesById() };
+const CONTENT: SaveContent = { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() };
 
 /**
  * The shard rate a recycle pays at.

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { HERO_POOL, heroTemplatesById } from '../content/heroes';
+import { equipmentTemplatesById } from '../content/equipment';
 import { migrateSave } from '../engine/save/migrate';
 import type { SaveV3 } from '../engine/save/schema';
 import { heroModelKey } from '../game/models/manifest';
 import { fightSignature, rosterFromSave } from './roster';
 
-const CONTENT = { heroesById: heroTemplatesById() };
+const CONTENT = { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() };
 const NOW = 1_700_000_000_000;
 
 /** A save built the way the app builds one: by migrating a stored payload. */

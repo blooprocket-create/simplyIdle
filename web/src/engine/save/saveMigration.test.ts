@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { equipmentTemplatesById } from '../../content/equipment';
 import type { PlayerClass } from '../../content/classes';
 import { RARITY_BOOST_MULTIPLIER } from '../../content/rarities';
 import { MAX_FORMATION_ROLE_HEROES, VALID_FORMATION_ROLES_FOR_CLASS } from '../combat/formation';
@@ -41,6 +42,7 @@ function decodeSpecials(value: unknown): unknown {
 }
 
 const CONTENT: SaveContent = {
+  equipmentById: equipmentTemplatesById(),
   heroesById: new Map(
     fixture.heroTemplates.map(template => [
       template.id,
@@ -141,15 +143,33 @@ describe('nothing is dropped', () => {
   });
 
   it('leaves a real account with a substantial legacy blob, not an empty one', () => {
-    // A v2 save is about 120 fields and this migration types roughly 35 of
+    // A v2 save is about 120 fields and this migration types roughly 40 of
     // them. If `legacy` ever came back near-empty it would mean the carry had
     // silently stopped working, and the loss would not surface until someone
     // went looking for a field years later.
     const { result } = migrateCase('veteran');
     expect(Object.keys(result.legacy).length).toBeGreaterThan(60);
     expect(result.legacy.achievements).toBeDefined();
-    expect(result.legacy.equippedItems).toBeDefined();
     expect(result.legacy.classMasteryXp).toBeDefined();
+    expect(result.legacy.guildhallFacilities).toBeDefined();
+  });
+
+  it('has stopped leaving equipment in the bag, now that a phase claims it', () => {
+    /*
+     * This is the test above, one assertion lighter. It named `equippedItems`
+     * as an example of a key still riding in `legacy`, and Phase 9 claiming
+     * the four equipment keys is what made that false — the tripwire firing
+     * exactly as intended rather than a regression.
+     *
+     * Kept as its own case rather than deleted, because "a key that used to be
+     * in legacy and is not any more" is the one direction this migration is
+     * allowed to move, and it should be visible when it does.
+     */
+    const { result } = migrateCase('veteran');
+    for (const key of ['inventoryItemIds', 'equipmentInventory', 'equippedItems', 'autoDismantleRarityFloor']) {
+      expect({ key, inLegacy: key in result.legacy }).toEqual({ key, inLegacy: false });
+    }
+    expect(result.equipment.equipped).toBeDefined();
   });
 
   it('partitions the payload: every key is either claimed or carried', () => {

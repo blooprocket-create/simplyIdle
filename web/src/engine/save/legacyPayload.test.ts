@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { equipmentTemplatesById } from '../../content/equipment';
 import type { PlayerClass } from '../../content/classes';
 import { toLegacyPayload } from './legacyPayload';
 import { CLAIMED_V2_KEYS, STAT_POINTS_PER_LEVEL, migrateSave, statPointsSpent } from './migrate';
@@ -36,6 +37,7 @@ function decodeSpecials(value: unknown): unknown {
 }
 
 const CONTENT: SaveContent = {
+  equipmentById: equipmentTemplatesById(),
   heroesById: new Map(
     fixture.heroTemplates.map(template => [
       template.id,

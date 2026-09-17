@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HERO_POOL, heroTemplatesById } from '../../content/heroes';
+import { equipmentTemplatesById } from '../../content/equipment';
 import { SPARK_EXCHANGE_OPTIONS } from '../../content/summon';
 import { readSave } from '../save/v3';
 import type { SaveV3 } from '../save/schema';
@@ -21,7 +22,7 @@ import type { SummonPoolEntry } from './summonSave';
  */
 
 const NOW = Date.UTC(2026, 0, 15, 12, 0, 0);
-const OPTIONS = { nowMs: NOW, content: { heroesById: heroTemplatesById() } };
+const OPTIONS = { nowMs: NOW, content: { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() } };
 
 const POOL: SummonPoolEntry[] = HERO_POOL.map(hero => ({
   id: hero.id,

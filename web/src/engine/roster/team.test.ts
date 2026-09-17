@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PlayerClass } from '../../content/classes';
 import { HERO_POOL, heroTemplatesById } from '../../content/heroes';
+import { equipmentTemplatesById } from '../../content/equipment';
 import type { FormationRole } from '../combat/formation';
 import type { SaveContent } from '../save/schema';
 import { HERO_LEVEL_CAP, heroGoldLevelCost } from './progression';
@@ -30,7 +31,7 @@ import fixture from './__fixtures__/team-management.json';
  * fixture exposed are reproduced.
  */
 
-const CONTENT: SaveContent = { heroesById: heroTemplatesById() };
+const CONTENT: SaveContent = { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() };
 
 /** The same two-of-each-class roster the fixture built, in the same order. */
 function roster(): TeamHero[] {

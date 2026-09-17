@@ -1,5 +1,6 @@
 import type { PlayerClass } from '../content/classes';
 import { HERO_POOL, heroTemplatesById } from '../content/heroes';
+import { equipmentTemplatesById } from '../content/equipment';
 import type { FormationRole } from '../engine/combat/formation';
 import type { Rarity } from '../content/rarities';
 import { readSave } from '../engine/save/v3';
@@ -138,7 +139,10 @@ export function startingSave(nowMs: number): SaveV3 {
     },
   };
 
-  return readSave(payload, { nowMs, content: { heroesById: heroTemplatesById() } });
+  return readSave(payload, {
+    nowMs,
+    content: { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() },
+  });
 }
 
 /*

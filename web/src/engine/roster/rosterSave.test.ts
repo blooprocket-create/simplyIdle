@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { heroTemplatesById } from '../../content/heroes';
+import { equipmentTemplatesById } from '../../content/equipment';
 import type { SaveContent, SaveV3 } from '../save/schema';
 import { readSave } from '../save/v3';
 import { ACTIVE_TEAM_SIZE, MIN_TEAM_SLOTS } from '../save/migrate';
@@ -25,7 +26,7 @@ import {
  */
 
 const NOW = 1_700_000_000_000;
-const CONTENT: SaveContent = { heroesById: heroTemplatesById() };
+const CONTENT: SaveContent = { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() };
 const OPTIONS = { nowMs: NOW, content: CONTENT };
 
 /** `h1` warrior, `h3` berserker, `h5` archer, `h7` mage, `h9` monk. */

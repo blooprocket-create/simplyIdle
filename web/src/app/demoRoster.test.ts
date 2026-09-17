@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { heroTemplatesById } from '../content/heroes';
+import { equipmentTemplatesById } from '../content/equipment';
 import { VALID_FORMATION_ROLES_FOR_CLASS, type FormationRole } from '../engine/combat/formation';
 import { ACTIVE_TEAM_SIZE } from '../engine/save/migrate';
 import { readSave, writeSaveV3 } from '../engine/save/v3';
@@ -21,7 +22,7 @@ const startingRoster = (nowMs: number) => rosterFromSave(startingSave(nowMs));
  */
 
 const NOW = 1_700_000_000_000;
-const CONTENT = { heroesById: heroTemplatesById() };
+const CONTENT = { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() };
 
 describe('the team a new player starts on', () => {
   it('fields all six, which the old formation could not', () => {

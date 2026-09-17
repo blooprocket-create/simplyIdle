@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HERO_POOL } from '../content/heroes';
+import { equipmentTemplatesById } from '../content/equipment';
 import type { PreferenceStore } from '../ui/prefs/store';
 import { migrateSave } from '../engine/save/migrate';
 import { heroTemplatesById } from '../content/heroes';
@@ -76,15 +77,17 @@ describe('loading a save', () => {
      */
     const fromV2 = migrateSave(
       { heroRoster: [{ id: FIRST.id, uid: 'a', rarity: 'epic', level: 5, rank: 1 }] },
-      { nowMs: NOW, content: { heroesById: heroTemplatesById() } },
+      { nowMs: NOW, content: { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() } },
     );
     expect(fromV2.roster.heroes).toHaveLength(1);
 
     // The old reader alone still empties it. Kept as the standing reason the
     // dispatcher exists rather than deleted along with the bug.
     expect(
-      migrateSave(JSON.parse(JSON.stringify(fromV2)), { nowMs: NOW, content: { heroesById: heroTemplatesById() } })
-        .roster.heroes,
+      migrateSave(JSON.parse(JSON.stringify(fromV2)), {
+        nowMs: NOW,
+        content: { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() },
+      }).roster.heroes,
     ).toEqual([]);
 
     const { store } = fakeStore();
@@ -101,7 +104,10 @@ describe('loading a save', () => {
      * failure a player's discovery when they close the tab.
      */
     const hostile: PreferenceStore = { read: () => null, write: () => {} };
-    const save = migrateSave({}, { nowMs: NOW, content: { heroesById: heroTemplatesById() } });
+    const save = migrateSave(
+      {},
+      { nowMs: NOW, content: { heroesById: heroTemplatesById(), equipmentById: equipmentTemplatesById() } },
+    );
     expect(writeSave(hostile, save)).toBe(false);
   });
 

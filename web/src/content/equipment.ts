@@ -1,5 +1,5 @@
 import type { PlayerClass } from './classes';
-import type { StatBlock } from '../engine/save/schema';
+import type { SaveEquipmentTemplate, StatBlock } from '../engine/save/schema';
 
 /**
  * Everything the player can wear: seventy-five items across three slots, and
@@ -851,4 +851,20 @@ export function starterEquipmentForClass(playerClass: PlayerClass): string[] {
     );
     return inSlot[0]?.id ?? null;
   }).filter((id): id is string => id !== null);
+}
+
+/**
+ * The catalogue in the shape the save layer needs it.
+ *
+ * The parallel of `heroTemplatesById`, and injected for the same reason: the
+ * engine may not import this file, and a stored item whose row is absent from
+ * the map is dropped — which is how a retired item leaves an old save.
+ */
+export function equipmentTemplatesById(): Map<string, SaveEquipmentTemplate> {
+  return new Map(
+    EQUIPMENT_CATALOG.map(item => [
+      item.id,
+      { slot: item.slot, rarity: item.rarity, name: item.name, emoji: item.emoji, description: item.description },
+    ]),
+  );
 }
