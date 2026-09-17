@@ -47,6 +47,8 @@ const FIXTURE_PATH = join(__dirname, '..', 'web', 'src', 'engine', 'combat', '__
 const PLAIN_WAVE = 7;
 /** `wave % 10 === 0`. */
 const BOSS_WAVE = 20;
+/** `no_armor_week` — 1.05x gold, 1x EXP. See the note in `state`. */
+const PINNED_WEEK = 0;
 
 function state(overrides: Partial<GameState> = {}): GameState {
   return {
@@ -67,6 +69,17 @@ function state(overrides: Partial<GameState> = {}): GameState {
      * what it pays.
      */
     statsAlloc: { strength: 50, vitality: 0, agility: 0, intelligence: 0, spirit: 0 },
+    /*
+     * Pinned, and this is not housekeeping.
+     *
+     * `DEFAULT_STATE.weeklyEventWeek` is `weekNumberForTimestamp(Date.now())`
+     * — a clock read at module load. Every gold and EXP figure below runs
+     * through the current week's multipliers, so a fixture generated from the
+     * default would record different numbers depending on the day it was
+     * generated, and would drift under the rewrite it is supposed to measure.
+     * Week zero is `no_armor_week`: 1.05x gold, 1x EXP.
+     */
+    weeklyEventWeek: PINNED_WEEK,
     wave: PLAIN_WAVE,
     monsterHp: 0.0001,
     monsterMaxHp: 1_000_000,
@@ -135,6 +148,9 @@ interface Fixture {
     chestNodeEvery: number;
     campaignStageCycle: number;
     weeklyEventCount: number;
+    /** The week every non-weekly row above was measured on. */
+    pinnedWeek: number;
+    pinnedWeekEvent: string;
   };
   /** One plain kill, and one boss kill, with everything they move. */
   baseline: { name: string; wave: number; paid: Paid }[];
@@ -287,6 +303,8 @@ function build(): Fixture {
       chestNodeEvery: 5,
       campaignStageCycle: 20,
       weeklyEventCount: WEEKLY_EVENTS.length,
+      pinnedWeek: PINNED_WEEK,
+      pinnedWeekEvent: WEEKLY_EVENTS[PINNED_WEEK % WEEKLY_EVENTS.length].id,
     },
     baseline: buildBaseline(),
     chain: buildChain(),
@@ -298,6 +316,22 @@ function build(): Fixture {
 
 describe('what a kill pays', () => {
   const fixture = build();
+
+  it('measures a fixed week rather than whichever one today is', () => {
+    /*
+     * The pin, asserted, because without it this whole fixture drifts with the
+     * calendar: `DEFAULT_STATE.weeklyEventWeek` is `weekNumberForTimestamp(
+     * Date.now())`, evaluated when the module loads, and every gold and EXP
+     * figure here runs through that week's multipliers.
+     *
+     * One week in eight the ambient value *is* zero and removing the pin would
+     * leave this green. That is the limit of what a test can say about a global
+     * read; the other seven days out of eight it catches it, and the note above
+     * covers the eighth.
+     */
+    expect(state().weeklyEventWeek).toBe(PINNED_WEEK);
+    expect(fixture.constants.pinnedWeekEvent).toBe('no_armor_week');
+  });
 
   it('pays gold and EXP for a plain kill, and nothing else but season points', () => {
     /*
@@ -346,10 +380,21 @@ describe('what a kill pays', () => {
     expect(at('training').exp).toBeGreaterThan(base.exp);
     expect(at('training').gold).toBe(base.gold);
 
-    // VIP and mastery are the two that reach both — VIP on each axis, mastery
-    // on gold alone through the economy bonus.
-    expect(['vip', 'mastery'].map(name => at(name).gold > base.gold)).toEqual([true, true]);
+    // VIP reaches both axes; mastery reaches gold alone, through the economy
+    // bonus rather than the damage one.
+    expect(['vip', 'mastery at cap'].map(name => at(name).gold > base.gold)).toEqual([true, true]);
     expect(at('vip').exp).toBeGreaterThan(base.exp);
+
+    /*
+     * And a small bonus can vanish outright. Mastery level 20 is worth 4%, and
+     * at wave 7 a kill pays about 18 gold — so 1.05 × 1.04 rounds to the same
+     * 20 that 1.05 alone does. The whole chain is wrapped in **one** `Math.ceil`
+     * rather than rounded factor by factor, which is why the loss is a single
+     * fractional gold rather than one per factor. A port rounding as it went
+     * would drift upward on every kill, and by wave 200 the two would be
+     * different games.
+     */
+    expect(at('mastery').gold).toBe(base.gold);
   });
 
   it('caps the mastery economy bonus at a quarter', () => {
@@ -372,11 +417,10 @@ describe('what a kill pays', () => {
   it('moves gold and EXP independently across the weekly events', () => {
     /*
      * Compared against each other rather than against the baseline, because
-     * the baseline *is* an event: `DEFAULT_STATE.weeklyEventWeek` lands on
-     * `balanced_week`, which pays 1.1x gold and 1.2x EXP rather than 1x of
-     * either. My first version asserted against it and failed for that reason
-     * — there is no un-evented kill to measure from, and a port that treated
-     * the default as neutral would bake a 10% gold bonus into its baseline.
+     * **there is no un-evented kill to measure from**. Every week in the table
+     * moves something, so a port treating any of them as neutral is wrong by
+     * whatever that week pays — and the shipped default is whichever week
+     * today falls in, which is why `state` pins one.
      */
     const weeklies = fixture.chain.filter(entry => entry.field === 'weeklyEventWeek');
     expect(weeklies).toHaveLength(WEEKLY_EVENTS.length);

@@ -7,15 +7,17 @@
     "bossEvery": 10,
     "chestNodeEvery": 5,
     "campaignStageCycle": 20,
-    "weeklyEventCount": 8
+    "weeklyEventCount": 8,
+    "pinnedWeek": 0,
+    "pinnedWeekEvent": "no_armor_week"
   },
   "baseline": [
     {
       "name": "plain wave",
       "wave": 7,
       "paid": {
-        "gold": 21,
-        "exp": 12,
+        "gold": 20,
+        "exp": 10,
         "essence": 0,
         "bossTears": 0,
         "seasonPoints": 12,
@@ -34,8 +36,8 @@
       "name": "boss wave",
       "wave": 20,
       "paid": {
-        "gold": 1352,
-        "exp": 244,
+        "gold": 1235,
+        "exp": 212,
         "essence": 3,
         "bossTears": 1,
         "seasonPoints": 92,
@@ -55,62 +57,62 @@
     {
       "name": "baseline",
       "field": "—",
-      "gold": 21,
-      "exp": 12
+      "gold": 20,
+      "exp": 10
     },
     {
       "name": "prestige",
       "field": "prestigeCount",
-      "gold": 71,
-      "exp": 12
+      "gold": 65,
+      "exp": 10
     },
     {
       "name": "meta economy",
       "field": "metaEconomyLevel",
-      "gold": 27,
-      "exp": 12
+      "gold": 24,
+      "exp": 10
     },
     {
       "name": "rebirth economy",
       "field": "rebirthEconomyPath",
-      "gold": 27,
-      "exp": 12
+      "gold": 25,
+      "exp": 10
     },
     {
       "name": "treasury",
       "field": "guildhallFacilities.treasury",
-      "gold": 24,
-      "exp": 12
+      "gold": 22,
+      "exp": 10
     },
     {
       "name": "training",
       "field": "guildhallFacilities.training",
-      "gold": 21,
-      "exp": 15
+      "gold": 20,
+      "exp": 13
     },
     {
       "name": "vip",
       "field": "vipLevel",
-      "gold": 24,
-      "exp": 13
+      "gold": 22,
+      "exp": 11
     },
     {
       "name": "mastery",
       "field": "classMasteryXp",
-      "gold": 22,
-      "exp": 12
+      "gold": 20,
+      "exp": 10
     },
     {
       "name": "mastery at cap",
       "field": "classMasteryXp",
-      "gold": 27,
-      "exp": 12
+      "gold": 24,
+      "exp": 10
     },
     {
       "name": "mastery past cap",
       "field": "classMasteryXp",
-      "gold": 27,
-      "exp": 12
+      "gold": 24,
+      "exp": 10
     },
     {
       "name": "weekly: no_armor_week",
