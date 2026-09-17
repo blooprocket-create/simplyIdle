@@ -1,0 +1,750 @@
+{
+  "note": "Shipped hero active skills: four generic archetypes, ten unique relic skills, and their cooldowns. Owned by __tests__/heroActivesFixture.test.ts.",
+  "generatedFrom": "src/useGameState.ts via CAST_HERO_ACTIVE",
+  "archetypeCooldowns": {
+    "frontline_ward": 10000,
+    "burst_volley": 7000,
+    "battle_chant": 9000,
+    "mending_pulse": 6000
+  },
+  "mendingPulse": {
+    "baseHeal": 0.08,
+    "levelScale": 0.0004
+  },
+  "archetypes": [
+    {
+      "name": "frontline_ward",
+      "kind": "frontline_ward",
+      "heroId": "h1",
+      "heroLevel": 1,
+      "relicRank": null,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 0,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0.2,
+        "damageReductionBuffMs": 3500
+      },
+      "cooldownMs": 10000
+    },
+    {
+      "name": "frontline_ward-level-200",
+      "kind": "frontline_ward",
+      "heroId": "h1",
+      "heroLevel": 200,
+      "relicRank": null,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 0,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0.2,
+        "damageReductionBuffMs": 3500
+      },
+      "cooldownMs": 10000
+    },
+    {
+      "name": "frontline_ward-level-9999",
+      "kind": "frontline_ward",
+      "heroId": "h1",
+      "heroLevel": 9999,
+      "relicRank": null,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 0,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0.2,
+        "damageReductionBuffMs": 3500
+      },
+      "cooldownMs": 10000
+    },
+    {
+      "name": "burst_volley",
+      "kind": "burst_volley",
+      "heroId": "h5",
+      "heroLevel": 1,
+      "relicRank": null,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 8000,
+        "teamHpGained": 0,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 7000
+    },
+    {
+      "name": "burst_volley-level-200",
+      "kind": "burst_volley",
+      "heroId": "h5",
+      "heroLevel": 200,
+      "relicRank": null,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 8000,
+        "teamHpGained": 0,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 7000
+    },
+    {
+      "name": "burst_volley-level-9999",
+      "kind": "burst_volley",
+      "heroId": "h5",
+      "heroLevel": 9999,
+      "relicRank": null,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 8000,
+        "teamHpGained": 0,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 7000
+    },
+    {
+      "name": "battle_chant",
+      "kind": "battle_chant",
+      "heroId": "h3",
+      "heroLevel": 1,
+      "relicRank": null,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 0,
+        "damageBuffPct": 0.18,
+        "damageBuffMs": 4200,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 9000
+    },
+    {
+      "name": "battle_chant-level-200",
+      "kind": "battle_chant",
+      "heroId": "h3",
+      "heroLevel": 200,
+      "relicRank": null,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 0,
+        "damageBuffPct": 0.18,
+        "damageBuffMs": 4200,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 9000
+    },
+    {
+      "name": "battle_chant-level-9999",
+      "kind": "battle_chant",
+      "heroId": "h3",
+      "heroLevel": 9999,
+      "relicRank": null,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 0,
+        "damageBuffPct": 0.18,
+        "damageBuffMs": 4200,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 9000
+    },
+    {
+      "name": "mending_pulse",
+      "kind": "mending_pulse",
+      "heroId": "h7",
+      "heroLevel": 1,
+      "relicRank": null,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 804,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 6000
+    },
+    {
+      "name": "mending_pulse-level-200",
+      "kind": "mending_pulse",
+      "heroId": "h7",
+      "heroLevel": 200,
+      "relicRank": null,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 1600,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 6000
+    },
+    {
+      "name": "mending_pulse-level-9999",
+      "kind": "mending_pulse",
+      "heroId": "h7",
+      "heroLevel": 9999,
+      "relicRank": null,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 2500,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 6000
+    },
+    {
+      "name": "relic-off",
+      "kind": "frontline_ward",
+      "heroId": "h1",
+      "heroLevel": 50,
+      "relicRank": null,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 0,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0.2,
+        "damageReductionBuffMs": 3500
+      },
+      "cooldownMs": 10000
+    },
+    {
+      "name": "relic-on",
+      "kind": "frontline_ward",
+      "heroId": "h1",
+      "heroLevel": 50,
+      "relicRank": 1,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 0,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0.3,
+        "damageReductionBuffMs": 4000
+      },
+      "cooldownMs": 10000
+    },
+    {
+      "name": "burst_volley-overkill",
+      "kind": "burst_volley",
+      "heroId": "h5",
+      "heroLevel": 1,
+      "relicRank": null,
+      "monsterMaxHp": 1000000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 999,
+        "teamHpGained": 0,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 7000
+    }
+  ],
+  "uniques": [
+    {
+      "name": "shield_wall-rank-1",
+      "kind": "shield_wall",
+      "heroId": "h1",
+      "heroLevel": 50,
+      "relicRank": 1,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 0,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0.3,
+        "damageReductionBuffMs": 4000
+      },
+      "cooldownMs": 10000
+    },
+    {
+      "name": "shield_wall-rank-10",
+      "kind": "shield_wall",
+      "heroId": "h1",
+      "heroLevel": 50,
+      "relicRank": 10,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 0,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0.624,
+        "damageReductionBuffMs": 4000
+      },
+      "cooldownMs": 10000
+    },
+    {
+      "name": "execute-rank-1",
+      "kind": "execute",
+      "heroId": "h6",
+      "heroLevel": 50,
+      "relicRank": 1,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 0,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 7000
+    },
+    {
+      "name": "execute-rank-10",
+      "kind": "execute",
+      "heroId": "h6",
+      "heroLevel": 50,
+      "relicRank": 10,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 0,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 7000
+    },
+    {
+      "name": "rallying_cry-rank-1",
+      "kind": "rallying_cry",
+      "heroId": "h4",
+      "heroLevel": 50,
+      "relicRank": 1,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 2000,
+        "damageBuffPct": 0.2,
+        "damageBuffMs": 4000,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 9000
+    },
+    {
+      "name": "rallying_cry-rank-10",
+      "kind": "rallying_cry",
+      "heroId": "h4",
+      "heroLevel": 50,
+      "relicRank": 10,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 4160,
+        "damageBuffPct": 0.41600000000000004,
+        "damageBuffMs": 4000,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 9000
+    },
+    {
+      "name": "soul_drain-rank-1",
+      "kind": "soul_drain",
+      "heroId": "h12",
+      "heroLevel": 50,
+      "relicRank": 1,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 8000,
+        "teamHpGained": 400,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 7000
+    },
+    {
+      "name": "soul_drain-rank-10",
+      "kind": "soul_drain",
+      "heroId": "h12",
+      "heroLevel": 50,
+      "relicRank": 10,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 16641,
+        "teamHpGained": 833,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 7000
+    },
+    {
+      "name": "crit_storm-rank-1",
+      "kind": "crit_storm",
+      "heroId": "h5",
+      "heroLevel": 50,
+      "relicRank": 1,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 30000,
+        "teamHpGained": 0,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 7000
+    },
+    {
+      "name": "crit_storm-rank-10",
+      "kind": "crit_storm",
+      "heroId": "h5",
+      "heroLevel": 50,
+      "relicRank": 10,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 62400,
+        "teamHpGained": 0,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 7000
+    },
+    {
+      "name": "mark_prey-rank-1",
+      "kind": "mark_prey",
+      "heroId": "h13",
+      "heroLevel": 50,
+      "relicRank": 1,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 0,
+        "damageBuffPct": 0.22,
+        "damageBuffMs": 4000,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 8000
+    },
+    {
+      "name": "mark_prey-rank-10",
+      "kind": "mark_prey",
+      "heroId": "h13",
+      "heroLevel": 50,
+      "relicRank": 10,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 0,
+        "damageBuffPct": 0.4576,
+        "damageBuffMs": 4000,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 8000
+    },
+    {
+      "name": "chain_lightning-rank-1",
+      "kind": "chain_lightning",
+      "heroId": "h8",
+      "heroLevel": 50,
+      "relicRank": 1,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 10000,
+        "teamHpGained": 0,
+        "damageBuffPct": 0.06,
+        "damageBuffMs": 3000,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 7000
+    },
+    {
+      "name": "chain_lightning-rank-10",
+      "kind": "chain_lightning",
+      "heroId": "h8",
+      "heroLevel": 50,
+      "relicRank": 10,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 20801,
+        "teamHpGained": 0,
+        "damageBuffPct": 0.12480000000000001,
+        "damageBuffMs": 3000,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 7000
+    },
+    {
+      "name": "barrier_pulse-rank-1",
+      "kind": "barrier_pulse",
+      "heroId": "h2",
+      "heroLevel": 50,
+      "relicRank": 1,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 1000,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0.05,
+        "damageReductionBuffMs": 3500
+      },
+      "cooldownMs": 9000
+    },
+    {
+      "name": "barrier_pulse-rank-10",
+      "kind": "barrier_pulse",
+      "heroId": "h2",
+      "heroLevel": 50,
+      "relicRank": 10,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 2080,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0.10400000000000001,
+        "damageReductionBuffMs": 3500
+      },
+      "cooldownMs": 9000
+    },
+    {
+      "name": "armor_shred-rank-1",
+      "kind": "armor_shred",
+      "heroId": "h3",
+      "heroLevel": 50,
+      "relicRank": 1,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 0,
+        "damageBuffPct": 0.2,
+        "damageBuffMs": 4000,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 8000
+    },
+    {
+      "name": "armor_shred-rank-10",
+      "kind": "armor_shred",
+      "heroId": "h3",
+      "heroLevel": 50,
+      "relicRank": 10,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 0,
+        "teamHpGained": 0,
+        "damageBuffPct": 0.41600000000000004,
+        "damageBuffMs": 4000,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 8000
+    },
+    {
+      "name": "overcharge-rank-1",
+      "kind": "overcharge",
+      "heroId": "h21",
+      "heroLevel": 50,
+      "relicRank": 1,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 15000,
+        "teamHpGained": 0,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 8000
+    },
+    {
+      "name": "overcharge-rank-10",
+      "kind": "overcharge",
+      "heroId": "h21",
+      "heroLevel": 50,
+      "relicRank": 10,
+      "monsterMaxHp": 100000,
+      "teamMaxHp": 10000,
+      "teamHp": 5000,
+      "effect": {
+        "monsterHpLost": 31200,
+        "teamHpGained": 0,
+        "damageBuffPct": 0,
+        "damageBuffMs": 0,
+        "damageReductionBuffPct": 0,
+        "damageReductionBuffMs": 0
+      },
+      "cooldownMs": 8000
+    }
+  ],
+  "refusals": [
+    {
+      "name": "benched",
+      "reason": "not on the active team",
+      "cooldownBefore": 0,
+      "fielded": false,
+      "changed": false
+    },
+    {
+      "name": "on-cooldown",
+      "reason": "cooldown has not elapsed",
+      "cooldownBefore": 1,
+      "fielded": true,
+      "changed": false
+    },
+    {
+      "name": "unknown-uid",
+      "reason": "no hero by that uid",
+      "cooldownBefore": 0,
+      "fielded": true,
+      "changed": false
+    }
+  ],
+  "rankScaling": [
+    {
+      "heroId": "h1",
+      "type": "shield_wall",
+      "rank": 1,
+      "power": 0.3,
+      "cooldownMs": 10000
+    },
+    {
+      "heroId": "h1",
+      "type": "shield_wall",
+      "rank": 2,
+      "power": 0.336,
+      "cooldownMs": 10000
+    },
+    {
+      "heroId": "h1",
+      "type": "shield_wall",
+      "rank": 5,
+      "power": 0.444,
+      "cooldownMs": 10000
+    },
+    {
+      "heroId": "h1",
+      "type": "shield_wall",
+      "rank": 10,
+      "power": 0.624,
+      "cooldownMs": 10000
+    }
+  ],
+  "statuses": [
+    {
+      "uid": "ward",
+      "skillName": "Frontline Ward",
+      "totalCooldownMs": 10000,
+      "ready": true
+    },
+    {
+      "uid": "mend",
+      "skillName": "Mending Pulse",
+      "totalCooldownMs": 6000,
+      "ready": false
+    }
+  ]
+}
