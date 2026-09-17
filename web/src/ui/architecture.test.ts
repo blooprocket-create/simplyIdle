@@ -317,6 +317,14 @@ describe('ui architecture', () => {
     const unbanked = writes.filter(line => /(?<![.\w])save\b(?!\s*:)/.test(line));
     expect(unbanked, 'a verb reads `save` instead of banking the run first').toEqual([]);
     expect(shell, 'nothing in the shell banks the run').toContain('loopRef.current?.bank()');
+    /*
+     * And through `bankInto`, which is the one place that does *everything* a
+     * banked run does — the wallet, both levellings, and the items it won. A
+     * shell calling `bankRun` alone would bank the currencies and drop the
+     * drops on the floor, silently, which is the shape of failure this whole
+     * file exists to refuse.
+     */
+    expect(shell, 'the shell banks currencies without the drops').toContain('bankInto(');
 
     /*
      * And a player at rest presses no verbs. Without a bank on the run

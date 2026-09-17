@@ -97,29 +97,61 @@ describe('where a chest is', () => {
     expect(killPayout(5, () => CHEST_TEAR_CHANCE - Number.EPSILON).bossTears).toBe(1);
   });
 
-  it('draws nothing at all on a wave that has no chest', () => {
+  it('draws the chest roll only on a chest node, after the drop roll', () => {
     /*
-     * Not tidiness: a port that drew unconditionally and discarded the answer
-     * would advance a seeded generator on waves the shipped game leaves alone,
-     * and every roll after the first chest would come out different.
+     * Every kill draws **once** for the equipment drop chance — that one is
+     * unconditional, as shipped. The chest roll is the second draw and comes
+     * only on a chest node.
+     *
+     * Both halves matter to a seeded generator. Drawing the chest roll on a
+     * wave that has no chest would advance the sequence where the shipped game
+     * leaves it alone; drawing it *before* the drop roll would swap two values
+     * the shipped order hands over the other way round.
      */
-    let draws = 0;
     const counted = () => {
       draws += 1;
-      return 0.49;
+      return 0.99;
     };
+    let draws = 0;
+
     killPayout(7, counted);
-    expect(draws).toBe(0);
-    killPayout(20, counted);
-    expect(draws).toBe(0);
-    killPayout(5, counted);
     expect(draws).toBe(1);
+
+    draws = 0;
+    killPayout(20, counted);
+    expect(draws).toBe(1);
+
+    draws = 0;
+    killPayout(5, counted);
+    expect(draws).toBe(2);
+  });
+
+  it('spends the first draw on the drop and the second on the chest', () => {
+    // A chest node where the first roll wins a drop and the second misses the
+    // chest. Swap the two and the outcome swaps with them.
+    const scripted = (values: number[]) => {
+      let at = 0;
+      return () => values[Math.min(at++, values.length - 1)];
+    };
+    const dropOnly = killPayout(5, scripted([0.01, 0.99]));
+    expect(dropOnly.equipmentDrops).toEqual([5]);
+    expect(dropOnly.bossTears).toBe(0);
+
+    const chestOnly = killPayout(5, scripted([0.99, 0.01]));
+    expect(chestOnly.equipmentDrops).toEqual([]);
+    expect(chestOnly.bossTears).toBe(1);
   });
 });
 
 describe('a run of kills', () => {
   it('adds up, and starts from nothing', () => {
-    expect(EMPTY_PAYOUT).toEqual({ essence: 0, bossTears: 0, seasonPoints: 0, masteryXp: 0 });
+    expect(EMPTY_PAYOUT).toEqual({
+      essence: 0,
+      bossTears: 0,
+      seasonPoints: 0,
+      masteryXp: 0,
+      equipmentDrops: [],
+    });
     const run = [7, 8, 9, 10].reduce((into, wave) => addPayout(into, killPayout(wave, UNLUCKY)), EMPTY_PAYOUT);
     // Three plain kills and one boss: 12 × 3 + 92, mastery 2 × 3 + 8.
     expect(run.seasonPoints).toBe(SEASON_POINTS_PER_KILL * 3 + SEASON_POINTS_PER_KILL + SEASON_POINTS_PER_BOSS);

@@ -1,5 +1,6 @@
 import { getActForWave } from '../../content/acts';
 import { isBossWave } from '../../content/monsters';
+import { dropsEquipment } from '../equipment/drops';
 
 /**
  * What a kill pays that is not gold or EXP.
@@ -41,7 +42,22 @@ export interface KillPayout {
   bossTears: number;
   seasonPoints: number;
   masteryXp: number;
+  /**
+   * The waves at which this run won an equipment drop.
+   *
+   * Waves rather than a count, because the *item* is rolled against the
+   * player's level and the pool against their class, and neither is known
+   * here — a drop is decided in the fight and built at the bank. The wave is
+   * what the fight knows and the bank does not.
+   *
+   * Capped, because an offline window credits thousands of kills at once and
+   * a list that long would be carried through every snapshot.
+   */
+  equipmentDrops: number[];
 }
+
+/** How many won drops a run carries before it stops recording them. */
+export const MAX_PENDING_DROPS = 50;
 
 /** Which stage of the twenty-wave chapter this is. One-based. */
 export function campaignStage(wave: number): number {
@@ -83,8 +99,15 @@ export function bossEssence(wave: number): number {
  */
 export function killPayout(wave: number, random: () => number): KillPayout {
   const boss = isBossWave(wave);
+  /*
+   * Drawn **before** the chest roll, which is the shipped order: the drop
+   * chances come first in `killMonster` and the chest node after them. Order
+   * matters to a seeded generator, and this is the half of it the fight owns.
+   */
+  const drop = dropsEquipment(wave, boss, random);
   const chest = !boss && isChestNode(wave) && random() < CHEST_TEAR_CHANCE;
   return {
+    equipmentDrops: drop ? [wave] : [],
     essence: boss ? bossEssence(wave) : 0,
     bossTears: (boss ? 1 : 0) + (chest ? 1 : 0),
     seasonPoints: SEASON_POINTS_PER_KILL + (boss ? SEASON_POINTS_PER_BOSS : 0),
@@ -92,7 +115,13 @@ export function killPayout(wave: number, random: () => number): KillPayout {
   };
 }
 
-export const EMPTY_PAYOUT: KillPayout = { essence: 0, bossTears: 0, seasonPoints: 0, masteryXp: 0 };
+export const EMPTY_PAYOUT: KillPayout = {
+  essence: 0,
+  bossTears: 0,
+  seasonPoints: 0,
+  masteryXp: 0,
+  equipmentDrops: [],
+};
 
 /** Two payouts, added. What a run accumulates across its kills. */
 export function addPayout(into: KillPayout, next: KillPayout): KillPayout {
@@ -101,5 +130,6 @@ export function addPayout(into: KillPayout, next: KillPayout): KillPayout {
     bossTears: into.bossTears + next.bossTears,
     seasonPoints: into.seasonPoints + next.seasonPoints,
     masteryXp: into.masteryXp + next.masteryXp,
+    equipmentDrops: into.equipmentDrops.concat(next.equipmentDrops).slice(0, MAX_PENDING_DROPS),
   };
 }

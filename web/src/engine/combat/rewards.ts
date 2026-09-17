@@ -58,6 +58,8 @@ export interface BankedRun {
   bossTears: number;
   /** Kills since the last bank. Every fielded hero gains a level for each. */
   kills: number;
+  /** The waves at which a drop was won. The item is rolled when it lands. */
+  equipmentDrops: readonly number[];
 }
 
 export interface Purse {
@@ -185,9 +187,10 @@ export class RunEarnings {
       essence: this.payout.essence,
       bossTears: this.payout.bossTears,
       kills: this.killsSinceBank,
+      equipmentDrops: this.payout.equipmentDrops,
     };
     this.purse = EMPTY_PURSE;
-    this.payout = { ...this.payout, essence: 0, bossTears: 0 };
+    this.payout = { ...this.payout, essence: 0, bossTears: 0, equipmentDrops: [] };
     this.killsSinceBank = 0;
     return banked;
   }

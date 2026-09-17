@@ -11,7 +11,8 @@ import { canAffordSpark, canSummon, priceOfSummon, rosterActions, sparkExchange,
 import { equipmentActions, migrateLegacyEquipment } from './equipmentActions';
 import { prestigeActions } from './prestigeActions';
 import { EMPTY_AUTOMATION_STATE, runAutomations } from './automationRunner';
-import { bankRun, worthBanking } from '../engine/save/bankRun';
+import { worthBanking } from '../engine/save/bankRun';
+import { bankInto } from './bank';
 import { fightIdentity, fightTuning, fightTuningKey, rosterFromSave } from './roster';
 import { loadSave, writeSave } from './saveStore';
 import type { SaveV3 } from '../engine/save/schema';
@@ -203,7 +204,7 @@ export function App() {
   const live = useCallback((): SaveV3 => {
     const banked = loopRef.current?.bank();
     if (banked === undefined || !worthBanking(banked)) return saveRef.current;
-    const next = bankRun(saveRef.current, banked);
+    const next = bankInto(saveRef.current, banked, Date.now(), Math.random);
     applySave(next);
     return next;
   }, [applySave]);

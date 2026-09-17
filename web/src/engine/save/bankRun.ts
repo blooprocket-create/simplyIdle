@@ -70,7 +70,14 @@ export function bankRun(save: SaveV3, banked: BankedRun): SaveV3 {
 
 /** Whether there is anything to move. Saves a render for a run that idled. */
 export function worthBanking(banked: BankedRun): boolean {
-  return banked.gold.gt(0) || banked.exp.gt(0) || banked.essence > 0 || banked.bossTears > 0 || banked.kills > 0;
+  return (
+    banked.gold.gt(0) ||
+    banked.exp.gt(0) ||
+    banked.essence > 0 ||
+    banked.bossTears > 0 ||
+    banked.kills > 0 ||
+    banked.equipmentDrops.length > 0
+  );
 }
 
 /**

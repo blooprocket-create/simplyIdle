@@ -29,12 +29,13 @@ function save(wallet: Record<string, number> = {}): SaveV3 {
   );
 }
 
-const run = (gold: number, essence = 0, bossTears = 0, exp = 0, kills = 0) => ({
+const run = (gold: number, essence = 0, bossTears = 0, exp = 0, kills = 0, equipmentDrops: number[] = []) => ({
   gold: new Decimal(gold),
   exp: new Decimal(exp),
   essence,
   bossTears,
   kills,
+  equipmentDrops,
 });
 
 describe('putting a run in the wallet', () => {
@@ -172,6 +173,8 @@ describe('levelling, banked', () => {
     // A team deep enough to out-level its gold still has to level.
     expect(worthBanking({ ...run(0), kills: 1 })).toBe(true);
     expect(worthBanking({ ...run(0), exp: new Decimal(1) })).toBe(true);
+    // A won drop is worth banking on its own: the item is built when it lands.
+    expect(worthBanking({ ...run(0), equipmentDrops: [40] })).toBe(true);
     expect(worthBanking(run(0))).toBe(false);
   });
 });
