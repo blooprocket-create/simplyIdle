@@ -4,7 +4,9 @@ import { Diorama } from '../game/Diorama';
 import { detectCapabilities, profileFor } from '../game/device/DeviceProfile';
 import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
 import { startingSave } from './demoRoster';
+import type { EquipmentRarity, EquipmentSlot } from '../content/equipment';
 import { canAffordSpark, canSummon, priceOfSummon, rosterActions, sparkExchange, summonOnce } from './playerActions';
+import { equipmentActions, migrateLegacyEquipment } from './equipmentActions';
 import { fightSignature, rosterFromSave } from './roster';
 import { loadSave, writeSave } from './saveStore';
 import type { SaveV3 } from '../engine/save/schema';
@@ -62,7 +64,12 @@ export function App() {
    */
   const [initialSave] = useState(() => {
     const nowMs = Date.now();
-    return loadSave(browserStore(), nowMs) ?? startingSave(nowMs);
+    const stored = loadSave(browserStore(), nowMs);
+    // The shipped reader converts bare catalogue ids into rolled instances on
+    // every load. The engine's reader may not — it draws and reads the
+    // catalogue — so it happens here, at the same moment, with both supplied.
+    // See `migrateLegacyEquipment`.
+    return stored === null ? startingSave(nowMs) : migrateLegacyEquipment(stored, nowMs, Math.random);
   });
   const [save, setSave] = useState<SaveV3>(initialSave);
 
@@ -175,6 +182,23 @@ export function App() {
       storeLoadout: (slot: number) => applying(rosterActions.storeLoadout(save, slot)),
       recallLoadout: (slot: number) => applying(rosterActions.recallLoadout(save, slot)),
       buySlot: () => applying(rosterActions.buySlot(save)),
+      equip: (id: string) => applying(equipmentActions.equip(save, id)),
+      unequip: (slot: EquipmentSlot) => applying(equipmentActions.unequip(save, slot)),
+      dismantle: (id: string) => applying(equipmentActions.dismantle(save, id)),
+      sweep: () => applying(equipmentActions.sweep(save)),
+      setSweepFloor: (floor: EquipmentRarity) => applying(equipmentActions.setFloor(save, floor)),
+      craft: (slot: EquipmentSlot) => {
+        const outcome = equipmentActions.craft({ save, nowMs: Date.now(), random: Math.random }, slot);
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      upgrade: (id: string) => {
+        const outcome = equipmentActions.upgrade({ save, nowMs: Date.now(), random: Math.random }, id);
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      refineEssence: (count?: number) => applying(equipmentActions.refineEssence(save, count)),
+      refineShards: (count?: number) => applying(equipmentActions.refineShards(save, count)),
     }),
     [save, applySave, applying],
   );

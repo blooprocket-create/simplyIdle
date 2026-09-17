@@ -12,6 +12,8 @@ import {
   teamHealthFromSave,
 } from '../engine/character/fromSave';
 import { incomingMultiplier, teamDefense } from '../engine/combat/mitigation';
+import { wornStats } from '../engine/equipment/equipmentSave';
+import { EQUIPMENT_CONTENT } from './equipmentActions';
 import type { HealthHero } from '../engine/character/stats';
 import { ACTIVE_TEAM_SIZE } from '../engine/save/migrate';
 import type { SavedHero, SaveV3 } from '../engine/save/schema';
@@ -185,6 +187,17 @@ export function rosterFromSave(save: SaveV3): LoadedRoster {
    */
   const playerClass = save.identity.playerClass;
   const activeUids = new Set(powered.map(hero => hero.uid));
+
+  /*
+   * What the player is wearing, as a stat block.
+   *
+   * `derivedStats` has taken this as an argument since Phase 7 with the note
+   * that "Phase 9 adds a caller rather than editing it". This is that caller,
+   * and it feeds all three of the places the player's stats reach the fight —
+   * their damage, the team's defence and the team's health — because the
+   * shipped `derivedStats` is one function and all three read it.
+   */
+  const equipment = wornStats(save, EQUIPMENT_CONTENT);
   const damage = teamDamage({
     team: powered,
     relics: relicBearers(save, activeUids),
@@ -195,6 +208,7 @@ export function rosterFromSave(save: SaveV3): LoadedRoster {
       playerClass,
       level: save.progression.level,
       alloc: save.stats.alloc,
+      equipment,
     }),
     heroDamage: baseDamage,
   });
@@ -240,6 +254,7 @@ export function rosterFromSave(save: SaveV3): LoadedRoster {
   const defense = teamDefense({
     playerClass,
     alloc: save.stats.alloc,
+    equipment,
     activeHeroes: healthHeroes,
     metaSurvivalLevel: save.progression.metaSurvivalLevel,
     rebirthSurvivalPath: save.progression.rebirthSurvivalPath,
@@ -250,7 +265,7 @@ export function rosterFromSave(save: SaveV3): LoadedRoster {
     heroes,
     cast,
     profile: profileFromSave(save),
-    teamMaxHp: teamHealthFromSave(save, healthHeroes),
+    teamMaxHp: teamHealthFromSave(save, healthHeroes, equipment),
     incomingMult: incomingMultiplier({
       defense,
       playerClass,

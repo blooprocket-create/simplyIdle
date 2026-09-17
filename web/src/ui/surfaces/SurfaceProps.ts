@@ -8,6 +8,8 @@ import type { SummonOutcome, SummonPayment } from '../../engine/roster/summonSav
 import type { SparkOutcome } from '../../engine/roster/sparkSave';
 import type { HeroSpend } from '../../engine/roster/rosterSave';
 import type { FormationRole } from '../../engine/combat/formation';
+import type { EquipmentRarity, EquipmentSlot } from '../../content/equipment';
+import type { CraftOutcome, UpgradeOutcome } from '../../engine/equipment/equipmentSave';
 import type { SaveV3 } from '../../engine/save/schema';
 
 /**
@@ -77,6 +79,20 @@ export interface SurfaceProps {
     storeLoadout: (slot: number) => boolean;
     recallLoadout: (slot: number) => boolean;
     buySlot: () => boolean;
+    /**
+     * The equipment verbs. `craft` and `upgrade` answer what arrived rather
+     * than a boolean, because both hand over a *rolled* item and a screen that
+     * could not name it would be a screen that says "something happened".
+     */
+    equip: (id: string) => boolean;
+    unequip: (slot: EquipmentSlot) => boolean;
+    dismantle: (id: string) => boolean;
+    sweep: () => boolean;
+    setSweepFloor: (floor: EquipmentRarity) => boolean;
+    craft: (slot: EquipmentSlot) => CraftOutcome | null;
+    upgrade: (id: string) => UpgradeOutcome | null;
+    refineEssence: (count?: number) => boolean;
+    refineShards: (count?: number) => boolean;
   };
   /** The player's save, for the counters no read model carries yet. */
   save: SaveV3;
