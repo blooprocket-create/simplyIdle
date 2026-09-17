@@ -1,0 +1,358 @@
+{
+  "note": "Shipped team management, batch levelling and spark exchange. Owned by __tests__/teamManagementFixture.test.ts.",
+  "generatedFrom": "src/reducers/rosterReducer.ts via the exported reducer",
+  "rosterUids": [
+    "warrior0",
+    "warrior1",
+    "berserker0",
+    "berserker1",
+    "archer0",
+    "archer1",
+    "mage0",
+    "mage1",
+    "monk0",
+    "monk1"
+  ],
+  "slotUnlockRules": [
+    {
+      "targetSlots": 5,
+      "requiredWave": 50,
+      "goldCost": 125000,
+      "shardCost": 450
+    },
+    {
+      "targetSlots": 6,
+      "requiredWave": 100,
+      "goldCost": 550000,
+      "shardCost": 1600
+    }
+  ],
+  "sparkOptions": [
+    {
+      "id": "spark_free_charge",
+      "sparkCost": 50,
+      "kind": "free_summon"
+    },
+    {
+      "id": "spark_rare",
+      "sparkCost": 150,
+      "kind": "targeted_hero",
+      "minRarity": "rare"
+    },
+    {
+      "id": "spark_epic",
+      "sparkCost": 500,
+      "kind": "targeted_hero",
+      "minRarity": "epic"
+    },
+    {
+      "id": "spark_legendary",
+      "sparkCost": 1500,
+      "kind": "targeted_hero",
+      "minRarity": "legendary"
+    },
+    {
+      "id": "spark_mythic",
+      "sparkCost": 5000,
+      "kind": "targeted_hero",
+      "minRarity": "mythic"
+    },
+    {
+      "id": "spark_transcendent_t4t5",
+      "sparkCost": 75000,
+      "kind": "guaranteed_transcendent",
+      "minRarity": "transcendent",
+      "minTier": 4
+    }
+  ],
+  "selections": [
+    {
+      "name": "plain",
+      "requested": [
+        "warrior0",
+        "mage0",
+        "archer0"
+      ],
+      "slotsUnlocked": 4,
+      "accepted": [
+        "warrior0",
+        "mage0",
+        "archer0"
+      ]
+    },
+    {
+      "name": "over-slots",
+      "requested": [
+        "warrior0",
+        "warrior1",
+        "berserker0",
+        "berserker1",
+        "archer0",
+        "archer1",
+        "mage0",
+        "mage1",
+        "monk0",
+        "monk1"
+      ],
+      "slotsUnlocked": 4,
+      "accepted": [
+        "warrior0",
+        "warrior1",
+        "archer0",
+        "archer1"
+      ]
+    },
+    {
+      "name": "six-slots",
+      "requested": [
+        "warrior0",
+        "warrior1",
+        "berserker0",
+        "berserker1",
+        "archer0",
+        "archer1",
+        "mage0",
+        "mage1",
+        "monk0",
+        "monk1"
+      ],
+      "slotsUnlocked": 6,
+      "accepted": [
+        "warrior0",
+        "warrior1",
+        "archer0",
+        "archer1",
+        "mage0",
+        "mage1"
+      ]
+    },
+    {
+      "name": "duplicate-uid",
+      "requested": [
+        "warrior0",
+        "warrior0",
+        "mage0"
+      ],
+      "slotsUnlocked": 4,
+      "accepted": [
+        "warrior0",
+        "mage0"
+      ]
+    },
+    {
+      "name": "unknown-uid",
+      "requested": [
+        "nobody",
+        "mage0"
+      ],
+      "slotsUnlocked": 4,
+      "accepted": [
+        "mage0"
+      ]
+    },
+    {
+      "name": "empty",
+      "requested": [],
+      "slotsUnlocked": 4,
+      "accepted": []
+    }
+  ],
+  "formations": [
+    {
+      "name": "legal-role",
+      "uid": "monk0",
+      "role": "mid",
+      "accepted": true,
+      "roleAfter": "mid"
+    },
+    {
+      "name": "illegal-for-class",
+      "uid": "mage0",
+      "role": "front",
+      "accepted": false,
+      "roleAfter": null
+    },
+    {
+      "name": "unknown-hero",
+      "uid": "nobody",
+      "role": "front",
+      "accepted": false,
+      "roleAfter": null
+    },
+    {
+      "name": "benched-hero",
+      "uid": "monk1",
+      "role": "mid",
+      "accepted": true,
+      "roleAfter": "mid"
+    }
+  ],
+  "loadouts": [
+    {
+      "name": "save-then-load",
+      "slot": 1,
+      "activeBefore": [
+        "warrior0",
+        "mage0"
+      ],
+      "savedSlot": [
+        "warrior0",
+        "mage0"
+      ],
+      "activeAfterLoad": [
+        "warrior0",
+        "mage0"
+      ]
+    },
+    {
+      "name": "slot-clamped",
+      "slot": 99,
+      "activeBefore": [
+        "warrior0",
+        "mage0"
+      ],
+      "savedSlot": [
+        "warrior0",
+        "mage0"
+      ],
+      "activeAfterLoad": [
+        "warrior0",
+        "mage0"
+      ]
+    }
+  ],
+  "slotUnlocks": [
+    {
+      "name": "too-early",
+      "from": 4,
+      "highestWave": 49,
+      "gold": 1000000000,
+      "shards": 1000000000,
+      "slotsAfter": 4,
+      "goldAfter": 1000000000,
+      "shardsAfter": 1000000000
+    },
+    {
+      "name": "too-poor",
+      "from": 4,
+      "highestWave": 100,
+      "gold": 1000,
+      "shards": 1000000000,
+      "slotsAfter": 4,
+      "goldAfter": 1000,
+      "shardsAfter": 1000000000
+    },
+    {
+      "name": "fifth",
+      "from": 4,
+      "highestWave": 60,
+      "gold": 1000000000,
+      "shards": 1000000000,
+      "slotsAfter": 5,
+      "goldAfter": 999875000,
+      "shardsAfter": 999999550
+    },
+    {
+      "name": "sixth-needs-wave-100",
+      "from": 5,
+      "highestWave": 60,
+      "gold": 1000000000,
+      "shards": 1000000000,
+      "slotsAfter": 5,
+      "goldAfter": 1000000000,
+      "shardsAfter": 1000000000
+    },
+    {
+      "name": "sixth",
+      "from": 5,
+      "highestWave": 150,
+      "gold": 1000000000,
+      "shards": 1000000000,
+      "slotsAfter": 6,
+      "goldAfter": 999450000,
+      "shardsAfter": 999998400
+    }
+  ],
+  "batchLevels": [
+    {
+      "name": "one-each",
+      "mode": "1",
+      "gold": 1000,
+      "requested": [
+        "warrior0",
+        "mage0",
+        "archer0"
+      ],
+      "levelsAfter": {
+        "warrior0": 2,
+        "mage0": 2,
+        "archer0": 2
+      },
+      "goldAfter": 700
+    },
+    {
+      "name": "five-each",
+      "mode": "5",
+      "gold": 10000,
+      "requested": [
+        "warrior0",
+        "mage0",
+        "archer0"
+      ],
+      "levelsAfter": {
+        "warrior0": 6,
+        "mage0": 6,
+        "archer0": 6
+      },
+      "goldAfter": 8245
+    },
+    {
+      "name": "five-each-short",
+      "mode": "5",
+      "gold": 250,
+      "requested": [
+        "warrior0",
+        "mage0",
+        "archer0"
+      ],
+      "levelsAfter": {
+        "warrior0": 2,
+        "mage0": 1,
+        "archer0": 2
+      },
+      "goldAfter": 50
+    },
+    {
+      "name": "max",
+      "mode": "max",
+      "gold": 10000,
+      "requested": [
+        "warrior0",
+        "mage0",
+        "archer0"
+      ],
+      "levelsAfter": {
+        "warrior0": 18,
+        "mage0": 17,
+        "archer0": 18
+      },
+      "goldAfter": 244
+    },
+    {
+      "name": "max-broke",
+      "mode": "max",
+      "gold": 50,
+      "requested": [
+        "warrior0",
+        "mage0",
+        "archer0"
+      ],
+      "levelsAfter": {
+        "warrior0": 1,
+        "mage0": 1,
+        "archer0": 1
+      },
+      "goldAfter": 50
+    }
+  ]
+}
