@@ -80,6 +80,11 @@ export interface SurfaceProps {
     recallLoadout: (slot: number) => boolean;
     buySlot: () => boolean;
     /**
+     * A hero's unique relic, on or off. Takes the uid of the copy pressed, and
+     * the relic still lands on the *best* copy — see `toggleUniqueRelic`.
+     */
+    toggleRelic: (uid: string) => boolean;
+    /**
      * The equipment verbs. `craft` and `upgrade` answer what arrived rather
      * than a boolean, because both hand over a *rolled* item and a screen that
      * could not name it would be a screen that says "something happened".

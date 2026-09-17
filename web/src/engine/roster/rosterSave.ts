@@ -1,4 +1,5 @@
 import type { SaveContent, SaveV3, SavedHero } from '../save/schema';
+import { preferredUniqueBearer } from '../save/migrate';
 import type { FormationRole } from '../combat/formation';
 import {
   levelUpWithGold,
@@ -228,5 +229,47 @@ export function buySlot(save: SaveV3): SaveV3 | null {
     ...save,
     wallet: { ...save.wallet, gold: unlock.gold, heroShards: unlock.heroShards },
     roster: { ...save.roster, slotsUnlocked: unlock.slotsUnlocked },
+  };
+}
+
+/**
+ * Put a hero's unique relic on or take it off, or refuse.
+ *
+ * **The uid decides which relic, not which copy carries it.** The shipped
+ * action looks the hero up to find their *template*, then re-derives the
+ * preferred bearer across every copy of that template and equips **that** one —
+ * so pressing the button on a weaker copy still hands the relic to the best
+ * one. It reads like a bug and is what makes the control safe: a relic can
+ * never end up on a copy that is not the strongest.
+ *
+ * The consequence for taking it *off* is the part a port gets wrong by
+ * tidying. It comes off only when the stored bearer is already the preferred
+ * copy; when it is not, the same press **moves** it to the preferred copy
+ * instead. So a player whose relic sits on an old copy presses once to move it
+ * and again to remove it.
+ *
+ * Refused when the hero is unknown or the relic has never dropped. The shipped
+ * guard is `!current || current.rank <= 0`; here it is the absence alone,
+ * because the reader floors a stored rank at one — so `rank <= 0` is a branch
+ * no save can reach, and a branch no input can reach is a branch no test can
+ * hold to account.
+ */
+export function toggleUniqueRelic(save: SaveV3, heroUid: string): SaveV3 | null {
+  const hero = save.roster.heroes.find(entry => entry.uid === heroUid);
+  if (!hero) return null;
+
+  const current = save.roster.uniqueByHeroId[hero.id];
+  if (!current) return null;
+
+  const bearer = preferredUniqueBearer(save.roster.heroes, hero.id);
+  if (!bearer) return null;
+
+  const equippedByUid = current.equippedByUid === bearer.uid ? null : bearer.uid;
+  return {
+    ...save,
+    roster: {
+      ...save.roster,
+      uniqueByHeroId: { ...save.roster.uniqueByHeroId, [hero.id]: { ...current, equippedByUid } },
+    },
   };
 }

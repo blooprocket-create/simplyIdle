@@ -85,6 +85,17 @@ export function RosterSurface(props: SurfaceProps) {
             {hero.active ? 'Bench' : 'Field'}
           </button>
           {/*
+            Only for a hero whose relic has actually dropped — `toggleUniqueRelic`
+            refuses the rest. The label says "relic" rather than "equip" because
+            the press does not put it on *this* copy: it puts it on the best
+            copy of this hero, whichever one was pressed.
+          */}
+          {props.save.roster.uniqueByHeroId[hero.templateId] !== undefined && (
+            <button type="button" className={styles.verb} onClick={() => actions.toggleRelic(hero.uid)}>
+              {props.save.roster.uniqueByHeroId[hero.templateId].equippedByUid === hero.uid ? 'Relic on' : 'Relic'}
+            </button>
+          )}
+          {/*
             Only for a benched hero, and not because a fielded one is harder to
             handle — `recycleHero` refuses them outright. Offering a button the
             engine will always refuse is the button that does nothing.

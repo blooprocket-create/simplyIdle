@@ -182,6 +182,7 @@ export function App() {
       storeLoadout: (slot: number) => applying(rosterActions.storeLoadout(save, slot)),
       recallLoadout: (slot: number) => applying(rosterActions.recallLoadout(save, slot)),
       buySlot: () => applying(rosterActions.buySlot(save)),
+      toggleRelic: (uid: string) => applying(rosterActions.toggleRelic(save, uid)),
       equip: (id: string) => applying(equipmentActions.equip(save, id)),
       unequip: (slot: EquipmentSlot) => applying(equipmentActions.unequip(save, slot)),
       dismantle: (id: string) => applying(equipmentActions.dismantle(save, id)),

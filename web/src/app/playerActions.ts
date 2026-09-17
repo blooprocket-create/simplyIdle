@@ -22,6 +22,7 @@ import {
   recycleHero,
   spendOnHero,
   storeLoadout,
+  toggleUniqueRelic,
   type HeroSpend,
 } from '../engine/roster/rosterSave';
 
@@ -158,4 +159,5 @@ export const rosterActions = {
   storeLoadout: (save: SaveV3, slot: number) => storeLoadout(save, slot),
   recallLoadout: (save: SaveV3, slot: number) => recallLoadout(save, CONTENT, slot),
   buySlot: (save: SaveV3) => buySlot(save),
+  toggleRelic: (save: SaveV3, uid: string) => toggleUniqueRelic(save, uid),
 };
