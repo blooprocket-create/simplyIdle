@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Diorama } from '../game/Diorama';
 import { detectCapabilities, profileFor } from '../game/device/DeviceProfile';
 import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
-import { demoSimulationOptions, startingSave } from './demoRoster';
+import { startingSave } from './demoRoster';
 import { canSummon, priceOfSummon, summonOnce } from './playerActions';
 import { fightSignature, rosterFromSave } from './roster';
 import { loadSave, writeSave } from './saveStore';
@@ -217,7 +217,10 @@ export function App() {
       // Both go through the same `teamMaxHp`, so a returning player and a new
       // one are measured by one rule rather than two.
       teamMaxHp: new Decimal(roster.teamMaxHp),
-      ...demoSimulationOptions(),
+      // The whole mitigation chain, derived. It used to be a flat `1` handed
+      // over by `demoSimulationOptions` — the team taking a monster's damage
+      // raw, which against the shipped chain is up to ten times too much.
+      incomingMult: roster.incomingMult,
       autoBurst: autoBurstRef.current,
       resume: restored.resume ?? undefined,
       awayMs: restored.awayMs,

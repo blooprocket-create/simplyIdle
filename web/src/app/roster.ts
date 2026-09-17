@@ -5,7 +5,13 @@ import { playerContribution } from '../engine/combat/playerDamage';
 import { teamDamage, type PoweredHero } from '../engine/combat/teamPower';
 import type { RelicBearer } from '../engine/combat/uniqueRelics';
 import { getIntendedFormationRole } from '../engine/combat/formation';
-import { progressionFromSave, teamHealthFromSave } from '../engine/character/fromSave';
+import {
+  classPassiveUnlockedFromLegacy,
+  progressionFromSave,
+  tacticsLevelFromLegacy,
+  teamHealthFromSave,
+} from '../engine/character/fromSave';
+import { incomingMultiplier, teamDefense } from '../engine/combat/mitigation';
 import type { HealthHero } from '../engine/character/stats';
 import { ACTIVE_TEAM_SIZE } from '../engine/save/migrate';
 import type { SavedHero, SaveV3 } from '../engine/save/schema';
@@ -42,6 +48,14 @@ export interface LoadedRoster {
    * same reason.
    */
   teamMaxHp: number;
+  /**
+   * What fraction of a monster's damage actually lands.
+   *
+   * The demo handed the loop a flat `1` — the team taking damage raw, with no
+   * defence, formation, synergy, passives or relics — which against the shipped
+   * chain is up to ten times too much. See `engine/combat/mitigation.ts`.
+   */
+  incomingMult: number;
 }
 
 /**
@@ -223,11 +237,32 @@ export function rosterFromSave(save: SaveV3): LoadedRoster {
     });
   }
 
+  const defense = teamDefense({
+    playerClass,
+    alloc: save.stats.alloc,
+    activeHeroes: healthHeroes,
+    metaSurvivalLevel: save.progression.metaSurvivalLevel,
+    rebirthSurvivalPath: save.progression.rebirthSurvivalPath,
+    tacticsFacilityLevel: tacticsLevelFromLegacy(save),
+  });
+
   return {
     heroes,
     cast,
     profile: profileFromSave(save),
     teamMaxHp: teamHealthFromSave(save, healthHeroes),
+    incomingMult: incomingMultiplier({
+      defense,
+      playerClass,
+      classPassiveUnlocked: classPassiveUnlockedFromLegacy(save),
+      team: powered,
+      relics: relicBearers(save, activeUids),
+      // Not read from the save. A temporary buff needs a clock to expire by
+      // and nothing here ticks one down, so honouring a stored one would make
+      // it permanent — the same call `progressionFromSave` makes about the
+      // damage buff, and for the same reason.
+      damageReductionBuffPct: 0,
+    }),
   };
 }
 
@@ -255,6 +290,7 @@ export function rosterFromSave(save: SaveV3): LoadedRoster {
 export function fightSignature(roster: LoadedRoster): string {
   return JSON.stringify([
     roster.teamMaxHp,
+    roster.incomingMult,
     roster.heroes.map(hero => [hero.uid, hero.damagePerHit.toString(), hero.timer.intervalMs]),
     roster.cast.map(member => [member.uid, member.role, member.modelKey, member.silhouette]),
   ]);

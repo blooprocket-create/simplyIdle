@@ -48,6 +48,9 @@ const HERO_VITALITY_BASE = 3;
 /** A hero's vitality grows this much per level, before rank and rebirth. */
 const HERO_VITALITY_PER_LEVEL = 0.8;
 
+/** And their spirit grows more slowly. Only team defence reads it. */
+const HERO_SPIRIT_PER_LEVEL = 0.5;
+
 export const META_SURVIVAL_PER_LEVEL = 0.05;
 export const REBIRTH_SURVIVAL_PER_LEVEL = 0.07;
 
@@ -136,6 +139,21 @@ export function heroVitality(hero: HealthHero): number {
   const statMult = Math.max(1, hero.rebirthStatMult);
   const base = CLASS_PROFILES[hero.heroClass].baseStats.vitality;
   return (base + hero.level * HERO_VITALITY_PER_LEVEL) * rankMult * statMult;
+}
+
+/**
+ * A hero's spirit, which only defence reads.
+ *
+ * Grows at **0.5** a level where vitality grows at 0.8 — two similar formulas
+ * with different slopes, sharing the rank and rebirth multipliers. Lives beside
+ * `heroVitality` so the pair cannot drift, even though nothing about health
+ * uses it.
+ */
+export function heroSpirit(hero: HealthHero): number {
+  const rankMult = getRankStatMultiplier(hero.rank, hero.rarity);
+  const statMult = Math.max(1, hero.rebirthStatMult);
+  const base = CLASS_PROFILES[hero.heroClass].baseStats.spirit;
+  return (base + hero.level * HERO_SPIRIT_PER_LEVEL) * rankMult * statMult;
 }
 
 /**

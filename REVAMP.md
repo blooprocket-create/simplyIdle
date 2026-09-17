@@ -308,7 +308,15 @@ The player is now a seventh combatant with their own entity, cast member and swi
 
 Measured on the starting team: DPS goes from 365 to 1,094, of which the player is 222 — more than any single hero. The demo reaches wave 45 in a minute against wave 36, and still meets its first wall at wave 41.
 
-What is still not connected is the *mitigation* chain. `demoSimulationOptions` hands the loop a flat `incomingMult: 1`, where the shipped game crosses team defence with the formation, synergy, passive and relic incoming multipliers. Team health, by contrast, was already complete: `teamMaxHp` applies formation and synergy itself.
+The **mitigation** chain went the same way, and it was wrong in both directions before it was right. `Simulation` defaults `incomingMult` to zero, which made the app's team literally invulnerable — they stalled around wave 59 with the wipe offer unreachable — so the demo handed it a flat `1`. That is a team taking a monster's damage *raw*: no defence, no formation, no synergy, no hero passives, no relics. Against the shipped chain that is up to **ten times** too much, since a deep account's multiplier is 0.10 and even a bare level-one warrior's is 0.97.
+
+Nothing anchored it. Every other multiplier fixture reads through `getDpsBreakdown`, which reports damage only — the synergy fixture's own note says "Iron Mandala moves incoming… none of which the breakdown reports" — so `mitigationFixture` measures the composed scalar off the real combat step instead, the way the offline fixture measures the same quantity.
+
+**Defence and health are not the same stack**, which is the trap: both scale by meta survival, the rebirth path, formation, synergy and the tactics facility, and health *also* takes class mastery while defence does not. Sharing one function between them would have handed the player a mastery bonus the shipped game does not give.
+
+And the port was off by exactly 0.8 on every scenario with a warrior in it, which turned out not to be mitigation at all: **hero active skills are a fifth unported system**, `autoCastHeroActivesEnabled` is on by default, and every `frontline_ward` hero auto-casts a damage-reduction buff. The fixture switches them off and says why, so the rewrite is measured against the chain rather than against a system it does not have. They belong with `CAST_HERO_ACTIVE` in Phase 10.
+
+Team health, by contrast, was already complete: `teamMaxHp` applies formation and synergy itself.
 
 #### The starting team is a save now, and that fixed four disagreements
 

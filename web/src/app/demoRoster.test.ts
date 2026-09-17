@@ -3,7 +3,7 @@ import { heroTemplatesById } from '../content/heroes';
 import { VALID_FORMATION_ROLES_FOR_CLASS, type FormationRole } from '../engine/combat/formation';
 import { ACTIVE_TEAM_SIZE } from '../engine/save/migrate';
 import { readSave, writeSaveV3 } from '../engine/save/v3';
-import { demoSimulationOptions, startingSave } from './demoRoster';
+import { startingSave } from './demoRoster';
 import { PLAYER_UID, rosterFromSave } from './roster';
 
 /**
@@ -130,9 +130,19 @@ describe('the team a new player starts on', () => {
     expect(again).toEqual(save);
   });
 
-  it('starts the fight somewhere it can be lost', () => {
-    // Zero incoming damage made the team invulnerable: they stalled in the
-    // fifties and sat there forever, so the wipe offer could not be reached.
-    expect(demoSimulationOptions().incomingMult).toBeGreaterThan(0);
+  it('starts the fight somewhere it can be lost, and not be slaughtered in', () => {
+    /*
+     * This used to read `demoSimulationOptions().incomingMult > 0`, guarding
+     * against the `Simulation` default of **zero** — which made the app's team
+     * invulnerable, stalling around wave 59 with the wipe offer unreachable.
+     *
+     * A flat `1` was the fix and was wrong the other way: the shipped chain
+     * reduces incoming damage by up to ninety percent, so a flat one is a team
+     * taking as much as ten times what it should. It is derived now, so the
+     * guard is on the derivation: strictly between nothing and everything.
+     */
+    const { incomingMult } = startingRoster(NOW);
+    expect(incomingMult).toBeGreaterThan(0);
+    expect(incomingMult).toBeLessThan(1);
   });
 });

@@ -141,16 +141,18 @@ export function startingSave(nowMs: number): SaveV3 {
   return readSave(payload, { nowMs, content: { heroesById: heroTemplatesById() } });
 }
 
-/**
- * What the demo hands the loop, beyond the heroes.
+/*
+ * `demoSimulationOptions` used to live here, handing the loop a flat
+ * `incomingMult: 1`.
  *
- * `incomingMult` defaults to zero in `Simulation`, which is right for a test
- * that wants to isolate damage dealt — and wrong for the app, where it made
- * the team literally invulnerable: they stalled out around wave 59 and sat
- * there forever, never dying, so the wipe offer could not be reached at all.
- * A shell demonstrating a game with no failure state is demonstrating the
- * wrong game.
+ * Its note explained the first half of the problem — `incomingMult` defaults
+ * to *zero* in `Simulation`, which is right for a test isolating damage dealt
+ * and made the app's team literally invulnerable, stalling around wave 59 with
+ * the wipe offer unreachable. A shell demonstrating a game with no failure
+ * state is demonstrating the wrong game.
+ *
+ * One was the fix and it was still wrong the other way: the shipped chain
+ * reduces incoming damage by up to ninety percent, so a flat one is a team
+ * taking as much as ten times what it should. `rosterFromSave` derives it now,
+ * from the same save as everything else.
  */
-export function demoSimulationOptions(): { incomingMult: number } {
-  return { incomingMult: 1 };
-}
