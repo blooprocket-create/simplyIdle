@@ -3,11 +3,14 @@ import { dirname, join } from 'path';
 import {
   HERO_LEVEL_CAP,
   HERO_POOL,
+  WEEKLY_EVENTS,
   getMonsterAffixes,
   getMonsterDamage,
   getMonsterExp,
   getMonsterGold,
   getMonsterMaxHp,
+  getWeeklyEventByWeek,
+  weekNumberForTimestamp,
   type HeroUnit,
   type PlayerClass,
   type Rarity,
@@ -44,6 +47,52 @@ import { DEFAULT_STATE, advanceCombatStep, getDpsBreakdown, reducer, type GameSt
 const FIXTURE_PATH = join(__dirname, '..', 'web', 'src', 'engine', 'offline', '__fixtures__', 'offline-progress.json');
 
 const FIXED_NOW = Date.UTC(2026, 0, 15, 12, 0, 0);
+
+/**
+ * The weekly event every scenario is generated under.
+ *
+ * `DEFAULT_STATE` is a module-scope constant and its weekly event is
+ * `getWeeklyEventForTimestamp(Date.now())` — evaluated when the module is
+ * *imported*, so it is read before `beforeAll` installs the `Date.now` spy.
+ * The event came from the real calendar however firmly the test pinned
+ * everything else, which made this fixture a calendar bomb rather than a
+ * flake: weeks here are `floor(ts / 604800000)`, epoch weeks, rolling over at
+ * midnight UTC on a Thursday because 1 Jan 1970 was one, and every
+ * `WEEKLY_EVENTS` entry carries different multipliers. On the Thursday the
+ * week rolled into an event with a different `enemyHpMultiplier` the whole
+ * simulation diverged and every committed number went stale at once — with no
+ * commit to blame, and guaranteed to recur on a later Thursday.
+ *
+ * Pinning to `FIXED_NOW`'s own week would fix the reproducibility and leave a
+ * worse problem: the parity baseline would be modulated by whichever event
+ * that week happens to land on. `FIXED_NOW` lands on an exp-doubling week,
+ * under which the `loses-ground` team climbs back out of its chapter inside
+ * the shortest window and the retreat stops being visible at all.
+ *
+ * So the pin is the one event that does not modulate the fight.
+ * `double_shard_drops` has `enemyHpMultiplier`, `enemyDamageMultiplier`,
+ * `goldMultiplier` and `expMultiplier` all at 1; its shard multiplier reaches
+ * only recycling, usable-progress rewards and minigames, none of which the
+ * offline combat loop touches and none of which this fixture records. So the
+ * baseline measures the curve itself rather than the curve times whatever was
+ * running that week. Searched for rather than hardcoded as a week number, and
+ * guarded by a test below, so reordering or retuning `WEEKLY_EVENTS` fails
+ * loudly instead of silently re-tuning the baseline.
+ *
+ * `weeklyEventWeek` is the field that matters: combat reads its event through
+ * `getWeeklyEventByWeek(state.weeklyEventWeek)` and `weeklyEventId` is
+ * derived from the same week on load. Deriving the id here the same way keeps
+ * the pair from ever disagreeing.
+ */
+const NEUTRAL_EVENT_ID = 'double_shard_drops';
+const FIXED_WEEK = (() => {
+  const from = weekNumberForTimestamp(FIXED_NOW);
+  for (let offset = 0; offset < WEEKLY_EVENTS.length; offset += 1) {
+    if (getWeeklyEventByWeek(from + offset).id === NEUTRAL_EVENT_ID) return from + offset;
+  }
+  throw new Error(`no week within one rotation of FIXED_NOW maps to ${NEUTRAL_EVENT_ID}`);
+})();
+
 const MINUTE = 60_000;
 const WINDOWS_MS = [MINUTE, 10 * MINUTE, 60 * MINUTE];
 /** Short enough to catch a single death, before the climb back hides it. */
@@ -83,6 +132,10 @@ function state(overrides: Partial<GameState>): GameState {
     playerName: 'Ref',
     playerClass: 'warrior' as PlayerClass,
     characterCreated: true,
+    // Pinned, for the reasons at `FIXED_WEEK`. The shipped behaviour is
+    // untouched and correct: reading the live week is what the game should do.
+    weeklyEventWeek: FIXED_WEEK,
+    weeklyEventId: getWeeklyEventByWeek(FIXED_WEEK).id,
     ...overrides,
   };
   return { ...base, monsterHp: getMonsterMaxHp(base.wave), monsterMaxHp: getMonsterMaxHp(base.wave) };
@@ -128,6 +181,33 @@ function settle(target: GameState): GameState {
   if (!resolved) throw new Error('scenario never resolved a round, so its team HP is still the default');
 
   return { ...target, teamHp: working.teamMaxHp, teamMaxHp: working.teamMaxHp };
+}
+
+/**
+ * Fight until one defeat lands, and report the wave it landed on and the wave
+ * the team retreated to.
+ *
+ * Reads the drop off `advanceCombatStep` directly rather than off the end of
+ * an offline window, because a window reports where the team *finished* — the
+ * retreat plus however much of the climb back fitted in the time.
+ */
+function fightToDefeat(source: GameState): { from: number; to: number } {
+  let working = source;
+  for (let step = 0; step < 20_000; step += 1) {
+    const next = advanceCombatStep(working, 100);
+    if (next.wave < working.wave) return { from: working.wave, to: next.wave };
+    working = next;
+  }
+  throw new Error(`team never died within the budget, starting from wave ${source.wave}`);
+}
+
+/** A level-one pair parked far above anything they can hurt. */
+function doomed(wave: number): GameState {
+  return state({
+    wave,
+    heroRoster: [hero('h1', { uid: 'u0' }), hero('h7', { uid: 'u1' })],
+    activeTeamHeroIds: ['u0', 'u1'],
+  });
 }
 
 interface Scenario {
@@ -199,11 +279,18 @@ function scenarios(): Scenario[] {
        * Three waves below the ceiling, with windows short enough to catch one
        * death before the climb back hides it.
        *
-       * The team clears a wave or two, dies, and retreats to the start of its
-       * twenty-wave chapter — from 118 that is wave 101. A player who closed
-       * the tab at 118 and reopened it thirty seconds later is seventeen waves
-       * worse off, and the reward popup tells them `+0 waves` because it
-       * reports `Math.max(0, delta)`.
+       * The team dies and retreats to the start of its twenty-wave chapter. A
+       * player who closed the tab just below the wall and reopened it thirty
+       * seconds later is a chapter worse off, and the reward popup tells them
+       * `+0 waves` because it reports `Math.max(0, delta)`.
+       *
+       * The start wave is measured, so where it lands moves with balance. It
+       * currently lands on a boss — every tenth wave, at five times the HP —
+       * which the team cannot kill at all, so the first thing that happens is
+       * the wipe. That is a fair picture of a stuck player and the retreat is
+       * what the scenario is for, but it is also what surfaced the kill
+       * pricing bug that `measureInputs` now guards against, so it is worth
+       * stating out loud rather than leaving to be rediscovered.
        *
        * Over longer windows the climb papers over it, which is why the fixture
        * needed a scenario of its own rather than a shorter window on an
@@ -321,6 +408,19 @@ function measureSustainedDpsMult(source: GameState): number {
   return off > 0 ? on / off : 1;
 }
 
+/** The wave's affixes collapsed into one multiplier per axis. */
+function affixesFor(wave: number) {
+  return getMonsterAffixes(wave).reduce(
+    (total, entry) => ({
+      hp: total.hp * entry.enemyHpMultiplier,
+      dmg: total.dmg * entry.enemyDamageMultiplier,
+      gold: total.gold * entry.goldMultiplier,
+      exp: total.exp * entry.expMultiplier,
+    }),
+    { hp: 1, dmg: 1, gold: 1, exp: 1 },
+  );
+}
+
 /**
  * The inputs a closed-form estimator needs, measured off the shipped code
  * rather than recomputed from it.
@@ -355,10 +455,28 @@ function measureInputs(live: GameState) {
   });
   const dpsPerHeroLevel = bumped.finalDps - breakdown.finalDps;
 
-  // Step until exactly one kill lands, then read what it paid.
+  /*
+   * Step until exactly one kill lands, then read what it paid — and remember
+   * the wave it was actually *earned* on, which is not always the wave the
+   * scenario starts at.
+   *
+   * Two ways it moves. A kill advances the wave, so `working.wave` afterwards
+   * is already one past the monster that paid. And a team parked on a boss
+   * wave — every tenth, at five times the HP — can die before it kills
+   * anything at all, retreat to the start of its chapter, and land its first
+   * kill twenty waves further down.
+   *
+   * Dividing that kill's gold by the boss wave's reward is how `loses-ground`
+   * came to report a reward chain of 0.62 where the identical roster in
+   * `at-ceiling` reported 57.7 — a hundredfold error, committed as a measured
+   * fact, in the baseline the rewrite is checked against. The scenario only
+   * had to drift onto a wave divisible by ten for it to appear.
+   */
   let working = source;
   let elapsedToKill = 0;
+  let killWave = source.wave;
   for (let step = 0; step < 5_000 && working.totalKills === source.totalKills; step += 1) {
+    killWave = working.wave;
     working = advanceCombatStep(working, 100);
     elapsedToKill += 100;
   }
@@ -401,20 +519,16 @@ function measureInputs(live: GameState) {
    * constant across a window: the weekly event on the enemy HP side, the whole
    * mitigation chain on the damage side.
    */
-  const affix = getMonsterAffixes(source.wave).reduce(
-    (total, entry) => ({
-      hp: total.hp * entry.enemyHpMultiplier,
-      dmg: total.dmg * entry.enemyDamageMultiplier,
-      gold: total.gold * entry.goldMultiplier,
-      exp: total.exp * entry.expMultiplier,
-    }),
-    { hp: 1, dmg: 1, gold: 1, exp: 1 },
-  );
+  const affix = affixesFor(source.wave);
   const enemyHpMult = hpDrop > 0 ? (breakdown.finalDps * (sliceMs / 1000)) / hpDrop / affix.hp : null;
   const incomingMult =
     incomingDmgPerSec === null ? null : incomingDmgPerSec / getMonsterDamage(source.wave) / affix.dmg;
-  const goldMult = killed ? (working.gold - source.gold) / getMonsterGold(source.wave) / affix.gold : null;
-  const expMult = killed ? (working.totalExp - source.totalExp) / getMonsterExp(source.wave) / affix.exp : null;
+  // Against the wave that paid, and that wave's affixes, so what is left is
+  // the wave-independent part: the prestige, meta and building chain, which is
+  // the only part an estimator can carry across a window.
+  const killAffix = affixesFor(killWave);
+  const goldMult = killed ? (working.gold - source.gold) / getMonsterGold(killWave) / killAffix.gold : null;
+  const expMult = killed ? (working.totalExp - source.totalExp) / getMonsterExp(killWave) / killAffix.exp : null;
 
   return {
     enemyHpMult,
@@ -424,6 +538,8 @@ function measureInputs(live: GameState) {
     sustainedDpsMult: measureSustainedDpsMult(live),
     teamHpPerHeroLevel: measureTeamHpPerHeroLevel(live),
     wave: source.wave,
+    /** Where the measured kill landed. Differs from `wave` on a boss stall. */
+    killWave,
     finalDps: breakdown.finalDps,
     dpsPerHeroLevel,
     heroLevel: source.heroRoster.find(entry => activeUids.has(entry.uid))?.level ?? 0,
@@ -507,11 +623,67 @@ describe('offline progress fixture', () => {
     return found;
   };
 
+  it('generates under a weekly event that does not modulate the fight', () => {
+    /*
+     * The guard for the pin at `FIXED_WEEK`. Retuning `double_shard_drops` or
+     * dropping it from the rotation would otherwise re-tune every number in
+     * the committed fixture at once, and the only symptom would be the
+     * estimator suddenly disagreeing with a baseline nobody changed.
+     */
+    const event = getWeeklyEventByWeek(FIXED_WEEK);
+    expect(event.id).toBe(NEUTRAL_EVENT_ID);
+    expect({
+      hp: event.enemyHpMultiplier,
+      dmg: event.enemyDamageMultiplier,
+      gold: event.goldMultiplier,
+      exp: event.expMultiplier,
+    }).toEqual({ hp: 1, dmg: 1, gold: 1, exp: 1 });
+
+    // And the pin actually reaches a scenario state, rather than
+    // `DEFAULT_STATE`'s live-calendar week quietly winning through the spread
+    // order. Checked on the helper every scenario is built from, because
+    // building the scenarios themselves means measuring the ceiling again.
+    const built = state({ wave: 1 });
+    expect(built.weeklyEventWeek).toBe(FIXED_WEEK);
+    expect(built.weeklyEventId).toBe(NEUTRAL_EVENT_ID);
+  });
+
   it('measures the inputs an estimator would need', () => {
     for (const entry of fixture.scenarios) {
       expect({ name: entry.name, dps: entry.inputs.finalDps > 0 }).toEqual({ name: entry.name, dps: true });
       expect({ name: entry.name, gold: entry.inputs.goldPerKill }).not.toEqual({ name: entry.name, gold: null });
     }
+  });
+
+  it('prices a kill against the wave that actually paid for it', () => {
+    /*
+     * `at-ceiling` and `loses-ground` are the same six transcendent heroes at
+     * the same rank, prestige and meta level, three waves apart. The reward
+     * chain — prestige, meta, buildings — does not depend on the wave, so the
+     * two have to agree; the wave-dependent part is divided back out.
+     *
+     * They disagreed by a hundredfold, because `loses-ground` had drifted onto
+     * a boss wave, died before landing a kill, retreated a chapter and had its
+     * first kill priced against the boss it never beat. The scenario's start
+     * wave is measured rather than fixed, so nothing in the diff pointed at it
+     * — the fixture simply began stating a false multiplier.
+     */
+    const ceiling = scenario('at-ceiling').inputs;
+    const ground = scenario('loses-ground').inputs;
+    expect({ gold: ceiling.goldMult === null, exp: ceiling.expMult === null }).toEqual({ gold: false, exp: false });
+
+    for (const [axis, a, b] of [
+      ['gold', ceiling.goldMult!, ground.goldMult!],
+      ['exp', ceiling.expMult!, ground.expMult!],
+    ] as const) {
+      expect({ axis, agrees: Math.abs(a - b) / a < 0.01 }).toEqual({ axis, agrees: true });
+    }
+
+    // And the divergence that caused it is recorded rather than smoothed over:
+    // this scenario really does land its first kill a chapter below where it
+    // starts, which is worth seeing in the committed JSON.
+    expect(ground.killWave).toBeLessThan(ground.wave);
+    expect(ceiling.killWave).toBe(ceiling.wave);
   });
 
   it('confirms team dps rises by a fixed amount per kill', () => {
@@ -569,24 +741,53 @@ describe('offline progress fixture', () => {
     }
   });
 
-  it('shows the retreat lands exactly on a chapter boundary', () => {
+  it('shows a defeat costs the rest of the chapter, not one wave', () => {
     /*
-     * Chapters are twenty waves and a defeat retreats to the start of the
-     * current one, which is why the loss above is seventeen waves rather than
-     * one. The shortest window catches the retreat before any climb-back, so
-     * it lands on the boundary exactly — an earlier version of this test
-     * asserted `endWave > 1` as its escape hatch and would have passed for
-     * any number at all.
+     * The rule the sawtooth is made of, read off the shipped combat step.
+     *
+     * An earlier version of this asserted that the shortest `loses-ground`
+     * window ended exactly on the chapter boundary. That only holds while the
+     * window is long enough to catch the death and short enough to miss the
+     * climb back out of it — a knife edge that any balance change moves, and
+     * one that had already moved: the same thirty seconds now buys twenty-seven
+     * kills and eight waves of climb-back, so the window ends mid-chapter with
+     * the retreat still perfectly intact underneath it.
+     *
+     * These two teams cannot climb at all, so the wave they land on is the
+     * retreat and nothing else.
+     */
+    expect(fightToDefeat(doomed(95))).toEqual({ from: 95, to: 81 });
+
+    /*
+     * Standing on a chapter start costs the whole previous chapter as well.
+     * There is no room to lose inside the current one, and the shipped code
+     * takes another twenty rather than leaving the team where it died — so a
+     * player wiping on the first wave of a chapter falls two chapters from
+     * where they were fighting a moment ago. Nothing in the UI says so.
+     */
+    expect(fightToDefeat(doomed(81))).toEqual({ from: 81, to: 61 });
+
+    // Both landings are boundaries, which is what makes the fixture's losses
+    // multiples of twenty rather than arbitrary.
+    for (const wave of [95, 81]) expect((fightToDefeat(doomed(wave)).to - 1) % 20).toBe(0);
+  });
+
+  it('shows the shortest window still has the retreat in it', () => {
+    /*
+     * The scenario exists to catch a loss before the climb back hides it, so
+     * what the shortest window has to show is that the team finished below
+     * where it started — and inside the chapter it retreated into, never
+     * below it, which would mean a second death the window is too short to
+     * be reporting honestly as one.
      */
     const ground = scenario('loses-ground');
     const chapterStart = Math.floor((ground.inputs.wave - 1) / 20) * 20 + 1;
 
     const shortest = ground.windows.reduce((best, window) => (window.elapsedMs < best.elapsedMs ? window : best));
-    expect(shortest.endWave).toBe(chapterStart);
-    expect((shortest.endWave - 1) % 20).toBe(0);
+    expect(shortest.endWave).toBeLessThan(ground.inputs.wave);
 
-    // Every longer window is the same retreat plus a partial climb back, so
-    // none may finish below the boundary.
+    // Every window is the same retreat plus a partial climb back, so none may
+    // finish below the boundary.
     for (const window of ground.windows) {
       expect({ ms: window.elapsedMs, aboveBoundary: window.endWave >= chapterStart }).toEqual({
         ms: window.elapsedMs,
