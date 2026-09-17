@@ -245,10 +245,20 @@ Three bugs the round-trip laws caught, none visible by reading the code:
 
 **Not done, and moved to Phase 12:** binding `SaveDocStore` to `firebase/firestore`. `users/{uid}/saveSlots/{slot}` needs a uid and the rewrite has no auth at all, so that binding would be a dependency and a file nothing could exercise, added in front of the thing it waits on. Around thirty lines once `onlineAuth` lands.
 
-### Phase 7 — The character *(~2 weeks)*
-`ALLOCATE_STAT`, `ALLOCATE_STAT_N`, `ALLOCATE_STAT_MAX`, `CREATE_CHARACTER`. With them the missing engine layer underneath: `derivedStats`, and the four multipliers `getTeamMaxHp` needs that this engine does not have — `getRankMultiplier`, `getMetaSurvivalMultiplier`, `getRebirthSurvivalMultiplier`, plus the mastery and tactics stacks. Team health is a flat `2000` until this lands, so every later balance number is unanchored.
+### Phase 7 — The character *(~2 weeks)* — **done**
+`ALLOCATE_STAT`, `ALLOCATE_STAT_N`, `ALLOCATE_STAT_MAX`, `CREATE_CHARACTER`, and the engine layer underneath: `derivedStats`, `getMetaSurvivalMultiplier`, `getRebirthSurvivalMultiplier`, the mastery ceiling and the tactics stack. Team health was a flat `2000` with a note saying nothing derived it, which left every later balance number unanchored.
 
-Fixture-backed like the Phase 1 ports, against `useGameState`, before anything reads them.
+Fixture-backed like the Phase 1 ports, against `useGameState`, before anything read them.
+
+Two shipped details pinned because they are easy to miss by reading quickly: heroes contribute their **class** base vitality, not their template's — `computeStats` prefers the template for display and `getTeamMaxHp` never does — and the six multipliers compose by multiplication, which is within a few percent of addition at low levels and wrong by a lot in the deep game.
+
+One deliberate divergence: `ALLOCATE_STAT_N` computes `Math.min(amount, unspent)` with no floor, so a negative amount adds points back and drives the stat below zero, repeatable. Nothing sends one today, but these are engine functions now rather than one component's private handler. The fixture records the shipped behaviour and the port clamps at zero.
+
+Class mastery and the tactics facility are **read** out of the `legacy` bag rather than claimed: claiming a key changes every stored save's meaning, and both belong to the phases that own the systems granting them.
+
+The starting team lands on **843** against the old 2000, and still climbs into the forties within a minute and sawtooths there — which the derivation was not tuned to preserve.
+
+Equipment is the one term still missing from `derivedStats`; it is Phase 9, and the function takes it as an argument so that phase adds a caller rather than editing it.
 
 ### Phase 8 — The roster *(~3 weeks)*
 Summoning and everything that shapes a team: `SUMMON_HERO` with banners, rate-ups, soft pity and milestones; `SPARK_EXCHANGE`; `LEVEL_UP_HERO_GOLD`, `BATCH_LEVEL_HEROES`, `RANK_UP_HERO` and its max/rebirth variants; `REBIRTH_HERO`, `RECYCLE_HERO`; `SET_ACTIVE_TEAM`, `SET_HERO_FORMATION`, `SAVE_TEAM_LOADOUT`, `LOAD_TEAM_LOADOUT`, `UNLOCK_TEAM_SLOT`.
