@@ -44,8 +44,26 @@ function codeOnly(source: string): string {
     .join('\n');
 }
 
-/** Cap on the coordinator. Rules belong in subsystems, not here. */
-const COORDINATOR_MAX_LINES = 300;
+/**
+ * Cap on the coordinator, in **code** lines. Rules belong in subsystems.
+ *
+ * Counted through `codeOnly`, and that is a correction rather than a detail.
+ * This was a raw line count, which made the one rule in this file that reads
+ * the source without stripping comments — and so the one rule that counts
+ * prose as if it were complexity. The module header above warns about exactly
+ * that: a rule that cannot tell the two apart "would push that explanation out
+ * of the codebase to keep itself green". It did. Hero actives cost three doc
+ * comments on their way in, trimmed for length rather than because they were
+ * wrong, and the next system would have cost more.
+ *
+ * The number is lower than the old one on purpose. The coordinator is at 172
+ * code lines here, so this is real headroom and not a rubber stamp — and it is
+ * a tighter rule than 300 raw was, because raw could always be satisfied by
+ * deleting an explanation instead of moving a rule. For scale, the largest
+ * engine module is `equipmentSave.ts` at 348 code lines: a coordinator allowed
+ * to reach that is the god file this rule exists to refuse.
+ */
+const COORDINATOR_MAX_LINES = 200;
 
 describe('engine dependency boundary', () => {
   it('has files to check', () => {
@@ -118,7 +136,8 @@ describe('engine dependency boundary', () => {
   });
 
   it('keeps the simulation a coordinator instead of a god file', () => {
-    const source = readFileSync(join(ENGINE_ROOT, 'Simulation.ts'), 'utf8');
-    expect(source.split('\n').length).toBeLessThan(COORDINATOR_MAX_LINES);
+    const source = codeOnly(readFileSync(join(ENGINE_ROOT, 'Simulation.ts'), 'utf8'));
+    const lines = source.split('\n').filter(line => line.trim() !== '');
+    expect(lines.length).toBeLessThan(COORDINATOR_MAX_LINES);
   });
 });

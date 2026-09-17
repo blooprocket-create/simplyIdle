@@ -71,7 +71,12 @@ export const AUTOMATIONS: readonly Automation[] = [
     tradeoff: 'Spent the moment they are ready, not when they would land best.',
     signal: 'level',
     goal: 25,
-    available: false,
+    // Available as of the commit that gave abilities a bar to be pressed on.
+    // It is the one automation whose shipped default was *on*, which is how a
+    // team cast four skills for five phases with nothing on screen naming
+    // them. Here it is earned like the rest, so the verb is hand-played first
+    // and automated second rather than the other way round.
+    available: true,
   },
   {
     id: 'tempo',

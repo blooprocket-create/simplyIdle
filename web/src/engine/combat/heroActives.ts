@@ -89,13 +89,27 @@ export interface FightView {
  * skill that *is* an execute reads the missing health explicitly.
  */
 export function castEffect(caster: CasterView, fight: FightView): { effect: CastEffect; cooldownMs: number } {
+  const cooldownMs = castCooldownMs(caster);
   if (caster.unique !== null) {
     return {
       effect: uniqueEffect(caster.unique.skill, uniqueSkillPower(caster.unique.skill, caster.unique.rank), fight),
-      cooldownMs: caster.unique.skill.cooldownMs,
+      cooldownMs,
     };
   }
-  return { effect: archetypeEffect(caster, fight), cooldownMs: ARCHETYPE_COOLDOWN_MS[caster.archetype] };
+  return { effect: archetypeEffect(caster, fight), cooldownMs };
+}
+
+/**
+ * How long this caster waits after casting.
+ *
+ * Split out because a cooldown is the one thing about a cast that does *not*
+ * depend on the fight — which is what lets an ability bar draw a filling ring
+ * without asking the enemy anything. Shared with `castEffect` rather than
+ * restated, so a relic whose cooldown changed could not fill at one rate and
+ * come up at another.
+ */
+export function castCooldownMs(caster: CasterView): number {
+  return caster.unique !== null ? caster.unique.skill.cooldownMs : ARCHETYPE_COOLDOWN_MS[caster.archetype];
 }
 
 function archetypeEffect(caster: CasterView, fight: FightView): CastEffect {

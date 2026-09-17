@@ -1,0 +1,104 @@
+/*
+ * Sits above BURST, which sits above the shelf: the three rows a thumb
+ * reaches are, in order, abilities, the timed verb, and where to go next.
+ */
+.bar {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-inline-size: 100%;
+}
+
+/*
+ * Scrolls rather than wraps. A team is six and a phone fits four, and a bar
+ * that reflowed to two rows would move BURST down the screen every time a
+ * hero was benched — the one control whose position has to be muscle memory.
+ */
+.slots {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: var(--space-1);
+}
+
+.slots::-webkit-scrollbar {
+  display: none;
+}
+
+.slot {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  inline-size: 62px;
+  block-size: 46px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--scrim);
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* The cooldown, filling from the bottom. Behind the words, never over them. */
+.fill {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  background: var(--raised);
+  pointer-events: none;
+}
+
+.skill,
+.who {
+  position: relative;
+}
+
+.who {
+  color: var(--ink-low);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.ready {
+  border-color: var(--ready);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.ready .fill {
+  background: transparent;
+}
+
+.ready:focus-visible {
+  outline: 2px solid var(--ready);
+  outline-offset: 2px;
+}
+
+.auto {
+  flex: 0 0 auto;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--scrim);
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.auto[aria-pressed='true'] {
+  border-color: var(--line-strong);
+  color: var(--ink-mid);
+}

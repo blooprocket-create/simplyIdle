@@ -45,18 +45,25 @@ describe('the automation catalogue', () => {
 
   it('marks only what this build can honour as available', () => {
     /*
-     * Still only `burst`, and Phase 8 did not change that despite building
-     * summoning and recycling. `available` is a claim that the *shell wires
-     * this flag to the running simulation*, not that the rules exist — and
-     * `ui/architecture.test.ts` enforces exactly that correspondence. It
-     * caught an attempt to flip these two on the strength of the rules alone.
+     * `burst` and now `castHeroActives`. Phase 8 did not change this despite
+     * building summoning and recycling: `available` is a claim that the *shell
+     * wires this flag to the running simulation*, not that the rules exist —
+     * and `ui/architecture.test.ts` enforces exactly that correspondence. It
+     * caught an attempt to flip those two on the strength of the rules alone.
      *
-     * What the wiring waits on is a wallet: the simulation carries no gold,
-     * shards or boss tears, so there is nothing for an automatic summon to
-     * spend or an automatic recycle to pay into. That is Phase 10's.
+     * Abilities earned it the other way round, which is the distinction worth
+     * keeping: the rules were ported in Phase 10, then stepped by the fight,
+     * then given a bar with a button on it — and only then was the flag
+     * flipped. Each of those three was its own commit, because the first two
+     * are exactly the state that looks finished and plays as though the system
+     * is missing.
+     *
+     * The remaining seven wait on a wallet: the simulation carries no shards
+     * or boss tears, so there is nothing for an automatic summon to spend or
+     * an automatic recycle to pay into. Later in Phase 10.
      */
     const available = availableAutomations();
-    expect(available.map(entry => entry.id)).toEqual(['burst']);
+    expect(available.map(entry => entry.id)).toEqual(['burst', 'castHeroActives']);
     for (const entry of AUTOMATIONS) {
       expect(entry.available, entry.id).toBe(available.includes(entry));
     }

@@ -3,7 +3,7 @@ import { isBossWave } from '../content/monsters';
 
 import { BossFight } from './combat/BossFight';
 import { HeroActiveClock, type ActiveCaster } from './combat/HeroActiveClock';
-import { applyActives } from './combat/applyActives';
+import { applyActives, castOne } from './combat/applyActives';
 import { RallyOffers } from './combat/RallyOffers';
 import { BURST_HIT_UID, TELL_HIT_UID, type BurstQuality } from './combat/burst';
 import { BurstMeter } from './combat/BurstMeter';
@@ -51,6 +51,14 @@ export interface SimulationOptions {
   rates?: RewardRates;
   /** Whose abilities are in the fight, in team order. Empty means none. */
   casters?: readonly ActiveCaster[];
+  /**
+   * Whether abilities fire themselves. Shipped on; here it is earned.
+   *
+   * Taken at construction rather than left to a setter, for the reason
+   * `autoBurst` is: an effect that switched it afterwards would run against a
+   * null loop on mount and drop the player's earned choice for a frame.
+   */
+  autoCast?: boolean;
 }
 
 export class Simulation {
@@ -78,6 +86,7 @@ export class Simulation {
     this.enemyHpMult = options.enemyHpMult ?? 1;
     this.incomingMult = options.incomingMult ?? 0;
     this.casters = options.casters ?? [];
+    if (options.autoCast !== undefined) this.actives.setAutoCast(options.autoCast);
     const resume = options.resume;
     this.kills = resume?.kills ?? 0;
     this.deaths = resume?.deaths ?? 0;
@@ -152,15 +161,36 @@ export class Simulation {
     );
   }
 
-  /**
-   * The player pressed BURST.
-   *
-   * Takes no time argument: the simulation owns the clock, and a caller
-   * passing its own would be timing the window against a different one.
-   */
   /** Whether a lapsed BURST window fires itself. Earned, and then chosen. */
   setAutoBurst(on: boolean): void {
     this.burst.setAutomated(on);
+  }
+
+  /**
+   * The player pressed a hero's ability.
+   *
+   * Refused — changing nothing, the cooldown included — for a hero who is
+   * benched or not ready, so a mistimed press is not a punished one. Goes
+   * through the same seam auto-cast does, so pressing is never worse than
+   * leaving it alone.
+   */
+  castHeroActive(uid: string): boolean {
+    const cast = castOne(this.actives, uid, this.casters, this.enemy, this.vitals);
+    if (cast === null) return false;
+    this.enemy = cast.enemy;
+    this.vitals = cast.vitals;
+    return true;
+  }
+
+  /**
+   * Whether abilities fire themselves the moment they come up.
+   *
+   * Named for the automation rather than for the clock, because
+   * `ui/architecture.test.ts` derives the gate from the method name: every
+   * `setAuto…` the shell calls has to be an automation the player earned.
+   */
+  setAutoCastHeroActives(on: boolean): void {
+    this.actives.setAutoCast(on);
   }
 
   /**
@@ -179,6 +209,12 @@ export class Simulation {
     return true;
   }
 
+  /**
+   * The player pressed BURST.
+   *
+   * Takes no time argument: the simulation owns the clock, and a caller
+   * passing its own would be timing the window against a different one.
+   */
   spendBurst(): { spent: boolean; multiplier: number; quality: BurstQuality } {
     const { payload, quality } = this.burst.spend(this.elapsedMs);
     if (payload) this.detonate(payload.multiplier, payload.seconds);
@@ -289,6 +325,7 @@ export class Simulation {
       team: { hp: this.vitals.hp, maxHp: this.vitals.maxHp },
       heroes: heroViews(this.heroes),
       hits: this.hits,
+      abilities: this.actives.view(this.casters),
       burst: this.burst.view(this.elapsedMs),
       wipe: this.rally.view(this.elapsedMs),
       boss: this.boss.view(this.elapsedMs),

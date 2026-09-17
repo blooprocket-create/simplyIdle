@@ -1,4 +1,5 @@
 import Decimal from 'break_eternity.js';
+import type { AbilityView } from './combat/HeroActiveClock';
 import { BURST_COST, type BurstQuality } from './combat/burst';
 
 /**
@@ -114,6 +115,15 @@ export interface SimulationSnapshot {
   heroes: HeroView[];
   /** Hits from the last step only. Replaced, not accumulated. */
   hits: HitEvent[];
+  /**
+   * Every fielded hero's ability, in team order. Empty before a roster loads.
+   *
+   * Beside `burst` because they are the same kind of thing — a verb the player
+   * holds, with a meter saying when. BURST got a HUD five phases before
+   * abilities had one, which is most of why a team was quietly casting four
+   * skills nobody could see, let alone time.
+   */
+  abilities: AbilityView[];
   burst: BurstView;
   /** Null unless the team is down and waiting on an answer. */
   wipe: WipeView | null;
@@ -153,6 +163,7 @@ export function emptySnapshot(): SimulationSnapshot {
     team: { hp: new Decimal(0), maxHp: new Decimal(0) },
     heroes: [],
     hits: [],
+    abilities: [],
     burst: {
       charge: 0,
       cost: BURST_COST,

@@ -1,5 +1,14 @@
 import Decimal from 'break_eternity.js';
-import { applyCastDamage, castEffect, type CasterView, type CastEffect, type FightView } from './heroActives';
+import type { UniqueSkillType } from '../../content/heroSkills';
+import type { HeroActiveSkillArchetypeId } from '../../content/uniqueEffects';
+import {
+  applyCastDamage,
+  castCooldownMs,
+  castEffect,
+  type CasterView,
+  type CastEffect,
+  type FightView,
+} from './heroActives';
 
 /**
  * Whose ability is ready, and how long a buff has left.
@@ -24,6 +33,26 @@ export interface ActiveCaster {
   uid: string;
   caster: CasterView;
   fielded: boolean;
+}
+
+/**
+ * One ability as a bar draws it.
+ *
+ * `ready` folds the bench in, because a benched hero's ability is not ready in
+ * any sense a player cares about — but `remainingMs` still counts down for
+ * them, so a hero fielded mid-cooldown does not come up free.
+ */
+export interface AbilityView {
+  uid: string;
+  archetype: HeroActiveSkillArchetypeId;
+  /** The relic's skill, when they are carrying one. Null means the archetype. */
+  uniqueType: UniqueSkillType | null;
+  fielded: boolean;
+  ready: boolean;
+  remainingMs: number;
+  cooldownMs: number;
+  /** Zero the instant after a cast, one when it is up again. */
+  progress: number;
 }
 
 export interface CastRecord {
@@ -161,6 +190,36 @@ export class HeroActiveClock {
     }
 
     return { casts, enemyHp, healFraction };
+  }
+
+  /** Whether abilities are firing themselves. The ability bar says so. */
+  automatic(): boolean {
+    return this.autoCast;
+  }
+
+  /**
+   * Every ability as a bar draws it, in team order.
+   *
+   * Built here rather than in the simulation because the cooldowns are here
+   * and nowhere else — a view assembled by whoever happened to hold the list
+   * would be a second opinion about whether a hero can cast, and the first
+   * time it disagreed the button would be live while the press was refused.
+   */
+  view(casters: readonly ActiveCaster[]): AbilityView[] {
+    return casters.map(entry => {
+      const cooldownMs = castCooldownMs(entry.caster);
+      const remainingMs = this.remainingMs(entry.uid);
+      return {
+        uid: entry.uid,
+        archetype: entry.caster.archetype,
+        uniqueType: entry.caster.unique?.skill.type ?? null,
+        fielded: entry.fielded,
+        ready: entry.fielded && remainingMs <= 0,
+        remainingMs,
+        cooldownMs,
+        progress: cooldownMs > 0 ? Math.min(1, 1 - remainingMs / cooldownMs) : 1,
+      };
+    });
   }
 
   /** Forget every cooldown and buff. For a wipe, or a team that changed. */

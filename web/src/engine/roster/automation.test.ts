@@ -32,6 +32,8 @@ describe('what the catalogue still does not claim', () => {
   it('leaves both flags unavailable, because nothing wires them', () => {
     /*
      * Phase 8 built summoning and recycling, and the flags stay false.
+     * Hero abilities are no longer among them: Phase 10 gave them a bar to be
+     * pressed on, so the shell wires that one and the catalogue may claim it.
      *
      * `available` is a claim that the shell wires the flag to the running
      * simulation, not that rules exist — `ui/architecture.test.ts` reads
@@ -49,7 +51,7 @@ describe('what the catalogue still does not claim', () => {
     // And tempo waits on something else again — this engine has no heat.
     expect(automationById('tempo')?.available).toBe(false);
 
-    expect(availableAutomations().map(entry => entry.id)).toEqual(['burst']);
+    expect(availableAutomations().map(entry => entry.id)).toEqual(['burst', 'castHeroActives']);
   });
 
   it('still lists every shipped flag, honoured or not', () => {
@@ -57,7 +59,7 @@ describe('what the catalogue still does not claim', () => {
     // has one. The unavailable ones stay listed for the same reason the
     // untracked achievements do.
     expect(AUTOMATIONS).toHaveLength(9);
-    expect(AUTOMATIONS.filter(entry => !entry.available).length).toBe(8);
+    expect(AUTOMATIONS.filter(entry => !entry.available).length).toBe(7);
   });
 });
 

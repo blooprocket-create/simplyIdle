@@ -50,16 +50,24 @@ export class GameLoop {
     return this.simulation.read();
   }
 
-  /**
-   * The player pressed BURST.
-   *
-   * Publishes immediately rather than waiting for the next frame: the press
-   * is the player's own input and the HUD showing it a frame late is the
-   * difference between a verb that feels answered and one that feels ignored.
-   */
   /** Whether a lapsed BURST window fires itself. */
   setAutoBurst(on: boolean): void {
     this.simulation.setAutoBurst(on);
+  }
+
+  /** Whether abilities fire themselves the moment they come up. */
+  setAutoCastHeroActives(on: boolean): void {
+    this.simulation.setAutoCastHeroActives(on);
+  }
+
+  /** The player pressed a hero's ability. Publishes for the same reason. */
+  castHeroActive(uid: string): boolean {
+    const cast = this.simulation.castHeroActive(uid);
+    if (cast) {
+      const snapshot = this.simulation.read();
+      for (const listener of this.listeners) listener(snapshot);
+    }
+    return cast;
   }
 
   /** The player answered a wipe offer. Publishes for the same reason. */
@@ -82,6 +90,13 @@ export class GameLoop {
     return answered;
   }
 
+  /**
+   * The player pressed BURST.
+   *
+   * Publishes immediately rather than waiting for the next frame: the press
+   * is the player's own input and the HUD showing it a frame late is the
+   * difference between a verb that feels answered and one that feels ignored.
+   */
   spendBurst(): ReturnType<Simulation['spendBurst']> {
     const result = this.simulation.spendBurst();
     if (result.spent) {

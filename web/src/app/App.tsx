@@ -29,6 +29,7 @@ import { WipeOffer } from '../ui/wipe/WipeOffer';
 import { Ticker } from '../ui/objectives/Ticker';
 import { usePinned } from '../ui/prefs/usePinned';
 import { useAutomation } from '../ui/prefs/useAutomation';
+import { AbilityBar } from '../ui/abilities/AbilityBar';
 import { automationProgress } from '../ui/automation/unlocks';
 import type { AutomationId } from '../content/automation';
 import { SurfaceHost } from '../ui/shell/SurfaceHost';
@@ -130,6 +131,8 @@ export function App() {
    */
   const autoBurst = automation.active.has('burst');
   const autoBurstRef = useRef(autoBurst);
+  const autoCast = automation.active.has('castHeroActives');
+  const autoCastRef = useRef(autoCast);
 
   /*
    * Change the save, and write it down.
@@ -293,6 +296,7 @@ export function App() {
       incomingMult: roster.incomingMult,
       casters: roster.casters,
       autoBurst: autoBurstRef.current,
+      autoCast: autoCastRef.current,
       resume: restored.resume ?? undefined,
       awayMs: restored.awayMs,
     });
@@ -339,6 +343,11 @@ export function App() {
     autoBurstRef.current = autoBurst;
     loopRef.current?.setAutoBurst(autoBurst);
   }, [autoBurst]);
+
+  useEffect(() => {
+    autoCastRef.current = autoCast;
+    loopRef.current?.setAutoCastHeroActives(autoCast);
+  }, [autoCast]);
 
   return (
     <div className={styles.root}>
@@ -396,6 +405,16 @@ export function App() {
         )}
         {open === null && snapshot.boss !== null && (
           <BossTell boss={snapshot.boss} onAnswer={() => loopRef.current?.answerTell()} />
+        )}
+        {open === null && (
+          <AbilityBar
+            abilities={snapshot.abilities}
+            cast={cast}
+            automatic={autoCast}
+            earned={earned.has('castHeroActives')}
+            onCast={uid => loopRef.current?.castHeroActive(uid)}
+            onToggleAuto={() => automation.toggle('castHeroActives')}
+          />
         )}
         {open === null && <BurstControl burst={snapshot.burst} onSpend={() => loopRef.current?.spendBurst()} />}
       </div>

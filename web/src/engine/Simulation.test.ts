@@ -1134,3 +1134,118 @@ describe('abilities reach the fight', () => {
     expect(fielded.read().totals.dealt.gt(bare.read().totals.dealt)).toBe(true);
   });
 });
+
+describe('an ability the player presses', () => {
+  /**
+   * The other half of the fifth system. Abilities reached the fight one commit
+   * before this, and fired themselves — which is how they shipped, and is most
+   * of why nobody noticed they were missing for five phases.
+   */
+  const caster = (uid: string, archetype: 'frontline_ward' | 'battle_chant' | 'burst_volley') => ({
+    uid,
+    fielded: true,
+    caster: { level: 1, archetype, unique: null },
+  });
+
+  const fight = (casters: ReturnType<typeof caster>[], autoCast = false) =>
+    new Simulation({ heroes: [], teamMaxHp: new Decimal(1e9), startWave: 40, casters, autoCast });
+
+  it('lands the cast and puts the hero on cooldown', () => {
+    const sim = fight([caster('v', 'burst_volley')]);
+    const before = sim.read().enemy!.hp;
+    expect(sim.castHeroActive('v')).toBe(true);
+    expect(sim.read().enemy!.hp.lt(before)).toBe(true);
+
+    const ability = sim.read().abilities.find(entry => entry.uid === 'v')!;
+    expect(ability.ready).toBe(false);
+    expect(ability.remainingMs).toBeGreaterThan(0);
+  });
+
+  it('refuses a second press, and the refusal costs nothing', () => {
+    /*
+     * The shipped rule, and the reason it matters: a refusal that reset the
+     * cooldown would punish a player for pressing early, which is the exact
+     * habit a bar with a filling ring on it invites.
+     */
+    const sim = fight([caster('v', 'burst_volley')]);
+    sim.castHeroActive('v');
+    const after = sim.read();
+
+    expect(sim.castHeroActive('v')).toBe(false);
+    expect(sim.read().enemy!.hp.eq(after.enemy!.hp)).toBe(true);
+    expect(sim.read().abilities[0].remainingMs).toBe(after.abilities[0].remainingMs);
+  });
+
+  it('refuses a hero who is not in the fight at all', () => {
+    // A press naming a uid the roster does not carry is a bug upstream, and
+    // casting for an invented hero would hide it behind a working button.
+    expect(fight([caster('v', 'burst_volley')]).castHeroActive('nobody')).toBe(false);
+  });
+
+  it('refuses a benched hero without touching their cooldown', () => {
+    const sim = new Simulation({
+      heroes: [],
+      teamMaxHp: new Decimal(1e9),
+      startWave: 40,
+      autoCast: false,
+      casters: [{ ...caster('b', 'burst_volley'), fielded: false }],
+    });
+    expect(sim.castHeroActive('b')).toBe(false);
+    expect(sim.read().abilities[0].remainingMs).toBe(0);
+    // Not ready, though the cooldown is zero — the bench is the reason.
+    expect(sim.read().abilities[0].ready).toBe(false);
+  });
+
+  it('buys timing rather than power, which is the whole trade', () => {
+    /*
+     * A pressed cast and an auto-cast one are worth exactly the same. That is
+     * the bargain the bar offers — and the reason both go through one seam
+     * rather than two code paths that could drift apart.
+     */
+    const pressed = fight([caster('v', 'burst_volley')]);
+    const automatic = fight([caster('v', 'burst_volley')], true);
+
+    const hpBefore = pressed.read().enemy!.hp;
+    pressed.castHeroActive('v');
+    const byHand = hpBefore.sub(pressed.read().enemy!.hp);
+
+    const autoBefore = automatic.read().enemy!.hp;
+    automatic.advance(100);
+    const byItself = autoBefore.sub(automatic.read().enemy!.hp);
+
+    expect(byHand.eq(byItself)).toBe(true);
+    expect(byHand.gt(0)).toBe(true);
+  });
+
+  it('holds every ability when auto-cast is off, and still lets a press through', () => {
+    // The state the bar exists for: nothing fires on its own, so the only
+    // damage an ability does is damage the player asked for.
+    const idle = fight([caster('v', 'burst_volley')]);
+    const before = idle.read().enemy!.hp;
+    run(idle, 30_000, 100);
+    expect(idle.read().enemy!.hp.eq(before)).toBe(true);
+    expect(idle.castHeroActive('v')).toBe(true);
+    expect(idle.read().enemy!.hp.lt(before)).toBe(true);
+  });
+
+  it('draws a ring that fills as the cooldown runs down', () => {
+    const sim = fight([caster('w', 'frontline_ward')]);
+    sim.castHeroActive('w');
+    const fresh = sim.read().abilities[0];
+    expect(fresh.progress).toBeCloseTo(0, 6);
+    expect(fresh.cooldownMs).toBe(10_000);
+
+    run(sim, 5_000, 100);
+    const half = sim.read().abilities[0];
+    expect(half.progress).toBeCloseTo(0.5, 6);
+    expect(half.ready).toBe(false);
+
+    run(sim, 5_000, 100);
+    expect(sim.read().abilities[0].progress).toBe(1);
+    expect(sim.read().abilities[0].ready).toBe(true);
+  });
+
+  it('reports no abilities for a fight that has none', () => {
+    expect(new Simulation({ heroes: [], teamMaxHp: new Decimal(1e9) }).read().abilities).toEqual([]);
+  });
+});

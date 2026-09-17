@@ -72,14 +72,26 @@ describe('progress towards an automation', () => {
     expect(at(burst.goal * 10)?.detail).toBe(`${burst.goal} / ${burst.goal}`);
   });
 
+  it('has stopped holding hero abilities back', () => {
+    /*
+     * This test used `castHeroActives` as its example of an automation the
+     * build cannot honour, and that stopped being true the moment abilities
+     * got a bar. The example moved to `useCoolant`; this is the note saying
+     * why, so the next reader does not have to diff two files to find out.
+     */
+    const cast = automationById('castHeroActives');
+    expect(cast?.available).toBe(true);
+    expect(isUnlocked('castHeroActives', profileWith({ level: cast?.goal ?? 25 }), emptySnapshot())).toBe(true);
+  });
+
   it('marks progress on an unavailable one without calling it unlocked', () => {
     // The bar can fill; the automation still does not apply. Both facts are
     // true and the screen has to be able to say both.
-    const rich = profileWith({ level: 9_999 });
-    const cast = automationProgress(rich, emptySnapshot()).find(entry => entry.automation.id === 'castHeroActives');
-    expect(cast?.fraction).toBe(1);
-    expect(cast?.unlocked).toBe(true);
-    expect(cast?.automation.available).toBe(false);
-    expect(isUnlocked('castHeroActives', rich, emptySnapshot())).toBe(false);
+    const rich = profileWith({ level: 9_999, wallet: { ...emptyProfile().wallet, bossTears: 1e6 } });
+    const coolant = automationProgress(rich, emptySnapshot()).find(entry => entry.automation.id === 'useCoolant');
+    expect(coolant?.fraction).toBe(1);
+    expect(coolant?.unlocked).toBe(true);
+    expect(coolant?.automation.available).toBe(false);
+    expect(isUnlocked('useCoolant', rich, emptySnapshot())).toBe(false);
   });
 });
