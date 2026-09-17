@@ -1,4 +1,5 @@
 import Decimal from 'break_eternity.js';
+import { FLAT_RATES, type RewardRates } from '../combat/rewards';
 import { estimateOffline, type OfflineEstimate } from './estimate';
 
 /**
@@ -13,10 +14,17 @@ import { estimateOffline, type OfflineEstimate } from './estimate';
  *
  * This is the call that makes the promise true.
  *
- * **What it credits, and what it does not.** The live simulation tracks waves,
- * kills and wipes; it has no economy yet, so no gold or EXP is awarded here.
- * Crediting rewards the running game cannot itself produce would be inventing
- * numbers. When the economy lands, it claims them from the same estimate.
+ * **What it credits.** Waves, kills and wipes — and, since the wallet landed,
+ * the gold and EXP the estimate was already computing and this was throwing
+ * away. That discard was correct while the live loop had no economy: crediting
+ * rewards the running game could not itself produce would have been inventing
+ * numbers. It has one now, so the note that said so is gone rather than left
+ * to mislead.
+ *
+ * The rates reach the estimator rather than being applied afterwards, because
+ * they belong inside the round model: a window's gold is the sum over the waves
+ * it actually spent, and scaling the total at the end would price every wave at
+ * whichever chain happened to be in force when the player came back.
  */
 
 /**
@@ -33,6 +41,8 @@ export interface AwayCreditInput {
   teamMaxHp: Decimal;
   enemyHpMult: number;
   incomingMult: number;
+  /** The gold and EXP chain, as the live loop is charging it. */
+  rates?: RewardRates;
 }
 
 export interface AwayCredit {
@@ -40,11 +50,20 @@ export interface AwayCredit {
   kills: number;
   deaths: number;
   msCredited: number;
+  /**
+   * Priced by the whole window rather than per kill, and so **not rounded**.
+   * The estimator resolves rounds and extrapolates repeats, so these cover
+   * kills it never individually simulated; applying the live loop's per-kill
+   * ceiling to them would round up once for every kill it skipped.
+   */
+  gold: Decimal;
+  exp: Decimal;
 }
 
 export function creditAwayTime(input: AwayCreditInput, elapsedMs: number): AwayCredit {
+  const rates = input.rates ?? FLAT_RATES;
   if (!Number.isFinite(elapsedMs) || elapsedMs <= 0 || input.teamDps.lte(0)) {
-    return { wave: input.wave, kills: 0, deaths: 0, msCredited: 0 };
+    return { wave: input.wave, kills: 0, deaths: 0, msCredited: 0, gold: new Decimal(0), exp: new Decimal(0) };
   }
 
   const estimate: OfflineEstimate = estimateOffline(input.wave, elapsedMs, {
@@ -59,8 +78,8 @@ export function creditAwayTime(input: AwayCreditInput, elapsedMs: number): AwayC
     teamMaxHp: input.teamMaxHp,
     enemyHpMult: input.enemyHpMult,
     incomingMult: input.incomingMult,
-    goldMult: 1,
-    expMult: 1,
+    goldMult: rates.goldMult,
+    expMult: rates.expMult,
     tempo: 1,
   });
 
@@ -69,5 +88,7 @@ export function creditAwayTime(input: AwayCreditInput, elapsedMs: number): AwayC
     kills: estimate.kills,
     deaths: estimate.deaths,
     msCredited: estimate.msSpent,
+    gold: estimate.gold,
+    exp: estimate.exp,
   };
 }

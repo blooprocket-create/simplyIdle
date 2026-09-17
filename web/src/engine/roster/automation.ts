@@ -17,11 +17,14 @@ import type { TeamHero } from './team';
  * available. It caught an attempt to flip these two on the strength of this
  * file alone, which is precisely the failure it was written for.
  *
- * What the wiring waits on is a **wallet**. `SimulationSnapshot` carries the
- * fight and nothing else — no gold, no shards, no boss tears — so there is
- * nothing for an automatic summon to spend or an automatic recycle to pay
- * into. Currencies get systems in Phase 10, and these two get switched on
- * there rather than here.
+ * What the wiring waits on is the **rest of the wallet**. The snapshot carries
+ * gold and EXP now — `combat/rewards.ts` pulled that much of Phase 10 forward,
+ * because the roster UI is priced in gold — but an automatic summon spends
+ * **boss tears** and an automatic recycle pays into **hero shards**, and the
+ * simulation earns neither. Nor could it usefully: both are spent as well as
+ * earned, and a counter that only ever goes up is not something an automation
+ * can be allowed to draw on. Spending is Phase 10, and these two get switched
+ * on there rather than here.
  *
  * So the parity plan's line that Phase 8 "unlocks the summon, recycle and
  * tempo automations" is wrong on all three, for two different reasons:

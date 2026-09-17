@@ -1,3 +1,5 @@
+import Decimal from 'break_eternity.js';
+
 /**
  * Bounded-value guards for reading a save.
  *
@@ -39,6 +41,32 @@ export function boundedInt(value: unknown, min: number, max: number, fallback: n
 export function boundedFloat(value: unknown, min: number, max: number, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
   return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * A currency, read from text.
+ *
+ * The one guard here that is **not** a port. The shipped save stores gold as a
+ * JSON number clamped against `SAFE_NUMBER_CAP`, which is `Number.MAX_VALUE` —
+ * so an account that drifts past it writes `Infinity`, and `JSON.stringify`
+ * turns that into `null`. A campaign whose wave curve is explicitly built to
+ * outlive doubles cannot keep its currencies in them, so these round-trip as
+ * `Decimal.toString()` output instead.
+ *
+ * Numbers are still accepted, because a save written before this existed has
+ * them. Negative and non-finite values read as the fallback: `NaN` and
+ * `Infinity` are both constructible `Decimal`s that propagate silently through
+ * every sum after them rather than failing.
+ *
+ * Outright nonsense is *not* rejected — `new Decimal('abc')` is zero, not
+ * `NaN`, so a mangled field reads as an empty purse. That is the same answer
+ * the fallback gives for every caller here, so it is left as it is rather than
+ * given a second code path nothing would exercise.
+ */
+export function boundedDecimal(value: unknown, fallback: Decimal): Decimal {
+  if (typeof value !== 'string' && typeof value !== 'number') return fallback;
+  const parsed = new Decimal(value);
+  return parsed.isFinite() && !parsed.lt(0) ? parsed : fallback;
 }
 
 export function boundedBoolean(value: unknown, fallback: boolean): boolean {

@@ -127,6 +127,14 @@ export interface SimulationSnapshot {
     dealt: Decimal;
     /** Damage lost past the killing blow — the price of discrete attacks. */
     overkill: Decimal;
+    /**
+     * Gold and EXP the **run** has earned, not the account's balance. A screen
+     * that spent from this would be decrementing a tally that means "since this
+     * run began"; what a player holds is their save's wallet plus this, and
+     * spending arrives with the wallet in Phase 10.
+     */
+    gold: Decimal;
+    exp: Decimal;
   };
 }
 
@@ -156,6 +164,13 @@ export function emptySnapshot(): SimulationSnapshot {
     },
     wipe: null,
     boss: null,
-    totals: { kills: 0, deaths: 0, dealt: new Decimal(0), overkill: new Decimal(0) },
+    totals: {
+      kills: 0,
+      deaths: 0,
+      dealt: new Decimal(0),
+      overkill: new Decimal(0),
+      gold: new Decimal(0),
+      exp: new Decimal(0),
+    },
   };
 }

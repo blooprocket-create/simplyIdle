@@ -7,9 +7,10 @@ import { RallyOffers } from './combat/RallyOffers';
 import { BURST_HIT_UID, TELL_HIT_UID, type BurstQuality } from './combat/burst';
 import { BurstMeter } from './combat/BurstMeter';
 import { applyHit, spawnEnemy, type Enemy } from './combat/encounter';
+import { FLAT_RATES, RunEarnings, type RewardRates } from './combat/rewards';
 import { applyIncoming, fullHealth, type TeamVitals } from './combat/survival';
 import { scheduleSwings } from './combat/swingSchedule';
-import { nominalDps, type HeroEntity } from './entities/HeroEntity';
+import { teamDps, type HeroEntity } from './entities/HeroEntity';
 import { creditAwayTime } from './offline/awayCredit';
 import type { RunProgress } from './save/runProgress';
 import { emptySnapshot, type HitEvent, type SimulationSnapshot } from './types';
@@ -45,6 +46,8 @@ export interface SimulationOptions {
   teamMaxHp?: Decimal;
   /** Enemy damage multiplier after the whole mitigation chain. */
   incomingMult?: number;
+  /** The gold and EXP multiplier chain. Flat until Phase 10 assembles it. */
+  rates?: RewardRates;
 }
 
 export class Simulation {
@@ -60,6 +63,7 @@ export class Simulation {
   private dealt = new Decimal(0);
   private overkill = new Decimal(0);
   private hits: HitEvent[] = [];
+  private readonly earnings: RunEarnings;
   private readonly burst: BurstMeter;
   private readonly rally = new RallyOffers();
   private readonly boss = new BossFight();
@@ -71,6 +75,7 @@ export class Simulation {
     const resume = options.resume;
     this.kills = resume?.kills ?? 0;
     this.deaths = resume?.deaths ?? 0;
+    this.earnings = new RunEarnings(options.rates ?? FLAT_RATES, resume);
     this.enemy = spawnEnemy(resume?.wave ?? options.startWave ?? 1, this.enemyHpMult);
     // Banked charge comes back at the sim clock's origin, so a player who
     // reloads on a full meter gets the window they had rather than a wait.
@@ -177,10 +182,11 @@ export class Simulation {
     const credit = creditAwayTime(
       {
         wave: this.enemy.wave,
-        teamDps: this.teamDps(),
+        teamDps: teamDps(this.heroes),
         teamMaxHp: this.vitals.maxHp,
         enemyHpMult: this.enemyHpMult,
         incomingMult: this.incomingMult,
+        rates: this.earnings.rates,
       },
       elapsedMs,
     );
@@ -189,6 +195,7 @@ export class Simulation {
     this.elapsedMs += credit.msCredited;
     this.kills += credit.kills;
     this.deaths += credit.deaths;
+    this.earnings.creditAway(credit.gold, credit.exp);
     // Charged after the clock moves, so the window that opens is open *now*
     // rather than at a moment that already passed while the tab was hidden.
     this.burst.creditAway(credit.kills, this.elapsedMs);
@@ -196,10 +203,6 @@ export class Simulation {
     this.vitals = fullHealth(this.vitals.maxHp);
     this.hits = [];
     this.heroes = this.heroes.map(hero => ({ ...hero, targetId: this.enemy.id }));
-  }
-
-  private teamDps(): Decimal {
-    return this.heroes.reduce((total, hero) => total.add(nominalDps(hero)), new Decimal(0));
   }
 
   /**
@@ -211,7 +214,7 @@ export class Simulation {
    * runs.
    */
   private detonate(multiplier: number, seconds: number, uid: string = BURST_HIT_UID): void {
-    const damage = this.teamDps().mul(seconds).mul(multiplier);
+    const damage = teamDps(this.heroes).mul(seconds).mul(multiplier);
     if (damage.lte(0)) return;
     // Not a hero's swing, so it carries a reserved uid rather than borrowing
     // one: the renderer places floating numbers by hashing this, and a
@@ -235,9 +238,11 @@ export class Simulation {
 
     if (!result.killed) return;
     this.kills += 1;
-    // Charged from the wave that just died, not the one replacing it: a boss
-    // is worth three, and reading after the respawn credits the wrong fight.
+    // Both charged from the wave that just died, not the one replacing it: a
+    // boss is worth three charges and seven times the gold, and reading after
+    // the respawn credits the wrong fight on both counts.
     this.burst.charge(isBossWave(this.enemy.wave), this.elapsedMs);
+    this.earnings.creditKill(this.enemy.wave);
     this.enemy = spawnEnemy(this.enemy.wave + 1, this.enemyHpMult);
     // The shipped game heals the team to full on a win, and so does the
     // estimator's round model. Matching it keeps the sawtooth the same shape.
@@ -269,6 +274,7 @@ export class Simulation {
 
   /** The current read model. Callers must treat it as immutable. */
   read(): SimulationSnapshot {
+    const earned = this.earnings.read();
     return {
       ...emptySnapshot(),
       elapsedMs: this.elapsedMs,
@@ -286,7 +292,7 @@ export class Simulation {
       burst: this.burst.view(this.elapsedMs),
       wipe: this.rally.view(this.elapsedMs),
       boss: this.boss.view(this.elapsedMs),
-      totals: { kills: this.kills, deaths: this.deaths, dealt: this.dealt, overkill: this.overkill },
+      totals: { kills: this.kills, deaths: this.deaths, dealt: this.dealt, overkill: this.overkill, ...earned },
     };
   }
 }

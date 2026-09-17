@@ -1,6 +1,7 @@
+import Decimal from 'break_eternity.js';
 import { BURST_COST } from '../combat/burst';
 import type { SimulationSnapshot } from '../types';
-import { boundedInt, isRecord, MAX_SAVE_WAVE } from './guards';
+import { boundedDecimal, boundedInt, isRecord, MAX_SAVE_WAVE } from './guards';
 
 /**
  * A run in progress, small enough to write on a timer.
@@ -33,12 +34,23 @@ export interface RunProgress {
   deaths: number;
   /** 0 to `BURST_COST`. Restored so a banked window survives the reload. */
   burstCharge: number;
+  /**
+   * What the run has earned. Carried here rather than derived, because there is
+   * nothing to derive it from: gold is a sum over every wave the run passed
+   * through, and the wave it is standing on now says nothing about the route.
+   *
+   * `Decimal` rather than `number`, and so written as a string —
+   * `Decimal.toJSON` returns one, which `boundedDecimal` reads back. See the
+   * note there for why the shipped save's JSON numbers were not enough.
+   */
+  gold: Decimal;
+  exp: Decimal;
   /** Wall-clock mark for `readAwayClock`, in epoch ms. */
   awayAtMs: number;
 }
 
 export function emptyRun(nowMs: number): RunProgress {
-  return { wave: 1, kills: 0, deaths: 0, burstCharge: 0, awayAtMs: nowMs };
+  return { wave: 1, kills: 0, deaths: 0, burstCharge: 0, gold: new Decimal(0), exp: new Decimal(0), awayAtMs: nowMs };
 }
 
 /** What to write, taken from the read model rather than from the simulation. */
@@ -48,6 +60,8 @@ export function runProgressFrom(snapshot: SimulationSnapshot, nowMs: number): Ru
     kills: snapshot.totals.kills,
     deaths: snapshot.totals.deaths,
     burstCharge: snapshot.burst.charge,
+    gold: snapshot.totals.gold,
+    exp: snapshot.totals.exp,
     awayAtMs: nowMs,
   };
 }
@@ -78,6 +92,8 @@ export function readRunProgress(raw: string | null): RunProgress | null {
     kills: boundedInt(parsed.kills, 0, MAX_TALLY, 0),
     deaths: boundedInt(parsed.deaths, 0, MAX_TALLY, 0),
     burstCharge: boundedInt(parsed.burstCharge, 0, BURST_COST, 0),
+    gold: boundedDecimal(parsed.gold, new Decimal(0)),
+    exp: boundedDecimal(parsed.exp, new Decimal(0)),
     // Clamped at zero rather than defaulted to "now": this module has no
     // clock, and a mark of zero reads as "away since the epoch", which the
     // away clock already caps rather than believing.

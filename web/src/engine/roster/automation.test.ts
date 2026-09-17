@@ -39,9 +39,10 @@ describe('what the catalogue still does not claim', () => {
      * marked available. It caught an attempt to flip these two on the strength
      * of the rules alone, which is the failure it was written for.
      *
-     * The wiring waits on a wallet: the snapshot carries the fight and nothing
-     * else, so there is nothing for an automatic summon to spend or an
-     * automatic recycle to pay into. Phase 10.
+     * The wiring waits on the rest of the wallet. The snapshot carries gold
+     * and EXP now, but an automatic summon spends boss tears and an automatic
+     * recycle pays into hero shards — neither of which the simulation earns,
+     * and neither of which it could, because both are spent as well. Phase 10.
      */
     expect(automationById('summon')?.available).toBe(false);
     expect(automationById('recycle')?.available).toBe(false);

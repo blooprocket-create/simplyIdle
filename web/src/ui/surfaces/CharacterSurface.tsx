@@ -1,6 +1,7 @@
 import { getClassProfile } from '../../content/classes';
 import { formatDamage } from '../../format/bigNumber';
 import { CLASS_COPY, STAT_COPY, statOrder } from '../copy/classes';
+import { heldGold } from '../profile/playerProfile';
 import type { SurfaceProps } from './SurfaceProps';
 import { Card, Cards, Empty, Row, Rows, Section, Tag } from './parts/parts';
 
@@ -12,7 +13,7 @@ import { Card, Cards, Empty, Row, Rows, Section, Tag } from './parts/parts';
  * which is the question anyone looking at a character sheet is actually
  * asking before they spend a point.
  */
-export function CharacterSurface({ profile }: SurfaceProps) {
+export function CharacterSurface({ profile, snapshot }: SurfaceProps) {
   if (!profile.created || profile.playerClass === null) {
     return <Empty>No character yet. Pick a class and this fills in.</Empty>;
   }
@@ -60,7 +61,7 @@ export function CharacterSurface({ profile }: SurfaceProps) {
       <Section title="Wallet">
         <Cards>
           <Card title="Gold" badge="🪙">
-            {formatDamage(profile.wallet.gold)}
+            {formatDamage(heldGold(profile, snapshot))}
           </Card>
           <Card title="Diamonds" badge="💎">
             {formatDamage(profile.wallet.diamonds)}
@@ -73,7 +74,8 @@ export function CharacterSurface({ profile }: SurfaceProps) {
           </Card>
         </Cards>
         <Empty>
-          <Tag tone="gold">Spent in Summon and Rebirth</Tag>
+          <Tag tone="gold">Spent in Summon and Rebirth</Tag> Gold counts what this run has earned as well as what was
+          banked.
         </Empty>
       </Section>
     </>

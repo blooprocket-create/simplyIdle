@@ -275,9 +275,26 @@ Thirteen shipped behaviours ported deliberately rather than tidied. The ones wor
 
 It said this phase unlocks `summon`, `recycle` and `tempo`. It unlocks none of them, for two different reasons, and the flags stay `available: false`.
 
-`summon` and `recycle` have their rules now, and `available` is a claim that **the shell wires the flag to the running simulation** — `ui/architecture.test.ts` enforces that correspondence directly and caught an attempt to flip them on the strength of the rules alone. The wiring waits on a **wallet**: `SimulationSnapshot` carries the fight and nothing else, so there is nothing for an automatic summon to spend or an automatic recycle to pay into. They get switched on in **Phase 10**.
+`summon` and `recycle` have their rules now, and `available` is a claim that **the shell wires the flag to the running simulation** — `ui/architecture.test.ts` enforces that correspondence directly and caught an attempt to flip them on the strength of the rules alone. The wiring waits on the currencies they move: an automatic summon spends **boss tears** and an automatic recycle pays into **hero shards**, and the simulation earns neither. Nor could it usefully — both are spent as well as earned, and a counter that only ever goes up is not something an automation can draw on. They get switched on in **Phase 10**, with spending.
 
 `tempo` cannot get rules here at all. Auto-tempo raises `combatTempo` when `combatHeat` is zero, and this engine has neither — heat does not exist in it, and `tempo` survives only as a scalar the offline estimator multiplies by. It waits on whichever phase builds heat.
+
+#### A slice of Phase 10, pulled forward: the wallet
+
+The simulation had **no economy at all**. `Simulation` tracked kills, deaths and damage; `awayCredit.ts` carried a note saying "it has no economy yet, so no gold or EXP is awarded here"; and `demoRoster.ts` handed the profile a hardcoded `gold: 8_421_000` in the same spirit as the flat team health Phase 7 replaced. Meanwhile the offline estimator had been computing a window's gold correctly *and throwing the figure away*. So a player who stayed earned nothing and a player who left was told nothing.
+
+That blocks this phase rather than the next one: levelling is priced in gold (`heroGoldLevelCost`, `batchLevel`), so is a team slot (`TEAM_SLOT_UNLOCK_RULES`), and a roster screen that shows what a level costs against a balance that does not exist cannot be built. So gold and EXP land here, in `engine/combat/rewards.ts`, and the plan says so rather than leaving the reordering implied.
+
+What landed is **earning, not spending**: `killReward`, a `RunEarnings` tally on the simulation, `gold` and `exp` on `SimulationSnapshot.totals`, the estimator's figures claimed instead of dropped, and the purse persisted in `RunProgress` — as text, because `Decimal.toString()` outlives the JSON number the shipped save used and the wave curve is explicitly built to pass that point. `ui/profile/playerProfile.ts` gains `heldGold`, which adds the run to the banked balance; before it, the Character screen's gold sat frozen at whatever the save said while the fight went on earning.
+
+Two things worth knowing, both ported rather than tidied:
+
+- **The kill reward is rounded up, once, over the whole chain.** The shipped `killMonster` wraps its entire product in a single `Math.ceil`, so a wave-one monster worth 8 gold on the curve and 8.48 after its affix pays **9**. The offline estimator deliberately does *not* round, because it extrapolates repeats and a per-kill ceiling would apply to kills it never simulated — so `RunEarnings.creditAway` takes a block whole rather than re-deriving it from a count.
+- **Gold is not linear in kills.** Over the same minute the estimator credits 15% more kills than the live loop and **3.5x** the gold, because the curve grows at 1.14 a wave and the last few waves are most of the purse. The away test asserts the relationship that does hold — a sum of `k` increasing prices sits between `k` times the first and `k` times the last — rather than a ratio that would look like a flake.
+
+`Simulation.ts` was six lines under its 300-line cap, so `teamDps` moved to `entities/HeroEntity.ts`, beside the `nominalDps` it sums. That is what the cap is for: summing a roster's damage is a rule about heroes, and it was living in the coordinator only because it was two lines long.
+
+**Still outstanding, and flagged rather than quietly changed:** `demoRoster.ts` describes a *showcase* account, not a new player — level 42, 1,482 kills, six heroes past level 40 and a seeded wallet — while the file's own comment says it answers "what does someone who has never played see?". The seeded gold is no longer a stand-in for a missing economy, since the displayed figure is now the seed plus what the run earns; but what a genuinely new player should start with is a design question, not a port, and it belongs with the rest of the economy in Phase 10.
 
 ### Phase 9 — Equipment *(~2 weeks)*
 `EQUIP_ITEM`, `TOGGLE_EQUIP_HERO`, `CRAFT_EQUIPMENT`, `DISMANTLE_EQUIPMENT`, `UPGRADE_EQUIPMENT_RARITY`, `CONVERT_SCRAP_TO_ESSENCE`, `CONVERT_SCRAP_TO_SHARDS`, `TOGGLE_HERO_UNIQUE_WEAPON`. Content: `EQUIPMENT_CATALOG`, `EQUIPMENT_RARITIES`.
@@ -288,6 +305,8 @@ Unlocks `equipBest` and `dismantle`.
 Shops and everything spendable: `BUY_GOLD_SHOP_ITEM`, `BUY_DIAMOND_SHOP_ITEM`, `BUY_PREMIUM_COOLANT`, `USE_USABLE_ITEM`, `SIMULATE_DOLLAR_PURCHASE`; skills via `BUY_SKILL` and `CAST_HERO_ACTIVE`; prestige via `REBIRTH`, `SPEND_REBIRTH_CORE`, `SPEND_ESSENCE_UPGRADE`, `UPGRADE_FACILITY`; VIP via `CLAIM_VIP_REWARD`, `CLAIM_CODEX_HERO_VIP`, `CLAIM_CODEX_UNIQUE_VIP`. Content: `USABLE_ITEMS`, `SKILLS`, `REBIRTH_BONUS`, `REBIRTH_WAVE_THRESHOLD`, `COST_SCALE`, `GIFT_AMOUNTS`.
 
 **All nine `auto*` flags finally have systems** — `usePotion`, `useCoolant` and `castHeroActives` land here, and the earn-then-choose gate built in Phase 4 stops being a policy with one subject.
+
+Gold and EXP arrived early, in Phase 8 — see the note there. What is left for this phase on the currency side is the part that actually needed the shops: **spending**, the seven other currencies, and the multiplier chain itself. `RewardRates` carries that chain as one measured scalar today, exactly as `OfflineConditions` does, so assembling it here means replacing a number rather than rewriting the callers.
 
 ### Phase 11 — The loops *(~3 weeks)*
 The reasons to log in: `CLAIM_MISSION`; `START_EXPEDITION`, `COMPLETE_EXPEDITION`, `REFRESH_EXPEDITION_CONTRACTS`; `RUN_RIFT_DUNGEON`, `RUN_TREASURY_RAID`; the four minigames and the bounty draft; `APPLY_DAILY_LOGIN`, `APPLY_WEEKLY_ROLLOVER`, `CLAIM_WEEKLY_TRACK`; mail (`APPEND_MAIL_MESSAGES`, `CLAIM_MAIL_ATTACHMENT`, `CLAIM_ALL_MAIL_ATTACHMENTS`); `MARK_STORY_BEAT_SEEN`. Content: `MISSION_BOARD_GOALS`, `WEEKLY_EVENTS`, `WEEKLY_TRACK_MILESTONES`, `STORY_BEATS`.
