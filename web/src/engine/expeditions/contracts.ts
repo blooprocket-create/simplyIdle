@@ -1,6 +1,10 @@
 import {
   CONTRACT_REFRESH_GOLD_COST,
+  CONTRACT_REFRESH_MS,
+  EXPEDITION_RARITIES,
+  EXPEDITION_TYPES,
   contractFor,
+  isExpeditionRarity,
   isExpeditionType,
   type ExpeditionContract,
   type ExpeditionRarity,
@@ -41,12 +45,113 @@ export interface RunningExpedition {
   durationMs: number;
 }
 
+/** One rarity per destination: the contract that destination is offering now. */
+export type ContractBoard = Record<ExpeditionType, ExpeditionRarity>;
+
 export interface SavedExpeditions {
   queue: RunningExpedition[];
+  /**
+   * What each destination is offering.
+   *
+   * The real gate on the expedition economy, and it took a second measurement
+   * to find: `START_EXPEDITION` takes an `offeredRarity` and **trusts it**, so
+   * the reducer will start a godly contract against a board offering common.
+   * What actually restricts a player is that the only caller passes the offer.
+   *
+   * So the board lives in the engine here and `startExpedition` takes a
+   * destination rather than a rarity — there is no parameter to pass the wrong
+   * thing to. A gate that depends on every caller remembering is not a gate.
+   */
+  board: ContractBoard;
+  /** When the board last rerolled. Null for an account that has never had one. */
+  boardRolledAtMs: number | null;
 }
 
 export function emptyExpeditions(): SavedExpeditions {
-  return { queue: [] };
+  return { queue: [], board: blankBoard(), boardRolledAtMs: null };
+}
+
+function blankBoard(): ContractBoard {
+  return { artifact: 'common', merchant: 'common', ruins: 'common', vault: 'common', abyss: 'common' };
+}
+
+/**
+ * Roll a fresh board: one rarity per destination, uniform over the five.
+ *
+ * Uniform is not a detail — a godly contract pays 400 diamonds for 1,000,000
+ * gold and a common one 35 for 25,000, and they are equally likely. Measured
+ * across the unit interval in `__tests__/contractBoardFixture.test.ts` rather
+ * than read off the expression, because an off-by-one in the index is exactly
+ * the sort of thing that reads correctly.
+ */
+export function rollBoard(random: () => number): ContractBoard {
+  const board = blankBoard();
+  for (const type of EXPEDITION_TYPES) {
+    board[type] = EXPEDITION_RARITIES[Math.floor(random() * EXPEDITION_RARITIES.length)];
+  }
+  return board;
+}
+
+/** Whether the board is old enough to reroll itself. */
+export function boardIsStale(save: SaveV3, nowMs: number): boolean {
+  const rolled = save.expeditions.boardRolledAtMs;
+  if (rolled === null) return true;
+  return nowMs - rolled >= CONTRACT_REFRESH_MS;
+}
+
+/** How long until the board rerolls itself. Nought once it is due. */
+export function boardRefreshInMs(save: SaveV3, nowMs: number): number {
+  const rolled = save.expeditions.boardRolledAtMs;
+  if (rolled === null) return 0;
+  return Math.max(0, rolled + CONTRACT_REFRESH_MS - nowMs);
+}
+
+/**
+ * The free reroll the board gives itself every eight hours.
+ *
+ * The shipped game runs this at the top of `START_EXPEDITION` and
+ * `REFRESH_EXPEDITION_CONTRACTS`, so a stale board refreshes on whatever the
+ * player does next rather than on a timer. Kept that way, and called by both
+ * verbs below — a board that only refreshed when the player pressed *refresh*
+ * would charge them for something they are owed.
+ */
+export function settleBoard(save: SaveV3, nowMs: number, random: () => number): SaveV3 {
+  if (!boardIsStale(save, nowMs)) return save;
+  return {
+    ...save,
+    expeditions: { ...save.expeditions, board: rollBoard(random), boardRolledAtMs: nowMs },
+  };
+}
+
+/**
+ * Reroll the board by hand, for a hundred thousand gold.
+ *
+ * Settles the free reroll first, exactly as shipped — so an account whose
+ * board was already due gets the new board and keeps its gold, rather than
+ * paying for a reroll it had coming. Null when the purse is short, and it
+ * charges nothing for the refusal.
+ */
+export function refreshBoard(
+  save: SaveV3,
+  nowMs: number,
+  random: () => number,
+): { save: SaveV3; paid: boolean } | null {
+  const settled = settleBoard(save, nowMs, random);
+  if (settled !== save) return { save: settled, paid: false };
+  if (settled.wallet.gold < CONTRACT_REFRESH_GOLD_COST) return null;
+  return {
+    paid: true,
+    save: {
+      ...settled,
+      wallet: { ...settled.wallet, gold: settled.wallet.gold - CONTRACT_REFRESH_GOLD_COST },
+      expeditions: { ...settled.expeditions, board: rollBoard(random), boardRolledAtMs: nowMs },
+    },
+  };
+}
+
+/** What a destination is offering right now. */
+export function offeredAt(save: SaveV3, type: ExpeditionType): ExpeditionRarity {
+  return save.expeditions.board[type];
 }
 
 /** How many may be out at once. The shipped queue has no cap; this one does. */
@@ -55,30 +160,42 @@ export const MAX_RUNNING = 5;
 export interface StartRequest {
   save: SaveV3;
   type: ExpeditionType;
-  rarity: ExpeditionRarity;
   nowMs: number;
+  random: () => number;
 }
 
 /**
- * Send one.
+ * Send one, on the terms the board is offering.
  *
- * Null when the contract is unknown, the purse is short, or the queue is
- * full. The queue cap is ours: the shipped queue is unbounded, which is
- * harmless there only because nothing waits.
+ * **There is no rarity parameter**, and that is the point. The shipped action
+ * takes one and uses it, so the board is a suggestion the caller may ignore;
+ * here the destination is the whole request and the rarity is read off the
+ * board, which makes the gate a property of the engine rather than of every
+ * caller remembering to pass the right thing.
+ *
+ * Settles the free reroll first, so a player arriving after eight hours away
+ * is offered today's board rather than yesterday's.
+ *
+ * Null when the purse is short or the queue is full. The queue cap is ours:
+ * the shipped queue is unbounded, which is harmless there only because nothing
+ * waits.
  */
 export function startExpedition(request: StartRequest): { save: SaveV3; expedition: RunningExpedition } | null {
-  const contract = contractFor(request.rarity);
-  if (contract === null || !isExpeditionType(request.type)) return null;
-  if (request.save.expeditions.queue.length >= MAX_RUNNING) return null;
-  if (request.save.wallet.gold < contract.goldCost) return null;
+  if (!isExpeditionType(request.type)) return null;
+  const save = settleBoard(request.save, request.nowMs, request.random);
+  const rarity = offeredAt(save, request.type);
+  const contract = contractFor(rarity);
+  if (contract === null) return null;
+  if (save.expeditions.queue.length >= MAX_RUNNING) return null;
+  if (save.wallet.gold < contract.goldCost) return null;
 
   const expedition: RunningExpedition = {
     // Built from the departure time and the destination rather than a counter,
     // so two sent in the same millisecond to the same place would collide —
     // which they cannot, because the second is refused while the first is out.
-    id: `${request.type}_${request.rarity}_${request.nowMs}`,
+    id: `${request.type}_${rarity}_${request.nowMs}`,
     type: request.type,
-    rarity: request.rarity,
+    rarity,
     startedAtMs: request.nowMs,
     durationMs: contract.durationMs,
   };
@@ -86,9 +203,9 @@ export function startExpedition(request: StartRequest): { save: SaveV3; expediti
   return {
     expedition,
     save: {
-      ...request.save,
-      wallet: { ...request.save.wallet, gold: request.save.wallet.gold - contract.goldCost },
-      expeditions: { queue: [...request.save.expeditions.queue, expedition] },
+      ...save,
+      wallet: { ...save.wallet, gold: save.wallet.gold - contract.goldCost },
+      expeditions: { ...save.expeditions, queue: [...save.expeditions.queue, expedition] },
     },
   };
 }
@@ -134,7 +251,7 @@ export function completeExpedition(save: SaveV3, id: string, nowMs: number): Com
         heroShards: save.wallet.heroShards + contract.reward.shards,
         essence: save.wallet.essence + contract.reward.essence,
       },
-      expeditions: { queue: save.expeditions.queue.filter(entry => entry.id !== id) },
+      expeditions: { ...save.expeditions, queue: save.expeditions.queue.filter(entry => entry.id !== id) },
     },
   };
 }
@@ -157,9 +274,32 @@ export function canRefreshContracts(save: SaveV3): boolean {
   return save.wallet.gold >= CONTRACT_REFRESH_GOLD_COST;
 }
 
+/**
+ * The board, off a save.
+ *
+ * A destination whose stored offer is not a rarity the catalogue still has
+ * falls back to `common` rather than dropping the destination — a board with a
+ * hole in it is a destination a player cannot visit at all, which is a worse
+ * answer than the cheapest contract.
+ */
+function readBoard(raw: unknown): ContractBoard {
+  const record = isRecord(raw) ? raw : {};
+  const board = blankBoard();
+  for (const type of EXPEDITION_TYPES) {
+    const offered = record[type];
+    if (isExpeditionRarity(offered)) board[type] = offered;
+  }
+  return board;
+}
+
 export function readExpeditions(raw: unknown, legacy = false): SavedExpeditions {
+  const record = isRecord(raw) ? raw : {};
+  const board = readBoard(legacy ? record.expeditionContractOffers : record.board);
+  const stamp = legacy ? record.expeditionContractsRefreshedAt : record.boardRolledAtMs;
+  const boardRolledAtMs = typeof stamp === 'number' && Number.isFinite(stamp) && stamp > 0 ? Math.floor(stamp) : null;
+
   const source = legacy ? (isRecord(raw) ? raw.expeditionQueue : null) : isRecord(raw) ? raw.queue : null;
-  if (!Array.isArray(source)) return emptyExpeditions();
+  if (!Array.isArray(source)) return { ...emptyExpeditions(), board, boardRolledAtMs };
 
   const queue: RunningExpedition[] = [];
   for (const entry of source.slice(0, MAX_SAVE_COLLECTION)) {
@@ -181,12 +321,17 @@ export function readExpeditions(raw: unknown, legacy = false): SavedExpeditions 
       durationMs: rarity.durationMs,
     });
   }
-  return { queue: queue.slice(0, MAX_RUNNING) };
+  return { queue: queue.slice(0, MAX_RUNNING), board, boardRolledAtMs };
 }
 
 /** Back out to the shape the shipped game reads. */
 export function expeditionsToLegacy(expeditions: SavedExpeditions): Record<string, unknown> {
   return {
+    expeditionContractOffers: { ...expeditions.board },
+    // The shipped auto-refresh reads this with `Number.isFinite`, so a null
+    // would leave the board frozen there forever. Nought is the value that
+    // reads as "due", which is the honest answer for a board never rolled.
+    expeditionContractsRefreshedAt: expeditions.boardRolledAtMs ?? 0,
     expeditionQueue: expeditions.queue.map(entry => {
       const contract = contractFor(entry.rarity);
       return {

@@ -16,7 +16,7 @@ import type { RebirthPreview } from '../../engine/prestige/prestigeSave';
 import type { BuyOutcome, LooseOutcome } from '../../engine/shop/buyOffer';
 import type { DungeonOutcome } from '../../engine/dungeons/run';
 import type { DungeonId } from '../../content/dungeons';
-import type { ExpeditionRarity, ExpeditionType } from '../../content/expeditions';
+import type { ExpeditionType } from '../../content/expeditions';
 import type { MiniOpOutcome } from '../../engine/minigames/miniOps';
 import type { BountyDraft, ReconOutcome } from '../../content/miniOps';
 import type { SaveV3 } from '../../engine/save/schema';
@@ -170,7 +170,14 @@ export interface SurfaceProps {
      * Expeditions. `collectExpeditions` answers how many came home, because
      * five can be out at once and pressing five buttons is not a design.
      */
-    sendExpedition: (type: ExpeditionType, rarity: ExpeditionRarity) => boolean;
+    /*
+     * A destination, not a rarity. What a destination costs and pays is
+     * whatever its contract board is offering today, and the board is read
+     * inside the engine — so there is no rarity for a surface to get wrong.
+     */
+    sendExpedition: (type: ExpeditionType) => boolean;
+    /** Reroll the board for a hundred thousand gold. False when it is short. */
+    refreshContracts: () => boolean;
     collectExpedition: (id: string) => boolean;
     collectExpeditions: () => number;
     /** The mailbox. `claimAllMail` answers whether anything was waiting. */

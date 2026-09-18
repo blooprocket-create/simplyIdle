@@ -1,4 +1,12 @@
-import { contractRows, dueCount, runningRows, type RunningRow } from '../../app/expeditionActions';
+import {
+  REFRESH_COST,
+  boardRows,
+  dueCount,
+  refreshInMs,
+  runningRows,
+  type BoardRow,
+  type RunningRow,
+} from '../../app/expeditionActions';
 import { MAX_RUNNING } from '../../engine/expeditions/contracts';
 import type { SaveV3 } from '../../engine/save/schema';
 import { formatDamage } from '../../format/bigNumber';
@@ -6,9 +14,18 @@ import type { SurfaceProps } from './SurfaceProps';
 import { Meter, Row, Rows, Section } from './parts/parts';
 
 /**
- * Expeditions: contracts to send, and the ones already out.
+ * Expeditions: five destinations, each offering one contract, and the ones
+ * already out.
  *
  * A `ledger` — two lists to spend down.
+ *
+ * **The board is the game.** Each destination offers one rarity, rolled
+ * uniformly, and that is what a player may send there — the way to get a
+ * different tier is to wait eight hours or pay a hundred thousand gold to
+ * reroll. An earlier version of this screen drew the five *tiers* and let the
+ * player choose, which turned a board into a menu and made a godly contract
+ * available on demand. The shipped reducer allows exactly that if asked, and
+ * the only reason it never happens is that its screen does not ask.
  *
  * **The wait is real here.** The shipped game stores a duration and never
  * checks it, so an eight-hour contract finishes the instant it starts; this
@@ -40,12 +57,27 @@ export function contractHint(contract: {
   return `${time} · ${reward.join(' · ')}`;
 }
 
-export function expeditionView(save: SaveV3, nowMs: number) {
+/** What a board row says under the destination's name. */
+export function boardHint(row: BoardRow): string {
+  return `${row.rarity} · ${contractHint(row.contract)}`;
+}
+
+/** How long until the board rerolls itself, in words. */
+export function refreshLabel(msLeft: number): string {
+  if (msLeft <= 0) return 'New contracts now';
+  const minutes = Math.ceil(msLeft / 60_000);
+  if (minutes < 60) return `New contracts in ${minutes}m`;
+  return `New contracts in ${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
+export function expeditionView(save: SaveV3, nowMs: number, random: () => number = Math.random) {
   return {
     running: runningRows(save, nowMs),
-    contracts: contractRows(save),
+    board: boardRows(save, nowMs, random),
     due: dueCount(save, nowMs),
     slotsLeft: MAX_RUNNING - save.expeditions.queue.length,
+    refreshInMs: refreshInMs(save, nowMs),
+    canRefresh: save.wallet.gold >= REFRESH_COST,
   };
 }
 
@@ -79,14 +111,19 @@ export function ExpeditionsSurface({ save, actions }: SurfaceProps) {
         </Rows>
       </Section>
 
-      <Section title="Contracts">
+      <Section title="On offer">
         <Rows>
-          {view.contracts.map(row => (
-            <Row key={row.contract.rarity} label={row.contract.rarity} hint={contractHint(row.contract)}>
+          <Row label="The board rerolls itself every eight hours" hint={refreshLabel(view.refreshInMs)}>
+            <button type="button" disabled={!view.canRefresh} onClick={() => actions.refreshContracts()}>
+              {view.canRefresh ? `Reroll · ${formatDamage(REFRESH_COST)} gold` : 'Not enough gold'}
+            </button>
+          </Row>
+          {view.board.map(row => (
+            <Row key={row.type} label={row.type} hint={boardHint(row)}>
               <button
                 type="button"
                 disabled={!row.affordable || !row.hasRoom}
-                onClick={() => actions.sendExpedition('ruins', row.contract.rarity)}
+                onClick={() => actions.sendExpedition(row.type)}
               >
                 {formatDamage(row.contract.goldCost)} gold
               </button>

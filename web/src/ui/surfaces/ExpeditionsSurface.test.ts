@@ -5,7 +5,7 @@ import { EXPEDITION_CONTRACTS } from '../../content/expeditions';
 import { startExpedition } from '../../engine/expeditions/contracts';
 import { readSave } from '../../engine/save/v3';
 import type { SaveV3 } from '../../engine/save/schema';
-import { contractHint, expeditionView, remainingLabel } from './ExpeditionsSurface';
+import { contractHint, expeditionView, refreshLabel, remainingLabel } from './ExpeditionsSurface';
 
 /**
  * The Expeditions surface's decisions: how long is left, in words, and what a
@@ -28,7 +28,20 @@ function save(): SaveV3 {
   );
 }
 
-const withGodly = () => startExpedition({ save: save(), type: 'ruins', rarity: 'godly', nowMs: NOW })!.save;
+/** A board stocked entirely with godly contracts, and one already sent. */
+const godlyBoard = () => {
+  const base = save();
+  return {
+    ...base,
+    expeditions: {
+      ...base.expeditions,
+      board: { artifact: 'godly', merchant: 'godly', ruins: 'godly', vault: 'godly', abyss: 'godly' } as const,
+      boardRolledAtMs: NOW,
+    },
+  };
+};
+
+const withGodly = () => startExpedition({ save: godlyBoard(), type: 'ruins', nowMs: NOW, random: () => 0.5 })!.save;
 
 describe('how long is left, in words', () => {
   const rowAt = (at: number) => expeditionView(withGodly(), at).running[0];
@@ -69,9 +82,32 @@ describe('what the screen offers', () => {
     expect(expeditionView(withGodly(), NOW + 8 * HOUR).due).toBe(1);
   });
 
-  it('greys a contract the purse cannot cover', () => {
-    const view = expeditionView(save(), NOW);
-    expect(view.contracts.every(row => row.affordable)).toBe(true);
-    expect(view.contracts.every(row => row.hasRoom)).toBe(true);
+  it('shows one contract per destination, not one per tier', () => {
+    /*
+     * The correction this phase needed. Each of the five destinations offers
+     * one rarity and that is what may be sent there; an earlier version listed
+     * the five *tiers* and let the player pick, which made a godly contract
+     * available whenever they had the gold.
+     */
+    const view = expeditionView(godlyBoard(), NOW, () => 0.5);
+    expect(view.board.map(row => row.type)).toEqual(['artifact', 'merchant', 'ruins', 'vault', 'abyss']);
+    expect(view.board.every(row => row.rarity === 'godly')).toBe(true);
+    expect(view.board.every(row => row.affordable)).toBe(true);
+    expect(view.board.every(row => row.hasRoom)).toBe(true);
+  });
+
+  it('greys a destination the purse cannot cover', () => {
+    const poor = { ...godlyBoard(), wallet: { ...save().wallet, gold: 10 } };
+    const view = expeditionView(poor, NOW, () => 0.5);
+    expect(view.board.every(row => row.affordable)).toBe(false);
+  });
+
+  it('says when the board rerolls itself, and what a reroll by hand costs', () => {
+    const fresh = expeditionView(godlyBoard(), NOW, () => 0.5);
+    expect(refreshLabel(fresh.refreshInMs)).toBe('New contracts in 8h 0m');
+    expect(fresh.canRefresh).toBe(true);
+
+    const due = expeditionView(godlyBoard(), NOW + 8 * HOUR, () => 0.5);
+    expect(refreshLabel(due.refreshInMs)).toBe('New contracts now');
   });
 });

@@ -8,11 +8,15 @@ import {
   type ExpeditionType,
 } from '../content/expeditions';
 import {
+  boardRefreshInMs,
   completeDue,
   completeExpedition,
   isDue,
   MAX_RUNNING,
+  offeredAt,
+  refreshBoard,
   remainingMs,
+  settleBoard,
   startExpedition,
   type CompleteOutcome,
   type RunningExpedition,
@@ -49,10 +53,45 @@ export function runningRows(save: SaveV3, nowMs: number): RunningRow[] {
   });
 }
 
-export interface ContractRow {
+/**
+ * The board, as a row per destination.
+ *
+ * One row per *destination* rather than one per contract tier, which is the
+ * correction this phase needed: the shipped screen draws the five
+ * destinations and each shows whatever it is offering today. A list of the
+ * five tiers would be a menu, and the board is not a menu.
+ */
+export interface BoardRow {
+  type: ExpeditionType;
+  rarity: ExpeditionRarity;
   contract: ExpeditionContract;
   affordable: boolean;
   /** False when the queue is full, whatever the purse holds. */
+  hasRoom: boolean;
+}
+
+/**
+ * Settles the free reroll before reading, so the screen and the verb agree.
+ *
+ * Without this a board eight hours stale would draw yesterday's offers and
+ * then send today's — the player pressing a common contract and getting a
+ * godly one, or the reverse. The settle is pure and idempotent, so asking
+ * twice is free.
+ */
+export function boardRows(save: SaveV3, nowMs: number, random: () => number): BoardRow[] {
+  const settled = settleBoard(save, nowMs, random);
+  const hasRoom = settled.expeditions.queue.length < MAX_RUNNING;
+  return EXPEDITION_TYPES.map(type => {
+    const rarity = offeredAt(settled, type);
+    const contract = contractFor(rarity)!;
+    return { type, rarity, contract, affordable: settled.wallet.gold >= contract.goldCost, hasRoom };
+  });
+}
+
+/** Every tier, for a screen that wants to show what the board *could* offer. */
+export interface ContractRow {
+  contract: ExpeditionContract;
+  affordable: boolean;
   hasRoom: boolean;
 }
 
@@ -65,8 +104,24 @@ export function contractRows(save: SaveV3): ContractRow[] {
   }));
 }
 
-export function send(save: SaveV3, type: ExpeditionType, rarity: ExpeditionRarity, nowMs: number) {
-  return startExpedition({ save, type, rarity, nowMs });
+/**
+ * Send to a destination, on whatever terms it is offering.
+ *
+ * No rarity argument: see `startExpedition`. This is the signature change that
+ * makes the board a gate rather than a suggestion.
+ */
+export function send(save: SaveV3, type: ExpeditionType, nowMs: number, random: () => number) {
+  return startExpedition({ save, type, nowMs, random });
+}
+
+/** Reroll the board by hand. Null when the hundred thousand is not there. */
+export function refresh(save: SaveV3, nowMs: number, random: () => number) {
+  return refreshBoard(save, nowMs, random);
+}
+
+/** How long until the board rerolls itself. */
+export function refreshInMs(save: SaveV3, nowMs: number): number {
+  return boardRefreshInMs(save, nowMs);
 }
 
 export function collect(save: SaveV3, id: string, nowMs: number): CompleteOutcome | null {

@@ -22,7 +22,7 @@ import { abandonBounty } from '../engine/minigames/miniOps';
 import type { BountyDraft, ReconOutcome } from '../content/miniOps';
 import { teamDps } from '../engine/entities/HeroEntity';
 import type { DungeonId } from '../content/dungeons';
-import type { ExpeditionRarity, ExpeditionType } from '../content/expeditions';
+import type { ExpeditionType } from '../content/expeditions';
 import { EMPTY_AUTOMATION_STATE, runAutomations } from './automationRunner';
 import { worthBanking } from '../engine/save/bankRun';
 import { bankInto } from './bank';
@@ -398,8 +398,19 @@ export function App() {
         if (outcome) applySave(outcome.save);
         return outcome;
       },
-      sendExpedition: (type: ExpeditionType, rarity: ExpeditionRarity) => {
-        const outcome = expeditionActions.send(live(), type, rarity, Date.now());
+      /*
+       * A destination, not a rarity: the board decides the terms. The shipped
+       * action takes a rarity and trusts it, which makes its board a
+       * suggestion — see `startExpedition`.
+       */
+      sendExpedition: (type: ExpeditionType) => {
+        const outcome = expeditionActions.send(live(), type, Date.now(), Math.random);
+        if (outcome === null) return false;
+        applySave(outcome.save);
+        return true;
+      },
+      refreshContracts: () => {
+        const outcome = expeditionActions.refresh(live(), Date.now(), Math.random);
         if (outcome === null) return false;
         applySave(outcome.save);
         return true;

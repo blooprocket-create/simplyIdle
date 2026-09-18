@@ -321,6 +321,8 @@ export const CLAIMED_V2_KEYS: readonly string[] = [
   'treasureEntryDay',
   'riftRaidTickets',
   'expeditionQueue',
+  'expeditionContractOffers',
+  'expeditionContractsRefreshedAt',
   'mailbox',
   'seenStoryBeatIds',
   'lastDiceRollDay',

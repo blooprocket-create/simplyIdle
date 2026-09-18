@@ -57,8 +57,22 @@ export const EXPEDITION_CONTRACTS: readonly ExpeditionContract[] = [
   { rarity: 'godly', goldCost: 1_000_000, durationMs: 8 * HOUR, reward: { diamonds: 400, shards: 2_400, essence: 4 } },
 ];
 
+/**
+ * The rarities, in the order the board rolls them.
+ *
+ * The order matters: the roll is `EXPEDITION_RARITIES[floor(random() * 5)]`,
+ * so this array *is* the distribution — uniform over five, which means a godly
+ * contract (1,000,000 gold for 400 diamonds) comes up exactly as often as a
+ * common one (25,000 for 35). Measured across the unit interval in
+ * `__tests__/contractBoardFixture.test.ts`.
+ */
+export const EXPEDITION_RARITIES: readonly ExpeditionRarity[] = ['common', 'rare', 'epic', 'legendary', 'godly'];
+
 /** What rerolling the contracts on offer costs. */
 export const CONTRACT_REFRESH_GOLD_COST = 100_000;
+
+/** How often the board rerolls itself, whether or not anyone asks. */
+export const CONTRACT_REFRESH_MS = 8 * HOUR;
 
 export function contractFor(rarity: string): ExpeditionContract | null {
   return EXPEDITION_CONTRACTS.find(contract => contract.rarity === rarity) ?? null;
@@ -66,4 +80,8 @@ export function contractFor(rarity: string): ExpeditionContract | null {
 
 export function isExpeditionType(value: unknown): value is ExpeditionType {
   return typeof value === 'string' && (EXPEDITION_TYPES as readonly string[]).includes(value);
+}
+
+export function isExpeditionRarity(value: unknown): value is ExpeditionRarity {
+  return typeof value === 'string' && (EXPEDITION_RARITIES as readonly string[]).includes(value);
 }
