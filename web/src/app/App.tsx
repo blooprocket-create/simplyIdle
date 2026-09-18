@@ -246,6 +246,7 @@ export function App() {
         applying(rosterActions.batchLevel(live(), uids, addLevels)),
       recycle: (uid: string) => applying(rosterActions.recycle(live(), uid)),
       fieldTeam: (requested: readonly string[]) => applying(rosterActions.fieldTeam(live(), requested)),
+      fieldBest: () => applying(rosterActions.fieldBest(live())),
       place: (uid: string, role: FormationRole) => applying(rosterActions.place(live(), uid, role)),
       storeLoadout: (slot: number) => applying(rosterActions.storeLoadout(live(), slot)),
       recallLoadout: (slot: number) => applying(rosterActions.recallLoadout(live(), slot)),

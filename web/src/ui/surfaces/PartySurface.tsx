@@ -167,6 +167,20 @@ export function PartySurface({ cast, snapshot, profile, save, actions }: Surface
 
       <Section title="Lineups">
         <Rows>
+          {/*
+            One press, and the roster decides. The sort only proposes — the
+            selection rules refuse a duplicate, a third hero in a rank and
+            anyone past the slots bought — so this can pass over a strong hero
+            with a slot still free, and the hint says so rather than leaving a
+            player to wonder.
+          */}
+          <Row label="Field my best" hint="Rarity first, then rebirth, level and boost — where the ranks allow it">
+            <button type="button" className={styles.verb} onClick={() => actions.fieldBest()}>
+              Auto-pick
+            </button>
+          </Row>
+        </Rows>
+        <Rows>
           {Array.from({ length: TEAM_LOADOUT_COUNT }, (_, slot) => {
             const stored = save.roster.loadouts[slot] ?? [];
             const names = stored

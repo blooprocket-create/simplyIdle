@@ -3,12 +3,19 @@ import type { AchievementSignal } from './achievements';
 /**
  * Automation, as something earned.
  *
- * The shipped game shipped nine `auto*` flags as plain settings toggles in
- * `settingsReducer.ts`. Eight of the nine default to `false` — REVAMP says
+ * The shipped game shipped **eight** `auto*` flags as plain settings toggles
+ * in `settingsReducer.ts`. Seven of the eight default to `false` — REVAMP says
  * they "let the game play itself from the start", which is right about the
  * effect and wrong about the defaults — but **none of them is gated**, so a
  * player can switch the whole game off in their first minute and never learn
  * a single verb.
+ *
+ * It said nine here for six phases, and the ninth was `equipBest`. There is no
+ * `autoEquipBestHeroes` flag: that name belongs to a `useCallback` dispatching
+ * a one-shot action from a button. It is a verb, it lives on the Party screen
+ * as one, and `engine/roster/bestTeam.ts` is the rule — which is why every
+ * note about it saying "no rule has been ported or measured" went six phases
+ * without anyone finding one. They were looking for the wrong shape.
  *
  * So each one is earned, against the same signals the achievements are
  * measured on. Reusing that vocabulary is deliberate: an unlock condition and
@@ -25,7 +32,6 @@ export type AutomationId =
   | 'burst'
   | 'castHeroActives'
   | 'dismantle'
-  | 'equipBest'
   | 'recycle'
   | 'summon'
   | 'tempo'
@@ -125,16 +131,6 @@ export const AUTOMATIONS: readonly Automation[] = [
     // than the shipped combat tick, which is where every save-side automation
     // runs here.
     available: true,
-  },
-  {
-    id: 'equipBest',
-    shippedFlag: 'autoEquipBestHeroes',
-    name: 'Auto-equip',
-    effect: 'Keeps the best gear on the heroes who are fighting.',
-    tradeoff: 'Its idea of best, not yours.',
-    signal: 'equippedCount',
-    goal: 5,
-    available: false,
   },
   {
     id: 'usePotion',

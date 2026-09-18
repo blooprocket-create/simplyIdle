@@ -1,15 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { AUTOMATIONS, AUTOMATION_COUNT, automationById, availableAutomations } from './automation';
+import { AUTOMATIONS, AUTOMATION_COUNT, automationById, availableAutomations, type AutomationId } from './automation';
 import { TRACKED_SIGNALS } from './achievements';
 
 describe('the automation catalogue', () => {
-  it('covers all nine shipped flags', () => {
-    // The shipped game has nine. Listing fewer would tell the player this
-    // game automates less than it does; the ones with no system yet are
-    // marked unavailable rather than dropped.
-    expect(AUTOMATION_COUNT).toBe(9);
-    expect(new Set(AUTOMATIONS.map(entry => entry.id)).size).toBe(9);
-    expect(new Set(AUTOMATIONS.map(entry => entry.shippedFlag)).size).toBe(9);
+  it('covers all eight shipped flags', () => {
+    /*
+     * Eight, not nine. This said nine for six phases and the ninth was
+     * `equipBest` — keyed to `autoEquipBestHeroes`, which is not a flag but a
+     * callback name behind a button. It is a verb and it lives on the Party
+     * screen as one now; `__tests__/bestTeamFixture.test.ts` enumerates the
+     * eight that are real off `DEFAULT_STATE` rather than asserting them.
+     *
+     * Listing fewer than the real eight would tell the player this game
+     * automates less than it does; the ones with no system yet are marked
+     * unavailable rather than dropped.
+     */
+    expect(AUTOMATION_COUNT).toBe(8);
+    expect(new Set(AUTOMATIONS.map(entry => entry.id)).size).toBe(8);
+    expect(new Set(AUTOMATIONS.map(entry => entry.shippedFlag)).size).toBe(8);
+  });
+
+  it('names a flag that is a flag, and not a button', () => {
+    // Every one of these is a boolean on the shipped settings state. The one
+    // that was not is the one this catalogue no longer carries.
+    for (const entry of AUTOMATIONS) {
+      expect(entry.shippedFlag.endsWith('Enabled'), entry.id).toBe(true);
+    }
   });
 
   it('names a real shipped flag for each one', () => {
@@ -71,9 +87,9 @@ describe('the automation catalogue', () => {
      * simulation (which has never seen a save) nor the runner (which runs on
      * the save's cadence rather than the frame's) could own it alone.
      *
-     * The three still listed and unavailable each wait on something real:
-     * `equipBest` on a rule nobody has ported or measured, and `tempo` and
-     * `useCoolant` on heat.
+     * The two still listed and unavailable wait on the same thing: heat.
+     * `equipBest` was a third and is no longer here at all — it was never a
+     * settings flag, and it is a verb on the Party screen now.
      */
     const available = availableAutomations();
     expect(available.map(entry => entry.id)).toEqual([
@@ -91,9 +107,9 @@ describe('the automation catalogue', () => {
 
   it('looks one up, and admits when it cannot', () => {
     expect(automationById('burst')?.shippedFlag).toBe('autoBurstEnabled');
-    // `equipBest` took `summon`'s place here when Phase 10 wired the
-    // save-side automations. It is the one left, and for a different reason:
-    // no rule for it has been ported or measured.
-    expect(automationById('equipBest')?.available).toBe(false);
+    // `useCoolant` is the one left that is genuinely waiting. `equipBest` was
+    // here and is gone: it was never a flag.
+    expect(automationById('useCoolant')?.available).toBe(false);
+    expect(automationById('equipBest' as AutomationId)).toBeUndefined();
   });
 });

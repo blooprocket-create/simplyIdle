@@ -19,6 +19,7 @@ import { getAchievementLegacyMultiplier } from '../engine/combat/progressionMult
 import { achievementCountFromLegacy, weeklyEventWeekFromLegacy } from '../engine/character/fromSave';
 import { applySummon, type SummonOutcome, type SummonPayment, type SummonPoolEntry } from '../engine/roster/summonSave';
 import { applySparkExchange, type SparkOutcome } from '../engine/roster/sparkSave';
+import { fieldBestHeroes } from '../engine/roster/bestTeam';
 import {
   batchLevelHeroes,
   buySlot,
@@ -165,6 +166,8 @@ export const rosterActions = {
     batchLevelHeroes(save, CONTENT, uids, addLevels),
   recycle: (save: SaveV3, uid: string) => recycleHero(save, uid, WEEKLY_SHARD_MULTIPLIER),
   fieldTeam: (save: SaveV3, requested: readonly string[]) => fieldTeam(save, CONTENT, requested),
+  // "Field my best." A verb rather than an automation — see `bestTeam.ts`.
+  fieldBest: (save: SaveV3) => fieldBestHeroes(save, CONTENT),
   place: (save: SaveV3, uid: string, role: FormationRole) => placeHero(save, CONTENT, uid, role),
   storeLoadout: (save: SaveV3, slot: number) => storeLoadout(save, slot),
   recallLoadout: (save: SaveV3, slot: number) => recallLoadout(save, CONTENT, slot),

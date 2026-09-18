@@ -87,6 +87,14 @@ export interface SurfaceProps {
     batchLevel: (uids: readonly string[], addLevels: number | 'max') => boolean;
     recycle: (uid: string) => boolean;
     fieldTeam: (requested: readonly string[]) => boolean;
+    /**
+     * "Field my best." One press, and the roster decides for the player.
+     *
+     * A verb, not an automation: the shipped `autoEquipBestHeroes` is a
+     * callback name behind a button and not one of the eight settings flags,
+     * which is what the rewrite's catalogue had it filed as for six phases.
+     */
+    fieldBest: () => boolean;
     place: (uid: string, role: FormationRole) => boolean;
     storeLoadout: (slot: number) => boolean;
     recallLoadout: (slot: number) => boolean;

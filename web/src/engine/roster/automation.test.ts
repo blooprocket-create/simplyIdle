@@ -47,8 +47,8 @@ describe('what the catalogue still does not claim', () => {
      * only the fight can see it, and the potion comes out of the bag, so only
      * the save holds it. `app/GameLoop.ts` is where those already meet.
      *
-     * `tempo` and `useCoolant` still wait, and on the same thing as each
-     * other: this engine has no heat.
+     * `tempo` and `useCoolant` are the only two left, and they wait on the
+     * same thing: this engine has no heat.
      */
     expect(automationById('summon')?.available).toBe(true);
     expect(automationById('recycle')?.available).toBe(true);
@@ -70,12 +70,10 @@ describe('what the catalogue still does not claim', () => {
     // A screen showing one automation would be telling the player this game
     // has one. The unavailable ones stay listed for the same reason the
     // untracked achievements do.
-    expect(AUTOMATIONS).toHaveLength(9);
-    expect(AUTOMATIONS.filter(entry => !entry.available).map(entry => entry.id)).toEqual([
-      'tempo',
-      'equipBest',
-      'useCoolant',
-    ]);
+    // Eight, not nine: `equipBest` was never a settings flag. See
+    // `content/automation.test.ts` and `__tests__/bestTeamFixture.test.ts`.
+    expect(AUTOMATIONS).toHaveLength(8);
+    expect(AUTOMATIONS.filter(entry => !entry.available).map(entry => entry.id)).toEqual(['tempo', 'useCoolant']);
   });
 });
 
