@@ -1,3 +1,4 @@
+import type { FightTuning } from '../engine/combat/retune';
 import { Simulation, type SimulationOptions } from '../engine/Simulation';
 import { AWAY_THRESHOLD_MS } from '../engine/offline/awayCredit';
 import type { SimulationSnapshot } from '../engine/types';
@@ -29,6 +30,7 @@ export class GameLoop {
   private readonly listeners = new Set<SnapshotListener>();
   private frame: number | null = null;
   private lastFrameAt = 0;
+  private autoPotion: ((hpRatio: number) => number) | null = null;
 
   /**
    * The roster comes in from outside. The loop builds no heroes of its own —
@@ -50,16 +52,76 @@ export class GameLoop {
     return this.simulation.read();
   }
 
-  /**
-   * The player pressed BURST.
-   *
-   * Publishes immediately rather than waiting for the next frame: the press
-   * is the player's own input and the HUD showing it a frame late is the
-   * difference between a verb that feels answered and one that feels ignored.
-   */
   /** Whether a lapsed BURST window fires itself. */
   setAutoBurst(on: boolean): void {
     this.simulation.setAutoBurst(on);
+  }
+
+  /**
+   * New numbers for the fight in progress. Publishes, so the HUD shows them.
+   *
+   * The alternative is rebuilding this loop, which restarts the run from
+   * `RunProgress` and loses everything that is not in it. See `retune.ts`.
+   */
+  retune(next: FightTuning): void {
+    this.simulation.retune(next);
+    const snapshot = this.simulation.read();
+    for (const listener of this.listeners) listener(snapshot);
+  }
+
+  /**
+   * Take the run's earnings out, for the caller to put in the save's wallet.
+   *
+   * Does **not** publish. The snapshot's totals drop to zero as the wallet
+   * rises, and pushing that to the HUD before the caller has written the save
+   * would show the player a frame with their gold in neither place.
+   */
+  bank(): ReturnType<Simulation['bank']> {
+    return this.simulation.bank();
+  }
+
+  /**
+   * A potion. Publishes, because the player pressed it and expects the bar to
+   * move — the same reason `spendBurst` does.
+   */
+  heal(fraction: number): void {
+    if (!(fraction > 0)) return;
+    this.simulation.heal(fraction);
+    const snapshot = this.simulation.read();
+    for (const listener of this.listeners) listener(snapshot);
+  }
+
+  /** Whether abilities fire themselves the moment they come up. */
+  setAutoCastHeroActives(on: boolean): void {
+    this.simulation.setAutoCastHeroActives(on);
+  }
+
+  /**
+   * Whether a team in trouble drinks for itself.
+   *
+   * Wired here rather than on the `Simulation`, and that is the only
+   * automation of the nine for which that is the right answer. Its *trigger*
+   * is the fight — the team's health is not on the save — but the potion it
+   * spends is, so neither the simulation (which has never seen a save) nor
+   * `automationRunner.ts` (which runs on the save's cadence, not the frame's)
+   * can own it alone. The loop is where the two already meet.
+   *
+   * The handler is given the ratio and answers a heal fraction: nought when
+   * the bag is empty or the team is fine. `choosePotion` decides; nothing
+   * about which potion or when is decided here.
+   */
+  setAutoUsePotion(drink: ((hpRatio: number) => number) | null): void {
+    this.autoPotion = drink;
+  }
+
+  /** The player pressed a hero's ability. Publishes for the same reason. */
+  castHeroActive(uid: string): boolean {
+    const cast = this.simulation.castHeroActive(uid);
+    if (cast) {
+      const snapshot = this.simulation.read();
+      for (const listener of this.listeners) listener(snapshot);
+    }
+    return cast;
   }
 
   /** The player answered a wipe offer. Publishes for the same reason. */
@@ -82,6 +144,13 @@ export class GameLoop {
     return answered;
   }
 
+  /**
+   * The player pressed BURST.
+   *
+   * Publishes immediately rather than waiting for the next frame: the press
+   * is the player's own input and the HUD showing it a frame late is the
+   * difference between a verb that feels answered and one that feels ignored.
+   */
   spendBurst(): ReturnType<Simulation['spendBurst']> {
     const result = this.simulation.spendBurst();
     if (result.spent) {
@@ -106,11 +175,25 @@ export class GameLoop {
       if (gap >= AWAY_THRESHOLD_MS) this.simulation.creditAway(gap);
       else this.simulation.advance(gap);
       this.lastFrameAt = now;
+      this.maybeDrink();
       const snapshot = this.simulation.read();
       for (const listener of this.listeners) listener(snapshot);
       this.frame = requestAnimationFrame(step);
     };
     this.frame = requestAnimationFrame(step);
+  }
+
+  /**
+   * After the step, not before it. The shipped rule reads the health the
+   * monster's damage has already taken, which is what makes a potion an answer
+   * to the hit rather than a guess about the next one.
+   */
+  private maybeDrink(): void {
+    if (this.autoPotion === null) return;
+    const team = this.simulation.read().team;
+    if (!team.maxHp.gt(0)) return;
+    const fraction = this.autoPotion(team.hp.div(team.maxHp).toNumber());
+    if (fraction > 0) this.simulation.heal(fraction);
   }
 
   stop(): void {

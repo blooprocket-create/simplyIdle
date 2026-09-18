@@ -9,9 +9,15 @@ import {
   classPassiveUnlockedFromLegacy,
   progressionFromSave,
   tacticsLevelFromLegacy,
+  economyFromSave,
   teamHealthFromSave,
 } from '../engine/character/fromSave';
 import { incomingMultiplier, teamDefense } from '../engine/combat/mitigation';
+import { rewardRatesFrom } from '../engine/combat/rewardRates';
+import type { FightTuning } from '../engine/combat/retune';
+import type { RewardRates } from '../engine/combat/rewards';
+import type { ActiveCaster } from '../engine/combat/HeroActiveClock';
+import { uniqueSkillFor } from '../content/heroSkills';
 import { wornStats } from '../engine/equipment/equipmentSave';
 import { EQUIPMENT_CONTENT } from './equipmentActions';
 import type { HealthHero } from '../engine/character/stats';
@@ -50,6 +56,27 @@ export interface LoadedRoster {
    * same reason.
    */
   teamMaxHp: number;
+  /**
+   * Whose abilities are in the fight, in team order.
+   *
+   * The fifth unported system, connected. Built from the same rows as the
+   * other four for the same reason — a hero's archetype and their relic's rank
+   * both live on the save, and reading them anywhere else is a second list to
+   * keep in step.
+   */
+  casters: ActiveCaster[];
+  /**
+   * The gold and EXP chains, as the two scalars the fight and the away
+   * estimator both take.
+   *
+   * `SimulationOptions.rates` has existed since Phase 8 and **nothing ever
+   * supplied it**, so every player has earned at 1x while thirteen factors sat
+   * computed and unread. Built here because the same rows already feed the
+   * damage chain — hero passives, relics and synergy all answer for gold and
+   * EXP as well as for damage, and reading them twice is two chances to
+   * disagree.
+   */
+  rates: RewardRates;
   /**
    * What fraction of a monster's damage actually lands.
    *
@@ -163,9 +190,26 @@ export function rosterFromSave(save: SaveV3): LoadedRoster {
    * vitality. Building it from the rows keeps the two in step by construction.
    */
   const healthHeroes: HealthHero[] = [];
+  const casters: ActiveCaster[] = [];
   for (const row of activeRows(save)) {
     const template = getHeroTemplate(row.id);
     if (template === undefined) continue;
+    /*
+     * A hero casts their relic's skill only when they are *carrying* it —
+     * equipped, and equipped by this copy. A relic in the armoury, or on a
+     * different copy of the same hero, leaves them on their archetype.
+     */
+    const gear = save.roster.uniqueByHeroId[row.id];
+    const skill = uniqueSkillFor(row.id);
+    casters.push({
+      uid: row.uid,
+      fielded: true,
+      caster: {
+        level: row.level,
+        archetype: template.activeSkillArchetype,
+        unique: skill !== null && gear?.equippedByUid === row.uid ? { skill, rank: gear.rank } : null,
+      },
+    });
     healthHeroes.push({
       uid: row.uid,
       heroClass: template.heroClass,
@@ -264,6 +308,8 @@ export function rosterFromSave(save: SaveV3): LoadedRoster {
   return {
     heroes,
     cast,
+    casters,
+    rates: rewardRatesFrom({ team: powered, relics: relicBearers(save, activeUids), economy: economyFromSave(save) }),
     profile: profileFromSave(save),
     teamMaxHp: teamHealthFromSave(save, healthHeroes, equipment),
     incomingMult: incomingMultiplier({
@@ -282,31 +328,58 @@ export function rosterFromSave(save: SaveV3): LoadedRoster {
 }
 
 /**
- * Everything the running fight can observe about a roster, as one string.
+ * Who is fighting. A change here **rebuilds** the loop.
  *
- * The shell rebuilds the loop when this changes and leaves it alone when it
- * does not, which is what lets a summon add a hero to the bench without
- * restarting the run — and lets fielding one, or levelling one, take effect
- * without a reload.
+ * Split from the tuning below, and that split is the point. This used to be
+ * one string covering the numbers too, so levelling a hero moved it and the
+ * whole loop was torn down — and a rebuild resumes from `RunProgress`, which
+ * carries the wave, the kills and the purse and *not* the enemy's health, the
+ * team's, any ability cooldown, the burst window or the clock. Measured: a
+ * rebuild two seconds into a fight healed both sides to full and handed every
+ * ability back free. See `engine/combat/retune.ts`.
  *
- * Derived from the *built* roster rather than from the save's fields, and that
- * is the whole point. Enumerating which save fields the fight depends on means
- * keeping a second list in step with `rosterFromSave` — and the day equipment
- * or a passive joins the damage calculation, the list is wrong and the symptom
- * is a hero whose new gear does nothing until the tab is reloaded. Comparing
- * the output cannot drift from the thing it describes.
- *
- * The damage term used to be redundant — damage and team health were functions
- * of the same hero fields, so no save change moved one without the other, and
- * a test asserted exactly that as a tripwire. Connecting the damage multiplier
- * chain broke it, which is what it was for: `metaDamageLevel` now moves damage
- * and nothing else, and so does the player's own level.
+ * What is left here is what a rebuild is actually for: the renderer's cast,
+ * and the swing schedule. A hero arriving or leaving changes both. A hero
+ * hitting harder changes neither.
  */
-export function fightSignature(roster: LoadedRoster): string {
+export function fightIdentity(roster: LoadedRoster): string {
+  return JSON.stringify([
+    roster.heroes.map(hero => [hero.uid, hero.timer.intervalMs]),
+    roster.cast.map(member => [member.uid, member.role, member.modelKey, member.silhouette]),
+  ]);
+}
+
+/** What the running fight can be handed without restarting it. */
+export function fightTuning(roster: LoadedRoster): FightTuning {
+  return {
+    heroes: roster.heroes,
+    teamMaxHp: roster.teamMaxHp,
+    incomingMult: roster.incomingMult,
+    rates: roster.rates,
+    casters: roster.casters,
+  };
+}
+
+/**
+ * The tuning, as a string to key an effect on.
+ *
+ * Every number the fight reads that is not in `fightIdentity`. If one moves
+ * and this does not, the fight goes on using the old value — a hero who
+ * levelled hits for what they did before, a relic just picked up casts the
+ * old skill, a rebirth pays the old rate.
+ */
+export function fightTuningKey(roster: LoadedRoster): string {
   return JSON.stringify([
     roster.teamMaxHp,
     roster.incomingMult,
-    roster.heroes.map(hero => [hero.uid, hero.damagePerHit.toString(), hero.timer.intervalMs]),
-    roster.cast.map(member => [member.uid, member.role, member.modelKey, member.silhouette]),
+    [roster.rates.goldMult, roster.rates.expMult],
+    roster.heroes.map(hero => [hero.uid, hero.damagePerHit.toString()]),
+    roster.casters.map(entry => [
+      entry.uid,
+      entry.caster.level,
+      entry.caster.archetype,
+      entry.caster.unique?.skill.type ?? null,
+      entry.caster.unique?.rank ?? null,
+    ]),
   ]);
 }

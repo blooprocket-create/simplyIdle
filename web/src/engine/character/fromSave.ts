@@ -1,7 +1,10 @@
+import { isRarity, type Rarity } from '../../content/rarities';
+import type { EconomyState } from '../combat/rewardRates';
 import type { ProgressionState } from '../combat/progressionMultipliers';
-import { MAX_SAVE_COLLECTION, boundedInt, isRecord } from '../save/guards';
+import { MAX_SAVE_COLLECTION, boundedFloat, boundedInt, isRecord } from '../save/guards';
 import type { SaveV3, StatBlock } from '../save/schema';
 import { teamMaxHp, type HealthHero } from './stats';
+import { AUTO_POTION_THRESHOLD } from '../items/autoPotion';
 
 /**
  * Team health for a save.
@@ -36,6 +39,12 @@ const MAX_FACILITY_LEVEL = 999;
 
 /** The shipped VIP track tops out at ten. */
 const MAX_VIP_LEVEL = 10;
+/*
+ * Weeks since the epoch, bounded the way the shipped sanitiser bounds it. The
+ * table wraps with a modulo, so the ceiling is about refusing a corrupt save
+ * rather than about the calendar.
+ */
+const MAX_WEEKLY_EVENT_WEEK = 1_000_000;
 
 /**
  * Mastery experience for the class the player is actually playing.
@@ -55,21 +64,31 @@ export function masteryXpFromLegacy(save: SaveV3): number {
 /**
  * The tactics facility's level.
  *
- * Stored as `guildhallFacilities.tactics.level` — a record of records, one
- * level deeper than it looks, which is the shape that made the fixture's first
- * tactics scenario silently do nothing when it was written as a flat map.
+ * **Typed since Phase 10**, which is the phase that can raise one. It was read
+ * out of `legacy` for three phases before that, as
+ * `guildhallFacilities.tactics.level` — a record of records, one level deeper
+ * than it looks, which is the shape that made the Phase 7 fixture's first
+ * tactics scenario silently measure nothing at all.
+ *
+ * The name is kept so the callers do not churn, and because it still describes
+ * where the number came from.
  */
 export function tacticsLevelFromLegacy(save: SaveV3): number {
-  const facilities = save.legacy.guildhallFacilities;
-  if (!isRecord(facilities)) return 0;
-  const tactics = facilities.tactics;
-  if (!isRecord(tactics)) return 0;
-  return boundedInt(tactics.level, 0, MAX_FACILITY_LEVEL, 0);
+  return boundedInt(save.facilities.tactics, 0, MAX_FACILITY_LEVEL, 0);
 }
 
-/** VIP level, out of the bag. The whole VIP system is Phase 10's to claim. */
+/**
+ * VIP level, off the typed block.
+ *
+ * It was `save.legacy.vipLevel` until Phase 10 claimed the five VIP keys, and
+ * the name is kept for the same reason `tacticsLevelFromLegacy` keeps its:
+ * the callers do not churn, and it still says where the number came from.
+ *
+ * The level is *derived from the points* on the way in — see `vipSlice.ts` —
+ * so this reads a number the save cannot contradict.
+ */
 export function vipLevelFromLegacy(save: SaveV3): number {
-  return boundedInt(save.legacy.vipLevel, 0, MAX_VIP_LEVEL, 0);
+  return boundedInt(save.vip.level, 0, MAX_VIP_LEVEL, 0);
 }
 
 /**
@@ -116,6 +135,59 @@ export function progressionFromSave(save: SaveV3): ProgressionState {
     classMasteryXp: masteryXpFromLegacy(save),
     classPassiveUnlocked: classPassiveUnlockedFromLegacy(save),
     damageBuffPct: 0,
+  };
+}
+
+/**
+ * The health share below which auto-potion drinks, out of the bag.
+ *
+ * A player setting with no screen to change it on yet, which is exactly what
+ * `legacy` is for: an account that set it in the shipped game keeps its
+ * choice, and a new one gets the shipped default. The bounds are the shipped
+ * sanitiser's, so a stored 0 does not turn the automation off by the back door.
+ */
+export function autoPotionThresholdFromLegacy(save: SaveV3): number {
+  return boundedFloat(save.legacy.autoUsePotionThresholdPct, 0.1, 1, AUTO_POTION_THRESHOLD);
+}
+
+/** Which weekly event is running, out of the bag. Its rotation is Phase 11's. */
+export function weeklyEventWeekFromLegacy(save: SaveV3): number {
+  return boundedInt(save.legacy.weeklyEventWeek, 0, MAX_WEEKLY_EVENT_WEEK, 0);
+}
+
+/**
+ * The rarity floor an automatic recycle sweeps up to, out of the bag.
+ *
+ * `autoRecycleMaxRarity` on the shipped state, defaulting to `uncommon` as it
+ * does there — which is not the safest possible default and is the shipped
+ * one, and a port that chose `common` would quietly stop recycling the rarity
+ * the player's old account had been feeding on.
+ */
+export function autoRecycleFloorFromLegacy(save: SaveV3): Rarity {
+  const stored = save.legacy.autoRecycleMaxRarity;
+  return isRarity(stored) ? stored : 'uncommon';
+}
+
+/**
+ * The account half of the reward chain.
+ *
+ * Beside `progressionFromSave` rather than inside it, because the two chains
+ * share only four of their factors: gold reads the *economy* meta level and
+ * rebirth path where damage reads the damage ones, and the treasury and
+ * training facilities where damage reads tactics. Widening one state to serve
+ * both is how a port ends up multiplying gold by the damage path.
+ */
+export function economyFromSave(save: SaveV3): EconomyState {
+  return {
+    prestigeCount: save.progression.prestigeCount,
+    achievementCount: achievementCountFromLegacy(save),
+    metaEconomyLevel: save.progression.metaEconomyLevel,
+    rebirthEconomyPath: save.progression.rebirthEconomyPath,
+    classMasteryXp: masteryXpFromLegacy(save),
+    vipLevel: vipLevelFromLegacy(save),
+    trainingFacilityLevel: boundedInt(save.facilities.training, 0, MAX_FACILITY_LEVEL, 0),
+    treasuryFacilityLevel: boundedInt(save.facilities.treasury, 0, MAX_FACILITY_LEVEL, 0),
+    weeklyEventWeek: weeklyEventWeekFromLegacy(save),
   };
 }
 

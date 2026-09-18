@@ -1,0 +1,396 @@
+{
+  "note": "Usable items: the catalogue, the drop roll, and what using one is worth.",
+  "generatedFrom": "src/gameConfig.ts USABLE_ITEMS, src/reducers/economyReducer.ts USE_USABLE_ITEM",
+  "items": [
+    {
+      "id": "small_potion",
+      "name": "Small Vital Potion",
+      "itemType": "basic",
+      "effect": "heal_team_percent",
+      "value": 0.35,
+      "dropWeight": 45
+    },
+    {
+      "id": "gold_cache",
+      "name": "Gold Cache",
+      "itemType": "basic",
+      "effect": "gain_gold_flat",
+      "value": 350,
+      "dropWeight": 28
+    },
+    {
+      "id": "exp_scroll",
+      "name": "Training Scroll",
+      "itemType": "basic",
+      "effect": "gain_exp_flat",
+      "value": 220,
+      "dropWeight": 20
+    },
+    {
+      "id": "shard_cluster",
+      "name": "Shard Cluster",
+      "itemType": "basic",
+      "effect": "gain_shards_flat",
+      "value": 60,
+      "dropWeight": 7
+    },
+    {
+      "id": "grand_potion",
+      "name": "Grand Vital Elixir",
+      "itemType": "advanced",
+      "effect": "heal_team_percent",
+      "value": 0.65,
+      "dropWeight": 26
+    },
+    {
+      "id": "vault_cache",
+      "name": "Imperial Vault Cache",
+      "itemType": "advanced",
+      "effect": "gain_gold_flat",
+      "value": 1200,
+      "dropWeight": 14
+    },
+    {
+      "id": "coolant_mk1",
+      "name": "Coolant Capsule I",
+      "itemType": "advanced",
+      "effect": "reduce_heat_flat",
+      "value": 35,
+      "dropWeight": 0
+    },
+    {
+      "id": "coolant_mk2",
+      "name": "Coolant Capsule II",
+      "itemType": "advanced",
+      "effect": "reduce_heat_flat",
+      "value": 75,
+      "dropWeight": 0
+    }
+  ],
+  "rolls": [
+    {
+      "roll": 0,
+      "basic": "small_potion",
+      "advanced": "small_potion"
+    },
+    {
+      "roll": 0.001,
+      "basic": "small_potion",
+      "advanced": "small_potion"
+    },
+    {
+      "roll": 0.2,
+      "basic": "small_potion",
+      "advanced": "small_potion"
+    },
+    {
+      "roll": 0.44,
+      "basic": "small_potion",
+      "advanced": "gold_cache"
+    },
+    {
+      "roll": 0.45,
+      "basic": "small_potion",
+      "advanced": "gold_cache"
+    },
+    {
+      "roll": 0.46,
+      "basic": "gold_cache",
+      "advanced": "gold_cache"
+    },
+    {
+      "roll": 0.72,
+      "basic": "gold_cache",
+      "advanced": "grand_potion"
+    },
+    {
+      "roll": 0.73,
+      "basic": "gold_cache",
+      "advanced": "grand_potion"
+    },
+    {
+      "roll": 0.92,
+      "basic": "exp_scroll",
+      "advanced": "vault_cache"
+    },
+    {
+      "roll": 0.93,
+      "basic": "exp_scroll",
+      "advanced": "vault_cache"
+    },
+    {
+      "roll": 0.999,
+      "basic": "shard_cluster",
+      "advanced": "vault_cache"
+    },
+    {
+      "roll": 1,
+      "basic": "shard_cluster",
+      "advanced": "vault_cache"
+    }
+  ],
+  "uses": [
+    {
+      "name": "potion, shallow",
+      "itemId": "small_potion",
+      "held": 1,
+      "amount": 1,
+      "level": 1,
+      "highestWave": 1,
+      "prestige": 0,
+      "vip": 0,
+      "gold": 0,
+      "exp": 0,
+      "shards": 0,
+      "teamHp": 350,
+      "remaining": 0
+    },
+    {
+      "name": "gold, shallow",
+      "itemId": "gold_cache",
+      "held": 1,
+      "amount": 1,
+      "level": 1,
+      "highestWave": 1,
+      "prestige": 0,
+      "vip": 0,
+      "gold": 851,
+      "exp": 0,
+      "shards": 0,
+      "teamHp": 0,
+      "remaining": 0
+    },
+    {
+      "name": "gold, deep",
+      "itemId": "gold_cache",
+      "held": 1,
+      "amount": 1,
+      "level": 200,
+      "highestWave": 400,
+      "prestige": 0,
+      "vip": 0,
+      "gold": 8.518143752687489e+24,
+      "exp": 0,
+      "shards": 0,
+      "teamHp": 0,
+      "remaining": 0
+    },
+    {
+      "name": "gold, deep and prestiged",
+      "itemId": "gold_cache",
+      "held": 1,
+      "amount": 1,
+      "level": 200,
+      "highestWave": 400,
+      "prestige": 6,
+      "vip": 0,
+      "gold": 8.518143752687489e+24,
+      "exp": 0,
+      "shards": 0,
+      "teamHp": 0,
+      "remaining": 0
+    },
+    {
+      "name": "gold, shallow and prestiged",
+      "itemId": "gold_cache",
+      "held": 1,
+      "amount": 1,
+      "level": 1,
+      "highestWave": 1,
+      "prestige": 6,
+      "vip": 0,
+      "gold": 1463,
+      "exp": 0,
+      "shards": 0,
+      "teamHp": 0,
+      "remaining": 0
+    },
+    {
+      "name": "gold, vip",
+      "itemId": "gold_cache",
+      "held": 1,
+      "amount": 1,
+      "level": 1,
+      "highestWave": 1,
+      "prestige": 0,
+      "vip": 8,
+      "gold": 1021,
+      "exp": 0,
+      "shards": 0,
+      "teamHp": 0,
+      "remaining": 0
+    },
+    {
+      "name": "exp, shallow",
+      "itemId": "exp_scroll",
+      "held": 1,
+      "amount": 1,
+      "level": 1,
+      "highestWave": 1,
+      "prestige": 0,
+      "vip": 0,
+      "gold": 0,
+      "exp": 535,
+      "shards": 0,
+      "teamHp": 0,
+      "remaining": 0
+    },
+    {
+      "name": "exp, deep",
+      "itemId": "exp_scroll",
+      "held": 1,
+      "amount": 1,
+      "level": 200,
+      "highestWave": 400,
+      "prestige": 0,
+      "vip": 0,
+      "gold": 0,
+      "exp": 1.7380050608723298e+21,
+      "shards": 0,
+      "teamHp": 0,
+      "remaining": 0
+    },
+    {
+      "name": "shards, shallow",
+      "itemId": "shard_cluster",
+      "held": 1,
+      "amount": 1,
+      "level": 1,
+      "highestWave": 1,
+      "prestige": 0,
+      "vip": 0,
+      "gold": 0,
+      "exp": 0,
+      "shards": 146,
+      "teamHp": 0,
+      "remaining": 0
+    },
+    {
+      "name": "shards, deep",
+      "itemId": "shard_cluster",
+      "held": 1,
+      "amount": 1,
+      "level": 200,
+      "highestWave": 400,
+      "prestige": 0,
+      "vip": 0,
+      "gold": 0,
+      "exp": 0,
+      "shards": 1625,
+      "teamHp": 0,
+      "remaining": 0
+    },
+    {
+      "name": "grand potion",
+      "itemId": "grand_potion",
+      "held": 1,
+      "amount": 1,
+      "level": 1,
+      "highestWave": 1,
+      "prestige": 0,
+      "vip": 0,
+      "gold": 0,
+      "exp": 0,
+      "shards": 0,
+      "teamHp": 650,
+      "remaining": 0
+    },
+    {
+      "name": "vault cache",
+      "itemId": "vault_cache",
+      "held": 1,
+      "amount": 1,
+      "level": 1,
+      "highestWave": 1,
+      "prestige": 0,
+      "vip": 0,
+      "gold": 2916,
+      "exp": 0,
+      "shards": 0,
+      "teamHp": 0,
+      "remaining": 0
+    },
+    {
+      "name": "three at once",
+      "itemId": "gold_cache",
+      "held": 5,
+      "amount": 3,
+      "level": 1,
+      "highestWave": 1,
+      "prestige": 0,
+      "vip": 0,
+      "gold": 2553,
+      "exp": 0,
+      "shards": 0,
+      "teamHp": 0,
+      "remaining": 2
+    },
+    {
+      "name": "all of them",
+      "itemId": "gold_cache",
+      "held": 4,
+      "amount": "all",
+      "level": 1,
+      "highestWave": 1,
+      "prestige": 0,
+      "vip": 0,
+      "gold": 3404,
+      "exp": 0,
+      "shards": 0,
+      "teamHp": 0,
+      "remaining": 0
+    },
+    {
+      "name": "more than held",
+      "itemId": "gold_cache",
+      "held": 2,
+      "amount": 9,
+      "level": 1,
+      "highestWave": 1,
+      "prestige": 0,
+      "vip": 0,
+      "gold": 1702,
+      "exp": 0,
+      "shards": 0,
+      "teamHp": 0,
+      "remaining": 0
+    },
+    {
+      "name": "none held",
+      "itemId": "gold_cache",
+      "held": 0,
+      "amount": 1,
+      "level": 1,
+      "highestWave": 1,
+      "prestige": 0,
+      "vip": 0,
+      "gold": 0,
+      "exp": 0,
+      "shards": 0,
+      "teamHp": 0,
+      "remaining": 0
+    }
+  ],
+  "duplicatedFunctions": [
+    {
+      "name": "getUsableProgressScale",
+      "inBothFiles": true,
+      "agree": true
+    },
+    {
+      "name": "getScaledUsableGoldGain",
+      "inBothFiles": true,
+      "agree": true
+    },
+    {
+      "name": "getScaledUsableExpGain",
+      "inBothFiles": true,
+      "agree": true
+    },
+    {
+      "name": "getScaledUsableShardGain",
+      "inBothFiles": true,
+      "agree": true
+    }
+  ]
+}

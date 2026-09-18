@@ -5,9 +5,19 @@ import { detectCapabilities, profileFor } from '../game/device/DeviceProfile';
 import { emptySnapshot, type SimulationSnapshot } from '../engine/types';
 import { startingSave } from './demoRoster';
 import type { EquipmentRarity, EquipmentSlot } from '../content/equipment';
+import type { FacilityId } from '../engine/prestige/facilities';
+import type { PrestigePath } from '../engine/prestige/rebirth';
 import { canAffordSpark, canSummon, priceOfSummon, rosterActions, sparkExchange, summonOnce } from './playerActions';
 import { equipmentActions, migrateLegacyEquipment } from './equipmentActions';
-import { fightSignature, rosterFromSave } from './roster';
+import { prestigeActions } from './prestigeActions';
+import * as shopActions from './shopActions';
+import { EMPTY_AUTOMATION_STATE, runAutomations } from './automationRunner';
+import { worthBanking } from '../engine/save/bankRun';
+import { bankInto } from './bank';
+import { fightIdentity, fightTuning, fightTuningKey, rosterFromSave } from './roster';
+import { useItem } from './playerActions';
+import { choosePotion } from '../engine/items/autoPotion';
+import { autoPotionThresholdFromLegacy } from '../engine/character/fromSave';
 import { loadSave, writeSave } from './saveStore';
 import type { SaveV3 } from '../engine/save/schema';
 import type { SummonPayment } from '../engine/roster/summonSave';
@@ -15,7 +25,7 @@ import type { HeroSpend } from '../engine/roster/rosterSave';
 import type { FormationRole } from '../engine/combat/formation';
 import { profileFromSave } from '../ui/profile/playerProfile';
 import { GameLoop } from './GameLoop';
-import { loadRun, RunSaver } from './runStore';
+import { loadRun, RunSaver, SAVE_INTERVAL_MS } from './runStore';
 import { browserStore } from '../ui/prefs/store';
 import { Rail } from '../ui/nav/Rail';
 import { Shelf } from '../ui/nav/Shelf';
@@ -26,6 +36,7 @@ import { WipeOffer } from '../ui/wipe/WipeOffer';
 import { Ticker } from '../ui/objectives/Ticker';
 import { usePinned } from '../ui/prefs/usePinned';
 import { useAutomation } from '../ui/prefs/useAutomation';
+import { AbilityBar } from '../ui/abilities/AbilityBar';
 import { automationProgress } from '../ui/automation/unlocks';
 import type { AutomationId } from '../content/automation';
 import { SurfaceHost } from '../ui/shell/SurfaceHost';
@@ -72,22 +83,28 @@ export function App() {
     return stored === null ? startingSave(nowMs) : migrateLegacyEquipment(stored, nowMs, Math.random);
   });
   const [save, setSave] = useState<SaveV3>(initialSave);
+  const saveRef = useRef(save);
 
   /*
-   * The fight's inputs, rebuilt whenever the save moves — and the *signature*
-   * is what the loop effect actually keys on.
+   * The fight's inputs, rebuilt whenever the save moves — and **two** keys
+   * come off them, which is the whole of how an account can change under a
+   * running game.
    *
-   * The distinction is the whole of how a roster can change under a running
-   * game. Summoning a hero rebuilds this object and changes nothing the fight
-   * can observe, so the signature holds and the run carries on. Fielding one,
-   * or levelling one, changes a hero's damage or the team's health, so the
-   * signature moves and the loop is rebuilt around the new team — resuming
-   * from the run that was just flushed, rather than starting again at wave one.
+   * `fightIdentity` is who is fighting, and moving it rebuilds the loop.
+   * `fightTuningKey` is what they hit for, and moving it is handed to the
+   * running fight instead.
+   *
+   * These were one string, and everything was a rebuild. A rebuild resumes
+   * from `RunProgress` — wave, kills, deaths, burst charge, gold, exp — so
+   * levelling a hero mid-run healed the team to full, healed the *enemy* to
+   * full, cleared every ability cooldown and put the clock back to zero. All
+   * four measured; see `engine/combat/retune.ts`.
    */
   const roster = useMemo(() => rosterFromSave(save), [save]);
   const rosterRef = useRef(roster);
   rosterRef.current = roster;
-  const fightKey = useMemo(() => fightSignature(roster), [roster]);
+  const fightKey = useMemo(() => fightIdentity(roster), [roster]);
+  const tuningKey = useMemo(() => fightTuningKey(roster), [roster]);
   const cast = roster.cast;
   // Rebuilt whenever the save moves, which is what makes a summon show up.
   const profile = useMemo(() => profileFromSave(save), [save]);
@@ -127,6 +144,16 @@ export function App() {
    */
   const autoBurst = automation.active.has('burst');
   const autoBurstRef = useRef(autoBurst);
+  const autoCast = automation.active.has('castHeroActives');
+  /*
+   * Read through a ref by the subscription, which is built once per fight and
+   * would otherwise close over the set as it was when the loop was made.
+   */
+  const activeRef = useRef(automation.active);
+  activeRef.current = automation.active;
+  const automationStateRef = useRef(EMPTY_AUTOMATION_STATE);
+  const autoCastRef = useRef(autoCast);
+  const autoUsePotion = automation.active.has('usePotion');
 
   /*
    * Change the save, and write it down.
@@ -138,6 +165,13 @@ export function App() {
    * second rather than one press.
    */
   const applySave = useCallback((next: SaveV3) => {
+    /*
+     * The ref leads the state, and deliberately. `live()` banks and then hands
+     * the result to a verb, and React has not re-rendered by then — a second
+     * bank in the same tick reading `save` would see the balance before the
+     * first one moved it. Writing the ref here makes it the current answer.
+     */
+    saveRef.current = next;
     setSave(next);
     writeSave(browserStore(), next);
   }, []);
@@ -158,50 +192,127 @@ export function App() {
     [applySave],
   );
 
+  /**
+   * The save, with anything the run has earned already in the wallet.
+   *
+   * **Every verb starts here rather than from `save`**, and that is what makes
+   * a purchase cost something. The player's spendable balance was read as the
+   * wallet plus the run's unbanked earnings, while a purchase deducted from
+   * the wallet alone and floored it at zero — so an empty wallet with a
+   * million unbanked gold bought seven facility levels and still read a
+   * million. Measured, not reasoned about.
+   *
+   * Banking first means the wallet *is* the balance at the moment anything is
+   * charged, so there is no second place holding the same coin. Queries below
+   * still read `save` directly: they change nothing, and a price is a price.
+   */
+  const live = useCallback((): SaveV3 => {
+    const banked = loopRef.current?.bank();
+    if (banked === undefined || !worthBanking(banked)) return saveRef.current;
+    const next = bankInto(saveRef.current, banked, Date.now(), Math.random);
+    applySave(next);
+    return next;
+  }, [applySave]);
+
   const actions = useMemo(
     () => ({
       summon: (pay: SummonPayment) => {
-        const outcome = summonOnce({ save, pay, nowMs: Date.now(), random: Math.random });
+        const outcome = summonOnce({ save: live(), pay, nowMs: Date.now(), random: Math.random });
         if (outcome) applySave(outcome.save);
         return outcome;
       },
       canSummon: (pay: SummonPayment) => canSummon(save, pay),
       priceOfSummon: (pay: SummonPayment) => priceOfSummon(save, pay),
       sparkExchange: (optionId: string) => {
-        const outcome = sparkExchange({ save, optionId, nowMs: Date.now(), random: Math.random });
+        const outcome = sparkExchange({ save: live(), optionId, nowMs: Date.now(), random: Math.random });
         if (outcome) applySave(outcome.save);
         return outcome;
       },
       canAffordSpark: (optionId: string) => canAffordSpark(save, optionId),
-      spendOnHero: (uid: string, spend: HeroSpend) => applying(rosterActions.spendOnHero(save, uid, spend)),
+      useItem: (itemId: string, amount: number | 'all' = 1) => {
+        /*
+         * The one action whose result is not entirely a save. A potion heals
+         * the *running fight* — the team's health is not stored — so the
+         * fraction goes to the loop and everything else goes to the save.
+         */
+        const outcome = useItem(live(), itemId, amount);
+        if (outcome === null) return false;
+        applySave(outcome.save);
+        loopRef.current?.heal(outcome.healFraction);
+        return true;
+      },
+      spendOnHero: (uid: string, spend: HeroSpend) => applying(rosterActions.spendOnHero(live(), uid, spend)),
       batchLevel: (uids: readonly string[], addLevels: number | 'max') =>
-        applying(rosterActions.batchLevel(save, uids, addLevels)),
-      recycle: (uid: string) => applying(rosterActions.recycle(save, uid)),
-      fieldTeam: (requested: readonly string[]) => applying(rosterActions.fieldTeam(save, requested)),
-      place: (uid: string, role: FormationRole) => applying(rosterActions.place(save, uid, role)),
-      storeLoadout: (slot: number) => applying(rosterActions.storeLoadout(save, slot)),
-      recallLoadout: (slot: number) => applying(rosterActions.recallLoadout(save, slot)),
-      buySlot: () => applying(rosterActions.buySlot(save)),
-      toggleRelic: (uid: string) => applying(rosterActions.toggleRelic(save, uid)),
-      equip: (id: string) => applying(equipmentActions.equip(save, id)),
-      unequip: (slot: EquipmentSlot) => applying(equipmentActions.unequip(save, slot)),
-      dismantle: (id: string) => applying(equipmentActions.dismantle(save, id)),
-      sweep: () => applying(equipmentActions.sweep(save)),
-      setSweepFloor: (floor: EquipmentRarity) => applying(equipmentActions.setFloor(save, floor)),
+        applying(rosterActions.batchLevel(live(), uids, addLevels)),
+      recycle: (uid: string) => applying(rosterActions.recycle(live(), uid)),
+      fieldTeam: (requested: readonly string[]) => applying(rosterActions.fieldTeam(live(), requested)),
+      fieldBest: () => applying(rosterActions.fieldBest(live())),
+      place: (uid: string, role: FormationRole) => applying(rosterActions.place(live(), uid, role)),
+      storeLoadout: (slot: number) => applying(rosterActions.storeLoadout(live(), slot)),
+      recallLoadout: (slot: number) => applying(rosterActions.recallLoadout(live(), slot)),
+      buySlot: () => applying(rosterActions.buySlot(live())),
+      toggleRelic: (uid: string) => applying(rosterActions.toggleRelic(live(), uid)),
+      equip: (id: string) => applying(equipmentActions.equip(live(), id)),
+      unequip: (slot: EquipmentSlot) => applying(equipmentActions.unequip(live(), slot)),
+      dismantle: (id: string) => applying(equipmentActions.dismantle(live(), id)),
+      sweep: () => applying(equipmentActions.sweep(live())),
+      setSweepFloor: (floor: EquipmentRarity) => applying(equipmentActions.setFloor(live(), floor)),
       craft: (slot: EquipmentSlot) => {
-        const outcome = equipmentActions.craft({ save, nowMs: Date.now(), random: Math.random }, slot);
+        const outcome = equipmentActions.craft({ save: live(), nowMs: Date.now(), random: Math.random }, slot);
         if (outcome) applySave(outcome.save);
         return outcome;
       },
       upgrade: (id: string) => {
-        const outcome = equipmentActions.upgrade({ save, nowMs: Date.now(), random: Math.random }, id);
+        const outcome = equipmentActions.upgrade({ save: live(), nowMs: Date.now(), random: Math.random }, id);
         if (outcome) applySave(outcome.save);
         return outcome;
       },
-      refineEssence: (count?: number) => applying(equipmentActions.refineEssence(save, count)),
-      refineShards: (count?: number) => applying(equipmentActions.refineShards(save, count)),
+      refineEssence: (count?: number) => applying(equipmentActions.refineEssence(live(), count)),
+      refineShards: (count?: number) => applying(equipmentActions.refineShards(live(), count)),
+      previewRebirth: () => prestigeActions.preview(save),
+      rebirth: () => applying(prestigeActions.rebirth(live())),
+      priceOfPath: (path: PrestigePath) => prestigeActions.priceOfPath(save, path),
+      spendCore: (path: PrestigePath) => applying(prestigeActions.spendCore(live(), path)),
+      priceOfMeta: (path: PrestigePath) => prestigeActions.priceOfMeta(save, path),
+      spendEssence: (path: PrestigePath) => applying(prestigeActions.spendEssence(live(), path)),
+      priceOfFacility: (facilityId: FacilityId) => prestigeActions.priceOfFacility(save, facilityId),
+      upgradeFacility: (facilityId: FacilityId) => {
+        /*
+         * Priced off the banked wallet rather than off `heldGold`, which adds
+         * the run's tally to it. Once `live()` has moved that tally into the
+         * wallet the two would be the same coin counted twice — the very bug
+         * this banking exists to close, reappearing on the one line that
+         * spends the largest sums.
+         */
+        const current = live();
+        return applying(prestigeActions.upgradeFacility(current, facilityId, current.wallet.gold));
+      },
+      buyOffer: (id: string) => {
+        const outcome = shopActions.buy({ save: live(), nowMs: Date.now(), random: Math.random }, id);
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      buyUnits: (itemId: string, amount: number) => {
+        const outcome = shopActions.buyUnits(live(), itemId, amount);
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      claimVip: (level: number) => {
+        const claim = shopActions.claimVip(live(), level);
+        if (claim === null) return false;
+        applySave(claim.save);
+        return true;
+      },
+      recordCodex: () => {
+        const swept = shopActions.recordCodex(live());
+        if (swept.recorded > 0) applySave(swept.save);
+        return swept.recorded;
+      },
+      // A query: it counts what a sweep would record without recording it, so
+      // the disabled button and any badge can both ask the same function.
+      claimableCodex: () => shopActions.claimableCodexEntries(save),
     }),
-    [save, applySave, applying],
+    [save, applySave, applying, live],
   );
 
   const select = (id: string) => {
@@ -279,7 +390,17 @@ export function App() {
       // over by `demoSimulationOptions` — the team taking a monster's damage
       // raw, which against the shipped chain is up to ten times too much.
       incomingMult: roster.incomingMult,
+      casters: roster.casters,
+      // The gold and EXP chains. This option has existed since Phase 8 with
+      // nothing supplying it, so every kill paid a flat 1x; `ui/architecture`
+      // now refuses a `LoadedRoster` field the loop takes and the shell drops.
+      rates: roster.rates,
       autoBurst: autoBurstRef.current,
+      autoCast: autoCastRef.current,
+      // The one place the real generator enters the fight. The engine's own
+      // default is seeded, so a shell that forgot this would run a repeating
+      // campaign rather than no campaign — quiet, and worth not being quiet.
+      random: Math.random,
       resume: restored.resume ?? undefined,
       awayMs: restored.awayMs,
     });
@@ -288,7 +409,33 @@ export function App() {
     const unsubscribe = loop.subscribe(next => {
       diorama.render(next);
       setSnapshot(next);
-      saver.tick(next, Date.now());
+      /*
+       * Banked on the same throttle the run is saved on, so an idle player
+       * levels too. Without this a player who never pressed anything would
+       * earn gold that stayed in the run forever and heroes who never
+       * levelled — every verb banks, and a player at rest presses no verbs.
+       */
+      if (saver.tick(next, Date.now())) {
+        const banked = live();
+        /*
+         * And the save-side automations, on the same cadence and after the
+         * bank — an automatic summon spends the boss tears the run just
+         * earned, so running it against an unbanked wallet would refuse a
+         * purchase the player can afford.
+         */
+        const ran = runAutomations(
+          activeRef.current,
+          {
+            save: banked,
+            elapsedMs: SAVE_INTERVAL_MS,
+            nowMs: Date.now(),
+            random: Math.random,
+          },
+          automationStateRef.current,
+        );
+        automationStateRef.current = ran.state;
+        if (ran.save !== null) applySave(ran.save);
+      }
     });
     loop.start();
 
@@ -314,7 +461,7 @@ export function App() {
       loop.stop();
       loopRef.current = null;
     };
-  }, [fightKey, device.profile]);
+  }, [fightKey, device.profile, live]);
 
   /*
    * The one place a preference reaches the simulation, and deliberately below
@@ -326,6 +473,55 @@ export function App() {
     autoBurstRef.current = autoBurst;
     loopRef.current?.setAutoBurst(autoBurst);
   }, [autoBurst]);
+
+  useEffect(() => {
+    autoCastRef.current = autoCast;
+    loopRef.current?.setAutoCastHeroActives(autoCast);
+  }, [autoCast]);
+
+  /*
+   * Auto-potion is the one automation that is neither purely in-fight nor
+   * purely save-side: the loop watches the health and this decides what comes
+   * out of the bag. `choosePotion` owns the rule; nothing about *when* or
+   * *which* is decided here.
+   *
+   * It must not call `loopRef.heal` the way the manual press does — the loop
+   * applies what this returns, and healing twice would make an automatic
+   * potion worth double a hand-pressed one.
+   */
+  const drink = useCallback(
+    (hpRatio: number) => {
+      const current = live();
+      const itemId = choosePotion({
+        hpRatio,
+        held: current.usables,
+        threshold: autoPotionThresholdFromLegacy(current),
+      });
+      if (itemId === null) return 0;
+      const outcome = useItem(current, itemId, 1);
+      if (outcome === null) return 0;
+      applySave(outcome.save);
+      return outcome.healFraction;
+    },
+    [live, applySave],
+  );
+
+  useEffect(() => {
+    loopRef.current?.setAutoUsePotion(autoUsePotion ? drink : null);
+  }, [autoUsePotion, drink]);
+
+  /*
+   * New numbers for the fight in progress. Below the effect that builds the
+   * loop, for the reason the two above are: effects run in declaration order,
+   * and above it this would retune a loop that does not exist yet.
+   *
+   * Keyed on the string rather than the roster, because `rosterFromSave` hands
+   * back a fresh object every time the save moves — a summon that changed
+   * nothing the fight reads would otherwise retune it on every press.
+   */
+  useEffect(() => {
+    loopRef.current?.retune(fightTuning(rosterRef.current));
+  }, [tuningKey]);
 
   return (
     <div className={styles.root}>
@@ -383,6 +579,16 @@ export function App() {
         )}
         {open === null && snapshot.boss !== null && (
           <BossTell boss={snapshot.boss} onAnswer={() => loopRef.current?.answerTell()} />
+        )}
+        {open === null && (
+          <AbilityBar
+            abilities={snapshot.abilities}
+            cast={cast}
+            automatic={autoCast}
+            earned={earned.has('castHeroActives')}
+            onCast={uid => loopRef.current?.castHeroActive(uid)}
+            onToggleAuto={() => automation.toggle('castHeroActives')}
+          />
         )}
         {open === null && <BurstControl burst={snapshot.burst} onSpend={() => loopRef.current?.spendBurst()} />}
       </div>

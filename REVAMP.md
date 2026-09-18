@@ -395,9 +395,64 @@ Which is the actual blocker, and it is structural: **every remaining automation 
 ### Phase 10 — The economy *(~3 weeks)*
 Shops and everything spendable: `BUY_GOLD_SHOP_ITEM`, `BUY_DIAMOND_SHOP_ITEM`, `BUY_PREMIUM_COOLANT`, `USE_USABLE_ITEM`, `SIMULATE_DOLLAR_PURCHASE`; skills via `BUY_SKILL` and `CAST_HERO_ACTIVE`; prestige via `REBIRTH`, `SPEND_REBIRTH_CORE`, `SPEND_ESSENCE_UPGRADE`, `UPGRADE_FACILITY`; VIP via `CLAIM_VIP_REWARD`, `CLAIM_CODEX_HERO_VIP`, `CLAIM_CODEX_UNIQUE_VIP`. Content: `USABLE_ITEMS`, `SKILLS`, `REBIRTH_BONUS`, `REBIRTH_WAVE_THRESHOLD`, `COST_SCALE`, `GIFT_AMOUNTS`.
 
-**All nine `auto*` flags finally have systems** — `usePotion`, `useCoolant` and `castHeroActives` land here, and the earn-then-choose gate built in Phase 4 stops being a policy with one subject.
+**All nine `auto*` flags finally have systems** — `usePotion`, `useCoolant` and `castHeroActives` land here, and the earn-then-choose gate built in Phase 4 stops being a policy with one subject. *(There are eight, not nine, and seven of them land here. See the note below.)*
 
 Gold and EXP arrived early, in Phase 8 — see the note there. What is left for this phase on the currency side is the part that actually needed the shops: **spending**, the seven other currencies, and the multiplier chain itself. `RewardRates` carries that chain as one measured scalar today, exactly as `OfflineConditions` does, so assembling it here means replacing a number rather than rewriting the callers.
+
+#### Two systems measured and declined
+
+Both were on the list above, and neither turned out to be a capability.
+
+**The skills tree is inert.** `SKILLS` lists three upgrades with a `multiplier` and a `targetId: 'click'`, `BUY_SKILL` charges for them and records them, the save round-trips them — and nothing reads them. No damage path consumes the multiplier, no shipped screen dispatches the action, and there is no click or tap attack in the game for `'click'` to refer to. Measured rather than grepped, because "nothing reads it" is exactly the claim a grep gets wrong: buying every skill costs **262,300 gold** and moves `finalDps`, `totalMultiplier`, `playerBaseDps` and every field of `computeStats` by nothing at all. Building a screen for it would create a gold sink that charges a quarter of a million and hands back nothing, which is shipping the defect rather than reproducing it. The destination stays listed and stays on the placeholder.
+
+**The dollar shop is switched off.** `SIMULATE_DOLLAR_PURCHASE` sells diamonds for simulated money; `ENABLE_SIMULATED_DOLLAR_PURCHASES` is `false` in both files that declare it, the reducer case is a guard on that flag, and `GameScreen` renders all four buttons `disabled`. Measured, because a grep that found one declaration would have been wrong about the other. Not ported, and a test asserts the absence so a `usd_` offer cannot slip in beside the real ones.
+
+#### VIP has a ceiling nobody wrote down
+
+It follows from the second of those. With purchases off, the only VIP points in the shipped game are the codex claims — ten for recording a hero's lore, ten for their unique weapon. There are 65 heroes, so 130 claims exist and they are worth **1,300 points** between them. VIP 5 costs 1,500.
+
+So four of the ten milestones are reachable by playing, six are reachable by nothing at all, and the 12,750 diamonds those six pay out are unreachable with them. Ported as measured rather than tuned around: the rewrite's answer is that a later phase adds a second source of points, and neither the threshold table nor the milestone table has to change when it does.
+
+VIP milestones are also, as of this phase, the **only source of diamonds the rewrite has** — the shipped inflows are minigames, expeditions, mail and that dead shop, and none of those exist here yet. That is why the shop and VIP arrived in one commit rather than two: separately they are a currency with nothing to spend it on and a shop with no currency.
+
+#### Claiming a key removes it, and four readers were pointing at the hole
+
+`legacy` has worked the same way for five phases — carry a v2 key verbatim, read it where it is needed, claim it on the phase that owns it — and this is the first phase where claiming one **broke live readers**. `playerActions.vipLevel` had read `save.legacy.vipLevel` since Phase 8, saying in its own comment that VIP was "a whole system … that Phase 10 owns". Claiming the five VIP keys deleted that field from the bag, and a reader left pointing there answers zero for every migrated account — silently, on a field worth 3% damage and 2.5% of each purse per rung.
+
+Four had to move: the summon discount, the damage chain, the gold and EXP chains, and the equipment bag cap. The existing test could not catch it, because it built `legacy` by hand and so never went through the migration that does the claiming. The new one migrates a real v2 payload and checks all four agree — which is the general lesson rather than a VIP one, and applies to every remaining claim.
+
+The stored level is **derived from the points** rather than trusted, for the same reason: the shipped state keeps both and writes them together, so they agree until something writes one.
+
+#### Half the shop is listed and withheld, on one rule
+
+An offer is available when everything it hands over has an effect in this build — the same rule the automation catalogue follows, and the same reason the untracked achievements stay listed. Gold buys all three of its offers. Every diamond offer is listed, priced, described and withheld: coolant clears combat heat and this engine has no heat, so a bought capsule would be spent for nothing; a raid ticket works, and there is nowhere to spend it until dungeons land. The screen draws them greyed **with the reason** rather than the price, because telling a player they cannot afford a coolant pack sends them off to earn diamonds for a button that will never work. Each flips with one flag and nothing else.
+
+One deliberate divergence, and only one: the armoury crate refuses a full bag. The shipped crate does not check at all, and `grantDrops` keeps the shipped rule that a won item falling into a full bag is simply lost — right for something free, and not the same trade at 9,500 gold.
+
+#### The automation gate has three shapes now, not one
+
+The line above says all nine flags get systems here. Seven do. The gate `ui/architecture.test.ts` enforces has widened twice in the process, and the shapes are worth naming because each was found by an automation that did not fit the last one:
+
+- **The loop, by `setAuto…`** — `burst` and `castHeroActives`. In-fight behaviours the shell switches on.
+- **`app/automationRunner.ts`** — `summon`, `recycle`, `dismantle`. Currency and roster, on the save's cadence, gated by construction rather than by a regex.
+- **`app/GameLoop.ts`** — `usePotion`, and only `usePotion`. Its trigger is the team's health, which only the fight knows, and its cost is an item in the bag, which only the save holds. Neither of the other two could own it alone.
+
+`tempo` and `useCoolant` are the two left, and they wait on the same thing: **heat**.
+
+#### And there were only ever eight
+
+The line above says nine flags. There are eight. The ninth the catalogue carried was `equipBest`, keyed to `autoEquipBestHeroes` — which is not a flag: it is the name of a `useCallback` dispatching a one-shot action from a button, and the shipped state has no boolean by that name. Enumerated off `DEFAULT_STATE` rather than argued, in `__tests__/bestTeamFixture.test.ts`.
+
+So it was never an automation waiting on a rule nobody had ported. It is a **verb**, and it has sat in a catalogue of automatic things for six phases being described as one — which is exactly why every note about it said "no rule has been ported or measured" and nobody found one. They were looking for the wrong shape.
+
+It is a button on the Party screen now, and `engine/roster/bestTeam.ts` is the rule: a four-key sort — rarity, the rebirth multiplier (with a ten-thousandth of tolerance, so 1.00005 and 1 tie), level, team boost — handed to the ordinary selection rules, which decide who fits. The sort only *proposes*: the third-best hero in the game is passed over for the worst one when their rank is full, with four slots still empty. The catalogue now checks that every flag it names ends in `Enabled`, which is the property the missing one did not have.
+
+#### Left for later phases, named rather than implied
+
+- **Heat**, which `tempo`, `useCoolant`, the two coolant items and three of the four diamond offers all wait on.
+- **Dungeons**, which the raid ticket waits on. The ticket is written into `legacy` when bought rather than dropped, so the phase that claims `riftRaidTickets` inherits whatever an account paid for.
+- **`GIFT_AMOUNTS`**, listed in this phase's content and belonging to `services/friends.ts`. A gift table with no friends list to send to is the skills tree again; it goes with the social layer in Phase 12.
+- **The starting save still carries the showcase numbers** — level 42, 1,482 kills, a seeded wallet. Phase 8 called choosing them a design question for this phase. It is still one number in one place, and still not a port.
 
 ### Phase 11 — The loops *(~3 weeks)*
 The reasons to log in: `CLAIM_MISSION`; `START_EXPEDITION`, `COMPLETE_EXPEDITION`, `REFRESH_EXPEDITION_CONTRACTS`; `RUN_RIFT_DUNGEON`, `RUN_TREASURY_RAID`; the four minigames and the bounty draft; `APPLY_DAILY_LOGIN`, `APPLY_WEEKLY_ROLLOVER`, `CLAIM_WEEKLY_TRACK`; mail (`APPEND_MAIL_MESSAGES`, `CLAIM_MAIL_ATTACHMENT`, `CLAIM_ALL_MAIL_ATTACHMENTS`); `MARK_STORY_BEAT_SEEN`. Content: `MISSION_BOARD_GOALS`, `WEEKLY_EVENTS`, `WEEKLY_TRACK_MILESTONES`, `STORY_BEATS`.

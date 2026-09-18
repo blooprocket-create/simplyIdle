@@ -1,19 +1,23 @@
 import Decimal from 'break_eternity.js';
-import { swingProgress } from './combat/attackTimer';
 import { isBossWave } from '../content/monsters';
 
 import { BossFight } from './combat/BossFight';
+import { HeroActiveClock, type ActiveCaster } from './combat/HeroActiveClock';
+import { applyActives, castOne } from './combat/applyActives';
 import { RallyOffers } from './combat/RallyOffers';
+import { retuneFight, type FightTuning } from './combat/retune';
 import { BURST_HIT_UID, TELL_HIT_UID, type BurstQuality } from './combat/burst';
 import { BurstMeter } from './combat/BurstMeter';
 import { applyHit, spawnEnemy, type Enemy } from './combat/encounter';
 import { FLAT_RATES, RunEarnings, type RewardRates } from './combat/rewards';
-import { applyIncoming, fullHealth, type TeamVitals } from './combat/survival';
+import { seededRandom } from './rng';
+import { applyIncoming, fullHealth, healTeam, type TeamVitals } from './combat/survival';
 import { scheduleSwings } from './combat/swingSchedule';
-import { teamDps, type HeroEntity } from './entities/HeroEntity';
+import { heroViews, teamDps, type HeroEntity } from './entities/HeroEntity';
 import { creditAwayTime } from './offline/awayCredit';
 import type { RunProgress } from './save/runProgress';
 import { emptySnapshot, type HitEvent, type SimulationSnapshot } from './types';
+import { totalsView } from './views';
 
 /**
  * The coordinator. It owns the clock and delegates every rule to a subsystem —
@@ -48,6 +52,26 @@ export interface SimulationOptions {
   incomingMult?: number;
   /** The gold and EXP multiplier chain. Flat until Phase 10 assembles it. */
   rates?: RewardRates;
+  /** Whose abilities are in the fight, in team order. Empty means none. */
+  casters?: readonly ActiveCaster[];
+  /**
+   * Whether abilities fire themselves. Shipped on; here it is earned.
+   *
+   * Taken at construction rather than left to a setter, for the reason
+   * `autoBurst` is: an effect that switched it afterwards would run against a
+   * null loop on mount and drop the player's earned choice for a frame.
+   */
+  autoCast?: boolean;
+  /**
+   * The chest roll, and the only randomness in the fight.
+   *
+   * An argument because everything random in this engine is one. The default
+   * is **deterministic rather than `Math.random`** — a fight built without one
+   * still drops chests, and drops the same ones twice, which is what the
+   * parity suite and the offline estimator need. The shell passes the real
+   * thing; see `App.tsx`.
+   */
+  random?: () => number;
 }
 
 export class Simulation {
@@ -55,7 +79,7 @@ export class Simulation {
   private enemy: Enemy;
   private vitals: TeamVitals;
   private readonly enemyHpMult: number;
-  private readonly incomingMult: number;
+  private incomingMult: number;
   private elapsedMs = 0;
   private ticks = 0;
   private kills = 0;
@@ -67,11 +91,17 @@ export class Simulation {
   private readonly burst: BurstMeter;
   private readonly rally = new RallyOffers();
   private readonly boss = new BossFight();
+  private readonly actives = new HeroActiveClock();
+  private casters: readonly ActiveCaster[];
+  private readonly random: () => number;
 
   constructor(options: SimulationOptions = { heroes: [] }) {
     this.burst = new BurstMeter(options.autoBurst ?? false);
     this.enemyHpMult = options.enemyHpMult ?? 1;
     this.incomingMult = options.incomingMult ?? 0;
+    this.casters = options.casters ?? [];
+    this.random = options.random ?? seededRandom();
+    if (options.autoCast !== undefined) this.actives.setAutoCast(options.autoCast);
     const resume = options.resume;
     this.kills = resume?.kills ?? 0;
     this.deaths = resume?.deaths ?? 0;
@@ -115,13 +145,25 @@ export class Simulation {
      * killed early in a step still paid the whole step's damage, on top of the
      * heal that kill had just given them.
      */
-    const survival = applyIncoming(this.vitals, this.enemy.wave, this.incomingMult, elapsedMs);
+    // Abilities first: a guard raised this step has to be up *before* the
+    // monster swings, or `frontline_ward` is always one step late.
+    const cast = applyActives(this.actives, elapsedMs, this.casters, this.enemy, this.vitals);
+    this.enemy = cast.enemy;
+    this.vitals = cast.vitals;
+
+    // A live guard multiplies the chain rather than joining it: the chain is
+    // a property of the roster and this is a property of the last few seconds.
+    const incoming = this.incomingMult * (1 - this.actives.damageReduction());
+    const survival = applyIncoming(this.vitals, this.enemy.wave, incoming, elapsedMs);
     this.vitals = survival.vitals;
     if (survival.died) this.wipe();
 
     const step = scheduleSwings(this.heroes, elapsedMs);
     this.heroes = step.heroes;
-    for (const swing of step.swings) this.land(swing.hero.damagePerHit, swing.hero.uid, swing.atMs);
+    // The buff multiplies the swing rather than the hero, so it rises and
+    // lapses without rebuilding the roster.
+    const buff = this.actives.damageMultiplier();
+    for (const swing of step.swings) this.land(swing.hero.damagePerHit.mul(buff), swing.hero.uid, swing.atMs);
 
     // A window that closed with nobody pressing; see `BurstMeter`.
     const fired = this.burst.tick(this.elapsedMs);
@@ -134,15 +176,36 @@ export class Simulation {
     );
   }
 
-  /**
-   * The player pressed BURST.
-   *
-   * Takes no time argument: the simulation owns the clock, and a caller
-   * passing its own would be timing the window against a different one.
-   */
   /** Whether a lapsed BURST window fires itself. Earned, and then chosen. */
   setAutoBurst(on: boolean): void {
     this.burst.setAutomated(on);
+  }
+
+  /**
+   * The player pressed a hero's ability.
+   *
+   * Refused — changing nothing, the cooldown included — for a hero who is
+   * benched or not ready, so a mistimed press is not a punished one. Goes
+   * through the same seam auto-cast does, so pressing is never worse than
+   * leaving it alone.
+   */
+  castHeroActive(uid: string): boolean {
+    const cast = castOne(this.actives, uid, this.casters, this.enemy, this.vitals);
+    if (cast === null) return false;
+    this.enemy = cast.enemy;
+    this.vitals = cast.vitals;
+    return true;
+  }
+
+  /**
+   * Whether abilities fire themselves the moment they come up.
+   *
+   * Named for the automation rather than for the clock, because
+   * `ui/architecture.test.ts` derives the gate from the method name: every
+   * `setAuto…` the shell calls has to be an automation the player earned.
+   */
+  setAutoCastHeroActives(on: boolean): void {
+    this.actives.setAutoCast(on);
   }
 
   /**
@@ -161,57 +224,44 @@ export class Simulation {
     return true;
   }
 
+  /**
+   * The player pressed BURST.
+   *
+   * Takes no time argument: the simulation owns the clock, and a caller
+   * passing its own would be timing the window against a different one.
+   */
   spendBurst(): { spent: boolean; multiplier: number; quality: BurstQuality } {
     const { payload, quality } = this.burst.spend(this.elapsedMs);
     if (payload) this.detonate(payload.multiplier, payload.seconds);
     return { spent: payload !== null, multiplier: payload?.multiplier ?? 1, quality };
   }
 
-  /**
-   * Credit a stretch the tab spent hidden.
-   *
-   * Routed through the offline estimator rather than `advance`, which clamps
-   * long steps and would drop the remainder on the floor. The estimator models
-   * the sawtooth — climbs, wipes and chapter retreats — so a player who closed
-   * the tab at their ceiling comes back to the same place the shipped game
-   * would have put them, rather than to a free climb or to nothing at all.
-   */
+  /** Credit a stretch the tab spent hidden. See `creditAwayTime` for why. */
   creditAway(elapsedMs: number): void {
     // An offer nobody was present for; the retreat it followed already ran.
     this.rally.clear();
-    const credit = creditAwayTime(
-      {
-        wave: this.enemy.wave,
-        teamDps: teamDps(this.heroes),
-        teamMaxHp: this.vitals.maxHp,
-        enemyHpMult: this.enemyHpMult,
-        incomingMult: this.incomingMult,
-        rates: this.earnings.rates,
-      },
-      elapsedMs,
-    );
+    const fight = { enemyHpMult: this.enemyHpMult, incomingMult: this.incomingMult, rates: this.earnings.rates };
+    const team = { teamDps: teamDps(this.heroes), teamMaxHp: this.vitals.maxHp };
+    const credit = creditAwayTime({ wave: this.enemy.wave, ...team, ...fight }, elapsedMs);
     if (credit.msCredited <= 0) return;
 
     this.elapsedMs += credit.msCredited;
     this.kills += credit.kills;
     this.deaths += credit.deaths;
-    this.earnings.creditAway(credit.gold, credit.exp);
+    this.earnings.creditAway(credit.gold, credit.exp, credit.kills);
     // Charged after the clock moves, so the window that opens is open *now*
     // rather than at a moment that already passed while the tab was hidden.
     this.burst.creditAway(credit.kills, this.elapsedMs);
-    this.enemy = spawnEnemy(credit.wave, this.enemyHpMult);
-    this.vitals = fullHealth(this.vitals.maxHp);
+    this.restart(credit.wave);
     this.hits = [];
     this.heroes = this.heroes.map(hero => ({ ...hero, targetId: this.enemy.id }));
   }
 
   /**
-   * A burst landing: seconds of the team's damage, multiplied.
-   *
-   * Goes through the same path an ordinary swing does, so it kills, overkills
-   * and chains waves identically — and so the kill it lands charges the
-   * *next* burst, which is right: the meter is already empty by the time this
-   * runs.
+   * A burst landing: seconds of the team's damage, multiplied. Goes through
+   * the same path an ordinary swing does, so it kills, overkills and chains
+   * waves identically — and the kill it lands charges the *next* burst, the
+   * meter being already empty by the time this runs.
    */
   private detonate(multiplier: number, seconds: number, uid: string = BURST_HIT_UID): void {
     const damage = teamDps(this.heroes).mul(seconds).mul(multiplier);
@@ -223,11 +273,9 @@ export class Simulation {
   }
 
   /**
-   * Damage arriving at the enemy, from whatever threw it.
-   *
-   * Shared by swings and bursts so a kill is bookkept once. Two copies of
-   * "did that kill it" is how a burst ends up charging the meter it just
-   * spent, or healing the team twice.
+   * Damage arriving at the enemy, from whatever threw it. Shared by swings and
+   * bursts so a kill is bookkept once: two copies of "did that kill it" is how
+   * a burst ends up charging the meter it just spent, or healing twice.
    */
   private land(damage: Decimal, heroUid: string, atMs: number): void {
     const result = applyHit(this.enemy, damage);
@@ -242,39 +290,78 @@ export class Simulation {
     // boss is worth three charges and seven times the gold, and reading after
     // the respawn credits the wrong fight on both counts.
     this.burst.charge(isBossWave(this.enemy.wave), this.elapsedMs);
-    this.earnings.creditKill(this.enemy.wave);
-    this.enemy = spawnEnemy(this.enemy.wave + 1, this.enemyHpMult);
+    this.earnings.creditKill(this.enemy.wave, this.random);
     // The shipped game heals the team to full on a win, and so does the
     // estimator's round model. Matching it keeps the sawtooth the same shape.
-    this.vitals = fullHealth(this.vitals.maxHp);
+    this.restart(this.enemy.wave + 1);
   }
 
   /**
-   * A wipe. Counted, the retreat applied at once, and then put to the player.
-   *
-   * Applying it now rather than when the offer closes is what keeps this in
-   * step with the offline estimator: pausing the fight to ask cost an idle
-   * player eight seconds per wipe and made the two models disagree.
+   * A wipe. Counted, the retreat applied at once, and then put to the player —
+   * applying it now rather than when the offer closes is what keeps this in
+   * step with the offline estimator, which does not pause to ask.
    */
   private wipe(): void {
     this.deaths += 1;
-    this.enemy = spawnEnemy(this.rally.open(this.enemy.wave, this.elapsedMs), this.enemyHpMult);
-    this.vitals = fullHealth(this.vitals.maxHp);
+    this.restart(this.rally.open(this.enemy.wave, this.elapsedMs));
+  }
+
+  /** A fresh enemy on `wave`, and the team back on their feet. */
+  private restart(wave: number, healthFraction = 1): void {
+    this.enemy = spawnEnemy(wave, this.enemyHpMult);
+    this.vitals = { hp: this.vitals.maxHp.mul(healthFraction), maxHp: this.vitals.maxHp };
   }
 
   /** The player answered a rally offer. */
   decideWipe(choice: 'retreat' | 'rally'): boolean {
     const { answered, outcome } = this.rally.take(choice);
-    if (outcome !== null) {
-      this.enemy = spawnEnemy(outcome.wave, this.enemyHpMult);
-      this.vitals = { ...fullHealth(this.vitals.maxHp), hp: this.vitals.maxHp.mul(outcome.healthFraction) };
-    }
+    if (outcome !== null) this.restart(outcome.wave, outcome.healthFraction);
     return answered;
+  }
+
+  /**
+   * New numbers for the same fight, rather than a new fight.
+   *
+   * What this is for, and what a rebuild costs instead, is in `retune.ts`.
+   * Everything not named by `FightTuning` survives untouched: the enemy's
+   * health, the team's, every ability cooldown, the burst window, the boss
+   * tell and the clock.
+   */
+  retune(next: FightTuning): void {
+    const tuned = retuneFight({ heroes: this.heroes, vitals: this.vitals }, next);
+    this.heroes = tuned.heroes;
+    this.vitals = tuned.vitals;
+    this.incomingMult = next.incomingMult;
+    this.casters = next.casters;
+    this.earnings.rates = next.rates;
+  }
+
+  /**
+   * Take the run's earnings out, to be put in the save's wallet.
+   *
+   * Zeroes the run's tally in the same breath, which is the point: the two
+   * must never both hold the same coin. See `RunEarnings.bank`.
+   */
+  bank(): ReturnType<RunEarnings['bank']> {
+    return this.earnings.bank();
+  }
+
+  /**
+   * Restore a share of the team's maximum. A potion, from outside the fight.
+   *
+   * The team's health lives here and not on the save, so a usable item that
+   * heals has to reach the simulation rather than change a number in storage.
+   * Clamped at full by `healTeam`, and a share rather than an amount because
+   * that is what the item promises.
+   */
+  heal(fraction: number): void {
+    this.vitals = healTeam(this.vitals, fraction);
   }
 
   /** The current read model. Callers must treat it as immutable. */
   read(): SimulationSnapshot {
     const earned = this.earnings.read();
+    const counts = { kills: this.kills, deaths: this.deaths, dealt: this.dealt, overkill: this.overkill };
     return {
       ...emptySnapshot(),
       elapsedMs: this.elapsedMs,
@@ -282,17 +369,13 @@ export class Simulation {
       ticks: this.ticks,
       enemy: { id: this.enemy.id, wave: this.enemy.wave, hp: this.enemy.hp, maxHp: this.enemy.maxHp },
       team: { hp: this.vitals.hp, maxHp: this.vitals.maxHp },
-      heroes: this.heroes.map(hero => ({
-        uid: hero.uid,
-        swingProgress: swingProgress(hero.timer),
-        damagePerHit: hero.damagePerHit,
-        targetId: hero.targetId,
-      })),
+      heroes: heroViews(this.heroes),
       hits: this.hits,
+      abilities: this.actives.view(this.casters),
       burst: this.burst.view(this.elapsedMs),
       wipe: this.rally.view(this.elapsedMs),
       boss: this.boss.view(this.elapsedMs),
-      totals: { kills: this.kills, deaths: this.deaths, dealt: this.dealt, overkill: this.overkill, ...earned },
+      totals: totalsView(counts, earned, this.earnings.spoils()),
     };
   }
 }

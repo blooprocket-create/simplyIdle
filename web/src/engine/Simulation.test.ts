@@ -6,9 +6,10 @@ import { TELL_HIT_UID } from './combat/burst';
 import { chapterStartWave, retreatWave } from './combat/chapters';
 import { FLAT_RATES, killReward } from './combat/rewards';
 import { bossMechanicForWave } from '../content/bossMechanics';
+import { MENDING_PULSE_BASE_HEAL, MENDING_PULSE_LEVEL_SCALE } from '../content/heroSkills';
 import { AWAY_THRESHOLD_MS } from './offline/awayCredit';
 import { estimateOffline, retreatWave as estimateRetreatWave } from './offline/estimate';
-import { Simulation } from './Simulation';
+import { Simulation, type SimulationOptions } from './Simulation';
 import type { PlayerClass } from '../content/classes';
 import { createHeroEntity, nominalDps, startOffsetMs, type HeroEntity } from './entities/HeroEntity';
 
@@ -1003,5 +1004,541 @@ describe('a run picked up where it was left', () => {
     // resuming onto a boss must arrive with that boss's mechanic live.
     const onBoss = new Simulation({ heroes: team(), resume: { ...stored, wave: 30 } });
     expect(onBoss.read().boss?.name).toBe(bossMechanicForWave(30).name);
+  });
+});
+
+describe('abilities reach the fight', () => {
+  /**
+   * The fifth unported system, connected. Every phase before this one ran the
+   * fight with no abilities at all and passed a temporary buff of zero, with a
+   * note saying a buff needs a clock to expire by.
+   */
+  const caster = (uid: string, archetype: 'frontline_ward' | 'battle_chant' | 'mending_pulse') => ({
+    uid,
+    fielded: true,
+    caster: { level: 1, archetype, unique: null },
+  });
+
+  it('a guard makes the team take less', () => {
+    /*
+     * `frontline_ward` is twenty percent off incoming damage, and it is the
+     * exact buff that made Phase 8's mitigation port look 0.8 off — because it
+     * fires on its own and nobody had built it.
+     */
+    const bare = new Simulation({ heroes: [], teamMaxHp: new Decimal(1e9), incomingMult: 1, startWave: 40 });
+    const warded = new Simulation({
+      heroes: [],
+      teamMaxHp: new Decimal(1e9),
+      incomingMult: 1,
+      startWave: 40,
+      casters: [caster('w', 'frontline_ward')],
+    });
+    run(bare, 3_000, 100);
+    run(warded, 3_000, 100);
+    expect(warded.read().team.hp.gt(bare.read().team.hp)).toBe(true);
+  });
+
+  it('a chant makes the team hit harder', () => {
+    /*
+     * Measured at wave 40 rather than wave 1, and that is not arbitrary.
+     * `dealt` is damage that *landed*, capped by what the enemy had left —
+     * everything past the killing blow is `overkill`. Against a wave-one
+     * monster a team of three thousand DPS overkills on every swing, so an
+     * eighteen percent buff shows up entirely as overkill and `dealt` does not
+     * move at all. My first version asserted on wave one and failed for that
+     * reason, which is the discrete model's own accounting working.
+     */
+    const bare = new Simulation({ heroes: team(), teamMaxHp: new Decimal(1e9), startWave: 40 });
+    const chanted = new Simulation({
+      heroes: team(),
+      teamMaxHp: new Decimal(1e9),
+      startWave: 40,
+      casters: [caster('c', 'battle_chant')],
+    });
+    run(bare, 5_000, 100);
+    run(chanted, 5_000, 100);
+    expect(chanted.read().totals.dealt.gt(bare.read().totals.dealt)).toBe(true);
+  });
+
+  it('a heal brings the team back up, and wastes the pulse it opens on', () => {
+    /*
+     * Ten seconds rather than two, and the length is the test.
+     *
+     * A cooldown starts *ready*, so the first pulse fires on the opening step
+     * — at which point the team is still at full and the heal clips to their
+     * maximum and is gone. `mending_pulse` waits six seconds, so a two-second
+     * run sees exactly one cast and that cast is the wasted one: my first
+     * version ran for two seconds and passed with `healTeam` stubbed out to
+     * return its argument, which is no test at all.
+     *
+     * Ten seconds sees two casts, and the second one lands on a team that has
+     * taken two hundred damage. So the gap is exactly one pulse — 8.04% of a
+     * thousand — and asserting the number rather than the direction is what
+     * pins down that the first one was thrown away.
+     */
+    const bare = new Simulation({ heroes: [], teamMaxHp: new Decimal(1_000), incomingMult: 1, startWave: 40 });
+    const mended = new Simulation({
+      heroes: [],
+      teamMaxHp: new Decimal(1_000),
+      incomingMult: 1,
+      startWave: 40,
+      casters: [caster('m', 'mending_pulse')],
+    });
+    run(bare, 10_000, 100);
+    run(mended, 10_000, 100);
+
+    const gained = mended.read().team.hp.sub(bare.read().team.hp).toNumber();
+    const onePulse = (MENDING_PULSE_BASE_HEAL + MENDING_PULSE_LEVEL_SCALE) * 1_000;
+    expect(gained).toBeCloseTo(onePulse, 6);
+    // Both are below full, so neither reading is the cap in disguise.
+    expect(mended.read().team.hp.lt(1_000)).toBe(true);
+  });
+
+  it('runs the fight unchanged for a team whose casters are all benched', () => {
+    /*
+     * The sixty-four tests above this block are the real control here: they
+     * were written before abilities existed, and a simulation that cast for a
+     * team with none would have moved every number in them.
+     *
+     * So this one asserts the part they cannot — the `fielded` guard, reached
+     * through the simulation rather than the clock. A benched hero keeps their
+     * ability and does not use it, which is why the flag exists rather than
+     * the roster simply leaving them out: the same list answers "who could
+     * cast" for the ability bar and "who does" for the fight.
+     *
+     * An earlier version compared `casters: []` against passing none at all,
+     * which reads like a control and is not one — both sides run the same code
+     * with the same empty list, so a buff leaking into a fight with no casters
+     * moved the two together and the test stayed green.
+     */
+    const bare = new Simulation({ heroes: team(), teamMaxHp: new Decimal(1e9), startWave: 40 });
+    const benched = new Simulation({
+      heroes: team(),
+      teamMaxHp: new Decimal(1e9),
+      startWave: 40,
+      casters: [{ ...caster('b', 'battle_chant'), fielded: false }],
+    });
+    run(bare, 5_000, 100);
+    run(benched, 5_000, 100);
+    expect(benched.read().totals.dealt.eq(bare.read().totals.dealt)).toBe(true);
+
+    // And the same team fielded *does* move it, so the reading above is the
+    // guard holding rather than the scenario having nothing to show.
+    const fielded = new Simulation({
+      heroes: team(),
+      teamMaxHp: new Decimal(1e9),
+      startWave: 40,
+      casters: [caster('b', 'battle_chant')],
+    });
+    run(fielded, 5_000, 100);
+    expect(fielded.read().totals.dealt.gt(bare.read().totals.dealt)).toBe(true);
+  });
+});
+
+describe('an ability the player presses', () => {
+  /**
+   * The other half of the fifth system. Abilities reached the fight one commit
+   * before this, and fired themselves — which is how they shipped, and is most
+   * of why nobody noticed they were missing for five phases.
+   */
+  const caster = (uid: string, archetype: 'frontline_ward' | 'battle_chant' | 'burst_volley') => ({
+    uid,
+    fielded: true,
+    caster: { level: 1, archetype, unique: null },
+  });
+
+  const fight = (casters: ReturnType<typeof caster>[], autoCast = false) =>
+    new Simulation({ heroes: [], teamMaxHp: new Decimal(1e9), startWave: 40, casters, autoCast });
+
+  it('lands the cast and puts the hero on cooldown', () => {
+    const sim = fight([caster('v', 'burst_volley')]);
+    const before = sim.read().enemy!.hp;
+    expect(sim.castHeroActive('v')).toBe(true);
+    expect(sim.read().enemy!.hp.lt(before)).toBe(true);
+
+    const ability = sim.read().abilities.find(entry => entry.uid === 'v')!;
+    expect(ability.ready).toBe(false);
+    expect(ability.remainingMs).toBeGreaterThan(0);
+  });
+
+  it('refuses a second press, and the refusal costs nothing', () => {
+    /*
+     * The shipped rule, and the reason it matters: a refusal that reset the
+     * cooldown would punish a player for pressing early, which is the exact
+     * habit a bar with a filling ring on it invites.
+     */
+    const sim = fight([caster('v', 'burst_volley')]);
+    sim.castHeroActive('v');
+    const after = sim.read();
+
+    expect(sim.castHeroActive('v')).toBe(false);
+    expect(sim.read().enemy!.hp.eq(after.enemy!.hp)).toBe(true);
+    expect(sim.read().abilities[0].remainingMs).toBe(after.abilities[0].remainingMs);
+  });
+
+  it('refuses a hero who is not in the fight at all', () => {
+    // A press naming a uid the roster does not carry is a bug upstream, and
+    // casting for an invented hero would hide it behind a working button.
+    expect(fight([caster('v', 'burst_volley')]).castHeroActive('nobody')).toBe(false);
+  });
+
+  it('refuses a benched hero without touching their cooldown', () => {
+    const sim = new Simulation({
+      heroes: [],
+      teamMaxHp: new Decimal(1e9),
+      startWave: 40,
+      autoCast: false,
+      casters: [{ ...caster('b', 'burst_volley'), fielded: false }],
+    });
+    expect(sim.castHeroActive('b')).toBe(false);
+    expect(sim.read().abilities[0].remainingMs).toBe(0);
+    // Not ready, though the cooldown is zero — the bench is the reason.
+    expect(sim.read().abilities[0].ready).toBe(false);
+  });
+
+  it('buys timing rather than power, which is the whole trade', () => {
+    /*
+     * A pressed cast and an auto-cast one are worth exactly the same. That is
+     * the bargain the bar offers — and the reason both go through one seam
+     * rather than two code paths that could drift apart.
+     */
+    const pressed = fight([caster('v', 'burst_volley')]);
+    const automatic = fight([caster('v', 'burst_volley')], true);
+
+    const hpBefore = pressed.read().enemy!.hp;
+    pressed.castHeroActive('v');
+    const byHand = hpBefore.sub(pressed.read().enemy!.hp);
+
+    const autoBefore = automatic.read().enemy!.hp;
+    automatic.advance(100);
+    const byItself = autoBefore.sub(automatic.read().enemy!.hp);
+
+    expect(byHand.eq(byItself)).toBe(true);
+    expect(byHand.gt(0)).toBe(true);
+  });
+
+  it('holds every ability when auto-cast is off, and still lets a press through', () => {
+    // The state the bar exists for: nothing fires on its own, so the only
+    // damage an ability does is damage the player asked for.
+    const idle = fight([caster('v', 'burst_volley')]);
+    const before = idle.read().enemy!.hp;
+    run(idle, 30_000, 100);
+    expect(idle.read().enemy!.hp.eq(before)).toBe(true);
+    expect(idle.castHeroActive('v')).toBe(true);
+    expect(idle.read().enemy!.hp.lt(before)).toBe(true);
+  });
+
+  it('draws a ring that fills as the cooldown runs down', () => {
+    const sim = fight([caster('w', 'frontline_ward')]);
+    sim.castHeroActive('w');
+    const fresh = sim.read().abilities[0];
+    expect(fresh.progress).toBeCloseTo(0, 6);
+    expect(fresh.cooldownMs).toBe(10_000);
+
+    run(sim, 5_000, 100);
+    const half = sim.read().abilities[0];
+    expect(half.progress).toBeCloseTo(0.5, 6);
+    expect(half.ready).toBe(false);
+
+    run(sim, 5_000, 100);
+    expect(sim.read().abilities[0].progress).toBe(1);
+    expect(sim.read().abilities[0].ready).toBe(true);
+  });
+
+  it('reports no abilities for a fight that has none', () => {
+    expect(new Simulation({ heroes: [], teamMaxHp: new Decimal(1e9) }).read().abilities).toEqual([]);
+  });
+});
+
+describe('the currencies a run earns', () => {
+  /**
+   * The other half of the economy. Gold and EXP have been earned since Phase
+   * 8; these four were earned by nothing at all, while the forge, the summon
+   * pool and the prestige trees all spent from a wallet with no income.
+   */
+  const sim = (over: Partial<SimulationOptions> = {}) =>
+    new Simulation({ heroes: team(), teamMaxHp: new Decimal(1e12), enemyHpMult: 1e-9, ...over });
+
+  it('earns nothing but season points and mastery from plain waves', () => {
+    // Waves 1 to 9 hold no boss and no chest, which is the whole first chapter
+    // of a new game — and is why a port earning only gold looked right.
+    const early = new Simulation({ heroes: team(), teamMaxHp: new Decimal(1e12), enemyHpMult: 1e-9, startWave: 1 });
+    run(early, 2_000, 100);
+    const totals = early.read().totals;
+    expect(totals.kills).toBeGreaterThan(0);
+    expect(totals.seasonPoints).toBe(totals.kills * 12);
+    expect(totals.masteryXp).toBe(totals.kills * 2);
+  });
+
+  it('earns essence and a tear from a boss', () => {
+    const boss = sim({ startWave: 10 });
+    expect(boss.read().totals.essence).toBe(0);
+    run(boss, 2_000, 100);
+    const after = boss.read().totals;
+    expect(after.essence).toBeGreaterThan(0);
+    expect(after.bossTears).toBeGreaterThan(0);
+  });
+
+  it('rolls a chest with the generator it was given, not a global one', () => {
+    /*
+     * The same fight twice, once with a generator that always rolls a chest
+     * and once with one that never does. Everything else is identical, so the
+     * gap is the chest and nothing else — and a simulation reaching for
+     * `Math.random` would show no gap at all.
+     */
+    const lucky = sim({ startWave: 5, random: () => 0.49 });
+    const unlucky = sim({ startWave: 5, random: () => 0.99 });
+    run(lucky, 5_000, 100);
+    run(unlucky, 5_000, 100);
+    expect(lucky.read().totals.bossTears).toBeGreaterThan(unlucky.read().totals.bossTears);
+    // And the rest of the fight is untouched by which generator ran.
+    expect(lucky.read().totals.kills).toBe(unlucky.read().totals.kills);
+    expect(lucky.read().totals.gold.eq(unlucky.read().totals.gold)).toBe(true);
+  });
+
+  it('runs the same campaign twice when nobody supplies a generator', () => {
+    // The engine's default is seeded rather than global, which is what the
+    // parity suite and the offline estimator need.
+    const first = sim({ startWave: 1 });
+    const second = sim({ startWave: 1 });
+    run(first, 5_000, 100);
+    run(second, 5_000, 100);
+    expect(first.read().totals.bossTears).toBe(second.read().totals.bossTears);
+    expect(first.read().totals.essence).toBe(second.read().totals.essence);
+  });
+});
+
+describe('new numbers for a fight in progress', () => {
+  /**
+   * What a retune keeps and a rebuild loses. Every figure in the first test is
+   * one a rebuild resets, measured on the same fight before this existed.
+   */
+  const caster = (uid: string) => ({
+    uid,
+    fielded: true,
+    caster: { level: 1, archetype: 'frontline_ward' as const, unique: null },
+  });
+
+  const started = () => {
+    const sim = new Simulation({
+      heroes: [hero('a', 200, 900)],
+      teamMaxHp: new Decimal(1_000),
+      incomingMult: 1,
+      startWave: 40,
+      casters: [caster('w')],
+    });
+    run(sim, 2_000, 100);
+    return sim;
+  };
+
+  const tuning = (sim: Simulation, over: Partial<Parameters<Simulation['retune']>[0]> = {}) => ({
+    heroes: [hero('a', 200, 900)],
+    teamMaxHp: sim.read().team.maxHp.toNumber(),
+    incomingMult: 1,
+    rates: FLAT_RATES,
+    casters: [caster('w')],
+    ...over,
+  });
+
+  it('keeps everything a rebuild would have thrown away', () => {
+    /*
+     * The four things measured before this: a rebuild two seconds in healed
+     * the team from 967 to full, healed the enemy from 15,688 to full, took
+     * the ward's cooldown from 8,100ms to zero, and put the clock back to nil.
+     */
+    const sim = started();
+    const before = sim.read();
+    expect(before.team.hp.lt(before.team.maxHp)).toBe(true);
+    expect(before.enemy!.hp.lt(before.enemy!.maxHp)).toBe(true);
+    expect(before.abilities[0].remainingMs).toBeGreaterThan(0);
+
+    sim.retune(tuning(sim));
+    const after = sim.read();
+    expect(after.team.hp.eq(before.team.hp)).toBe(true);
+    expect(after.enemy!.hp.eq(before.enemy!.hp)).toBe(true);
+    expect(after.abilities[0].remainingMs).toBe(before.abilities[0].remainingMs);
+    expect(after.elapsedMs).toBe(before.elapsedMs);
+    expect(after.wave).toBe(before.wave);
+    expect(after.totals.kills).toBe(before.totals.kills);
+  });
+
+  it('carries the team across a rising ceiling by share, not by points', () => {
+    /*
+     * A hero levels and the team's maximum rises. Keeping the *fraction* is
+     * what stops that being a heal — copying the points across would leave the
+     * team at a smaller share of a bigger bar, and setting them to full would
+     * make levelling a free reset mid-fight.
+     */
+    const sim = started();
+    const before = sim.read().team;
+    const share = before.hp.div(before.maxHp).toNumber();
+    expect(share).toBeLessThan(1);
+
+    sim.retune(tuning(sim, { teamMaxHp: before.maxHp.mul(2).toNumber() }));
+    const after = sim.read().team;
+    expect(after.maxHp.eq(before.maxHp.mul(2))).toBe(true);
+    expect(after.hp.div(after.maxHp).toNumber()).toBeCloseTo(share, 12);
+    expect(after.hp.gt(before.hp)).toBe(true);
+  });
+
+  it('gives the heroes new damage without restarting their swings', () => {
+    /*
+     * Replacing the entities outright would put every hero back to the start
+     * of their swing, so a player who levelled someone would lose a fraction
+     * of a second of the team's damage each time they did it.
+     */
+    const sim = started();
+    const progress = sim.read().heroes[0].swingProgress;
+    expect(progress).toBeGreaterThan(0);
+
+    sim.retune(tuning(sim, { heroes: [hero('a', 4_000, 900)] }));
+    expect(sim.read().heroes[0].swingProgress).toBe(progress);
+    expect(sim.read().heroes[0].damagePerHit.gt(200)).toBe(true);
+  });
+
+  it('pays the new rate from the next kill', () => {
+    /*
+     * Its own fight rather than `started()`, and that is the measurement
+     * talking: two hundred DPS against a wave-forty monster is eighty seconds
+     * to a kill, so the first version of this ran for twenty and compared
+     * nothing to nothing. `enemyHpMult` brings the monster within reach.
+     */
+    const winnable = () =>
+      new Simulation({
+        heroes: [hero('a', 200, 900)],
+        teamMaxHp: new Decimal(1e9),
+        enemyHpMult: 1e-9,
+        startWave: 40,
+        casters: [caster('w')],
+      });
+
+    const richer = winnable();
+    richer.retune({ ...tuning(richer), rates: { goldMult: 1_000, expMult: 1 } });
+    run(richer, 5_000, 100);
+
+    const flat = winnable();
+    run(flat, 5_000, 100);
+
+    expect(flat.read().totals.kills).toBeGreaterThan(0);
+    expect(richer.read().totals.kills).toBe(flat.read().totals.kills);
+    expect(richer.read().totals.gold.gt(flat.read().totals.gold)).toBe(true);
+  });
+
+  it('hands abilities to whoever is now carrying them', () => {
+    // A relic picked up mid-fight swaps the skill without the fight noticing
+    // anything else — and the old cooldown stands, so it is not a free cast.
+    const sim = started();
+    const held = sim.read().abilities[0].remainingMs;
+    sim.retune(tuning(sim, { casters: [] }));
+    expect(sim.read().abilities).toEqual([]);
+
+    sim.retune(tuning(sim));
+    expect(sim.read().abilities[0].remainingMs).toBe(held);
+  });
+});
+
+describe('banking a run', () => {
+  const winnable = () =>
+    new Simulation({
+      heroes: [hero('a', 200, 900)],
+      teamMaxHp: new Decimal(1e9),
+      enemyHpMult: 1e-9,
+      startWave: 10,
+    });
+
+  it('hands over the gold and stops holding it', () => {
+    /*
+     * The whole point: after this, the coin is in exactly one place. Before
+     * banking existed the run kept its tally forever and the wallet was added
+     * to it, so the same gold was spendable again on every press.
+     */
+    const sim = winnable();
+    run(sim, 3_000, 100);
+    const earned = sim.read().totals.gold;
+    expect(earned.gt(0)).toBe(true);
+
+    const banked = sim.bank();
+    expect(banked.gold.eq(earned)).toBe(true);
+    expect(sim.read().totals.gold.eq(0)).toBe(true);
+  });
+
+  it('hands over the essence and tears a boss paid', () => {
+    const sim = winnable();
+    run(sim, 3_000, 100);
+    const before = sim.read().totals;
+    expect(before.bossTears).toBeGreaterThan(0);
+
+    const banked = sim.bank();
+    expect(banked.essence).toBe(before.essence);
+    expect(banked.bossTears).toBe(before.bossTears);
+    expect(sim.read().totals.essence).toBe(0);
+    expect(sim.read().totals.bossTears).toBe(0);
+  });
+
+  it('hands over the EXP and the kills, which now have somewhere to go', () => {
+    // Both were held back when banking arrived, because the account had no
+    // home for them. It has one now: the EXP buys player levels and the kills
+    // level every fielded hero.
+    const sim = winnable();
+    run(sim, 3_000, 100);
+    const before = sim.read().totals;
+    expect(before.exp.gt(0)).toBe(true);
+    expect(before.kills).toBeGreaterThan(0);
+
+    const banked = sim.bank();
+    expect(banked.exp.eq(before.exp)).toBe(true);
+    expect(banked.kills).toBe(before.kills);
+    expect(sim.read().totals.exp.eq(0)).toBe(true);
+  });
+
+  it('keeps what the account still has nowhere to put', () => {
+    /*
+     * Season points and mastery XP stay in the run, and deliberately: both
+     * sit in the legacy bag untyped, and zeroing them here would lose them
+     * outright, which is worse than leaving them uncounted.
+     */
+    const sim = winnable();
+    run(sim, 3_000, 100);
+    const before = sim.read().totals;
+    expect(before.seasonPoints).toBeGreaterThan(0);
+
+    sim.bank();
+    const after = sim.read().totals;
+    expect(after.seasonPoints).toBe(before.seasonPoints);
+    expect(after.masteryXp).toBe(before.masteryXp);
+  });
+
+  it('counts unbanked kills without resetting the run own tally', () => {
+    // `totals.kills` is the run's lifetime count and a HUD reads it; what a
+    // bank takes is how many have gone unpaid. The two must not be the same
+    // number, or banking would make the run look like it had just started.
+    const sim = winnable();
+    run(sim, 3_000, 100);
+    const lifetime = sim.read().totals.kills;
+    expect(sim.bank().kills).toBe(lifetime);
+    expect(sim.read().totals.kills).toBe(lifetime);
+
+    run(sim, 3_000, 100);
+    expect(sim.read().totals.kills).toBeGreaterThan(lifetime);
+    expect(sim.bank().kills).toBe(sim.read().totals.kills - lifetime);
+  });
+
+  it('banks nothing twice', () => {
+    const sim = winnable();
+    run(sim, 3_000, 100);
+    sim.bank();
+    const second = sim.bank();
+    expect(second.gold.eq(0)).toBe(true);
+    expect(second.essence).toBe(0);
+    expect(second.bossTears).toBe(0);
+  });
+
+  it('goes on earning after a bank', () => {
+    // A bank is not a stop. The run keeps paying into an empty tally.
+    const sim = winnable();
+    run(sim, 3_000, 100);
+    sim.bank();
+    run(sim, 3_000, 100);
+    expect(sim.read().totals.gold.gt(0)).toBe(true);
   });
 });

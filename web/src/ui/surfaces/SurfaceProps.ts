@@ -10,6 +10,10 @@ import type { HeroSpend } from '../../engine/roster/rosterSave';
 import type { FormationRole } from '../../engine/combat/formation';
 import type { EquipmentRarity, EquipmentSlot } from '../../content/equipment';
 import type { CraftOutcome, UpgradeOutcome } from '../../engine/equipment/equipmentSave';
+import type { FacilityId } from '../../engine/prestige/facilities';
+import type { PrestigePath } from '../../engine/prestige/rebirth';
+import type { RebirthPreview } from '../../engine/prestige/prestigeSave';
+import type { BuyOutcome, LooseOutcome } from '../../engine/shop/buyOffer';
 import type { SaveV3 } from '../../engine/save/schema';
 
 /**
@@ -56,6 +60,14 @@ export interface SurfaceProps {
   actions: {
     summon: (pay: SummonPayment) => SummonOutcome | null;
     canSummon: (pay: SummonPayment) => boolean;
+    /**
+     * Use an item from the bag.
+     *
+     * The one verb whose result is not entirely a save: a potion heals the
+     * running fight, so the shell hands that half to the loop. A surface only
+     * needs the yes or no.
+     */
+    useItem: (itemId: string, amount?: number | 'all') => boolean;
     priceOfSummon: (pay: SummonPayment) => number;
     /**
      * The spark exchange, which is the other way a hero arrives: the currency
@@ -75,6 +87,14 @@ export interface SurfaceProps {
     batchLevel: (uids: readonly string[], addLevels: number | 'max') => boolean;
     recycle: (uid: string) => boolean;
     fieldTeam: (requested: readonly string[]) => boolean;
+    /**
+     * "Field my best." One press, and the roster decides for the player.
+     *
+     * A verb, not an automation: the shipped `autoEquipBestHeroes` is a
+     * callback name behind a button and not one of the eight settings flags,
+     * which is what the rewrite's catalogue had it filed as for six phases.
+     */
+    fieldBest: () => boolean;
     place: (uid: string, role: FormationRole) => boolean;
     storeLoadout: (slot: number) => boolean;
     recallLoadout: (slot: number) => boolean;
@@ -98,6 +118,33 @@ export interface SurfaceProps {
     upgrade: (id: string) => UpgradeOutcome | null;
     refineEssence: (count?: number) => boolean;
     refineShards: (count?: number) => boolean;
+    /**
+     * Prestige. `previewRebirth` is a query rather than a verb — unlike the
+     * equipment upgrade's plan, it draws nothing, so a screen may quote it.
+     */
+    previewRebirth: () => RebirthPreview;
+    rebirth: () => boolean;
+    priceOfPath: (path: PrestigePath) => number;
+    spendCore: (path: PrestigePath) => boolean;
+    priceOfMeta: (path: PrestigePath) => number;
+    spendEssence: (path: PrestigePath) => boolean;
+    priceOfFacility: (facilityId: FacilityId) => number;
+    upgradeFacility: (facilityId: FacilityId) => boolean;
+    /**
+     * The shop. `buyOffer` answers what arrived rather than a boolean for the
+     * same reason `craft` does: the armoury crate hands over a *rolled* item,
+     * and a screen that could not name it would be a screen that says
+     * "something happened".
+     */
+    buyOffer: (id: string) => BuyOutcome | null;
+    buyUnits: (itemId: string, amount: number) => LooseOutcome | null;
+    /**
+     * VIP. `claimableCodex` is a query — it counts what a sweep would record
+     * without recording it — so a badge and a disabled button can both ask.
+     */
+    claimVip: (level: number) => boolean;
+    recordCodex: () => number;
+    claimableCodex: () => number;
   };
   /** The player's save, for the counters no read model carries yet. */
   save: SaveV3;

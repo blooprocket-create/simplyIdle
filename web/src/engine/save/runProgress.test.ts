@@ -44,6 +44,7 @@ describe('a run written down and read back', () => {
       wave: 42,
       burst: { ...emptySnapshot().burst, charge: 7 },
       totals: {
+        ...emptySnapshot().totals,
         kills: 300,
         deaths: 5,
         dealt: new Decimal(1),

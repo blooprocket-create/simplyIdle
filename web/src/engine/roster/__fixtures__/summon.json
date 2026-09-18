@@ -120,6 +120,38 @@
     "vipDiscountLevel": 3,
     "vipDiscount": 0.1
   },
+  "charged": {
+    "tears": {
+      "bossTears": 1,
+      "diamonds": 0,
+      "summoned": true
+    },
+    "tearsAtVip": {
+      "bossTears": 1,
+      "diamonds": 0,
+      "summoned": true
+    },
+    "diamonds": {
+      "bossTears": 0,
+      "diamonds": 500,
+      "summoned": true
+    },
+    "diamondsAtVip": {
+      "bossTears": 0,
+      "diamonds": 450,
+      "summoned": true
+    },
+    "oneTear": {
+      "bossTears": 1,
+      "diamonds": 0,
+      "summoned": true
+    },
+    "noTears": {
+      "bossTears": 0,
+      "diamonds": 0,
+      "summoned": false
+    }
+  },
   "bannerRateUpByRarity": {
     "legendary": 0.35,
     "mythic": 0.45,

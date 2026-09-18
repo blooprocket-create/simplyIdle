@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { SAVE_SIDE_AUTOMATIONS } from '../app/automationRunner';
 import { AUTOMATIONS } from '../content/automation';
 import { ARCHETYPES, GROUP_ORDER, SHELF_SLOTS } from './nav/destinations';
 import { REGISTRY } from './nav/registry';
@@ -229,7 +230,7 @@ describe('ui architecture', () => {
     expect(gatesAbove).toEqual([]);
   });
 
-  it('lets no automation reach the simulation except through the gate that earns it', () => {
+  it('lets no automation reach the player except through the gate that earns it', () => {
     /*
      * Phase 4's thesis, made structural rather than merely true today.
      *
@@ -237,29 +238,169 @@ describe('ui architecture', () => {
      * no gate on any of them, and the fault was the *absent* gate rather than
      * the default any of them shipped with. An absence that is only an
      * absence comes back the first time someone wires the next automation
-     * straight from a switch, and the policy this phase built would still be
-     * sitting there, correct and bypassed.
+     * straight from a switch.
      *
-     * `loopRef` is declared and used only in `App.tsx` — nothing else in the
-     * tree holds the loop — so reading that one file covers every path by
-     * which anything at all reaches the running simulation.
+     * **There are two ways to honour one, and this counts both.** The rule
+     * used to require `loopRef.setAuto…` in the shell, which is exactly right
+     * for `burst` — an in-fight behaviour — and has no shape at all for one
+     * that spends currency or rearranges a roster. That is why four
+     * automations sat `available: false` across three phases with a note
+     * saying the widening belonged to Phase 10. So an automation is honoured
+     * either by the loop, through `setAuto…`, or by `automationRunner.ts`.
+     *
+     * The two halves are gated differently, and deliberately. The loop's are
+     * gated here, by `automation.active.has`, because the shell is what calls
+     * them. The runner's are gated *by construction* — `runAutomations` skips
+     * anything not in the set it is handed — which is a stronger rule than a
+     * regex and has its own test.
      */
     const shell = codeOnly(readFileSync(join(process.cwd(), 'src', 'app', 'App.tsx'), 'utf8'));
     const lower = (name: string) => name.charAt(0).toLowerCase() + name.slice(1);
 
-    const wired = [...shell.matchAll(/\.setAuto([A-Z]\w*)\(/g)].map(match => lower(match[1])).sort();
+    const inFight = [...shell.matchAll(/\.setAuto([A-Z]\w*)\(/g)].map(match => lower(match[1]));
     const gated = [...shell.matchAll(/automation\.active\.has\('([^']+)'\)/g)].map(match => match[1]).sort();
+    const saveSide = Object.keys(SAVE_SIDE_AUTOMATIONS);
+    const honoured = [...inFight, ...saveSide].sort();
     const available = AUTOMATIONS.filter(entry => entry.available)
       .map(entry => entry.id)
       .sort();
 
-    expect(wired.length, 'the shell wires no automation at all').toBeGreaterThan(0);
+    expect(honoured.length, 'nothing honours any automation at all').toBeGreaterThan(0);
     // Wired but ungated is the shipped fault coming back. Gated but unwired
     // is a switch that promises something nothing delivers.
-    expect(wired, 'every automation the shell wires must read from `active`').toEqual(gated);
+    expect([...inFight].sort(), 'every automation the shell wires must read from `active`').toEqual(gated);
     // And the catalogue cannot claim an automation this build does not
     // honour, nor honour one it does not admit to having.
-    expect(wired, 'what is marked available must be exactly what is wired').toEqual(available);
+    expect(honoured, 'what is marked available must be exactly what is honoured').toEqual(available);
+
+    // The runner is handed the set rather than reading a global one, which is
+    // what makes "gated by construction" a fact about its signature.
+    const runner = codeOnly(readFileSync(join(process.cwd(), 'src', 'app', 'automationRunner.ts'), 'utf8'));
+    expect(runner, 'the runner does not take the active set').toMatch(/active: ReadonlySet<AutomationId>/);
+  });
+
+  it('banks the run before any verb reads the save', () => {
+    /*
+     * A coin has to belong to the wallet or to the run and never to both.
+     *
+     * The player's spendable balance was the wallet plus the run's unbanked
+     * earnings; a purchase deducted from the wallet alone and floored it at
+     * zero; nothing ever reduced the run's tally. Measured: an empty wallet
+     * with a million unbanked gold bought seven facility levels and still read
+     * a million. Free, seven times over.
+     *
+     * So every verb in the shell's `actions` starts from `live()`, which banks
+     * first. A verb that reached for `save` directly would charge against a
+     * balance that is not the one the player is spending from — and the next
+     * verb anyone adds is exactly where that comes back, which is why this is
+     * a rule rather than a fixed set of call sites.
+     *
+     * Queries are deliberately *not* held to it: they change nothing, and a
+     * price is a price. They are told apart by shape — a verb hands its result
+     * to `applying` or to `applySave`, and a query returns it.
+     */
+    const shell = codeOnly(readFileSync(join(process.cwd(), 'src', 'app', 'App.tsx'), 'utf8'));
+    const actions = /const actions = useMemo\(([\s\S]*?)\n {4}\[/.exec(shell);
+    expect(actions, 'App.tsx no longer builds its actions in one memo').not.toBeNull();
+
+    const lines = actions![1].split('\n');
+    const writes = lines.filter(line => line.includes('applying(') || line.includes('applySave('));
+    expect(writes.length, 'the shell has no verbs at all').toBeGreaterThan(5);
+
+    /*
+     * A verb naming the closure's `save` on the line it charges is reading the
+     * balance the bank was supposed to have moved. `outcome.save` and
+     * `save: live()` are not that — one is a property on a result and the
+     * other is the banked save being passed in — so the lookaround excludes a
+     * preceding dot or word character and a following colon.
+     */
+    const unbanked = writes.filter(line => /(?<![.\w])save\b(?!\s*:)/.test(line));
+    expect(unbanked, 'a verb reads `save` instead of banking the run first').toEqual([]);
+    expect(shell, 'nothing in the shell banks the run').toContain('loopRef.current?.bank()');
+    /*
+     * And through `bankInto`, which is the one place that does *everything* a
+     * banked run does — the wallet, both levellings, and the items it won. A
+     * shell calling `bankRun` alone would bank the currencies and drop the
+     * drops on the floor, silently, which is the shape of failure this whole
+     * file exists to refuse.
+     */
+    expect(shell, 'the shell banks currencies without the drops').toContain('bankInto(');
+
+    /*
+     * And a player at rest presses no verbs. Without a bank on the run
+     * saver's own cadence, an idle account earns gold that stays in the run
+     * forever and heroes who never level — the two progressions this banking
+     * carries. `saver.tick` already answers whether it wrote, so the throttle
+     * is shared rather than invented a second time.
+     */
+    const tickAt = shell.indexOf('saver.tick(');
+    expect(tickAt, 'the shell no longer throttles its run saves').toBeGreaterThan(-1);
+    expect(shell.slice(tickAt, tickAt + 400), 'nothing banks while the player is idle').toContain('live()');
+  });
+
+  it('never rebuilds the fight for numbers it could have handed over', () => {
+    /*
+     * The split, held. A rebuild resumes from `RunProgress` — wave, kills,
+     * deaths, burst charge, gold, exp — and carries nothing else, so it heals
+     * both sides to full, clears every ability cooldown and puts the clock
+     * back to zero. Before the split that happened whenever a hero levelled or
+     * a piece of gear was equipped, which is most presses on the roster screen.
+     *
+     * So the effect that builds the loop may depend on the *identity* key and
+     * must not depend on the tuning key — and something has to `retune`, or
+     * the numbers never arrive at all and a levelled hero fights at their old
+     * damage forever. Both halves are checked, because either alone is a rule
+     * that can be satisfied by doing nothing.
+     */
+    const shell = codeOnly(readFileSync(join(process.cwd(), 'src', 'app', 'App.tsx'), 'utf8'));
+
+    const buildDeps = /\}, \[([^\]]*fightKey[^\]]*)\]\);/.exec(shell);
+    expect(buildDeps, 'App.tsx no longer keys an effect on the fight identity').not.toBeNull();
+    expect(buildDeps![1], 'the loop is rebuilt for numbers a retune could carry').not.toContain('tuningKey');
+
+    const retuneDeps = /\}, \[([^\]]*tuningKey[^\]]*)\]\);/.exec(shell);
+    expect(retuneDeps, 'nothing in the shell reacts to the tuning key').not.toBeNull();
+    expect(shell, 'the shell never retunes the running fight').toContain('.retune(');
+  });
+
+  it('hands the loop every roster field the simulation can take', () => {
+    /*
+     * The failure this project keeps finding, made structural.
+     *
+     * Five systems in a row were ported, tested, and then never called: the
+     * clock existed, the reader read it, and the fight ran without it. Hero
+     * abilities were the fifth, and they were found by accident — a mitigation
+     * fixture came out 0.8 off on every scenario with a warrior in it.
+     *
+     * A field can only reach the fight one way: `rosterFromSave` puts it on
+     * `LoadedRoster`, `SimulationOptions` names it, and `App.tsx` passes it to
+     * the loop. The first two are typed and the third is not — an omitted
+     * optional is not a type error — so that third step is the one that can
+     * silently not happen, and this is the test for it.
+     *
+     * Derived from the two interfaces rather than listed, so the next field
+     * anyone adds to both is covered on the day it is added rather than on the
+     * day someone remembers to extend a list here.
+     */
+    const read = (...parts: string[]) => readFileSync(join(process.cwd(), 'src', ...parts), 'utf8');
+    const fieldsOf = (source: string, name: string) => {
+      const body = new RegExp(`export interface ${name} \\{(.*?)\\n\\}`, 's').exec(codeOnly(source));
+      expect(body, `${name} is no longer an interface this test can read`).not.toBeNull();
+      return [...body![1].matchAll(/^ {2}(\w+)\??:/gm)].map(match => match[1]);
+    };
+
+    const provided = fieldsOf(read('app', 'roster.ts'), 'LoadedRoster');
+    const accepted = fieldsOf(read('engine', 'Simulation.ts'), 'SimulationOptions');
+    const shared = provided.filter(field => accepted.includes(field)).sort();
+
+    // If this ever empties out, the test has stopped meaning anything rather
+    // than started passing.
+    expect(shared.length, 'the roster and the simulation share no field at all').toBeGreaterThan(2);
+
+    const shell = codeOnly(read('app', 'App.tsx'));
+    for (const field of shared) {
+      expect(shell, `App.tsx builds roster.${field} and never hands it to the loop`).toContain(`roster.${field}`);
+    }
   });
 
   it('lets the player read an act mechanic outside the fight that uses it', () => {

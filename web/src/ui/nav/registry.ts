@@ -32,14 +32,51 @@ export const REGISTRY: readonly Destination[] = [
   // Power — what the player is made of.
   { id: 'character', group: 'power', label: 'Character', archetype: 'detail' },
   { id: 'equipment', group: 'power', label: 'Equipment', archetype: 'ledger' },
+  /*
+   * Listed, and deliberately left on the placeholder.
+   *
+   * The shipped game's skills tree is **inert**. `SKILLS` lists three upgrades
+   * with a `multiplier` and a `targetId: 'click'`, `BUY_SKILL` charges for
+   * them and records them, and nothing reads them: no damage path consumes the
+   * multiplier, no screen dispatches the action, and there is no click or tap
+   * attack for `'click'` to refer to. Measured rather than grepped — buying
+   * every skill costs 262,300 gold and moves no number anywhere. See
+   * `__tests__/skillsFixture.test.ts`.
+   *
+   * So there is no capability here to port. Building a screen for it would
+   * create a gold sink that charges a quarter of a million and hands back
+   * nothing, which is shipping the defect rather than reproducing it. The
+   * destination stays listed because the shipped game lists it, and the
+   * placeholder is the honest thing to draw.
+   */
   { id: 'skills', group: 'power', label: 'Skills', archetype: 'ledger' },
+  // Consumables a run finds. A ledger: a list to spend down.
+  { id: 'items', group: 'power', label: 'Items', archetype: 'ledger' },
+  // A ledger, not a moment — the same correction `party` needed and for the
+  // same reason. The *press* is a moment: irreversible, and it ends a run of
+  // two hundred waves. But the screen around it is two upgrade trees and four
+  // facilities, which is a list to spend down, and a `moment` does not scroll.
+  // The irreversibility is carried by the button rather than by the geometry.
   {
     id: 'rebirth',
     group: 'power',
     label: 'Rebirth',
-    archetype: 'moment',
+    archetype: 'ledger',
     available: snapshot => snapshot.wave >= REBIRTH_VISIBLE_FROM_WAVE,
   },
+
+  /*
+   * The shop, filed under Power because everything in it is bought to be
+   * stronger: a gear crate, training scrolls, potions.
+   *
+   * The VIP track rides on the same surface rather than taking a destination
+   * of its own, which is where the shipped game puts it too — and it is the
+   * right place for a different reason: VIP milestones are the only source of
+   * diamonds this build has, and the diamond half of the shop is the only
+   * place to spend them. A VIP screen on its own would be a currency with no
+   * shop, and a shop with no currency.
+   */
+  { id: 'shop', group: 'power', label: 'Shop', archetype: 'ledger' },
 
   // Companion — who fights alongside them.
   { id: 'roster', group: 'companion', label: 'Roster', archetype: 'ledger' },

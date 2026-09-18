@@ -1,4 +1,5 @@
 import Decimal from 'break_eternity.js';
+import type { AbilityView } from './combat/HeroActiveClock';
 import { BURST_COST, type BurstQuality } from './combat/burst';
 
 /**
@@ -114,6 +115,15 @@ export interface SimulationSnapshot {
   heroes: HeroView[];
   /** Hits from the last step only. Replaced, not accumulated. */
   hits: HitEvent[];
+  /**
+   * Every fielded hero's ability, in team order. Empty before a roster loads.
+   *
+   * Beside `burst` because they are the same kind of thing — a verb the player
+   * holds, with a meter saying when. BURST got a HUD five phases before
+   * abilities had one, which is most of why a team was quietly casting four
+   * skills nobody could see, let alone time.
+   */
+  abilities: AbilityView[];
   burst: BurstView;
   /** Null unless the team is down and waiting on an answer. */
   wipe: WipeView | null;
@@ -135,6 +145,21 @@ export interface SimulationSnapshot {
      */
     gold: Decimal;
     exp: Decimal;
+    /**
+     * The four currencies a kill pays that are not gold.
+     *
+     * Plain numbers rather than `Decimal` because they are counted rather than
+     * scaled: a boss pays one tear and eight mastery whatever wave it is on,
+     * and nothing multiplies them. Gold and EXP run through a twelve-factor
+     * chain and past `Number.MAX_SAFE_INTEGER` on a deep account; these do not.
+     *
+     * Earned by the run, like the two above, and for the same reason: what a
+     * player *holds* is the save's wallet plus this.
+     */
+    essence: number;
+    bossTears: number;
+    seasonPoints: number;
+    masteryXp: number;
   };
 }
 
@@ -153,6 +178,7 @@ export function emptySnapshot(): SimulationSnapshot {
     team: { hp: new Decimal(0), maxHp: new Decimal(0) },
     heroes: [],
     hits: [],
+    abilities: [],
     burst: {
       charge: 0,
       cost: BURST_COST,
@@ -171,6 +197,10 @@ export function emptySnapshot(): SimulationSnapshot {
       overkill: new Decimal(0),
       gold: new Decimal(0),
       exp: new Decimal(0),
+      essence: 0,
+      bossTears: 0,
+      seasonPoints: 0,
+      masteryXp: 0,
     },
   };
 }

@@ -1,0 +1,313 @@
+{
+  "note": "The shops and VIP, measured through the shipped reducers.",
+  "generatedFrom": "src/reducers/economyReducer.ts, src/reducers/progressionReducer.ts",
+  "goldShop": [
+    {
+      "name": "exp_cache",
+      "gold": 2200,
+      "diamonds": 0,
+      "items": {
+        "exp_scroll": 6
+      },
+      "riftRaidTickets": 0,
+      "equipmentGained": 0
+    },
+    {
+      "name": "potion_bundle",
+      "gold": 3600,
+      "diamonds": 0,
+      "items": {
+        "small_potion": 3,
+        "grand_potion": 1,
+        "gold_cache": 2
+      },
+      "riftRaidTickets": 0,
+      "equipmentGained": 0
+    },
+    {
+      "name": "armory_crate",
+      "gold": 9500,
+      "diamonds": 0,
+      "items": {},
+      "riftRaidTickets": 0,
+      "equipmentGained": 1
+    }
+  ],
+  "armoryCrate": {
+    "itemLevel": 40,
+    "rarity": "common",
+    "allowedForClass": true,
+    "listedInInventory": true
+  },
+  "diamondShop": [
+    {
+      "name": "coolant_i_pack",
+      "gold": 0,
+      "diamonds": 18,
+      "items": {
+        "coolant_mk1": 4
+      },
+      "riftRaidTickets": 0,
+      "equipmentGained": 0
+    },
+    {
+      "name": "coolant_ii_pack",
+      "gold": 0,
+      "diamonds": 42,
+      "items": {
+        "coolant_mk2": 3
+      },
+      "riftRaidTickets": 0,
+      "equipmentGained": 0
+    },
+    {
+      "name": "elite_supply",
+      "gold": 0,
+      "diamonds": 88,
+      "items": {
+        "coolant_mk1": 5,
+        "coolant_mk2": 3,
+        "grand_potion": 2
+      },
+      "riftRaidTickets": 0,
+      "equipmentGained": 0
+    },
+    {
+      "name": "rift_raid_ticket",
+      "gold": 0,
+      "diamonds": 120,
+      "items": {},
+      "riftRaidTickets": 1,
+      "equipmentGained": 0
+    }
+  ],
+  "premiumCoolant": [
+    {
+      "itemId": "coolant_mk1",
+      "unitCost": 8
+    },
+    {
+      "itemId": "coolant_mk2",
+      "unitCost": 18
+    }
+  ],
+  "coolantAmounts": [
+    {
+      "asked": "0",
+      "diamondsCharged": 8,
+      "granted": 1
+    },
+    {
+      "asked": "1",
+      "diamondsCharged": 8,
+      "granted": 1
+    },
+    {
+      "asked": "5",
+      "diamondsCharged": 40,
+      "granted": 5
+    },
+    {
+      "asked": "99",
+      "diamondsCharged": 792,
+      "granted": 99
+    },
+    {
+      "asked": "500",
+      "diamondsCharged": 792,
+      "granted": 99
+    },
+    {
+      "asked": "2.9",
+      "diamondsCharged": 16,
+      "granted": 2
+    }
+  ],
+  "dollarShop": {
+    "enabled": false,
+    "packs": [
+      {
+        "offerId": "usd_499",
+        "usdCents": 499,
+        "diamonds": 500
+      },
+      {
+        "offerId": "usd_1999",
+        "usdCents": 1999,
+        "diamonds": 2200
+      },
+      {
+        "offerId": "usd_4999",
+        "usdCents": 4999,
+        "diamonds": 6000
+      },
+      {
+        "offerId": "usd_9999",
+        "usdCents": 9999,
+        "diamonds": 13000
+      }
+    ],
+    "purchasesThatMovedAnything": []
+  },
+  "vip": {
+    "thresholds": [
+      0,
+      50,
+      150,
+      350,
+      700,
+      1500,
+      3000,
+      6500,
+      15000,
+      35000,
+      100000
+    ],
+    "damagePerLevel": 0.03,
+    "goldPerLevel": 0.025,
+    "expPerLevel": 0.025,
+    "milestones": [
+      {
+        "level": 1,
+        "diamonds": 50,
+        "gold": 1200,
+        "shards": 50,
+        "essence": 0
+      },
+      {
+        "level": 2,
+        "diamonds": 100,
+        "gold": 2800,
+        "shards": 90,
+        "essence": 1
+      },
+      {
+        "level": 3,
+        "diamonds": 180,
+        "gold": 5200,
+        "shards": 140,
+        "essence": 1
+      },
+      {
+        "level": 4,
+        "diamonds": 300,
+        "gold": 9200,
+        "shards": 220,
+        "essence": 2
+      },
+      {
+        "level": 5,
+        "diamonds": 500,
+        "gold": 16000,
+        "shards": 340,
+        "essence": 3
+      },
+      {
+        "level": 6,
+        "diamonds": 800,
+        "gold": 30000,
+        "shards": 500,
+        "essence": 4
+      },
+      {
+        "level": 7,
+        "diamonds": 1250,
+        "gold": 52000,
+        "shards": 760,
+        "essence": 6
+      },
+      {
+        "level": 8,
+        "diamonds": 2000,
+        "gold": 90000,
+        "shards": 1100,
+        "essence": 9
+      },
+      {
+        "level": 9,
+        "diamonds": 3200,
+        "gold": 145000,
+        "shards": 1550,
+        "essence": 13
+      },
+      {
+        "level": 10,
+        "diamonds": 5000,
+        "gold": 220000,
+        "shards": 2200,
+        "essence": 20
+      }
+    ],
+    "codexPointsPerClaim": 10,
+    "heroCount": 65,
+    "maxCodexClaims": 130,
+    "maxPointsWithoutPaying": 1300,
+    "maxLevelWithoutPaying": 4
+  },
+  "refusals": [
+    {
+      "name": "gold shop, empty purse",
+      "gold": 0,
+      "diamonds": 0,
+      "items": {},
+      "riftRaidTickets": 0,
+      "equipmentGained": 0
+    },
+    {
+      "name": "crate, no class",
+      "gold": 0,
+      "diamonds": 0,
+      "items": {},
+      "riftRaidTickets": 0,
+      "equipmentGained": 0
+    },
+    {
+      "name": "diamond shop, no diamonds",
+      "gold": 0,
+      "diamonds": 0,
+      "items": {},
+      "riftRaidTickets": 0,
+      "equipmentGained": 0
+    },
+    {
+      "name": "coolant, no diamonds",
+      "gold": 0,
+      "diamonds": 0,
+      "items": {},
+      "riftRaidTickets": 0,
+      "equipmentGained": 0
+    },
+    {
+      "name": "coolant, unknown item",
+      "gold": 0,
+      "diamonds": 0,
+      "items": {},
+      "riftRaidTickets": 0,
+      "equipmentGained": 0
+    },
+    {
+      "name": "vip reward above level",
+      "gold": 0,
+      "diamonds": 0,
+      "items": {},
+      "riftRaidTickets": 0,
+      "equipmentGained": 0
+    },
+    {
+      "name": "vip reward twice",
+      "gold": 0,
+      "diamonds": 0,
+      "items": {},
+      "riftRaidTickets": 0,
+      "equipmentGained": 0
+    },
+    {
+      "name": "codex for a hero not owned",
+      "gold": 0,
+      "diamonds": 0,
+      "items": {},
+      "riftRaidTickets": 0,
+      "equipmentGained": 0
+    }
+  ]
+}

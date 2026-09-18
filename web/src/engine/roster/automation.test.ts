@@ -29,35 +29,51 @@ const ROSTER: TeamHero[] = [
 const NO_RELICS: ReadonlySet<string> = new Set();
 
 describe('what the catalogue still does not claim', () => {
-  it('leaves both flags unavailable, because nothing wires them', () => {
+  it('claims the two flags now that the shell honours them', () => {
     /*
-     * Phase 8 built summoning and recycling, and the flags stay false.
+     * Phase 8 built summoning and recycling and the flags stayed false, for a
+     * reason this test used to state: `available` is a claim that the shell
+     * wires the flag, and `ui/architecture.test.ts` required a
+     * `loopRef.setAuto…` call for each one — which is right for `burst`, an
+     * in-fight behaviour, and has no shape for one that spends currency.
      *
-     * `available` is a claim that the shell wires the flag to the running
-     * simulation, not that rules exist — `ui/architecture.test.ts` reads
-     * `App.tsx` for `setAuto…` calls and requires that set to equal the set
-     * marked available. It caught an attempt to flip these two on the strength
-     * of the rules alone, which is the failure it was written for.
+     * Phase 10 widened that gate. An automation is honoured either by the
+     * loop or by `app/automationRunner.ts`, which runs on the shell's save
+     * cadence — and the wallet blocker is gone too, because the fight earns
+     * and banks boss tears now.
      *
-     * The wiring waits on the rest of the wallet. The snapshot carries gold
-     * and EXP now, but an automatic summon spends boss tears and an automatic
-     * recycle pays into hero shards — neither of which the simulation earns,
-     * and neither of which it could, because both are spent as well. Phase 10.
+     * `usePotion` came later in the same phase and by a *third* route, which
+     * is why the gate now counts three: its trigger is the team's health, so
+     * only the fight can see it, and the potion comes out of the bag, so only
+     * the save holds it. `app/GameLoop.ts` is where those already meet.
+     *
+     * `tempo` and `useCoolant` are the only two left, and they wait on the
+     * same thing: this engine has no heat.
      */
-    expect(automationById('summon')?.available).toBe(false);
-    expect(automationById('recycle')?.available).toBe(false);
-    // And tempo waits on something else again — this engine has no heat.
+    expect(automationById('summon')?.available).toBe(true);
+    expect(automationById('recycle')?.available).toBe(true);
+    expect(automationById('usePotion')?.available).toBe(true);
     expect(automationById('tempo')?.available).toBe(false);
+    expect(automationById('useCoolant')?.available).toBe(false);
 
-    expect(availableAutomations().map(entry => entry.id)).toEqual(['burst']);
+    expect(availableAutomations().map(entry => entry.id)).toEqual([
+      'burst',
+      'castHeroActives',
+      'summon',
+      'recycle',
+      'dismantle',
+      'usePotion',
+    ]);
   });
 
   it('still lists every shipped flag, honoured or not', () => {
     // A screen showing one automation would be telling the player this game
     // has one. The unavailable ones stay listed for the same reason the
     // untracked achievements do.
-    expect(AUTOMATIONS).toHaveLength(9);
-    expect(AUTOMATIONS.filter(entry => !entry.available).length).toBe(8);
+    // Eight, not nine: `equipBest` was never a settings flag. See
+    // `content/automation.test.ts` and `__tests__/bestTeamFixture.test.ts`.
+    expect(AUTOMATIONS).toHaveLength(8);
+    expect(AUTOMATIONS.filter(entry => !entry.available).map(entry => entry.id)).toEqual(['tempo', 'useCoolant']);
   });
 });
 

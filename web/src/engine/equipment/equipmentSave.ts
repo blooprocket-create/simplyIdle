@@ -308,7 +308,82 @@ export function craftEquipment(request: CraftRequest): CraftOutcome | null {
   };
 }
 
-function addInstance(equipment: SaveEquipment, item: EquipmentInstance): SaveEquipment {
+export interface DropRequest {
+  save: SaveV3;
+  content: EquipmentContent;
+  /** The waves at which drops were won, in the order they were won. */
+  waves: readonly number[];
+  unlocks: { mythic: boolean; transcendent: boolean };
+  vipLevel: number;
+  forgeLevel: number;
+  random: () => number;
+  /** Only for the instance ids. Nothing here reads a clock. */
+  nowMs: number;
+}
+
+/**
+ * Items a run won, built and put in the bag.
+ *
+ * The same shape as a craft and deliberately not the same function: a craft
+ * picks a **slot** and a drop takes any slot the class can wear, a craft is
+ * paid for and a drop is not, and a craft refuses when the bag is full where a
+ * drop is simply lost. That last one is the shipped behaviour and reads as a
+ * bug until you notice the alternative is a bag that grows without limit.
+ *
+ * The rarity is a *preference* rather than a promise, exactly as it is for a
+ * craft: every class is missing some rarities in some slots, so a roll with no
+ * item behind it falls back to the whole class pool. Phase 9 found that the
+ * hard way.
+ *
+ * Whoever won it, the instance rolls against the player's level — a drop at
+ * wave 400 on a level-20 account is a level-20 item.
+ */
+export function grantDrops(request: DropRequest): { save: SaveV3; items: EquipmentInstance[] } {
+  const playerClass = request.save.identity.playerClass;
+  if (playerClass === null || request.waves.length === 0) return { save: request.save, items: [] };
+
+  const wearable = request.content.catalog.filter(item => item.allowedClasses.includes(playerClass));
+  if (wearable.length === 0) return { save: request.save, items: [] };
+
+  const cap = craftInventoryCap(request.vipLevel);
+  let save = request.save;
+  const items: EquipmentInstance[] = [];
+
+  for (const _wave of request.waves) {
+    // Lost rather than queued when the bag is full, as shipped. The roll is
+    // not taken either, which keeps a full bag from advancing the sequence.
+    if (save.equipment.inventory.length >= cap) break;
+
+    const rolledRarity = rollEquipmentRarityByTier(request.random(), request.content.rarityTable, request.unlocks);
+    const atRarity = wearable.filter(item => item.rarity === rolledRarity);
+    const pool = atRarity.length > 0 ? atRarity : wearable;
+    const baseItem = pool[Math.floor(request.random() * pool.length)];
+
+    const item = createEquipmentInstance({
+      baseItem,
+      itemLevel: Math.max(1, save.progression.level),
+      source: 'drop',
+      random: request.random,
+      nowMs: request.nowMs,
+      statMultiplier: forgeStatMultiplier(request.forgeLevel),
+      taken: new Set(save.equipment.inventory),
+    });
+
+    save = withEquipment(save, addInstance(save.equipment, item));
+    items.push(item);
+  }
+
+  return { save, items };
+}
+
+/**
+ * Put a rolled item in the bag.
+ *
+ * Exported for the shop, which buys one the same way a run wins one. The
+ * alternative was a second copy of the instance-to-stored conversion, and two
+ * copies of `fullBonus` is how a shop-bought item ends up missing a stat.
+ */
+export function addInstance(equipment: SaveEquipment, item: EquipmentInstance): SaveEquipment {
   return {
     ...equipment,
     inventory: [...equipment.inventory, item.id],

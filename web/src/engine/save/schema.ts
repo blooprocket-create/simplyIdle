@@ -3,6 +3,9 @@ import type { EquipmentRarity, EquipmentSlot } from '../../content/equipment';
 import type { Rarity } from '../../content/rarities';
 import type { FormationRole } from '../combat/formation';
 import type { EquipmentSource } from '../equipment/instance';
+import type { SavedUsables } from './usablesSlice';
+import type { SavedVip } from './vipSlice';
+import type { FacilityId } from '../prestige/facilities';
 
 /**
  * The v3 save.
@@ -134,6 +137,19 @@ export interface SaveV3 {
     unspent: number;
   };
 
+  /** How many of each usable item is held. Claimed out of `legacy` in Phase 10. */
+  usables: SavedUsables;
+
+  /**
+   * VIP, claimed out of `legacy` in Phase 10 because this is the phase with a
+   * shop to spend it in and a claim button to raise it with.
+   *
+   * Read out of the bag since Phase 8 — the summon discount is priced off it —
+   * which is the arrangement `legacy` exists for: read a field on the phase
+   * that needs it, claim it on the phase that owns it.
+   */
+  vip: SavedVip;
+
   wallet: {
     gold: number;
     totalGold: number;
@@ -170,6 +186,18 @@ export interface SaveV3 {
     /** Whether the account's one-off first summon has been handed out. */
     firstGiven: boolean;
   };
+
+  /**
+   * The guildhall's four facility levels, claimed out of `legacy` in Phase 10
+   * because this is the phase that can raise one.
+   *
+   * Two of them have been *read* out of the bag since earlier phases — tactics
+   * multiplies team power in the health and defence chains, forge multiplies a
+   * crafted item's stat budget — which is exactly the arrangement `legacy` is
+   * for: read a field on the phase that needs it, claim it on the phase that
+   * owns it.
+   */
+  facilities: Record<FacilityId, number>;
 
   /**
    * Equipment, claimed out of `legacy` in Phase 9 because `derivedStats` has

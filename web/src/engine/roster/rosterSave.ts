@@ -40,7 +40,7 @@ import {
  */
 
 /** What the rules need about a hero, from their save row. */
-function asRosterHero(row: SavedHero): RosterHero {
+export function asRosterHero(row: SavedHero): RosterHero {
   return { uid: row.uid, rarity: row.rarity, level: row.level, rank: row.rank, rebirthStatMult: row.rebirthStatMult };
 }
 

@@ -1,0 +1,434 @@
+{
+  "note": "What one kill pays, measured through advanceCombatStep on the shipped reducer.",
+  "generatedFrom": "src/useGameState.ts killMonster",
+  "constants": {
+    "rebirthBonus": 1.5,
+    "heroLevelCap": 999,
+    "bossEvery": 10,
+    "chestNodeEvery": 5,
+    "campaignStageCycle": 20,
+    "weeklyEventCount": 8,
+    "pinnedWeek": 0,
+    "pinnedWeekEvent": "no_armor_week"
+  },
+  "baseline": [
+    {
+      "name": "plain wave",
+      "wave": 7,
+      "paid": {
+        "gold": 20,
+        "exp": 10,
+        "essence": 0,
+        "bossTears": 0,
+        "seasonPoints": 12,
+        "masteryXp": 2,
+        "heroShards": 0,
+        "diamonds": 0,
+        "equipmentScrap": 0,
+        "burstCharge": 1,
+        "heroLevelUps": 0,
+        "waveAfter": 8,
+        "playerLevelAfter": 1,
+        "unspentStatPoints": 0
+      }
+    },
+    {
+      "name": "boss wave",
+      "wave": 20,
+      "paid": {
+        "gold": 1235,
+        "exp": 212,
+        "essence": 3,
+        "bossTears": 1,
+        "seasonPoints": 92,
+        "masteryXp": 8,
+        "heroShards": 0,
+        "diamonds": 0,
+        "equipmentScrap": 0,
+        "burstCharge": 3,
+        "heroLevelUps": 0,
+        "waveAfter": 21,
+        "playerLevelAfter": 3,
+        "unspentStatPoints": 10
+      }
+    }
+  ],
+  "chain": [
+    {
+      "name": "baseline",
+      "field": "—",
+      "gold": 20,
+      "exp": 10
+    },
+    {
+      "name": "prestige",
+      "field": "prestigeCount",
+      "gold": 65,
+      "exp": 10
+    },
+    {
+      "name": "meta economy",
+      "field": "metaEconomyLevel",
+      "gold": 24,
+      "exp": 10
+    },
+    {
+      "name": "rebirth economy",
+      "field": "rebirthEconomyPath",
+      "gold": 25,
+      "exp": 10
+    },
+    {
+      "name": "treasury",
+      "field": "guildhallFacilities.treasury",
+      "gold": 22,
+      "exp": 10
+    },
+    {
+      "name": "training",
+      "field": "guildhallFacilities.training",
+      "gold": 20,
+      "exp": 13
+    },
+    {
+      "name": "vip",
+      "field": "vipLevel",
+      "gold": 22,
+      "exp": 11
+    },
+    {
+      "name": "mastery",
+      "field": "classMasteryXp",
+      "gold": 20,
+      "exp": 10
+    },
+    {
+      "name": "mastery at cap",
+      "field": "classMasteryXp",
+      "gold": 24,
+      "exp": 10
+    },
+    {
+      "name": "mastery past cap",
+      "field": "classMasteryXp",
+      "gold": 24,
+      "exp": 10
+    },
+    {
+      "name": "weekly: no_armor_week",
+      "field": "weeklyEventWeek",
+      "gold": 20,
+      "exp": 10
+    },
+    {
+      "name": "weekly: double_shard_drops",
+      "field": "weeklyEventWeek",
+      "gold": 19,
+      "exp": 10
+    },
+    {
+      "name": "weekly: elite_waves_only",
+      "field": "weeklyEventWeek",
+      "gold": 23,
+      "exp": 13
+    },
+    {
+      "name": "weekly: double_gold_week",
+      "field": "weeklyEventWeek",
+      "gold": 37,
+      "exp": 10
+    },
+    {
+      "name": "weekly: hero_experience_surge",
+      "field": "weeklyEventWeek",
+      "gold": 19,
+      "exp": 20
+    },
+    {
+      "name": "weekly: nightmare_assault",
+      "field": "weeklyEventWeek",
+      "gold": 55,
+      "exp": 25
+    },
+    {
+      "name": "weekly: essence_harvest",
+      "field": "weeklyEventWeek",
+      "gold": 21,
+      "exp": 11
+    },
+    {
+      "name": "weekly: balanced_week",
+      "field": "weeklyEventWeek",
+      "gold": 21,
+      "exp": 12
+    }
+  ],
+  "bossEssence": [
+    {
+      "wave": 10,
+      "essence": 2,
+      "bossTears": 1
+    },
+    {
+      "wave": 20,
+      "essence": 3,
+      "bossTears": 1
+    },
+    {
+      "wave": 30,
+      "essence": 4,
+      "bossTears": 1
+    },
+    {
+      "wave": 40,
+      "essence": 6,
+      "bossTears": 1
+    },
+    {
+      "wave": 60,
+      "essence": 9,
+      "bossTears": 1
+    },
+    {
+      "wave": 80,
+      "essence": 10,
+      "bossTears": 1
+    },
+    {
+      "wave": 100,
+      "essence": 11,
+      "bossTears": 1
+    },
+    {
+      "wave": 140,
+      "essence": 13,
+      "bossTears": 1
+    },
+    {
+      "wave": 200,
+      "essence": 16,
+      "bossTears": 1
+    }
+  ],
+  "chestNodes": [
+    {
+      "wave": 4,
+      "roll": 0.49,
+      "bossTears": 0
+    },
+    {
+      "wave": 4,
+      "roll": 0.5,
+      "bossTears": 0
+    },
+    {
+      "wave": 5,
+      "roll": 0.49,
+      "bossTears": 1
+    },
+    {
+      "wave": 5,
+      "roll": 0.5,
+      "bossTears": 0
+    },
+    {
+      "wave": 15,
+      "roll": 0.49,
+      "bossTears": 1
+    },
+    {
+      "wave": 15,
+      "roll": 0.5,
+      "bossTears": 0
+    },
+    {
+      "wave": 24,
+      "roll": 0.49,
+      "bossTears": 0
+    },
+    {
+      "wave": 24,
+      "roll": 0.5,
+      "bossTears": 0
+    },
+    {
+      "wave": 25,
+      "roll": 0.49,
+      "bossTears": 1
+    },
+    {
+      "wave": 25,
+      "roll": 0.5,
+      "bossTears": 0
+    },
+    {
+      "wave": 35,
+      "roll": 0.49,
+      "bossTears": 1
+    },
+    {
+      "wave": 35,
+      "roll": 0.5,
+      "bossTears": 0
+    },
+    {
+      "wave": 45,
+      "roll": 0.49,
+      "bossTears": 1
+    },
+    {
+      "wave": 45,
+      "roll": 0.5,
+      "bossTears": 0
+    }
+  ],
+  "heroLevels": [
+    {
+      "name": "three fielded",
+      "active": 3,
+      "benched": 2,
+      "startLevel": 1,
+      "leveled": 3
+    },
+    {
+      "name": "none fielded",
+      "active": 0,
+      "benched": 3,
+      "startLevel": 1,
+      "leveled": 0
+    },
+    {
+      "name": "at the cap",
+      "active": 2,
+      "benched": 0,
+      "startLevel": 999,
+      "leveled": 0
+    },
+    {
+      "name": "one under the cap",
+      "active": 2,
+      "benched": 0,
+      "startLevel": 998,
+      "leveled": 2
+    }
+  ],
+  "drops": {
+    "chances": [
+      {
+        "wave": 1,
+        "boss": false,
+        "equipment": 0.103,
+        "usable": 0.1215
+      },
+      {
+        "wave": 10,
+        "boss": true,
+        "equipment": 0.25,
+        "usable": 0.215
+      },
+      {
+        "wave": 41,
+        "boss": false,
+        "equipment": 0.223,
+        "usable": 0.1815
+      },
+      {
+        "wave": 50,
+        "boss": true,
+        "equipment": 0.37,
+        "usable": 0.275
+      },
+      {
+        "wave": 100,
+        "boss": true,
+        "equipment": 0.4,
+        "usable": 0.32
+      },
+      {
+        "wave": 200,
+        "boss": true,
+        "equipment": 0.4,
+        "usable": 0.32
+      },
+      {
+        "wave": 400,
+        "boss": true,
+        "equipment": 0.4,
+        "usable": 0.32
+      }
+    ],
+    "scripted": [
+      {
+        "name": "nothing drops",
+        "wave": 41,
+        "draws": 2,
+        "equipment": null,
+        "usables": 0
+      },
+      {
+        "name": "equipment only",
+        "wave": 41,
+        "draws": 10,
+        "equipment": {
+          "slot": "armor",
+          "rarity": "common",
+          "itemLevel": 60,
+          "source": "drop"
+        },
+        "usables": 0
+      },
+      {
+        "name": "usable only",
+        "wave": 41,
+        "draws": 3,
+        "equipment": null,
+        "usables": 1
+      },
+      {
+        "name": "both drop",
+        "wave": 41,
+        "draws": 11,
+        "equipment": {
+          "slot": "armor",
+          "rarity": "common",
+          "itemLevel": 60,
+          "source": "drop"
+        },
+        "usables": 1
+      },
+      {
+        "name": "a boss drops on a roll that misses",
+        "wave": 40,
+        "draws": 10,
+        "equipment": {
+          "slot": "armor",
+          "rarity": "common",
+          "itemLevel": 60,
+          "source": "drop"
+        },
+        "usables": 0
+      },
+      {
+        "name": "and the wave beside it does not",
+        "wave": 41,
+        "draws": 2,
+        "equipment": null,
+        "usables": 0
+      }
+    ],
+    "boundary": [
+      {
+        "roll": 0.223,
+        "dropped": true
+      },
+      {
+        "roll": 0.22299999999999978,
+        "dropped": true
+      },
+      {
+        "roll": 0.224,
+        "dropped": false
+      }
+    ]
+  }
+}

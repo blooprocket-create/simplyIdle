@@ -3,6 +3,9 @@ import { RARITY_BOOST_MULTIPLIER, RARITY_IDS, isRarity, type Rarity } from '../.
 import { VALID_FORMATION_ROLES_FOR_CLASS, type FormationRole } from '../combat/formation';
 import { PITY_THRESHOLD } from '../roster/summon';
 import { readEquipment } from './equipmentSlice';
+import { readUsables } from './usablesSlice';
+import { readVipFromLegacy } from './vipSlice';
+import { readFacilities } from './facilitiesSlice';
 import { roundTo4 } from '../math/safe';
 import {
   MAX_SAVE_COLLECTION,
@@ -289,6 +292,13 @@ export const CLAIMED_V2_KEYS: readonly string[] = [
   'equipmentInventory',
   'equippedItems',
   'autoDismantleRarityFloor',
+  'guildhallFacilities',
+  'usableItemCounts',
+  'vipPoints',
+  'vipLevel',
+  'vipRewardClaimedLevels',
+  'codexVipClaimedHeroIds',
+  'codexVipClaimedUniqueIds',
 ];
 
 export interface MigrateOptions {
@@ -400,6 +410,9 @@ export function migrateSave(payload: unknown, options: MigrateOptions): SaveV3 {
     level,
   });
 
+  const facilities = readFacilities(raw.guildhallFacilities);
+  const usables = readUsables(raw.usableItemCounts);
+
   const legacy: Record<string, unknown> = {};
   const claimed = new Set(CLAIMED_V2_KEYS);
   for (const [key, value] of Object.entries(raw)) {
@@ -431,6 +444,9 @@ export function migrateSave(payload: unknown, options: MigrateOptions): SaveV3 {
       metaSurvivalLevel: boundedInt(raw.metaSurvivalLevel, 0, SAFE_NUMBER_CAP, 0),
     },
     stats: { alloc, unspent },
+    facilities,
+    usables,
+    vip: readVipFromLegacy(raw),
     equipment,
     wallet: {
       gold,

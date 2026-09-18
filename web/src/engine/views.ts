@@ -2,7 +2,10 @@ import { BURST_COST, burstQuality, isWindowOpen, peakBand, windowProgress, type 
 import { chipFor, isTellOpen, tellProgress, untilNextTell, type TellState } from './combat/bossTells';
 import { WIPE_DECISION_MS, remainingMs, type PendingWipe } from './combat/wipe';
 import type { BossMechanic } from '../content/bossMechanics';
-import type { BossView, BurstView, WipeView } from './types';
+import type Decimal from 'break_eternity.js';
+import type { KillPayout } from './combat/killPayout';
+import type { Purse } from './combat/rewards';
+import type { BossView, BurstView, SimulationSnapshot, WipeView } from './types';
 
 /**
  * Turning the fight's internal state into what a HUD reads.
@@ -53,5 +56,32 @@ export function bossView(state: TellState, mechanic: BossMechanic, nowMs: number
     // rather than only reporting a count nobody can price.
     chipSeconds: chipFor(mechanic, state.streak),
     nextInMs: untilNextTell(state, nowMs),
+  };
+}
+
+/**
+ * The run's tallies, as a HUD reads them.
+ *
+ * Four counters the simulation keeps and everything the earnings module does,
+ * joined. Here rather than in `Simulation.read` for this file's stated reason:
+ * it is presentation of state rather than advancement of it, and the
+ * coordinator has a line cap that exists to stop it absorbing exactly this.
+ */
+export function totalsView(
+  counts: { kills: number; deaths: number; dealt: Decimal; overkill: Decimal },
+  earned: Purse,
+  spoils: KillPayout,
+): SimulationSnapshot['totals'] {
+  return {
+    kills: counts.kills,
+    deaths: counts.deaths,
+    dealt: counts.dealt,
+    overkill: counts.overkill,
+    gold: earned.gold,
+    exp: earned.exp,
+    essence: spoils.essence,
+    bossTears: spoils.bossTears,
+    seasonPoints: spoils.seasonPoints,
+    masteryXp: spoils.masteryXp,
   };
 }

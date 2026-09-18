@@ -8,6 +8,7 @@ import {
   DIAMOND_SUMMON_COST,
   FEATURED_SUMMON_BANNERS,
   GACHA_SUMMON_COST,
+  SHIPPED_GACHA_COST_CONSTANT,
   SPARK_EXCHANGE_OPTIONS,
   SPARK_TOKEN_BY_RARITY,
   SUMMON_MILESTONES,
@@ -25,20 +26,41 @@ import {
  */
 
 describe('what a summon costs', () => {
-  it('carries the shipped prices', () => {
-    expect({
-      gacha: GACHA_SUMMON_COST,
-      diamonds: DIAMOND_SUMMON_COST,
-      vipDiscountLevel: VIP_SUMMON_DISCOUNT_LEVEL,
-      vipDiscount: VIP_SUMMON_DISCOUNT,
-    }).toEqual(fixture.costs);
+  it('charges what a pull takes, not what the constant says', () => {
+    /*
+     * This test used to compare our four numbers against the fixture's four
+     * *constants* and pass, while the tear price was five hundred times the
+     * shipped one. `gameConfig.GACHA_SUMMON_COST` is 500 and is used by
+     * nothing: both `SUMMON_HERO` implementations guard on `bossTears < 1` and
+     * charge `bossTears - 1`.
+     *
+     * So it is measured against what a pull *charged* when the fixture drove
+     * one through the reducer. The dead constant is kept beside it, named as
+     * dead, because the fixture still records it and a reader finding 500 in
+     * `gameConfig` deserves to find the explanation here.
+     */
+    expect(GACHA_SUMMON_COST).toBe(fixture.charged.tears.bossTears);
+    expect(DIAMOND_SUMMON_COST).toBe(fixture.charged.diamonds.diamonds);
+    expect(SHIPPED_GACHA_COST_CONSTANT).toBe(fixture.costs.gacha);
+    expect(SHIPPED_GACHA_COST_CONSTANT).not.toBe(GACHA_SUMMON_COST);
+
+    expect({ vipDiscountLevel: VIP_SUMMON_DISCOUNT_LEVEL, vipDiscount: VIP_SUMMON_DISCOUNT }).toEqual({
+      vipDiscountLevel: fixture.costs.vipDiscountLevel,
+      vipDiscount: fixture.costs.vipDiscount,
+    });
   });
 
-  it('takes a tenth off for VIP 3 and nothing below it', () => {
-    expect(summonCost(GACHA_SUMMON_COST, 0)).toBe(GACHA_SUMMON_COST);
-    expect(summonCost(GACHA_SUMMON_COST, VIP_SUMMON_DISCOUNT_LEVEL - 1)).toBe(GACHA_SUMMON_COST);
-    expect(summonCost(GACHA_SUMMON_COST, VIP_SUMMON_DISCOUNT_LEVEL)).toBe(450);
-    expect(summonCost(GACHA_SUMMON_COST, 12)).toBe(450);
+  it('takes a tenth off the diamond price for VIP 3 and nothing below it', () => {
+    /*
+     * The *diamond* price. The tear price is a guard rather than a cost —
+     * there is no arithmetic on that path — so a VIP pays 450 diamonds and
+     * still pays exactly one tear. The fixture measured both.
+     */
+    expect(summonCost(DIAMOND_SUMMON_COST, 0)).toBe(DIAMOND_SUMMON_COST);
+    expect(summonCost(DIAMOND_SUMMON_COST, VIP_SUMMON_DISCOUNT_LEVEL - 1)).toBe(DIAMOND_SUMMON_COST);
+    expect(summonCost(DIAMOND_SUMMON_COST, VIP_SUMMON_DISCOUNT_LEVEL)).toBe(fixture.charged.diamondsAtVip.diamonds);
+    expect(summonCost(DIAMOND_SUMMON_COST, 12)).toBe(fixture.charged.diamondsAtVip.diamonds);
+    expect(fixture.charged.tearsAtVip.bossTears).toBe(fixture.charged.tears.bossTears);
   });
 
   it('floors the discount rather than rounding it', () => {

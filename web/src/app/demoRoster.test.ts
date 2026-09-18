@@ -5,7 +5,8 @@ import { VALID_FORMATION_ROLES_FOR_CLASS, type FormationRole } from '../engine/c
 import { ACTIVE_TEAM_SIZE } from '../engine/save/migrate';
 import { readSave, writeSaveV3 } from '../engine/save/v3';
 import { startingSave } from './demoRoster';
-import { PLAYER_UID, rosterFromSave } from './roster';
+import { uniqueSkillFor } from '../content/heroSkills';
+import { fightTuningKey, PLAYER_UID, rosterFromSave } from './roster';
 
 /**
  * The three shapes, from the one save. `App` composes these itself — there is
@@ -200,5 +201,150 @@ describe('the team a new player starts on', () => {
     expect(withGear.teamMaxHp).toBeGreaterThan(without.teamMaxHp);
     // More vitality and spirit is more defence, so less damage lands.
     expect(withGear.incomingMult).toBeLessThan(without.incomingMult);
+  });
+
+  it('gives every fielded hero an ability, and the player none', () => {
+    /*
+     * The fifth unported system, reaching the fight. Every hero on the team
+     * casts; the player is not in this list because they have no archetype —
+     * abilities are a hero thing, and the player's verb is BURST.
+     */
+    const save = startingSave(NOW, fixedRandom());
+    const { casters, cast } = rosterFromSave(save);
+    expect(casters.map(entry => entry.uid)).toEqual(save.roster.activeUids);
+    expect(casters.every(entry => entry.fielded)).toBe(true);
+    expect(casters.some(entry => entry.uid === PLAYER_UID)).toBe(false);
+    // And the player *is* in the cast, so the two lists differing is the point
+    // rather than an omission.
+    expect(cast.some(member => member.uid === PLAYER_UID)).toBe(true);
+  });
+
+  it('casts the archetype without a relic and the unique skill with one', () => {
+    /*
+     * A relic swaps the ability rather than strengthening it — and only for
+     * the copy actually carrying it. A relic in the armoury, or on a different
+     * copy of the same hero, leaves them on their archetype.
+     */
+    const save = startingSave(NOW, fixedRandom());
+    const first = save.roster.heroes[0];
+    expect(rosterFromSave(save).casters[0].caster.unique).toBeNull();
+
+    const armed: typeof save = {
+      ...save,
+      roster: {
+        ...save.roster,
+        uniqueByHeroId: { [first.id]: { rank: 4, equippedByUid: first.uid } },
+      },
+    };
+    const armedCaster = rosterFromSave(armed).casters.find(entry => entry.uid === first.uid)!;
+    expect(armedCaster.caster.unique?.rank).toBe(4);
+
+    // The same relic, in the armoury rather than carried.
+    const shelved: typeof save = {
+      ...save,
+      roster: { ...save.roster, uniqueByHeroId: { [first.id]: { rank: 4, equippedByUid: null } } },
+    };
+    expect(rosterFromSave(shelved).casters.find(entry => entry.uid === first.uid)!.caster.unique).toBeNull();
+  });
+
+  it('rebuilds the fight when an ability changes', () => {
+    /*
+     * Varied on `casters` directly rather than through a save, and that is a
+     * correction: my first version equipped a relic and asserted the signature
+     * moved, which it did — but a carried relic also multiplies its bearer's
+     * damage, and damage was already in the signature. The test passed with
+     * the caster list stripped out of `fightTuningKey` entirely, which is
+     * exactly the regression it was supposed to catch.
+     *
+     * `fightTuningKey` is a pure function of a `LoadedRoster`, so the honest
+     * way to ask whether abilities are in it is to move an ability and nothing
+     * else. The loop is keyed on this string: a hero who picked up a relic
+     * casts a different skill, and a fight that was not rebuilt goes on
+     * casting the old one.
+     */
+    const save = startingSave(NOW, fixedRandom());
+    const roster = rosterFromSave(save);
+    // Two reads of the same save agree, so a difference below is the change
+    // and not the building of it.
+    expect(fightTuningKey(rosterFromSave(startingSave(NOW, fixedRandom())))).toBe(fightTuningKey(roster));
+
+    const [first, ...rest] = roster.casters;
+    const skill = uniqueSkillFor(save.roster.heroes.find(hero => hero.uid === first.uid)!.id)!;
+    expect(skill).toBeDefined();
+    const armed = {
+      ...roster,
+      casters: [{ ...first, caster: { ...first.caster, unique: { skill, rank: 4 } } }, ...rest],
+    };
+    expect(fightTuningKey(armed)).not.toBe(fightTuningKey(roster));
+
+    // And the rank alone moves it, because a rank is twelve percent of power.
+    const higher = {
+      ...roster,
+      casters: [{ ...first, caster: { ...first.caster, unique: { skill, rank: 5 } } }, ...rest],
+    };
+    expect(fightTuningKey(higher)).not.toBe(fightTuningKey(armed));
+  });
+});
+
+describe('what the starting team earns', () => {
+  /*
+   * `SimulationOptions.rates` existed from Phase 8 and nothing supplied it, so
+   * every kill paid a flat 1x while thirteen factors sat computed and unread.
+   * These are the tests for the other end of that wire.
+   */
+  it('derives both chains rather than leaving them flat', () => {
+    const { rates } = rosterFromSave(startingSave(NOW, fixedRandom()));
+    // Not 1x, because there is no neutral week — every event in the table
+    // moves something, and a new save is on one of them.
+    expect(rates.goldMult).not.toBe(1);
+    expect(rates.expMult).not.toBe(1);
+    expect(rates.goldMult).toBeGreaterThan(0);
+    expect(rates.expMult).toBeGreaterThan(0);
+  });
+
+  it('runs gold and EXP down different chains, from a real save', () => {
+    /*
+     * The finding, end to end. A rebirth economy path multiplies gold and
+     * leaves EXP exactly where it was; the training facility does the reverse.
+     * Measured through `rosterFromSave` rather than the chain directly, so
+     * this covers the save reading as well as the arithmetic.
+     */
+    const base = startingSave(NOW, fixedRandom());
+    const flat = rosterFromSave(base).rates;
+    const withProgression = (over: Partial<typeof base.progression>) =>
+      rosterFromSave({ ...base, progression: { ...base.progression, ...over } }).rates;
+
+    for (const over of [{ rebirthEconomyPath: 5 }, { metaEconomyLevel: 5 }]) {
+      expect(withProgression(over).goldMult).toBeGreaterThan(flat.goldMult);
+      expect(withProgression(over).expMult).toBe(flat.expMult);
+    }
+
+    /*
+     * And the *damage* levels move neither, which is the half that a port
+     * sharing one state between the two chains gets wrong — and the half a
+     * test on the starting save alone cannot see, because both meta levels
+     * begin at zero and reading the wrong one looks identical.
+     */
+    for (const over of [{ rebirthDamagePath: 5 }, { metaDamageLevel: 5 }]) {
+      expect(withProgression(over).goldMult).toBe(flat.goldMult);
+      expect(withProgression(over).expMult).toBe(flat.expMult);
+    }
+
+    const studied = rosterFromSave({ ...base, facilities: { ...base.facilities, training: 5 } }).rates;
+    expect(studied.expMult).toBeGreaterThan(flat.expMult);
+    expect(studied.goldMult).toBe(flat.goldMult);
+  });
+
+  it('rebuilds the fight when what a kill pays changes', () => {
+    /*
+     * Varied on the training facility, which reaches EXP and *nothing else* —
+     * not damage, not health, not defence. My first version raised
+     * `prestigeCount`, which moved the signature whether or not the rates were
+     * in it, because prestige multiplies damage too and damage was already
+     * there. The same over-determination the caster test had.
+     */
+    const base = startingSave(NOW, fixedRandom());
+    const studied: typeof base = { ...base, facilities: { ...base.facilities, training: 5 } };
+    expect(fightTuningKey(rosterFromSave(studied))).not.toBe(fightTuningKey(rosterFromSave(base)));
   });
 });
