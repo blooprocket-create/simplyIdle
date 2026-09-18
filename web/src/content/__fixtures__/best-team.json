@@ -1,0 +1,254 @@
+{
+  "note": "AUTO_EQUIP_BEST_HEROES, measured through the shipped reducer.",
+  "generatedFrom": "src/reducers/rosterReducer.ts",
+  "isASettingsFlag": false,
+  "shippedAutoFlags": [
+    "autoBurstEnabled",
+    "autoCastHeroActivesEnabled",
+    "autoDismantleEnabled",
+    "autoRecycleEnabled",
+    "autoSummonEnabled",
+    "autoTempoEnabled",
+    "autoUseCoolantEnabled",
+    "autoUsePotionEnabled"
+  ],
+  "cases": [
+    {
+      "name": "rarity outranks everything else",
+      "roster": [
+        {
+          "uid": "low",
+          "template": "h1",
+          "rarity": "common",
+          "level": 999,
+          "teamBoost": 999,
+          "rebirthStatMult": 9
+        },
+        {
+          "uid": "high",
+          "template": "h7",
+          "rarity": "legendary",
+          "level": 1,
+          "teamBoost": 1
+        }
+      ],
+      "fielded": [
+        "high",
+        "low"
+      ]
+    },
+    {
+      "name": "then the rebirth multiplier",
+      "roster": [
+        {
+          "uid": "plain",
+          "template": "h1",
+          "rarity": "rare",
+          "level": 999,
+          "teamBoost": 999
+        },
+        {
+          "uid": "reborn",
+          "template": "h7",
+          "rarity": "rare",
+          "level": 1,
+          "teamBoost": 1,
+          "rebirthStatMult": 2
+        }
+      ],
+      "fielded": [
+        "reborn",
+        "plain"
+      ]
+    },
+    {
+      "name": "which ignores a difference below a ten-thousandth",
+      "roster": [
+        {
+          "uid": "hair",
+          "template": "h1",
+          "rarity": "rare",
+          "level": 1,
+          "teamBoost": 1,
+          "rebirthStatMult": 1.00005
+        },
+        {
+          "uid": "levelled",
+          "template": "h7",
+          "rarity": "rare",
+          "level": 9,
+          "teamBoost": 1
+        }
+      ],
+      "fielded": [
+        "levelled",
+        "hair"
+      ]
+    },
+    {
+      "name": "then the level",
+      "roster": [
+        {
+          "uid": "junior",
+          "template": "h1",
+          "rarity": "rare",
+          "level": 1,
+          "teamBoost": 999
+        },
+        {
+          "uid": "senior",
+          "template": "h7",
+          "rarity": "rare",
+          "level": 9,
+          "teamBoost": 1
+        }
+      ],
+      "fielded": [
+        "senior",
+        "junior"
+      ]
+    },
+    {
+      "name": "then the team boost",
+      "roster": [
+        {
+          "uid": "quiet",
+          "template": "h1",
+          "rarity": "rare",
+          "level": 9,
+          "teamBoost": 1
+        },
+        {
+          "uid": "loud",
+          "template": "h7",
+          "rarity": "rare",
+          "level": 9,
+          "teamBoost": 2
+        }
+      ],
+      "fielded": [
+        "loud",
+        "quiet"
+      ]
+    },
+    {
+      "name": "skips a second copy of the same hero",
+      "roster": [
+        {
+          "uid": "first",
+          "template": "h1",
+          "rarity": "legendary",
+          "level": 9,
+          "teamBoost": 9
+        },
+        {
+          "uid": "copy",
+          "template": "h1",
+          "rarity": "legendary",
+          "level": 8,
+          "teamBoost": 8
+        },
+        {
+          "uid": "other",
+          "template": "h7",
+          "rarity": "common",
+          "level": 1,
+          "teamBoost": 1
+        }
+      ],
+      "fielded": [
+        "first",
+        "other"
+      ]
+    },
+    {
+      "name": "takes only two heroes to a rank, however good the third is",
+      "roster": [
+        {
+          "uid": "w1",
+          "template": "h1",
+          "rarity": "legendary",
+          "level": 9,
+          "teamBoost": 9
+        },
+        {
+          "uid": "w2",
+          "template": "h2",
+          "rarity": "legendary",
+          "level": 8,
+          "teamBoost": 8
+        },
+        {
+          "uid": "w3",
+          "template": "h11",
+          "rarity": "legendary",
+          "level": 7,
+          "teamBoost": 7
+        },
+        {
+          "uid": "m1",
+          "template": "h7",
+          "rarity": "common",
+          "level": 1,
+          "teamBoost": 1
+        }
+      ],
+      "fielded": [
+        "w1",
+        "w2",
+        "m1"
+      ]
+    },
+    {
+      "name": "fields no more than the slots the account has bought",
+      "roster": [
+        {
+          "uid": "w1",
+          "template": "h1",
+          "rarity": "legendary",
+          "level": 9,
+          "teamBoost": 9
+        },
+        {
+          "uid": "w2",
+          "template": "h2",
+          "rarity": "legendary",
+          "level": 8,
+          "teamBoost": 8
+        },
+        {
+          "uid": "m1",
+          "template": "h7",
+          "rarity": "epic",
+          "level": 7,
+          "teamBoost": 7
+        },
+        {
+          "uid": "m2",
+          "template": "h8",
+          "rarity": "epic",
+          "level": 6,
+          "teamBoost": 6
+        },
+        {
+          "uid": "a1",
+          "template": "h5",
+          "rarity": "rare",
+          "level": 5,
+          "teamBoost": 5
+        }
+      ],
+      "fielded": [
+        "w1",
+        "w2",
+        "m1",
+        "m2"
+      ]
+    },
+    {
+      "name": "fields nobody from an empty roster",
+      "roster": [],
+      "fielded": []
+    }
+  ]
+}
