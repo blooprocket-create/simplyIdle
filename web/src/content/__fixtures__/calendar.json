@@ -1,0 +1,188 @@
+{
+  "note": "The daily streak, the weekly rollover and the weekly track, measured.",
+  "generatedFrom": "src/reducers/progressionReducer.ts",
+  "dayBoundary": "2026-01-16T00:00:00.000Z",
+  "weekBoundary": "2026-01-22T00:00:00.000Z",
+  "weekBoundaryWeekday": "Thursday",
+  "streak": [
+    {
+      "day": 1,
+      "streak": 1,
+      "gold": 250,
+      "shards": 20,
+      "freeSummons": 0,
+      "insurance": 0
+    },
+    {
+      "day": 2,
+      "streak": 2,
+      "gold": 330,
+      "shards": 26,
+      "freeSummons": 0,
+      "insurance": 0
+    },
+    {
+      "day": 3,
+      "streak": 3,
+      "gold": 410,
+      "shards": 32,
+      "freeSummons": 1,
+      "insurance": 0
+    },
+    {
+      "day": 4,
+      "streak": 4,
+      "gold": 490,
+      "shards": 38,
+      "freeSummons": 0,
+      "insurance": 0
+    },
+    {
+      "day": 5,
+      "streak": 5,
+      "gold": 570,
+      "shards": 44,
+      "freeSummons": 0,
+      "insurance": 0
+    },
+    {
+      "day": 6,
+      "streak": 6,
+      "gold": 650,
+      "shards": 50,
+      "freeSummons": 1,
+      "insurance": 0
+    },
+    {
+      "day": 7,
+      "streak": 7,
+      "gold": 730,
+      "shards": 56,
+      "freeSummons": 0,
+      "insurance": 1
+    },
+    {
+      "day": 8,
+      "streak": 8,
+      "gold": 810,
+      "shards": 62,
+      "freeSummons": 0,
+      "insurance": 1
+    },
+    {
+      "day": 9,
+      "streak": 9,
+      "gold": 890,
+      "shards": 68,
+      "freeSummons": 1,
+      "insurance": 1
+    },
+    {
+      "day": 10,
+      "streak": 10,
+      "gold": 970,
+      "shards": 74,
+      "freeSummons": 0,
+      "insurance": 1
+    },
+    {
+      "day": 11,
+      "streak": 11,
+      "gold": 970,
+      "shards": 74,
+      "freeSummons": 0,
+      "insurance": 1
+    },
+    {
+      "day": 12,
+      "streak": 12,
+      "gold": 970,
+      "shards": 74,
+      "freeSummons": 1,
+      "insurance": 1
+    }
+  ],
+  "gaps": [
+    {
+      "name": "the next day",
+      "gapDays": 1,
+      "insuranceBefore": 0,
+      "streak": 6,
+      "insuranceAfter": 0
+    },
+    {
+      "name": "a day missed, no insurance",
+      "gapDays": 2,
+      "insuranceBefore": 0,
+      "streak": 1,
+      "insuranceAfter": 0
+    },
+    {
+      "name": "a day missed, insurance held",
+      "gapDays": 2,
+      "insuranceBefore": 1,
+      "streak": 6,
+      "insuranceAfter": 0
+    },
+    {
+      "name": "two days missed, insurance held",
+      "gapDays": 3,
+      "insuranceBefore": 1,
+      "streak": 1,
+      "insuranceAfter": 1
+    }
+  ],
+  "track": [
+    {
+      "milestone": 25,
+      "gold": 520,
+      "shards": 63,
+      "essence": 1
+    },
+    {
+      "milestone": 75,
+      "gold": 1120,
+      "shards": 153,
+      "essence": 2
+    },
+    {
+      "milestone": 150,
+      "gold": 2020,
+      "shards": 288,
+      "essence": 4
+    },
+    {
+      "milestone": 260,
+      "gold": 3340,
+      "shards": 486,
+      "essence": 4
+    }
+  ],
+  "rollover": {
+    "weekMoved": true,
+    "weeklyKills": 0,
+    "claimedCount": 0
+  },
+  "refusals": [
+    {
+      "name": "logging in twice the same day",
+      "moved": false
+    },
+    {
+      "name": "a rollover inside the same week",
+      "moved": false
+    },
+    {
+      "name": "a track milestone not reached",
+      "moved": false
+    },
+    {
+      "name": "a track milestone already claimed",
+      "moved": false
+    },
+    {
+      "name": "a milestone nobody listed",
+      "moved": false
+    }
+  ]
+}
