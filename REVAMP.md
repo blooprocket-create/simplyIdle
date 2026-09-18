@@ -459,6 +459,55 @@ The reasons to log in: `CLAIM_MISSION`; `START_EXPEDITION`, `COMPLETE_EXPEDITION
 
 Clears eight of the twelve placeholder destinations.
 
+#### The banking bug, in its third and fourth forms
+
+Porting the mission board found it. `bankRun` moved the wallet, the player's level and the heroes' levels, and left **`totalKills`**, **`highestWave`** and **`weeklyKills`** exactly as the save reader had set them — and nothing else in the rewrite writes any of the three.
+
+`totalKills` gates five achievements and two automations; the achievements screen read `profile.totalKills + snapshot.totals.kills`, which papers over it while a run is live and loses the lot on reload. `highestWave` gates the rebirth button and both team-slot purchases, and two surfaces read it raw, so a player who fought to wave 200 found rebirth still locked. `weeklyKills` is the one the weekly track is measured on, so the track could never move.
+
+Gold was spendable twice, essence and tears arrived never, and these three were earned and dropped. The wave is not something a run *earned*, so `RunEarnings.bank()` returns `BankedEarnings` and the `Simulation` composes `BankedRun` from it plus the wave the fight stands on — a seam with its own test, because `bankRun` can raise the deepest wave perfectly from a wave the simulation never reached.
+
+**And fixing it broke the workaround.** Adding the run's kills on top of a banked figure double counts, because `snapshot.totals.kills` is the whole run and does not reset when the purse does. Two tests asserted that arithmetic and said why; both were rewritten rather than retuned.
+
+#### Two more rules written twice, and one written four times
+
+`getMissionProgressValue` exists in `useGameState.ts` for the progress bar a player reads and in `progressionReducer.ts` for the button that decides whether a claim goes through. They agree, and nothing makes them; a divergence shows up as a goal that reads 100% and refuses to be claimed. **Found by an injection that did not bite** — changing the metric in one file left the whole fixture green.
+
+The dungeon entry cap is worse: `getRiftDailyEntryCap` and `getTreasuryDailyEntryCap` are the same three lines under two names, in each of two files, and the two in `useGameState.ts` are dead — silenced with `void f;`. One rule, four copies, called twice.
+
+Both are one function here. The verdict on "do the copies agree" is deliberately **not** a text comparison in either case: the dungeon copies are written as a ternary chain in one file and three `if`s in the other, so normalising whitespace still reports a difference that is not one. Compare what the copies *do*.
+
+#### Two metrics that do not mean what the missions say
+
+`wave` is the wave the player is **on**, not the deepest reached — including on the three goals whose own description says "highest". Reach 60, wipe back to 41, and the wave-50 goal is locked again. `kills` is the account's **lifetime** count, though every kill goal says "this run"; there is no per-run counter on the shipped state to read instead.
+
+Both are reproduced rather than corrected. They are awkward, not broken — every goal is reachable and pays what it says — and silently redefining a metric would change which goals a returning player's account has already satisfied. The wave rows say **claim while you are there** instead, which is the fix that costs nobody a claim.
+
+#### The week turns over on a Thursday
+
+`floor(ts / 604800000)` counts weeks from the Unix epoch and 1 January 1970 was a Thursday. Nobody wrote it down; it falls out of the divisor, and it is exactly the sort of thing a rewrite silently moves to Monday. Both calendar boundaries are ported from a **bisection against the reducer** rather than from the divisor, because reading the divisor proves nothing: a port flooring a local timestamp keeps every divisor and is wrong by up to thirteen hours. The Events screen says "Thursday, midnight UTC" out loud, since a player pushing for the top rung needs to know when their kills reset.
+
+The streak insurance covers a gap of **exactly one missed day** and is kept rather than spent on anything longer. A port spending it on any gap would make the streak unbreakable, which is the opposite of what a streak is for.
+
+#### Expeditions: the wait is stored and never checked
+
+The largest deliberate divergence in the rewrite. `COMPLETE_EXPEDITION` looks the expedition up by id and pays it out — no comparison against `startTime + durationMs` anywhere in the case, and no clock in it at all. Measured: an eight-hour godly contract, started and completed with no time passed, hands over its full 400 diamonds and 2,400 shards.
+
+So an expedition is not a timer but a **gold-to-diamonds exchange with an unenforced delay**: 1,000,000 gold for 400 diamonds, as fast as a player can press twice. With the dollar shop switched off (Phase 10), that is one of the few diamond sources the game has, and an unbounded one is a tap rather than a source.
+
+The wait is enforced here. Every tier's price, duration and reward is built around it, the screen describes it, and the only thing missing is the comparison — so the honest port is the rule as written rather than the rule as skipped. Same shape as Phase 10's crate refusing a full bag: diverge where the shipped behaviour makes the rewrite worse, once, with the measurement recorded beside it.
+
+**Artifacts are the phase's second dead field.** Every tier carries a count, up to eight, the save reader validates it, and the completion pays diamonds, shards and essence. There is no artifact anywhere on the shipped state to receive them, so none is listed — promising a reward this game cannot hand over is worse than the shipped silence. They still round-trip out through `legacy`: not paying them is a decision about this game, not licence to damage a save.
+
+#### Tests that passed while measuring nothing
+
+Four this phase, each recorded where it happened rather than quietly fixed:
+
+- The streak reward table ran to ten days, and `min(9, streak - 1)` is just `streak - 1` up to day ten — so deleting the cap left every row green. It runs to twelve now.
+- The wipe rule cost three attempts: a guessed level where the run wipes whatever the roll says; a scan over levels alone that found no contested case at all; and a constant generator that moved *both* draws, so the comparison measured the damage roll instead of the wipe.
+- The separate-entry-caps test read `entriesLeftToday` after one run — a different code path from the gate inside `runDungeon` — so an injection making the gate sum both dungeons passed it.
+- `opened` applies the weekly rollover before the daily login and the comment claimed it had to. Swapping them passed every assertion, because the two write **disjoint fields**. The real property is independence, and that is what is pinned now.
+
 ### Phase 12 — Accounts and the social layer *(~4 weeks)*
 The 6,090 lines nothing has touched: `onlineAuth`, `onlineSave`, `guild`, `guildWars`, `chat`, `directMessages`, `friends`, `leaderboard`, `presence`, `publicProfile`, `activityFeed`, `blockReport`, `characterNameRegistry`, `cloudMail`, `playerSearch`.
 
