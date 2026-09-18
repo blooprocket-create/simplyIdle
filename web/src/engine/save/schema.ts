@@ -6,6 +6,7 @@ import type { EquipmentSource } from '../equipment/instance';
 import type { SavedUsables } from './usablesSlice';
 import type { SavedVip } from './vipSlice';
 import type { SavedCalendar } from '../progression/calendar';
+import type { SavedDungeons } from '../dungeons/run';
 import type { FacilityId } from '../prestige/facilities';
 
 /**
@@ -165,6 +166,13 @@ export interface SaveV3 {
    * the arrangement `legacy` exists for. This is the phase that can move it.
    */
   calendar: SavedCalendar;
+
+  /**
+   * The two dungeons and the tickets that skip them, claimed out of `legacy`
+   * in Phase 11. Phase 10's shop has been selling a ticket into the bag since
+   * it had nowhere typed to put one.
+   */
+  dungeons: SavedDungeons;
 
   wallet: {
     gold: number;

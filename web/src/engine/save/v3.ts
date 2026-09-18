@@ -4,6 +4,7 @@ import { readUsables } from './usablesSlice';
 import { readVip } from './vipSlice';
 import { readMissions } from '../progression/missions';
 import { readCalendar } from '../progression/calendar';
+import { readDungeons } from '../dungeons/run';
 import { readFacilityLevels } from './facilitiesSlice';
 import { VALID_FORMATION_ROLES_FOR_CLASS } from '../combat/formation';
 import {
@@ -308,6 +309,7 @@ export function readSaveV3(payload: unknown, options: MigrateOptions): SaveV3 {
     vip: readVip(raw.vip),
     missions: readMissions(raw.missions),
     calendar: readCalendar(raw.calendar),
+    dungeons: readDungeons(raw.dungeons),
     equipment,
     wallet: {
       gold,

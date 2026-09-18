@@ -65,8 +65,10 @@ function moved(before: SaveV3, after: SaveV3) {
     const change = (after.usables[id] ?? 0) - (before.usables[id] ?? 0);
     if (change !== 0) items[id] = change;
   }
-  const tickets = (value: SaveV3) =>
-    typeof value.legacy.riftRaidTickets === 'number' ? value.legacy.riftRaidTickets : 0;
+  // Off the typed block since Phase 11 claimed it. It was
+  // `legacy.riftRaidTickets` while the dungeons did not exist, and claiming a
+  // key takes the writers with it as well as the readers.
+  const tickets = (value: SaveV3) => value.dungeons.raidTickets;
   return {
     gold: before.wallet.gold - after.wallet.gold,
     diamonds: before.wallet.diamonds - after.wallet.diamonds,
@@ -127,7 +129,9 @@ describe('every offer the shipped shops sell', () => {
         nowMs: NOW,
       });
     const sold = SHOP_OFFERS.filter(offer => throughCatalogue(offer.id) !== null);
-    expect(sold.map(offer => offer.id)).toEqual(['exp_cache', 'potion_bundle', 'armory_crate']);
+    // The ticket joined them in Phase 11, by flipping one flag and nothing
+    // else — which is what the withholding rule was for.
+    expect(sold.map(offer => offer.id)).toEqual(['exp_cache', 'potion_bundle', 'armory_crate', 'rift_raid_ticket']);
   });
 });
 

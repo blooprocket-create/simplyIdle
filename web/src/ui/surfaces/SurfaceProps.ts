@@ -14,6 +14,8 @@ import type { FacilityId } from '../../engine/prestige/facilities';
 import type { PrestigePath } from '../../engine/prestige/rebirth';
 import type { RebirthPreview } from '../../engine/prestige/prestigeSave';
 import type { BuyOutcome, LooseOutcome } from '../../engine/shop/buyOffer';
+import type { DungeonOutcome } from '../../engine/dungeons/run';
+import type { DungeonId } from '../../content/dungeons';
 import type { SaveV3 } from '../../engine/save/schema';
 
 /**
@@ -154,6 +156,13 @@ export interface SurfaceProps {
     claimAllMissions: () => number;
     /** One rung of the weekly track. The login and the rollover are not verbs. */
     claimWeeklyTrack: (milestone: number) => boolean;
+    /**
+     * The two dungeons. Both answer what happened rather than a boolean: a
+     * run that got 40% of the way through a vault and a run that cleared it
+     * are two different things to tell a player about.
+     */
+    runDungeon: (id: DungeonId) => DungeonOutcome | null;
+    raidDungeon: (id: DungeonId) => DungeonOutcome | null;
   };
   /** The player's save, for the counters no read model carries yet. */
   save: SaveV3;

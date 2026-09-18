@@ -7,6 +7,7 @@ import { readUsables } from './usablesSlice';
 import { readVipFromLegacy } from './vipSlice';
 import { readMissions } from '../progression/missions';
 import { readCalendar } from '../progression/calendar';
+import { readDungeons } from '../dungeons/run';
 import { readFacilities } from './facilitiesSlice';
 import { roundTo4 } from '../math/safe';
 import {
@@ -308,6 +309,13 @@ export const CLAIMED_V2_KEYS: readonly string[] = [
   'weeklyEventWeek',
   'weeklyKills',
   'weeklyTrackClaimed',
+  'riftDungeonLevel',
+  'riftEntriesUsedToday',
+  'riftEntryDay',
+  'treasureDungeonLevel',
+  'treasureEntriesUsedToday',
+  'treasureEntryDay',
+  'riftRaidTickets',
 ];
 
 export interface MigrateOptions {
@@ -458,6 +466,7 @@ export function migrateSave(payload: unknown, options: MigrateOptions): SaveV3 {
     vip: readVipFromLegacy(raw),
     missions: readMissions({ claimedMissionIds: raw.claimedMissionIds }),
     calendar: readCalendar(raw, true),
+    dungeons: readDungeons(raw, true),
     equipment,
     wallet: {
       gold,

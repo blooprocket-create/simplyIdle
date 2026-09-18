@@ -13,6 +13,9 @@ import { prestigeActions } from './prestigeActions';
 import * as shopActions from './shopActions';
 import * as missionActions from './missionActions';
 import * as calendarActions from './calendarActions';
+import * as dungeonActions from './dungeonActions';
+import { teamDps } from '../engine/entities/HeroEntity';
+import type { DungeonId } from '../content/dungeons';
 import { EMPTY_AUTOMATION_STATE, runAutomations } from './automationRunner';
 import { worthBanking } from '../engine/save/bankRun';
 import { bankInto } from './bank';
@@ -346,6 +349,23 @@ export function App() {
         if (outcome === null) return false;
         applySave(outcome.save);
         return true;
+      },
+      runDungeon: (id: DungeonId) => {
+        /*
+         * The same DPS the fight is built on, handed over rather than derived
+         * again — a dungeon that disagreed with the fight about how hard the
+         * player hits is a divergence nobody notices until the numbers stop
+         * making sense.
+         */
+        const dps = teamDps(rosterRef.current.heroes).toNumber();
+        const outcome = dungeonActions.run({ save: live(), dps, nowMs: Date.now(), random: Math.random }, id);
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      raidDungeon: (id: DungeonId) => {
+        const outcome = dungeonActions.raid(live(), id, Date.now());
+        if (outcome) applySave(outcome.save);
+        return outcome;
       },
       claimWeeklyTrack: (milestone: number) => {
         const claim = calendarActions.claimTrack(live(), milestone);

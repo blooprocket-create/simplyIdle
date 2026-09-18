@@ -66,11 +66,14 @@ describe('what the shop will sell', () => {
     expect(buyUnits(save(), 'not_an_item', 1)).toBeNull();
   });
 
-  it('sells the three this build can honour and withholds the rest', () => {
+  it('sells the four this build can honour and withholds the rest', () => {
+    // Three until Phase 11 built the dungeons a raid ticket opens. The three
+    // still withheld are the coolant ones, and they wait on heat.
     expect(SHOP_OFFERS.filter(offer => canBuy(save(), offer.id)).map(offer => offer.id)).toEqual([
       'exp_cache',
       'potion_bundle',
       'armory_crate',
+      'rift_raid_ticket',
     ]);
   });
 });

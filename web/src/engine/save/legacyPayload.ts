@@ -2,6 +2,7 @@ import { equipmentToLegacy } from './equipmentSlice';
 import { usablesToLegacy } from './usablesSlice';
 import { vipToLegacy } from './vipSlice';
 import { calendarToLegacy } from '../progression/calendar';
+import { dungeonsToLegacy } from '../dungeons/run';
 import { facilitiesToLegacy } from './facilitiesSlice';
 import { STAT_POINTS_PER_LEVEL, statPointsSpent } from './migrate';
 import { LEGACY_SAVE_VERSION, type SaveV3 } from './schema';
@@ -160,6 +161,9 @@ export function toLegacyPayload(save: SaveV3): Record<string, unknown> {
 
     // The streak and the week, back under their six v2 names.
     ...calendarToLegacy(save.calendar),
+
+    // The two dungeons and their shared ticket pool, back under seven names.
+    ...dungeonsToLegacy(save.dungeons),
 
     /*
      * The summon counters, back under the names the shipped state uses.
