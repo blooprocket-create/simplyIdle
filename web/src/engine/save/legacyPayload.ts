@@ -4,6 +4,7 @@ import { vipToLegacy } from './vipSlice';
 import { calendarToLegacy } from '../progression/calendar';
 import { dungeonsToLegacy } from '../dungeons/run';
 import { expeditionsToLegacy } from '../expeditions/contracts';
+import { mailboxToLegacy } from '../mail/mailbox';
 import { facilitiesToLegacy } from './facilitiesSlice';
 import { STAT_POINTS_PER_LEVEL, statPointsSpent } from './migrate';
 import { LEGACY_SAVE_VERSION, type SaveV3 } from './schema';
@@ -168,6 +169,9 @@ export function toLegacyPayload(save: SaveV3): Record<string, unknown> {
 
     // Expeditions still out, in the shape the shipped queue holds them.
     ...expeditionsToLegacy(save.expeditions),
+
+    // The mailbox, with every unclaimed attachment exactly as it stood.
+    ...mailboxToLegacy(save.mail),
 
     /*
      * The summon counters, back under the names the shipped state uses.

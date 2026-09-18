@@ -15,6 +15,7 @@ import * as missionActions from './missionActions';
 import * as calendarActions from './calendarActions';
 import * as dungeonActions from './dungeonActions';
 import * as expeditionActions from './expeditionActions';
+import { ATTACHMENT_KEYS, claimEverything, claimFrom } from '../engine/mail/mailbox';
 import { teamDps } from '../engine/entities/HeroEntity';
 import type { DungeonId } from '../content/dungeons';
 import type { ExpeditionRarity, ExpeditionType } from '../content/expeditions';
@@ -385,6 +386,18 @@ export function App() {
         const swept = expeditionActions.collectDue(live(), Date.now());
         if (swept.completed.length > 0) applySave(swept.save);
         return swept.completed.length;
+      },
+      claimMail: (id: string) => {
+        const claim = claimFrom(live(), id, ATTACHMENT_KEYS);
+        if (claim === null) return false;
+        applySave(claim.save);
+        return true;
+      },
+      claimAllMail: () => {
+        const claim = claimEverything(live());
+        if (claim === null) return false;
+        applySave(claim.save);
+        return true;
       },
       claimWeeklyTrack: (milestone: number) => {
         const claim = calendarActions.claimTrack(live(), milestone);

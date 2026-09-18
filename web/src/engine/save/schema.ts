@@ -8,6 +8,7 @@ import type { SavedVip } from './vipSlice';
 import type { SavedCalendar } from '../progression/calendar';
 import type { SavedDungeons } from '../dungeons/run';
 import type { SavedExpeditions } from '../expeditions/contracts';
+import type { SavedMailbox } from '../mail/mailbox';
 import type { FacilityId } from '../prestige/facilities';
 
 /**
@@ -182,6 +183,12 @@ export interface SaveV3 {
    * is made.
    */
   expeditions: SavedExpeditions;
+
+  /**
+   * The mailbox, claimed out of `legacy` in Phase 11 so a v2 account's
+   * unclaimed attachments survive the migration. Its sender is Phase 12's.
+   */
+  mail: SavedMailbox;
 
   wallet: {
     gold: number;

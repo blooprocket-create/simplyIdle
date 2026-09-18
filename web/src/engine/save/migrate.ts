@@ -9,6 +9,7 @@ import { readMissions } from '../progression/missions';
 import { readCalendar } from '../progression/calendar';
 import { readDungeons } from '../dungeons/run';
 import { readExpeditions } from '../expeditions/contracts';
+import { readMailbox } from '../mail/mailbox';
 import { readFacilities } from './facilitiesSlice';
 import { roundTo4 } from '../math/safe';
 import {
@@ -318,6 +319,7 @@ export const CLAIMED_V2_KEYS: readonly string[] = [
   'treasureEntryDay',
   'riftRaidTickets',
   'expeditionQueue',
+  'mailbox',
 ];
 
 export interface MigrateOptions {
@@ -470,6 +472,7 @@ export function migrateSave(payload: unknown, options: MigrateOptions): SaveV3 {
     calendar: readCalendar(raw, true),
     dungeons: readDungeons(raw, true),
     expeditions: readExpeditions(raw, true),
+    mail: readMailbox(raw, true),
     equipment,
     wallet: {
       gold,

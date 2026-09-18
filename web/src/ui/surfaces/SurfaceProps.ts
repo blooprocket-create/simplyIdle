@@ -171,6 +171,9 @@ export interface SurfaceProps {
     sendExpedition: (type: ExpeditionType, rarity: ExpeditionRarity) => boolean;
     collectExpedition: (id: string) => boolean;
     collectExpeditions: () => number;
+    /** The mailbox. `claimAllMail` answers whether anything was waiting. */
+    claimMail: (id: string) => boolean;
+    claimAllMail: () => boolean;
   };
   /** The player's save, for the counters no read model carries yet. */
   save: SaveV3;

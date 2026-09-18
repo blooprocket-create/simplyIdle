@@ -154,12 +154,18 @@ describe('nothing is dropped', () => {
      * is the honest move rather than a retune: what it guards is the carry
      * still happening at all, not a particular count. The three named keys
      * below are what actually make it bite.
+     *
+     * `mailbox` was the third of them until Phase 11 claimed it, so the
+     * example moved to `summonHistory` — which is the most durable choice
+     * available: `schema.ts` records it as deliberately *never* claimable,
+     * because writing it back needs the catalogue and the engine may not read
+     * one.
      */
     const { result } = migrateCase('veteran');
-    expect(Object.keys(result.legacy).length).toBeGreaterThan(50);
+    expect(Object.keys(result.legacy).length).toBeGreaterThan(45);
     expect(result.legacy.achievements).toBeDefined();
     expect(result.legacy.classMasteryXp).toBeDefined();
-    expect(result.legacy.mailbox).toBeDefined();
+    expect(result.legacy.summonHistory).toBeDefined();
   });
 
   it('has stopped leaving equipment, the guildhall or the usables in the bag', () => {
@@ -186,6 +192,7 @@ describe('nothing is dropped', () => {
       'autoDismantleRarityFloor',
       'guildhallFacilities',
       'usableItemCounts',
+      'mailbox',
     ]) {
       expect({ key, inLegacy: key in result.legacy }).toEqual({ key, inLegacy: false });
     }
