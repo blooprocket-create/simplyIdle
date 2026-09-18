@@ -33,6 +33,9 @@ const banked = (over: Partial<Parameters<typeof bankInto>[1]> = {}) => ({
   essence: 0,
   bossTears: 0,
   kills: 0,
+  // Where the run stands, rather than something it earned. Banking raises the
+  // account's deepest wave from it.
+  wave: 1,
   equipmentDrops: [] as number[],
   usableDrops: [] as string[],
   ...over,

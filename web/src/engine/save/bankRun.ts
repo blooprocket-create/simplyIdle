@@ -52,6 +52,21 @@ export function bankRun(save: SaveV3, banked: BankedRun): SaveV3 {
       level: gain.level,
       exp: gain.exp,
       totalExp: save.progression.totalExp + toNumber(banked.exp),
+      /*
+       * The two lifetime tallies, which were earned by every run and banked by
+       * none. `totalKills` gates five achievements and two automations;
+       * `highestWave` gates the rebirth button and both team-slot purchases.
+       * Both were written by the save reader and by nothing after it, so a
+       * player who fought to wave 200 found rebirth still locked and a player
+       * with ten thousand kills had, as far as the account was concerned,
+       * none.
+       *
+       * The deepest wave only ever climbs. A run that wiped back a chapter is
+       * still a run that got there, which is the same rule the shipped
+       * `highestWaveReached` follows.
+       */
+      totalKills: save.progression.totalKills + Math.max(0, Math.floor(banked.kills)),
+      highestWave: Math.max(save.progression.highestWave, Math.floor(banked.wave)),
     },
     stats: { ...save.stats, unspent: save.stats.unspent + gain.statPoints },
     roster: {

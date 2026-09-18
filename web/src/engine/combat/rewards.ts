@@ -51,7 +51,8 @@ export interface RewardRates {
 export const FLAT_RATES: RewardRates = { goldMult: 1, expMult: 1 };
 
 /** What a bank moves out of the run. See `RunEarnings.bank` for what does not. */
-export interface BankedRun {
+/** What the purse holds. Everything here was *earned* since the last bank. */
+export interface BankedEarnings {
   gold: Decimal;
   exp: Decimal;
   essence: number;
@@ -62,6 +63,20 @@ export interface BankedRun {
   equipmentDrops: readonly number[];
   /** The usable items a run found, already resolved. */
   usableDrops: readonly string[];
+}
+
+/**
+ * The earnings, plus where the run stands.
+ *
+ * `wave` is not earned and does not belong to the purse — it is the wave the
+ * fight is on at the moment of banking, and the `Simulation` is what knows it.
+ * It rides along because the account's **deepest wave** has to move with a
+ * bank and nothing else was moving it: `highestWave` gates the rebirth button
+ * and both team-slot purchases, and it was written by the save reader and by
+ * nothing since.
+ */
+export interface BankedRun extends BankedEarnings {
+  wave: number;
 }
 
 export interface Purse {
@@ -182,7 +197,7 @@ export class RunEarnings {
    * sit in the legacy bag untyped, and zeroing them here would lose them
    * outright, which is worse than leaving them uncounted.
    */
-  bank(): BankedRun {
+  bank(): BankedEarnings {
     const banked = {
       gold: this.purse.gold,
       exp: this.purse.exp,

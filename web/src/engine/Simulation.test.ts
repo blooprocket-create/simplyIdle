@@ -1542,3 +1542,32 @@ describe('banking a run', () => {
     expect(sim.read().totals.gold.gt(0)).toBe(true);
   });
 });
+
+describe('what a bank carries out of the fight', () => {
+  it('reports the wave the run is standing on, not the one it started at', () => {
+    /*
+     * The wave is the one thing in a `BankedRun` that was not *earned*, and it
+     * rides along because the account's deepest wave has to move with a bank —
+     * `highestWave` gates the rebirth button and both team-slot purchases, and
+     * nothing else in the rewrite writes it.
+     *
+     * Pinned here rather than left to `bankRun`, because the seam is where it
+     * would break: `bankRun` can raise the deepest wave perfectly from a wave
+     * the simulation never actually reached.
+     */
+    const sim = new Simulation({ heroes: team(), startWave: 1 });
+    run(sim, 120_000, 100);
+
+    const reached = sim.read().wave;
+    expect(reached).toBeGreaterThan(1);
+    expect(sim.bank().wave).toBe(reached);
+  });
+
+  it('keeps reporting it on a bank that carries no earnings at all', () => {
+    // A bank with an empty purse still has a wave, and `worthBanking` refuses
+    // it — so a run that advanced and earned nothing is the one case where the
+    // deepest wave would be lost. Worth knowing which way it goes.
+    const sim = new Simulation({ heroes: team(), startWave: 7 });
+    expect(sim.bank().wave).toBe(7);
+  });
+});
