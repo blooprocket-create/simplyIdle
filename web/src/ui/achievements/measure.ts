@@ -34,16 +34,24 @@ export function measure(
     case 'prestigeCount':
       return profile.prestigeCount;
     /*
-     * The saved baseline *plus* this run.
+     * The saved figure alone, exactly as `totalGold` below is read.
      *
-     * The profile is loaded once and does not change while the game is
-     * running, so reading it alone froze every kill achievement at whatever
-     * the save held — the meter moved on screen and the ledger never did.
-     * The same for the record: a player setting a new best could not
-     * complete an achievement about setting one.
+     * It was `profile.totalKills + snapshot.totals.kills`, and that was right
+     * while nothing banked a run's kills: reading the profile alone froze
+     * every kill achievement at whatever the save held. Now that `bankRun`
+     * credits them, the sum **double counts** every kill already banked —
+     * `snapshot.totals.kills` is the whole run and does not reset when the
+     * purse does.
+     *
+     * So it lags by at most one bank tick, which is what `totalGold` has
+     * always done and nobody has noticed.
      */
     case 'totalKills':
-      return profile.totalKills + snapshot.totals.kills;
+      return profile.totalKills;
+    /*
+     * A *max* rather than a sum, so it stays right either way. Banking raises
+     * the record now, and until the next tick the snapshot is still ahead.
+     */
     case 'highestWaveReached':
       return Math.max(profile.highestWave, snapshot.wave);
     // The wave being fought, from whichever read model is further along —
