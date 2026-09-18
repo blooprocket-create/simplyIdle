@@ -457,7 +457,7 @@ It is a button on the Party screen now, and `engine/roster/bestTeam.ts` is the r
 ### Phase 11 — The loops *(~3 weeks)*
 The reasons to log in: `CLAIM_MISSION`; `START_EXPEDITION`, `COMPLETE_EXPEDITION`, `REFRESH_EXPEDITION_CONTRACTS`; `RUN_RIFT_DUNGEON`, `RUN_TREASURY_RAID`; the four minigames and the bounty draft; `APPLY_DAILY_LOGIN`, `APPLY_WEEKLY_ROLLOVER`, `CLAIM_WEEKLY_TRACK`; mail (`APPEND_MAIL_MESSAGES`, `CLAIM_MAIL_ATTACHMENT`, `CLAIM_ALL_MAIL_ATTACHMENTS`); `MARK_STORY_BEAT_SEEN`. Content: `MISSION_BOARD_GOALS`, `WEEKLY_EVENTS`, `WEEKLY_TRACK_MILESTONES`, `STORY_BEATS`.
 
-Clears eight of the twelve placeholder destinations.
+Clears eight of the twelve placeholder destinations. **Done.** Seventeen of the twenty-one destinations are built; what is left is `skills`, which is inert and deliberately stays on the placeholder, and the three social ones below.
 
 #### The banking bug, in its third and fourth forms
 
@@ -507,6 +507,28 @@ Four this phase, each recorded where it happened rather than quietly fixed:
 - The wipe rule cost three attempts: a guessed level where the run wipes whatever the roll says; a scan over levels alone that found no contested case at all; and a constant generator that moved *both* draws, so the comparison measured the damage roll instead of the wipe.
 - The separate-entry-caps test read `entriesLeftToday` after one run — a different code path from the gate inside `runDungeon` — so an injection making the gate sum both dungeons passed it.
 - `opened` applies the weekly rollover before the daily login and the comment claimed it had to. Swapping them passed every assertion, because the two write **disjoint fields**. The real property is independence, and that is what is pinned now.
+- The dice payout's second copy is real but agrees; the *cooldown clamp* is the one that does not exist. `Math.min(lastUsedMs, nowMs)` cannot change the guard's verdict — a future stamp gives a negative gap, which is under a positive cooldown exactly as the clamped zero is — so deleting it left everything green, correctly. It is not ported. The load-time clamp, which does work, is.
+- The live-writ guard's case was refused by the **cooldown**, which accepting a writ also sets, so an injection deleting `|| state.miniBounty` sailed through the case named for it. It clears the cooldown now, and the two guards are measured one at a time.
+- The lockpick's per-digit hint was only tested where the tens digit and the whole number point the same way, so comparing whole numbers instead passed all three cases. 47 against 43 is where they part.
+- `startExpedition`'s settle had nothing to do in any case, because every one stocked a board with a fresh stamp. The case that exercises it is a player returning after nine hours, who should send from today's offers.
+
+#### The four mini ops: the player plays, the engine pays
+
+No screen in the shipped game leaves a minigame's outcome to the reducer. The dice are animated and then reported, the lockpick is a two-digit code cracked in three guesses with a higher/lower hint per digit, target practice is a meter stopped by hand, the recon sweep is three of four cards face down. So the reducer's `Math.random()` fallbacks — including the `< 0.46` that looks like the lockpick's success rate — have **never run**.
+
+The rewrite keeps that seam exactly: every engine function takes the outcome as an argument, and setting up a round lives in `app/miniOpActions.ts` where a generator is allowed. For once the port and the engine boundary want the same thing.
+
+**The cooldown is four hours** and all five fields holding it are named `last…Day` — a fossil from a save format that really did store a day number, which the loader still migrates by multiplying. Bisected rather than read, because a port dividing by a day because the field says so passes every test that records the constant.
+
+**Two rules the shipped game never tells anyone**, both reproduced and both now said out loud on the screen. Every gold payout is priced off the wave the player is *standing on*, and `getMonsterGold` pays a boss wave seven times an ordinary one: a recon sweep on wave 50 pays 1,160,586 gold and the same sweep on wave 51 pays 190,278. And the weekly shard event reaches target practice's shards but not its diamonds, and at wave one reaches neither — the floor is applied after the multiply, so six of the eight weeks pay an identical 140. A timing quirk a player can see is a choice; one they cannot is a secret handshake.
+
+`miniBounty.claimed` is the phase's third dead field: sanitised at load, guarded on at claim, written by nothing. The claim nulls the writ instead. It is dropped, and a writ can now be abandoned — the shipped game has no way to drop one, so a Frontline Push accepted at wave 199 sits unclaimable while the cooldown it already spent runs out.
+
+#### The contract board, which the first expedition slice ported around
+
+`REFRESH_EXPEDITION_CONTRACTS` was in this phase's scope and the expedition work went past it, which quietly turned a board into a menu. Each of the five destinations offers **one rarity**, rolled uniformly, and that is the contract a player may send there; the way to get another tier is to wait eight hours or pay 100,000 gold to reroll. A godly contract is 1,000,000 gold for 400 diamonds and a common one 25,000 for 35, and they come up equally often — so which tier is on the board is most of the expedition economy. Listing the five *tiers* and letting the player choose, as the first slice did, made a godly contract available on demand.
+
+**And the gate is not where it looks.** `START_EXPEDITION` takes an `offeredRarity` and uses it, so the reducer will start a godly contract against a board offering common; the board is consulted only when nothing is passed. What restricts a player is that the sole caller passes the offer. A rule enforced by every caller remembering is not a rule — so the board lives in the engine here and `startExpedition` takes a destination, with no rarity parameter to get wrong.
 
 ### Phase 12 — Accounts and the social layer *(~4 weeks)*
 The 6,090 lines nothing has touched: `onlineAuth`, `onlineSave`, `guild`, `guildWars`, `chat`, `directMessages`, `friends`, `leaderboard`, `presence`, `publicProfile`, `activityFeed`, `blockReport`, `characterNameRegistry`, `cloudMail`, `playerSearch`.
