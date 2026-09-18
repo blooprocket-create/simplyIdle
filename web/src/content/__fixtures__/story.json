@@ -1,0 +1,171 @@
+{
+  "note": "The story beats and their unlock order, measured through the shipped reducer.",
+  "generatedFrom": "src/gameConfig.ts STORY_BEATS, src/reducers/settingsReducer.ts, src/screens/GameScreen.tsx",
+  "beats": [
+    {
+      "id": "prologue_ash",
+      "chapter": "Prologue",
+      "unlockWave": 1,
+      "unlockPrestige": null
+    },
+    {
+      "id": "chapter_1_raiders",
+      "chapter": "Chapter I",
+      "unlockWave": 10,
+      "unlockPrestige": null
+    },
+    {
+      "id": "chapter_2_verdant",
+      "chapter": "Chapter II",
+      "unlockWave": 20,
+      "unlockPrestige": null
+    },
+    {
+      "id": "chapter_3_glass",
+      "chapter": "Chapter III",
+      "unlockWave": 30,
+      "unlockPrestige": null
+    },
+    {
+      "id": "chapter_4_storm",
+      "chapter": "Chapter IV",
+      "unlockWave": 40,
+      "unlockPrestige": null
+    },
+    {
+      "id": "chapter_5_crownfall",
+      "chapter": "Chapter V",
+      "unlockWave": 50,
+      "unlockPrestige": null
+    },
+    {
+      "id": "chapter_6_eclipse",
+      "chapter": "Chapter VI",
+      "unlockWave": 60,
+      "unlockPrestige": null
+    },
+    {
+      "id": "chapter_7_abyss",
+      "chapter": "Chapter VII",
+      "unlockWave": 80,
+      "unlockPrestige": null
+    },
+    {
+      "id": "chapter_8_ascendant",
+      "chapter": "Chapter VIII",
+      "unlockWave": 100,
+      "unlockPrestige": null
+    },
+    {
+      "id": "ascension_first",
+      "chapter": "Ascension I",
+      "unlockWave": 100,
+      "unlockPrestige": 1
+    },
+    {
+      "id": "chapter_9_throne",
+      "chapter": "Chapter IX",
+      "unlockWave": 150,
+      "unlockPrestige": null
+    },
+    {
+      "id": "chapter_10_eternity",
+      "chapter": "Chapter X",
+      "unlockWave": 200,
+      "unlockPrestige": null
+    },
+    {
+      "id": "ascension_empire",
+      "chapter": "Ascension II",
+      "unlockWave": 180,
+      "unlockPrestige": 5
+    },
+    {
+      "id": "chapter_11_void",
+      "chapter": "Chapter XI",
+      "unlockWave": 300,
+      "unlockPrestige": null
+    },
+    {
+      "id": "chapter_12_transcendence",
+      "chapter": "Chapter XII",
+      "unlockWave": 400,
+      "unlockPrestige": null
+    },
+    {
+      "id": "ascension_eternal",
+      "chapter": "Ascension III",
+      "unlockWave": 250,
+      "unlockPrestige": 10
+    },
+    {
+      "id": "chapter_13_singularity",
+      "chapter": "Chapter XIII",
+      "unlockWave": 500,
+      "unlockPrestige": null
+    },
+    {
+      "id": "finale_voidthrone",
+      "chapter": "Finale",
+      "unlockWave": 300,
+      "unlockPrestige": 10
+    },
+    {
+      "id": "ascension_infinite",
+      "chapter": "Apotheosis",
+      "unlockWave": 600,
+      "unlockPrestige": 25
+    }
+  ],
+  "inWaveOrder": false,
+  "misleadingNextAt": [
+    {
+      "wave": 150,
+      "saysNextIs": "chapter_10_eternity",
+      "atWave": 200,
+      "nearestIs": "ascension_empire",
+      "atNearestWave": 180
+    },
+    {
+      "wave": 179,
+      "saysNextIs": "chapter_10_eternity",
+      "atWave": 200,
+      "nearestIs": "ascension_empire",
+      "atNearestWave": 180
+    },
+    {
+      "wave": 200,
+      "saysNextIs": "chapter_11_void",
+      "atWave": 300,
+      "nearestIs": "ascension_eternal",
+      "atNearestWave": 250
+    },
+    {
+      "wave": 249,
+      "saysNextIs": "chapter_11_void",
+      "atWave": 300,
+      "nearestIs": "ascension_eternal",
+      "atNearestWave": 250
+    }
+  ],
+  "seen": [
+    {
+      "name": "marking one",
+      "recorded": [
+        "prologue_ash"
+      ]
+    },
+    {
+      "name": "marking the same one twice",
+      "recorded": [
+        "prologue_ash"
+      ]
+    },
+    {
+      "name": "marking one nobody wrote",
+      "recorded": [
+        "not_a_beat"
+      ]
+    }
+  ]
+}
