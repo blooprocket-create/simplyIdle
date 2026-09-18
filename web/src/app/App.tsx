@@ -12,6 +12,7 @@ import { equipmentActions, migrateLegacyEquipment } from './equipmentActions';
 import { prestigeActions } from './prestigeActions';
 import * as shopActions from './shopActions';
 import * as missionActions from './missionActions';
+import * as calendarActions from './calendarActions';
 import { EMPTY_AUTOMATION_STATE, runAutomations } from './automationRunner';
 import { worthBanking } from '../engine/save/bankRun';
 import { bankInto } from './bank';
@@ -92,7 +93,18 @@ export function App() {
     // every load. The engine's reader may not — it draws and reads the
     // catalogue — so it happens here, at the same moment, with both supplied.
     // See `migrateLegacyEquipment`.
-    return stored === null ? startingSave(nowMs) : migrateLegacyEquipment(stored, nowMs, Math.random);
+    const loaded = stored === null ? startingSave(nowMs) : migrateLegacyEquipment(stored, nowMs, Math.random);
+    /*
+     * And everything that happens *because* the account was opened: the week
+     * rolling over and the day's login. Both are no-ops when nothing is due,
+     * which is what lets them be called here unconditionally rather than the
+     * shell doing date arithmetic.
+     *
+     * Applied to the loaded save rather than after mount, so the first frame a
+     * player sees already has their streak paid — the same reason the away
+     * credit is taken before anything subscribes.
+     */
+    return calendarActions.opened(loaded, nowMs).save;
   });
   const [save, setSave] = useState<SaveV3>(initialSave);
   const saveRef = useRef(save);
@@ -333,6 +345,12 @@ export function App() {
         const outcome = missionActions.claim(live(), snapshotRef.current, id);
         if (outcome === null) return false;
         applySave(outcome.save);
+        return true;
+      },
+      claimWeeklyTrack: (milestone: number) => {
+        const claim = calendarActions.claimTrack(live(), milestone);
+        if (claim === null) return false;
+        applySave(claim.save);
         return true;
       },
       claimAllMissions: () => {

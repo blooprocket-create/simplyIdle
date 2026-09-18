@@ -6,6 +6,7 @@ import { readEquipment } from './equipmentSlice';
 import { readUsables } from './usablesSlice';
 import { readVipFromLegacy } from './vipSlice';
 import { readMissions } from '../progression/missions';
+import { readCalendar } from '../progression/calendar';
 import { readFacilities } from './facilitiesSlice';
 import { roundTo4 } from '../math/safe';
 import {
@@ -301,6 +302,12 @@ export const CLAIMED_V2_KEYS: readonly string[] = [
   'codexVipClaimedHeroIds',
   'codexVipClaimedUniqueIds',
   'claimedMissionIds',
+  'dailyLoginStreak',
+  'lastDailyLoginDay',
+  'streakInsuranceCharges',
+  'weeklyEventWeek',
+  'weeklyKills',
+  'weeklyTrackClaimed',
 ];
 
 export interface MigrateOptions {
@@ -450,6 +457,7 @@ export function migrateSave(payload: unknown, options: MigrateOptions): SaveV3 {
     usables,
     vip: readVipFromLegacy(raw),
     missions: readMissions({ claimedMissionIds: raw.claimedMissionIds }),
+    calendar: readCalendar(raw, true),
     equipment,
     wallet: {
       gold,

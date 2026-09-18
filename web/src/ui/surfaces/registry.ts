@@ -5,6 +5,7 @@ import { CampaignSurface } from './CampaignSurface';
 import { CharacterSurface } from './CharacterSurface';
 import { CodexSurface } from './CodexSurface';
 import { EquipmentSurface } from './EquipmentSurface';
+import { EventsSurface } from './EventsSurface';
 import { ItemsSurface } from './ItemsSurface';
 import { MissionsSurface } from './MissionsSurface';
 import { RebirthSurface } from './RebirthSurface';
@@ -38,6 +39,7 @@ export const SURFACES: Partial<Record<string, ComponentType<SurfaceProps>>> = {
   roster: RosterSurface,
   codex: CodexSurface,
   missions: MissionsSurface,
+  events: EventsSurface,
   summon: SummonSurface,
   shop: ShopSurface,
   settings: SettingsSurface,

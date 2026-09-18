@@ -50,7 +50,7 @@ const run = (
   wave,
 });
 
-describe('the two lifetime tallies a run moves', () => {
+describe('the three tallies a run moves that nothing else does', () => {
   it('adds the kills to the account, not just to the heroes', () => {
     /*
      * They were used to level fielded heroes and then dropped. Nothing else in
@@ -79,11 +79,23 @@ describe('the two lifetime tallies a run moves', () => {
     expect(bankRun(deep, run(0, 0, 0, 0, 0, [], 41)).progression.highestWave).toBe(214);
   });
 
+  it('adds the kills to the week as well as to the account', () => {
+    /*
+     * The third tally, and the one that is *meant* to go backwards: the
+     * weekly track is measured on it and the rollover clears it. Without this
+     * the track could never move.
+     */
+    const banked = bankRun(save(), run(0, 0, 0, 0, 40));
+    expect(banked.calendar.weeklyKills).toBe(40);
+    expect(bankRun(banked, run(0, 0, 0, 0, 2)).calendar.weeklyKills).toBe(42);
+  });
+
   it('takes a fractional or negative count as nothing rather than as a loss', () => {
     // Neither should ever arrive; both would silently *reduce* a lifetime
     // tally, which is the one direction it must never move.
     const banked = bankRun(save(), run(0, 0, 0, 0, -5, [], -3));
     expect(banked.progression.totalKills).toBe(0);
+    expect(banked.calendar.weeklyKills).toBe(0);
     expect(banked.progression.highestWave).toBe(save().progression.highestWave);
   });
 });

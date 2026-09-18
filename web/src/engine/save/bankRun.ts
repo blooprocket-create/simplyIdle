@@ -32,6 +32,7 @@ export function bankRun(save: SaveV3, banked: BankedRun): SaveV3 {
   const gold = toNumber(banked.gold);
   const gain = applyExp(save.progression.level, save.progression.exp, toNumber(banked.exp));
   const fielded = new Set(save.roster.activeUids);
+  const kills = Math.max(0, Math.floor(banked.kills));
 
   return {
     ...save,
@@ -65,9 +66,16 @@ export function bankRun(save: SaveV3, banked: BankedRun): SaveV3 {
        * still a run that got there, which is the same rule the shipped
        * `highestWaveReached` follows.
        */
-      totalKills: save.progression.totalKills + Math.max(0, Math.floor(banked.kills)),
+      totalKills: save.progression.totalKills + kills,
       highestWave: Math.max(save.progression.highestWave, Math.floor(banked.wave)),
     },
+    /*
+     * And the week's kills, which the weekly track is measured on. Third of
+     * the three tallies a run earns and nothing was crediting — the rollover
+     * clears it, so it is the one that is *meant* to go backwards, and only
+     * there.
+     */
+    calendar: { ...save.calendar, weeklyKills: save.calendar.weeklyKills + kills },
     stats: { ...save.stats, unspent: save.stats.unspent + gain.statPoints },
     roster: {
       ...save.roster,

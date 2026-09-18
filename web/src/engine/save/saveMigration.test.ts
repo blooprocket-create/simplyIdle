@@ -143,12 +143,20 @@ describe('nothing is dropped', () => {
   });
 
   it('leaves a real account with a substantial legacy blob, not an empty one', () => {
-    // A v2 save is about 120 fields and this migration types roughly 40 of
-    // them. If `legacy` ever came back near-empty it would mean the carry had
-    // silently stopped working, and the loss would not surface until someone
-    // went looking for a field years later.
+    /*
+     * A v2 save is about 120 fields and the typed slice takes a growing share
+     * of them. If `legacy` ever came back near-empty it would mean the carry
+     * had silently stopped working, and the loss would not surface until
+     * someone went looking for a field years later.
+     *
+     * The floor comes **down** as phases claim keys — it was 60 before Phase
+     * 11 took the mission list and the six calendar fields — and lowering it
+     * is the honest move rather than a retune: what it guards is the carry
+     * still happening at all, not a particular count. The three named keys
+     * below are what actually make it bite.
+     */
     const { result } = migrateCase('veteran');
-    expect(Object.keys(result.legacy).length).toBeGreaterThan(60);
+    expect(Object.keys(result.legacy).length).toBeGreaterThan(50);
     expect(result.legacy.achievements).toBeDefined();
     expect(result.legacy.classMasteryXp).toBeDefined();
     expect(result.legacy.mailbox).toBeDefined();

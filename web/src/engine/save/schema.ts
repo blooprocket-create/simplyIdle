@@ -5,6 +5,7 @@ import type { FormationRole } from '../combat/formation';
 import type { EquipmentSource } from '../equipment/instance';
 import type { SavedUsables } from './usablesSlice';
 import type { SavedVip } from './vipSlice';
+import type { SavedCalendar } from '../progression/calendar';
 import type { FacilityId } from '../prestige/facilities';
 
 /**
@@ -155,6 +156,15 @@ export interface SaveV3 {
    * because this is the phase with a board to claim them on.
    */
   missions: { claimedIds: string[] };
+
+  /**
+   * The login streak and the week, claimed out of `legacy` in Phase 11.
+   *
+   * `weeklyEventWeek` has been *read* out of the bag since Phase 8 — it picks
+   * which of the eight events multiplies the gold and EXP chains — which is
+   * the arrangement `legacy` exists for. This is the phase that can move it.
+   */
+  calendar: SavedCalendar;
 
   wallet: {
     gold: number;

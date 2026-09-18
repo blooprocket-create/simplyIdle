@@ -152,6 +152,8 @@ export interface SurfaceProps {
      */
     claimMission: (id: string) => boolean;
     claimAllMissions: () => number;
+    /** One rung of the weekly track. The login and the rollover are not verbs. */
+    claimWeeklyTrack: (milestone: number) => boolean;
   };
   /** The player's save, for the counters no read model carries yet. */
   save: SaveV3;
