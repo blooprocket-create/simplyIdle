@@ -1,0 +1,169 @@
+{
+  "note": "The rift breach and the treasury raid, measured through the shipped reducer.",
+  "generatedFrom": "src/reducers/minigamesReducer.ts",
+  "dps": 492.79938535203485,
+  "entryCaps": [
+    {
+      "vipLevel": 0,
+      "rift": 3,
+      "treasury": 3
+    },
+    {
+      "vipLevel": 1,
+      "rift": 3,
+      "treasury": 3
+    },
+    {
+      "vipLevel": 2,
+      "rift": 4,
+      "treasury": 4
+    },
+    {
+      "vipLevel": 3,
+      "rift": 4,
+      "treasury": 4
+    },
+    {
+      "vipLevel": 4,
+      "rift": 5,
+      "treasury": 5
+    },
+    {
+      "vipLevel": 5,
+      "rift": 5,
+      "treasury": 5
+    }
+  ],
+  "capDuplication": {
+    "copies": [
+      "src/useGameState.ts:getRiftDailyEntryCap",
+      "src/useGameState.ts:getTreasuryDailyEntryCap",
+      "src/reducers/minigamesReducer.ts:getRiftDailyEntryCap",
+      "src/reducers/minigamesReducer.ts:getTreasuryDailyEntryCap"
+    ],
+    "live": [
+      "src/reducers/minigamesReducer.ts:getRiftDailyEntryCap",
+      "src/reducers/minigamesReducer.ts:getTreasuryDailyEntryCap"
+    ],
+    "sameStyle": false,
+    "bothNamesAgree": true
+  },
+  "runs": [
+    {
+      "name": "rift at level one",
+      "type": "RUN_RIFT_DUNGEON",
+      "level": 1,
+      "result": {
+        "diamonds": 17,
+        "shards": 270,
+        "gold": 0,
+        "scrap": 0,
+        "tickets": 0,
+        "riftLevel": 2,
+        "treasuryLevel": 1,
+        "riftEntries": 1,
+        "treasuryEntries": 0
+      }
+    },
+    {
+      "name": "rift at level five",
+      "type": "RUN_RIFT_DUNGEON",
+      "level": 5,
+      "result": {
+        "diamonds": 7,
+        "shards": 155,
+        "gold": 0,
+        "scrap": 0,
+        "tickets": 0,
+        "riftLevel": 5,
+        "treasuryLevel": 5,
+        "riftEntries": 1,
+        "treasuryEntries": 0
+      }
+    },
+    {
+      "name": "treasury at level one",
+      "type": "RUN_TREASURY_RAID",
+      "level": 1,
+      "result": {
+        "diamonds": 0,
+        "shards": 0,
+        "gold": 1400,
+        "scrap": 4,
+        "tickets": 0,
+        "riftLevel": 1,
+        "treasuryLevel": 2,
+        "riftEntries": 0,
+        "treasuryEntries": 1
+      }
+    },
+    {
+      "name": "treasury at level five",
+      "type": "RUN_TREASURY_RAID",
+      "level": 5,
+      "result": {
+        "diamonds": 0,
+        "shards": 0,
+        "gold": 146,
+        "scrap": 0,
+        "tickets": 0,
+        "riftLevel": 5,
+        "treasuryLevel": 5,
+        "riftEntries": 0,
+        "treasuryEntries": 1
+      }
+    }
+  ],
+  "raids": [
+    {
+      "name": "rift raid from level three",
+      "type": "RUN_RIFT_DUNGEON",
+      "level": 3,
+      "result": {
+        "diamonds": 23,
+        "shards": 400,
+        "gold": 0,
+        "scrap": 0,
+        "tickets": -1,
+        "riftLevel": 3,
+        "treasuryLevel": 3,
+        "riftEntries": 0,
+        "treasuryEntries": 0
+      }
+    },
+    {
+      "name": "treasury raid from level three",
+      "type": "RUN_TREASURY_RAID",
+      "level": 3,
+      "result": {
+        "diamonds": 0,
+        "shards": 0,
+        "gold": 2000,
+        "scrap": 6,
+        "tickets": -1,
+        "riftLevel": 3,
+        "treasuryLevel": 3,
+        "riftEntries": 0,
+        "treasuryEntries": 0
+      }
+    }
+  ],
+  "refusals": [
+    {
+      "name": "rift raid with no ticket",
+      "moved": false
+    },
+    {
+      "name": "rift raid at level one",
+      "moved": false
+    },
+    {
+      "name": "treasury raid with no ticket",
+      "moved": false
+    },
+    {
+      "name": "rift run past the daily cap",
+      "moved": false
+    }
+  ]
+}
