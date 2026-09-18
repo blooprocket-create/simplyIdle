@@ -150,8 +150,9 @@ describe('nothing is dropped', () => {
      * someone went looking for a field years later.
      *
      * The floor comes **down** as phases claim keys — it was 60 before Phase
-     * 11 took the mission list and the six calendar fields — and lowering it
-     * is the honest move rather than a retune: what it guards is the carry
+     * 11 took the mission list, the six calendar fields, the dungeons, the
+     * mailbox, the story beats and now the seven mini-op keys — and lowering
+     * it is the honest move rather than a retune: what it guards is the carry
      * still happening at all, not a particular count. The three named keys
      * below are what actually make it bite.
      *
@@ -162,7 +163,7 @@ describe('nothing is dropped', () => {
      * one.
      */
     const { result } = migrateCase('veteran');
-    expect(Object.keys(result.legacy).length).toBeGreaterThan(45);
+    expect(Object.keys(result.legacy).length).toBeGreaterThan(40);
     expect(result.legacy.achievements).toBeDefined();
     expect(result.legacy.classMasteryXp).toBeDefined();
     expect(result.legacy.summonHistory).toBeDefined();
@@ -193,6 +194,8 @@ describe('nothing is dropped', () => {
       'guildhallFacilities',
       'usableItemCounts',
       'mailbox',
+      'miniBounty',
+      'lastDiceRollDay',
     ]) {
       expect({ key, inLegacy: key in result.legacy }).toEqual({ key, inLegacy: false });
     }

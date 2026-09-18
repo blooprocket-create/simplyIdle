@@ -15,8 +15,11 @@ import * as missionActions from './missionActions';
 import * as calendarActions from './calendarActions';
 import * as dungeonActions from './dungeonActions';
 import * as expeditionActions from './expeditionActions';
+import * as miniOpActions from './miniOpActions';
 import { ATTACHMENT_KEYS, claimEverything, claimFrom } from '../engine/mail/mailbox';
 import { markBeatSeen } from '../engine/progression/story';
+import { abandonBounty } from '../engine/minigames/miniOps';
+import type { BountyDraft, ReconOutcome } from '../content/miniOps';
 import { teamDps } from '../engine/entities/HeroEntity';
 import type { DungeonId } from '../content/dungeons';
 import type { ExpeditionRarity, ExpeditionType } from '../content/expeditions';
@@ -245,6 +248,30 @@ export function App() {
     return next;
   }, [applySave]);
 
+  /**
+   * What a mini op is priced against: the live save, the clock, and the wave
+   * the player is standing on right now.
+   *
+   * Built per call rather than memoised, because two of its three fields move
+   * every frame and a stale one silently changes what a press is worth.
+   */
+  const miniOpContext = () => ({
+    save: live(),
+    nowMs: Date.now(),
+    wave: snapshotRef.current.wave,
+    highestWave: live().progression.highestWave,
+  });
+
+  /** The three metrics a writ can be measured against, from where each lives. */
+  const bountyStandingNow = () => {
+    const current = live();
+    return {
+      kills: current.progression.totalKills,
+      wave: snapshotRef.current.wave,
+      summons: current.summon.totalSummons,
+    };
+  };
+
   const actions = useMemo(
     () => ({
       summon: (pay: SummonPayment) => {
@@ -412,6 +439,48 @@ export function App() {
         if (swept.claimed.length > 0) applySave(swept.save);
         return swept.claimed.length;
       },
+      /*
+       * The mini ops. Each takes the outcome the surface produced rather than
+       * rolling for itself — the shipped screens work the same way, and the
+       * engine may not read a generator in any case.
+       *
+       * `snapshotRef` again, and it matters more here than anywhere: every
+       * gold payout is priced off the wave the player is *standing on*, and a
+       * boss wave is worth seven times its neighbours. A stale wave is not a
+       * rounding error, it is a sixfold one.
+       */
+      playDice: (roll: number) => {
+        const outcome = miniOpActions.dice(miniOpContext(), roll);
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      playRecon: (pick: ReconOutcome) => {
+        const outcome = miniOpActions.recon(miniOpContext(), pick);
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      playLockpick: (cracked: boolean) => {
+        const outcome = miniOpActions.lockpick(miniOpContext(), cracked);
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      playTarget: (score: number, shardMultiplier: number) => {
+        const outcome = miniOpActions.target(miniOpContext(), score, shardMultiplier);
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      acceptBounty: (draft: BountyDraft) => {
+        const started = miniOpActions.accept(miniOpContext(), draft, bountyStandingNow());
+        if (started === null) return false;
+        applySave(started.save);
+        return true;
+      },
+      claimBounty: () => {
+        const outcome = miniOpActions.claim(miniOpContext(), bountyStandingNow());
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      abandonBounty: () => applying(abandonBounty(live())),
     }),
     [save, applySave, applying, live],
   );

@@ -11,6 +11,7 @@ import { ExpeditionsSurface } from './ExpeditionsSurface';
 import { MailSurface } from './MailSurface';
 import { ItemsSurface } from './ItemsSurface';
 import { MissionsSurface } from './MissionsSurface';
+import { OperationsSurface } from './OperationsSurface';
 import { RebirthSurface } from './RebirthSurface';
 import { PartySurface } from './PartySurface';
 import { RosterSurface } from './RosterSurface';
@@ -42,6 +43,7 @@ export const SURFACES: Partial<Record<string, ComponentType<SurfaceProps>>> = {
   roster: RosterSurface,
   codex: CodexSurface,
   missions: MissionsSurface,
+  operations: OperationsSurface,
   events: EventsSurface,
   dungeons: DungeonsSurface,
   expeditions: ExpeditionsSurface,

@@ -10,6 +10,7 @@ import { readCalendar } from '../progression/calendar';
 import { readDungeons } from '../dungeons/run';
 import { readExpeditions } from '../expeditions/contracts';
 import { readMailbox } from '../mail/mailbox';
+import { readMiniOps } from '../minigames/miniOps';
 import { readStory } from '../progression/story';
 import { readFacilities } from './facilitiesSlice';
 import { roundTo4 } from '../math/safe';
@@ -322,6 +323,13 @@ export const CLAIMED_V2_KEYS: readonly string[] = [
   'expeditionQueue',
   'mailbox',
   'seenStoryBeatIds',
+  'lastDiceRollDay',
+  'lastDiceRollValue',
+  'lastReconSweepDay',
+  'lastLockpickDay',
+  'lastTargetPracticeDay',
+  'lastBountyDraftDay',
+  'miniBounty',
 ];
 
 export interface MigrateOptions {
@@ -476,6 +484,7 @@ export function migrateSave(payload: unknown, options: MigrateOptions): SaveV3 {
     expeditions: readExpeditions(raw, true),
     mail: readMailbox(raw, true),
     story: readStory(raw, true),
+    miniOps: readMiniOps(raw, nowMs, true),
     equipment,
     wallet: {
       gold,

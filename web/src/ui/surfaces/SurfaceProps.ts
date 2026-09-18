@@ -17,6 +17,8 @@ import type { BuyOutcome, LooseOutcome } from '../../engine/shop/buyOffer';
 import type { DungeonOutcome } from '../../engine/dungeons/run';
 import type { DungeonId } from '../../content/dungeons';
 import type { ExpeditionRarity, ExpeditionType } from '../../content/expeditions';
+import type { MiniOpOutcome } from '../../engine/minigames/miniOps';
+import type { BountyDraft, ReconOutcome } from '../../content/miniOps';
 import type { SaveV3 } from '../../engine/save/schema';
 
 /**
@@ -176,6 +178,25 @@ export interface SurfaceProps {
     claimAllMail: () => boolean;
     /** Mark a story beat read. False for one nobody wrote, or already read. */
     markStoryBeatSeen: (id: string) => boolean;
+    /*
+     * The four mini ops, and the writ.
+     *
+     * Each takes the **outcome the surface produced** — the face it rolled,
+     * the card the player turned, whether the code cracked, where the meter
+     * stopped — rather than rolling for itself. That is the shipped seam: no
+     * screen in the old game leaves the result to the reducer, and the engine
+     * may not read a generator anyway. They answer what was paid, because a
+     * roll of 20 and a roll of 3 are both successes and a boolean cannot tell
+     * a player which they got.
+     */
+    playDice: (roll: number) => MiniOpOutcome | null;
+    playRecon: (outcome: ReconOutcome) => MiniOpOutcome | null;
+    playLockpick: (cracked: boolean) => MiniOpOutcome | null;
+    playTarget: (score: number, shardMultiplier: number) => MiniOpOutcome | null;
+    /** The writ. `abandonBounty` drops it without refunding the press. */
+    acceptBounty: (draft: BountyDraft) => boolean;
+    claimBounty: () => MiniOpOutcome | null;
+    abandonBounty: () => boolean;
   };
   /** The player's save, for the counters no read model carries yet. */
   save: SaveV3;

@@ -5,6 +5,7 @@ import { calendarToLegacy } from '../progression/calendar';
 import { dungeonsToLegacy } from '../dungeons/run';
 import { expeditionsToLegacy } from '../expeditions/contracts';
 import { mailboxToLegacy } from '../mail/mailbox';
+import { miniOpsToLegacy } from '../minigames/miniOps';
 import { storyToLegacy } from '../progression/story';
 import { facilitiesToLegacy } from './facilitiesSlice';
 import { STAT_POINTS_PER_LEVEL, statPointsSpent } from './migrate';
@@ -176,6 +177,14 @@ export function toLegacyPayload(save: SaveV3): Record<string, unknown> {
 
     // The story beats already read.
     ...storyToLegacy(save.story),
+
+    /*
+     * The five mini-op clocks and the writ, back under their seven v2 names —
+     * including the five that say `Day` and hold a millisecond stamp. The
+     * rewrite's field is honest and the key it writes is not, because the key
+     * is what a v2 build reads.
+     */
+    ...miniOpsToLegacy(save.miniOps),
 
     /*
      * The summon counters, back under the names the shipped state uses.

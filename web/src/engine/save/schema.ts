@@ -9,6 +9,7 @@ import type { SavedCalendar } from '../progression/calendar';
 import type { SavedDungeons } from '../dungeons/run';
 import type { SavedExpeditions } from '../expeditions/contracts';
 import type { SavedMailbox } from '../mail/mailbox';
+import type { SavedMiniOps } from '../minigames/miniOps';
 import type { FacilityId } from '../prestige/facilities';
 
 /**
@@ -192,6 +193,16 @@ export interface SaveV3 {
 
   /** Story beats already read, claimed out of `legacy` in Phase 11. */
   story: { seenIds: string[] };
+
+  /**
+   * The four mini ops and the bounty writ, claimed out of `legacy` in Phase 11.
+   *
+   * Seven v2 keys collapse to three fields here. Five of them are named
+   * `last…Day` and hold a millisecond stamp against a four-hour cooldown, so
+   * they become one `lastUsedMs` record keyed by op — the name stops lying and
+   * the shape stops repeating itself five times.
+   */
+  miniOps: SavedMiniOps;
 
   wallet: {
     gold: number;
