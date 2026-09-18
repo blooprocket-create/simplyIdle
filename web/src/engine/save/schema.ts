@@ -190,6 +190,9 @@ export interface SaveV3 {
    */
   mail: SavedMailbox;
 
+  /** Story beats already read, claimed out of `legacy` in Phase 11. */
+  story: { seenIds: string[] };
+
   wallet: {
     gold: number;
     totalGold: number;

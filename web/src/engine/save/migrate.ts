@@ -10,6 +10,7 @@ import { readCalendar } from '../progression/calendar';
 import { readDungeons } from '../dungeons/run';
 import { readExpeditions } from '../expeditions/contracts';
 import { readMailbox } from '../mail/mailbox';
+import { readStory } from '../progression/story';
 import { readFacilities } from './facilitiesSlice';
 import { roundTo4 } from '../math/safe';
 import {
@@ -320,6 +321,7 @@ export const CLAIMED_V2_KEYS: readonly string[] = [
   'riftRaidTickets',
   'expeditionQueue',
   'mailbox',
+  'seenStoryBeatIds',
 ];
 
 export interface MigrateOptions {
@@ -473,6 +475,7 @@ export function migrateSave(payload: unknown, options: MigrateOptions): SaveV3 {
     dungeons: readDungeons(raw, true),
     expeditions: readExpeditions(raw, true),
     mail: readMailbox(raw, true),
+    story: readStory(raw, true),
     equipment,
     wallet: {
       gold,

@@ -5,6 +5,7 @@ import { calendarToLegacy } from '../progression/calendar';
 import { dungeonsToLegacy } from '../dungeons/run';
 import { expeditionsToLegacy } from '../expeditions/contracts';
 import { mailboxToLegacy } from '../mail/mailbox';
+import { storyToLegacy } from '../progression/story';
 import { facilitiesToLegacy } from './facilitiesSlice';
 import { STAT_POINTS_PER_LEVEL, statPointsSpent } from './migrate';
 import { LEGACY_SAVE_VERSION, type SaveV3 } from './schema';
@@ -172,6 +173,9 @@ export function toLegacyPayload(save: SaveV3): Record<string, unknown> {
 
     // The mailbox, with every unclaimed attachment exactly as it stood.
     ...mailboxToLegacy(save.mail),
+
+    // The story beats already read.
+    ...storyToLegacy(save.story),
 
     /*
      * The summon counters, back under the names the shipped state uses.

@@ -7,6 +7,7 @@ import { readCalendar } from '../progression/calendar';
 import { readDungeons } from '../dungeons/run';
 import { readExpeditions } from '../expeditions/contracts';
 import { readMailbox } from '../mail/mailbox';
+import { readStory } from '../progression/story';
 import { readFacilityLevels } from './facilitiesSlice';
 import { VALID_FORMATION_ROLES_FOR_CLASS } from '../combat/formation';
 import {
@@ -314,6 +315,7 @@ export function readSaveV3(payload: unknown, options: MigrateOptions): SaveV3 {
     dungeons: readDungeons(raw.dungeons),
     expeditions: readExpeditions(raw.expeditions),
     mail: readMailbox(raw.mail),
+    story: readStory(raw.story),
     equipment,
     wallet: {
       gold,

@@ -16,6 +16,7 @@ import * as calendarActions from './calendarActions';
 import * as dungeonActions from './dungeonActions';
 import * as expeditionActions from './expeditionActions';
 import { ATTACHMENT_KEYS, claimEverything, claimFrom } from '../engine/mail/mailbox';
+import { markBeatSeen } from '../engine/progression/story';
 import { teamDps } from '../engine/entities/HeroEntity';
 import type { DungeonId } from '../content/dungeons';
 import type { ExpeditionRarity, ExpeditionType } from '../content/expeditions';
@@ -399,6 +400,7 @@ export function App() {
         applySave(claim.save);
         return true;
       },
+      markStoryBeatSeen: (id: string) => applying(markBeatSeen(live(), id)),
       claimWeeklyTrack: (milestone: number) => {
         const claim = calendarActions.claimTrack(live(), milestone);
         if (claim === null) return false;

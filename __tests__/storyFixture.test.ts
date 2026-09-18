@@ -43,7 +43,14 @@ const unlocked = (beat: (typeof STORY_BEATS)[number], wave: number, prestige: nu
 interface Fixture {
   note: string;
   generatedFrom: string;
-  beats: { id: string; chapter: string; unlockWave: number; unlockPrestige: number | null }[];
+  beats: {
+    id: string;
+    chapter: string;
+    title: string;
+    body: string;
+    unlockWave: number;
+    unlockPrestige: number | null;
+  }[];
   /** Whether the catalogue is listed in the order it unlocks. */
   inWaveOrder: boolean;
   /**
@@ -55,9 +62,13 @@ interface Fixture {
 }
 
 function build(): Fixture {
+  // The prose comes across too: the rewrite's catalogue is generated from
+  // this, so a beat's text is measured rather than retyped.
   const beats = STORY_BEATS.map(beat => ({
     id: beat.id,
     chapter: beat.chapter,
+    title: beat.title,
+    body: beat.body,
     unlockWave: beat.unlockWave,
     unlockPrestige: beat.unlockPrestige ?? null,
   }));

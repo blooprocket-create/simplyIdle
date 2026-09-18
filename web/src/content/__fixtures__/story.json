@@ -5,114 +5,152 @@
     {
       "id": "prologue_ash",
       "chapter": "Prologue",
+      "title": "Ashen Signal",
+      "body": "The frontier beacons relight after years of silence. Your command seal activates and old war machines answer your name.",
       "unlockWave": 1,
       "unlockPrestige": null
     },
     {
       "id": "chapter_1_raiders",
       "chapter": "Chapter I",
+      "title": "The Raider Accord",
+      "body": "Scattered clans rally under a red standard. Every wave you clear denies their pact another foothold.",
       "unlockWave": 10,
       "unlockPrestige": null
     },
     {
       "id": "chapter_2_verdant",
       "chapter": "Chapter II",
+      "title": "Roots of the Citadel",
+      "body": "Ancient gardens overrun the old roads. Beneath the vines, imperial vault doors begin to open on their own.",
       "unlockWave": 20,
       "unlockPrestige": null
     },
     {
       "id": "chapter_3_glass",
       "chapter": "Chapter III",
+      "title": "Glass and Oathfire",
+      "body": "The crystal city fractures from within. Echoes of the first dynasty demand tribute in blood, gold, and memory.",
       "unlockWave": 30,
       "unlockPrestige": null
     },
     {
       "id": "chapter_4_storm",
       "chapter": "Chapter IV",
+      "title": "Storm Court",
+      "body": "A council of storm captains crowns a false sovereign. Their fleets ride lightning across the abyss horizon.",
       "unlockWave": 40,
       "unlockPrestige": null
     },
     {
       "id": "chapter_5_crownfall",
       "chapter": "Chapter V",
+      "title": "Crownfall Depths",
+      "body": "Sunken throne-ships awaken below black tide. Every captain you defeat restores one lost imperial oath.",
       "unlockWave": 50,
       "unlockPrestige": null
     },
     {
       "id": "chapter_6_eclipse",
       "chapter": "Chapter VI",
+      "title": "Eternal Eclipse",
+      "body": "Daylight dies over the campaign line. Your banner is now one of the final symbols of lawful command.",
       "unlockWave": 60,
       "unlockPrestige": null
     },
     {
       "id": "chapter_7_abyss",
       "chapter": "Chapter VII",
+      "title": "Abyssal Maw",
+      "body": "The monsters no longer retreat. They are converging. Something vast stirs in the deep, drawn by your victories.",
       "unlockWave": 80,
       "unlockPrestige": null
     },
     {
       "id": "chapter_8_ascendant",
       "chapter": "Chapter VIII",
+      "title": "Ascendant Path",
+      "body": "The boundary between mortal and legend begins to dissolve. Your heroes transform. The cost of power becomes visible.",
       "unlockWave": 100,
       "unlockPrestige": null
     },
     {
       "id": "ascension_first",
       "chapter": "Ascension I",
+      "title": "Rebirth Protocol",
+      "body": "Death no longer closes the ledger. You begin rewriting fate through controlled collapse and rebirth cores. Your first cycle completes.",
       "unlockWave": 100,
       "unlockPrestige": 1
     },
     {
       "id": "chapter_9_throne",
       "chapter": "Chapter IX",
+      "title": "Throne of Kings",
+      "body": "Wave 150 marks a reign. Empires rise from your legacies. Ancient records now bear your seal across generations.",
       "unlockWave": 150,
       "unlockPrestige": null
     },
     {
       "id": "chapter_10_eternity",
       "chapter": "Chapter X",
+      "title": "Eternity Engine",
+      "body": "Wave 200. Your heroes' names become myth. The cycles accelerate. You are no longer led by time; you lead it.",
       "unlockWave": 200,
       "unlockPrestige": null
     },
     {
       "id": "ascension_empire",
       "chapter": "Ascension II",
+      "title": "Dynasty Engine",
+      "body": "Your cycles form a war-dynasty. Heroes no longer fight for survival alone, but for succession across eras. Legacy multiplies.",
       "unlockWave": 180,
       "unlockPrestige": 5
     },
     {
       "id": "chapter_11_void",
       "chapter": "Chapter XI",
+      "title": "Void Covenant",
+      "body": "Wave 300. The abyss speaks in your voice now. Cults emerge in your wake, seeking the secret of your infinite return.",
       "unlockWave": 300,
       "unlockPrestige": null
     },
     {
       "id": "chapter_12_transcendence",
       "chapter": "Chapter XII",
+      "title": "Transcendence",
+      "body": "Wave 400. You are no longer mortal. Neither are those who follow you. The cosmos itself bends to your campaign.",
       "unlockWave": 400,
       "unlockPrestige": null
     },
     {
       "id": "ascension_eternal",
       "chapter": "Ascension III",
+      "title": "Eternal Recursion",
+      "body": "Prestige 10+. Your rebirths now create branching timelines. Each cycle feeds the next. You are unstoppable.",
       "unlockWave": 250,
       "unlockPrestige": 10
     },
     {
       "id": "chapter_13_singularity",
       "chapter": "Chapter XIII",
+      "title": "Singularity Breach",
+      "body": "Wave 500. Reality fractures under the weight of your victories. The final monsters are echoes of collapsed universes.",
       "unlockWave": 500,
       "unlockPrestige": null
     },
     {
       "id": "finale_voidthrone",
       "chapter": "Finale",
+      "title": "The Empty Throne",
+      "body": "At the edge of all things, one throne remains unclaimed. The cults, captains, and dynasts now turn toward you. The choice is yours alone.",
       "unlockWave": 300,
       "unlockPrestige": 10
     },
     {
       "id": "ascension_infinite",
       "chapter": "Apotheosis",
+      "title": "Infinite Ascension",
+      "body": "Prestige 25+. You have transcended the limitations of your world. Godhood is no longer a destination—it is a waypoint.",
       "unlockWave": 600,
       "unlockPrestige": 25
     }

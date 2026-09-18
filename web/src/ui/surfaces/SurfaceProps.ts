@@ -174,6 +174,8 @@ export interface SurfaceProps {
     /** The mailbox. `claimAllMail` answers whether anything was waiting. */
     claimMail: (id: string) => boolean;
     claimAllMail: () => boolean;
+    /** Mark a story beat read. False for one nobody wrote, or already read. */
+    markStoryBeatSeen: (id: string) => boolean;
   };
   /** The player's save, for the counters no read model carries yet. */
   save: SaveV3;
