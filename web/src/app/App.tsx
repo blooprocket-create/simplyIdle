@@ -14,8 +14,10 @@ import * as shopActions from './shopActions';
 import * as missionActions from './missionActions';
 import * as calendarActions from './calendarActions';
 import * as dungeonActions from './dungeonActions';
+import * as expeditionActions from './expeditionActions';
 import { teamDps } from '../engine/entities/HeroEntity';
 import type { DungeonId } from '../content/dungeons';
+import type { ExpeditionRarity, ExpeditionType } from '../content/expeditions';
 import { EMPTY_AUTOMATION_STATE, runAutomations } from './automationRunner';
 import { worthBanking } from '../engine/save/bankRun';
 import { bankInto } from './bank';
@@ -366,6 +368,23 @@ export function App() {
         const outcome = dungeonActions.raid(live(), id, Date.now());
         if (outcome) applySave(outcome.save);
         return outcome;
+      },
+      sendExpedition: (type: ExpeditionType, rarity: ExpeditionRarity) => {
+        const outcome = expeditionActions.send(live(), type, rarity, Date.now());
+        if (outcome === null) return false;
+        applySave(outcome.save);
+        return true;
+      },
+      collectExpedition: (id: string) => {
+        const outcome = expeditionActions.collect(live(), id, Date.now());
+        if (outcome === null) return false;
+        applySave(outcome.save);
+        return true;
+      },
+      collectExpeditions: () => {
+        const swept = expeditionActions.collectDue(live(), Date.now());
+        if (swept.completed.length > 0) applySave(swept.save);
+        return swept.completed.length;
       },
       claimWeeklyTrack: (milestone: number) => {
         const claim = calendarActions.claimTrack(live(), milestone);

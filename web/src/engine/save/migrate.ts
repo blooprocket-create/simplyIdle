@@ -8,6 +8,7 @@ import { readVipFromLegacy } from './vipSlice';
 import { readMissions } from '../progression/missions';
 import { readCalendar } from '../progression/calendar';
 import { readDungeons } from '../dungeons/run';
+import { readExpeditions } from '../expeditions/contracts';
 import { readFacilities } from './facilitiesSlice';
 import { roundTo4 } from '../math/safe';
 import {
@@ -316,6 +317,7 @@ export const CLAIMED_V2_KEYS: readonly string[] = [
   'treasureEntriesUsedToday',
   'treasureEntryDay',
   'riftRaidTickets',
+  'expeditionQueue',
 ];
 
 export interface MigrateOptions {
@@ -467,6 +469,7 @@ export function migrateSave(payload: unknown, options: MigrateOptions): SaveV3 {
     missions: readMissions({ claimedMissionIds: raw.claimedMissionIds }),
     calendar: readCalendar(raw, true),
     dungeons: readDungeons(raw, true),
+    expeditions: readExpeditions(raw, true),
     equipment,
     wallet: {
       gold,

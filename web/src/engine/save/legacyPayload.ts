@@ -3,6 +3,7 @@ import { usablesToLegacy } from './usablesSlice';
 import { vipToLegacy } from './vipSlice';
 import { calendarToLegacy } from '../progression/calendar';
 import { dungeonsToLegacy } from '../dungeons/run';
+import { expeditionsToLegacy } from '../expeditions/contracts';
 import { facilitiesToLegacy } from './facilitiesSlice';
 import { STAT_POINTS_PER_LEVEL, statPointsSpent } from './migrate';
 import { LEGACY_SAVE_VERSION, type SaveV3 } from './schema';
@@ -164,6 +165,9 @@ export function toLegacyPayload(save: SaveV3): Record<string, unknown> {
 
     // The two dungeons and their shared ticket pool, back under seven names.
     ...dungeonsToLegacy(save.dungeons),
+
+    // Expeditions still out, in the shape the shipped queue holds them.
+    ...expeditionsToLegacy(save.expeditions),
 
     /*
      * The summon counters, back under the names the shipped state uses.

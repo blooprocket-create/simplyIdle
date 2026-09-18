@@ -5,6 +5,7 @@ import { readVip } from './vipSlice';
 import { readMissions } from '../progression/missions';
 import { readCalendar } from '../progression/calendar';
 import { readDungeons } from '../dungeons/run';
+import { readExpeditions } from '../expeditions/contracts';
 import { readFacilityLevels } from './facilitiesSlice';
 import { VALID_FORMATION_ROLES_FOR_CLASS } from '../combat/formation';
 import {
@@ -310,6 +311,7 @@ export function readSaveV3(payload: unknown, options: MigrateOptions): SaveV3 {
     missions: readMissions(raw.missions),
     calendar: readCalendar(raw.calendar),
     dungeons: readDungeons(raw.dungeons),
+    expeditions: readExpeditions(raw.expeditions),
     equipment,
     wallet: {
       gold,

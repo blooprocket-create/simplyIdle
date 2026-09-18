@@ -7,6 +7,7 @@ import { CodexSurface } from './CodexSurface';
 import { EquipmentSurface } from './EquipmentSurface';
 import { EventsSurface } from './EventsSurface';
 import { DungeonsSurface } from './DungeonsSurface';
+import { ExpeditionsSurface } from './ExpeditionsSurface';
 import { ItemsSurface } from './ItemsSurface';
 import { MissionsSurface } from './MissionsSurface';
 import { RebirthSurface } from './RebirthSurface';
@@ -42,6 +43,7 @@ export const SURFACES: Partial<Record<string, ComponentType<SurfaceProps>>> = {
   missions: MissionsSurface,
   events: EventsSurface,
   dungeons: DungeonsSurface,
+  expeditions: ExpeditionsSurface,
   summon: SummonSurface,
   shop: ShopSurface,
   settings: SettingsSurface,

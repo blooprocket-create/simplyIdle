@@ -7,6 +7,7 @@ import type { SavedUsables } from './usablesSlice';
 import type { SavedVip } from './vipSlice';
 import type { SavedCalendar } from '../progression/calendar';
 import type { SavedDungeons } from '../dungeons/run';
+import type { SavedExpeditions } from '../expeditions/contracts';
 import type { FacilityId } from '../prestige/facilities';
 
 /**
@@ -173,6 +174,14 @@ export interface SaveV3 {
    * it had nowhere typed to put one.
    */
   dungeons: SavedDungeons;
+
+  /**
+   * Expeditions out on contract, claimed out of `legacy` in Phase 11. The
+   * wait is enforced here and is not in the shipped game — see
+   * `engine/expeditions/contracts.ts`, which is the one place that decision
+   * is made.
+   */
+  expeditions: SavedExpeditions;
 
   wallet: {
     gold: number;

@@ -16,6 +16,7 @@ import type { RebirthPreview } from '../../engine/prestige/prestigeSave';
 import type { BuyOutcome, LooseOutcome } from '../../engine/shop/buyOffer';
 import type { DungeonOutcome } from '../../engine/dungeons/run';
 import type { DungeonId } from '../../content/dungeons';
+import type { ExpeditionRarity, ExpeditionType } from '../../content/expeditions';
 import type { SaveV3 } from '../../engine/save/schema';
 
 /**
@@ -163,6 +164,13 @@ export interface SurfaceProps {
      */
     runDungeon: (id: DungeonId) => DungeonOutcome | null;
     raidDungeon: (id: DungeonId) => DungeonOutcome | null;
+    /**
+     * Expeditions. `collectExpeditions` answers how many came home, because
+     * five can be out at once and pressing five buttons is not a design.
+     */
+    sendExpedition: (type: ExpeditionType, rarity: ExpeditionRarity) => boolean;
+    collectExpedition: (id: string) => boolean;
+    collectExpeditions: () => number;
   };
   /** The player's save, for the counters no read model carries yet. */
   save: SaveV3;
