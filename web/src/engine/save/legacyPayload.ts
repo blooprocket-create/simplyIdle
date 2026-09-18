@@ -154,6 +154,9 @@ export function toLegacyPayload(save: SaveV3): Record<string, unknown> {
      */
     ...vipToLegacy(save.vip),
 
+    // The mission goals already collected, back under the v2 name.
+    claimedMissionIds: [...save.missions.claimedIds],
+
     /*
      * The summon counters, back under the names the shipped state uses.
      *

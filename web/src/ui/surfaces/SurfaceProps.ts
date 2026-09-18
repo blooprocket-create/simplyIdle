@@ -145,6 +145,13 @@ export interface SurfaceProps {
     claimVip: (level: number) => boolean;
     recordCodex: () => number;
     claimableCodex: () => number;
+    /**
+     * The mission board. `claimAll` answers how many it collected, because a
+     * returning account can arrive with eight already satisfied and pressing
+     * eight buttons is not a design.
+     */
+    claimMission: (id: string) => boolean;
+    claimAllMissions: () => number;
   };
   /** The player's save, for the counters no read model carries yet. */
   save: SaveV3;

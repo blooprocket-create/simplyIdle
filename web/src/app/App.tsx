@@ -11,6 +11,7 @@ import { canAffordSpark, canSummon, priceOfSummon, rosterActions, sparkExchange,
 import { equipmentActions, migrateLegacyEquipment } from './equipmentActions';
 import { prestigeActions } from './prestigeActions';
 import * as shopActions from './shopActions';
+import * as missionActions from './missionActions';
 import { EMPTY_AUTOMATION_STATE, runAutomations } from './automationRunner';
 import { worthBanking } from '../engine/save/bankRun';
 import { bankInto } from './bank';
@@ -53,6 +54,17 @@ import styles from './App.module.css';
 export function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(() => emptySnapshot());
+  /*
+   * The latest snapshot, for verbs rather than for rendering.
+   *
+   * A verb memoised on `snapshot` would rebuild every callback in the game
+   * sixty times a second; one closing over a stale `snapshot` would price a
+   * mission claim against a wave the player left minutes ago. The ref is
+   * neither, and it is the same arrangement `activeRef` makes for the
+   * automation set two screens up.
+   */
+  const snapshotRef = useRef(snapshot);
+  snapshotRef.current = snapshot;
   const [openId, setOpenId] = useState<string | null>(null);
   const [railOpen, setRailOpen] = useState(false);
   // The loop is held so the one player-driven verb can reach the simulation.
@@ -311,6 +323,23 @@ export function App() {
       // A query: it counts what a sweep would record without recording it, so
       // the disabled button and any badge can both ask the same function.
       claimableCodex: () => shopActions.claimableCodexEntries(save),
+      claimMission: (id: string) => {
+        /*
+         * `snapshotRef` rather than the `snapshot` in scope: this callback is
+         * memoised on the save and the snapshot changes sixty times a second,
+         * so closing over it would either price a claim against a stale wave
+         * or rebuild every verb in the game on every frame.
+         */
+        const outcome = missionActions.claim(live(), snapshotRef.current, id);
+        if (outcome === null) return false;
+        applySave(outcome.save);
+        return true;
+      },
+      claimAllMissions: () => {
+        const swept = missionActions.claimAll(live(), snapshotRef.current);
+        if (swept.claimed.length > 0) applySave(swept.save);
+        return swept.claimed.length;
+      },
     }),
     [save, applySave, applying, live],
   );

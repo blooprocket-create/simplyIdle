@@ -5,6 +5,7 @@ import { PITY_THRESHOLD } from '../roster/summon';
 import { readEquipment } from './equipmentSlice';
 import { readUsables } from './usablesSlice';
 import { readVipFromLegacy } from './vipSlice';
+import { readMissions } from '../progression/missions';
 import { readFacilities } from './facilitiesSlice';
 import { roundTo4 } from '../math/safe';
 import {
@@ -299,6 +300,7 @@ export const CLAIMED_V2_KEYS: readonly string[] = [
   'vipRewardClaimedLevels',
   'codexVipClaimedHeroIds',
   'codexVipClaimedUniqueIds',
+  'claimedMissionIds',
 ];
 
 export interface MigrateOptions {
@@ -447,6 +449,7 @@ export function migrateSave(payload: unknown, options: MigrateOptions): SaveV3 {
     facilities,
     usables,
     vip: readVipFromLegacy(raw),
+    missions: readMissions({ claimedMissionIds: raw.claimedMissionIds }),
     equipment,
     wallet: {
       gold,

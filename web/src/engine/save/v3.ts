@@ -2,6 +2,7 @@ import type { FormationRole } from '../combat/formation';
 import { readEquipment } from './equipmentSlice';
 import { readUsables } from './usablesSlice';
 import { readVip } from './vipSlice';
+import { readMissions } from '../progression/missions';
 import { readFacilityLevels } from './facilitiesSlice';
 import { VALID_FORMATION_ROLES_FOR_CLASS } from '../combat/formation';
 import {
@@ -304,6 +305,7 @@ export function readSaveV3(payload: unknown, options: MigrateOptions): SaveV3 {
     facilities: readFacilityLevels(raw.facilities),
     usables: readUsables(raw.usables),
     vip: readVip(raw.vip),
+    missions: readMissions(raw.missions),
     equipment,
     wallet: {
       gold,

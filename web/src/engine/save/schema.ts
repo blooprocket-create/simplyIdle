@@ -150,6 +150,12 @@ export interface SaveV3 {
    */
   vip: SavedVip;
 
+  /**
+   * Mission goals already collected, claimed out of `legacy` in Phase 11
+   * because this is the phase with a board to claim them on.
+   */
+  missions: { claimedIds: string[] };
+
   wallet: {
     gold: number;
     totalGold: number;
