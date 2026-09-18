@@ -395,7 +395,7 @@ Which is the actual blocker, and it is structural: **every remaining automation 
 ### Phase 10 — The economy *(~3 weeks)*
 Shops and everything spendable: `BUY_GOLD_SHOP_ITEM`, `BUY_DIAMOND_SHOP_ITEM`, `BUY_PREMIUM_COOLANT`, `USE_USABLE_ITEM`, `SIMULATE_DOLLAR_PURCHASE`; skills via `BUY_SKILL` and `CAST_HERO_ACTIVE`; prestige via `REBIRTH`, `SPEND_REBIRTH_CORE`, `SPEND_ESSENCE_UPGRADE`, `UPGRADE_FACILITY`; VIP via `CLAIM_VIP_REWARD`, `CLAIM_CODEX_HERO_VIP`, `CLAIM_CODEX_UNIQUE_VIP`. Content: `USABLE_ITEMS`, `SKILLS`, `REBIRTH_BONUS`, `REBIRTH_WAVE_THRESHOLD`, `COST_SCALE`, `GIFT_AMOUNTS`.
 
-**All nine `auto*` flags finally have systems** — `usePotion`, `useCoolant` and `castHeroActives` land here, and the earn-then-choose gate built in Phase 4 stops being a policy with one subject.
+**All nine `auto*` flags finally have systems** — `usePotion`, `useCoolant` and `castHeroActives` land here, and the earn-then-choose gate built in Phase 4 stops being a policy with one subject. *(There are eight, not nine, and seven of them land here. See the note below.)*
 
 Gold and EXP arrived early, in Phase 8 — see the note there. What is left for this phase on the currency side is the part that actually needed the shops: **spending**, the seven other currencies, and the multiplier chain itself. `RewardRates` carries that chain as one measured scalar today, exactly as `OfflineConditions` does, so assembling it here means replacing a number rather than rewriting the callers.
 
@@ -437,7 +437,15 @@ The line above says all nine flags get systems here. Seven do. The gate `ui/arch
 - **`app/automationRunner.ts`** — `summon`, `recycle`, `dismantle`. Currency and roster, on the save's cadence, gated by construction rather than by a regex.
 - **`app/GameLoop.ts`** — `usePotion`, and only `usePotion`. Its trigger is the team's health, which only the fight knows, and its cost is an item in the bag, which only the save holds. Neither of the other two could own it alone.
 
-`tempo` and `useCoolant` are the two left with a system to wait for, and it is the same one: **heat**. `equipBest` waits on something different again — no rule for it has been ported or measured, and `AUTO_EQUIP_BEST_HEROES` is misnamed, since it fields the strongest heroes rather than equipping anyone.
+`tempo` and `useCoolant` are the two left, and they wait on the same thing: **heat**.
+
+#### And there were only ever eight
+
+The line above says nine flags. There are eight. The ninth the catalogue carried was `equipBest`, keyed to `autoEquipBestHeroes` — which is not a flag: it is the name of a `useCallback` dispatching a one-shot action from a button, and the shipped state has no boolean by that name. Enumerated off `DEFAULT_STATE` rather than argued, in `__tests__/bestTeamFixture.test.ts`.
+
+So it was never an automation waiting on a rule nobody had ported. It is a **verb**, and it has sat in a catalogue of automatic things for six phases being described as one — which is exactly why every note about it said "no rule has been ported or measured" and nobody found one. They were looking for the wrong shape.
+
+It is a button on the Party screen now, and `engine/roster/bestTeam.ts` is the rule: a four-key sort — rarity, the rebirth multiplier (with a ten-thousandth of tolerance, so 1.00005 and 1 tie), level, team boost — handed to the ordinary selection rules, which decide who fits. The sort only *proposes*: the third-best hero in the game is passed over for the worst one when their rank is full, with four slots still empty. The catalogue now checks that every flag it names ends in `Enabled`, which is the property the missing one did not have.
 
 #### Left for later phases, named rather than implied
 
