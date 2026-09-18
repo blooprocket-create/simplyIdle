@@ -14,6 +14,11 @@ import type { FacilityId } from '../../engine/prestige/facilities';
 import type { PrestigePath } from '../../engine/prestige/rebirth';
 import type { RebirthPreview } from '../../engine/prestige/prestigeSave';
 import type { BuyOutcome, LooseOutcome } from '../../engine/shop/buyOffer';
+import type { DungeonOutcome } from '../../engine/dungeons/run';
+import type { DungeonId } from '../../content/dungeons';
+import type { ExpeditionType } from '../../content/expeditions';
+import type { MiniOpOutcome } from '../../engine/minigames/miniOps';
+import type { BountyDraft, ReconOutcome } from '../../content/miniOps';
 import type { SaveV3 } from '../../engine/save/schema';
 
 /**
@@ -145,6 +150,60 @@ export interface SurfaceProps {
     claimVip: (level: number) => boolean;
     recordCodex: () => number;
     claimableCodex: () => number;
+    /**
+     * The mission board. `claimAll` answers how many it collected, because a
+     * returning account can arrive with eight already satisfied and pressing
+     * eight buttons is not a design.
+     */
+    claimMission: (id: string) => boolean;
+    claimAllMissions: () => number;
+    /** One rung of the weekly track. The login and the rollover are not verbs. */
+    claimWeeklyTrack: (milestone: number) => boolean;
+    /**
+     * The two dungeons. Both answer what happened rather than a boolean: a
+     * run that got 40% of the way through a vault and a run that cleared it
+     * are two different things to tell a player about.
+     */
+    runDungeon: (id: DungeonId) => DungeonOutcome | null;
+    raidDungeon: (id: DungeonId) => DungeonOutcome | null;
+    /**
+     * Expeditions. `collectExpeditions` answers how many came home, because
+     * five can be out at once and pressing five buttons is not a design.
+     */
+    /*
+     * A destination, not a rarity. What a destination costs and pays is
+     * whatever its contract board is offering today, and the board is read
+     * inside the engine — so there is no rarity for a surface to get wrong.
+     */
+    sendExpedition: (type: ExpeditionType) => boolean;
+    /** Reroll the board for a hundred thousand gold. False when it is short. */
+    refreshContracts: () => boolean;
+    collectExpedition: (id: string) => boolean;
+    collectExpeditions: () => number;
+    /** The mailbox. `claimAllMail` answers whether anything was waiting. */
+    claimMail: (id: string) => boolean;
+    claimAllMail: () => boolean;
+    /** Mark a story beat read. False for one nobody wrote, or already read. */
+    markStoryBeatSeen: (id: string) => boolean;
+    /*
+     * The four mini ops, and the writ.
+     *
+     * Each takes the **outcome the surface produced** — the face it rolled,
+     * the card the player turned, whether the code cracked, where the meter
+     * stopped — rather than rolling for itself. That is the shipped seam: no
+     * screen in the old game leaves the result to the reducer, and the engine
+     * may not read a generator anyway. They answer what was paid, because a
+     * roll of 20 and a roll of 3 are both successes and a boolean cannot tell
+     * a player which they got.
+     */
+    playDice: (roll: number) => MiniOpOutcome | null;
+    playRecon: (outcome: ReconOutcome) => MiniOpOutcome | null;
+    playLockpick: (cracked: boolean) => MiniOpOutcome | null;
+    playTarget: (score: number, shardMultiplier: number) => MiniOpOutcome | null;
+    /** The writ. `abandonBounty` drops it without refunding the press. */
+    acceptBounty: (draft: BountyDraft) => boolean;
+    claimBounty: () => MiniOpOutcome | null;
+    abandonBounty: () => boolean;
   };
   /** The player's save, for the counters no read model carries yet. */
   save: SaveV3;

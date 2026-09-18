@@ -32,6 +32,7 @@ export function bankRun(save: SaveV3, banked: BankedRun): SaveV3 {
   const gold = toNumber(banked.gold);
   const gain = applyExp(save.progression.level, save.progression.exp, toNumber(banked.exp));
   const fielded = new Set(save.roster.activeUids);
+  const kills = Math.max(0, Math.floor(banked.kills));
 
   return {
     ...save,
@@ -52,7 +53,29 @@ export function bankRun(save: SaveV3, banked: BankedRun): SaveV3 {
       level: gain.level,
       exp: gain.exp,
       totalExp: save.progression.totalExp + toNumber(banked.exp),
+      /*
+       * The two lifetime tallies, which were earned by every run and banked by
+       * none. `totalKills` gates five achievements and two automations;
+       * `highestWave` gates the rebirth button and both team-slot purchases.
+       * Both were written by the save reader and by nothing after it, so a
+       * player who fought to wave 200 found rebirth still locked and a player
+       * with ten thousand kills had, as far as the account was concerned,
+       * none.
+       *
+       * The deepest wave only ever climbs. A run that wiped back a chapter is
+       * still a run that got there, which is the same rule the shipped
+       * `highestWaveReached` follows.
+       */
+      totalKills: save.progression.totalKills + kills,
+      highestWave: Math.max(save.progression.highestWave, Math.floor(banked.wave)),
     },
+    /*
+     * And the week's kills, which the weekly track is measured on. Third of
+     * the three tallies a run earns and nothing was crediting — the rollover
+     * clears it, so it is the one that is *meant* to go backwards, and only
+     * there.
+     */
+    calendar: { ...save.calendar, weeklyKills: save.calendar.weeklyKills + kills },
     stats: { ...save.stats, unspent: save.stats.unspent + gain.statPoints },
     roster: {
       ...save.roster,

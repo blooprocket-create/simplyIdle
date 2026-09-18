@@ -9,7 +9,7 @@ import { retuneFight, type FightTuning } from './combat/retune';
 import { BURST_HIT_UID, TELL_HIT_UID, type BurstQuality } from './combat/burst';
 import { BurstMeter } from './combat/BurstMeter';
 import { applyHit, spawnEnemy, type Enemy } from './combat/encounter';
-import { FLAT_RATES, RunEarnings, type RewardRates } from './combat/rewards';
+import { FLAT_RATES, RunEarnings, type BankedRun, type RewardRates } from './combat/rewards';
 import { seededRandom } from './rng';
 import { applyIncoming, fullHealth, healTeam, type TeamVitals } from './combat/survival';
 import { scheduleSwings } from './combat/swingSchedule';
@@ -342,8 +342,8 @@ export class Simulation {
    * Zeroes the run's tally in the same breath, which is the point: the two
    * must never both hold the same coin. See `RunEarnings.bank`.
    */
-  bank(): ReturnType<RunEarnings['bank']> {
-    return this.earnings.bank();
+  bank(): BankedRun {
+    return { ...this.earnings.bank(), wave: this.enemy.wave };
   }
 
   /**

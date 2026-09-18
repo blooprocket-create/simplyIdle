@@ -2,6 +2,13 @@ import type { FormationRole } from '../combat/formation';
 import { readEquipment } from './equipmentSlice';
 import { readUsables } from './usablesSlice';
 import { readVip } from './vipSlice';
+import { readMissions } from '../progression/missions';
+import { readCalendar } from '../progression/calendar';
+import { readDungeons } from '../dungeons/run';
+import { readExpeditions } from '../expeditions/contracts';
+import { readMailbox } from '../mail/mailbox';
+import { readMiniOps } from '../minigames/miniOps';
+import { readStory } from '../progression/story';
 import { readFacilityLevels } from './facilitiesSlice';
 import { VALID_FORMATION_ROLES_FOR_CLASS } from '../combat/formation';
 import {
@@ -304,6 +311,13 @@ export function readSaveV3(payload: unknown, options: MigrateOptions): SaveV3 {
     facilities: readFacilityLevels(raw.facilities),
     usables: readUsables(raw.usables),
     vip: readVip(raw.vip),
+    missions: readMissions(raw.missions),
+    calendar: readCalendar(raw.calendar),
+    dungeons: readDungeons(raw.dungeons),
+    expeditions: readExpeditions(raw.expeditions),
+    mail: readMailbox(raw.mail),
+    story: readStory(raw.story),
+    miniOps: readMiniOps(raw.miniOps, nowMs),
     equipment,
     wallet: {
       gold,

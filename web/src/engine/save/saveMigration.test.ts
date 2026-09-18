@@ -143,15 +143,30 @@ describe('nothing is dropped', () => {
   });
 
   it('leaves a real account with a substantial legacy blob, not an empty one', () => {
-    // A v2 save is about 120 fields and this migration types roughly 40 of
-    // them. If `legacy` ever came back near-empty it would mean the carry had
-    // silently stopped working, and the loss would not surface until someone
-    // went looking for a field years later.
+    /*
+     * A v2 save is about 120 fields and the typed slice takes a growing share
+     * of them. If `legacy` ever came back near-empty it would mean the carry
+     * had silently stopped working, and the loss would not surface until
+     * someone went looking for a field years later.
+     *
+     * The floor comes **down** as phases claim keys — it was 60 before Phase
+     * 11 took the mission list, the six calendar fields, the dungeons, the
+     * mailbox, the story beats, the seven mini-op keys and the contract board
+     * — and lowering it is the honest move rather than a retune: what it
+     * guards is the carry still happening at all, not a particular count. The
+     * three named keys below are what actually make it bite.
+     *
+     * `mailbox` was the third of them until Phase 11 claimed it, so the
+     * example moved to `summonHistory` — which is the most durable choice
+     * available: `schema.ts` records it as deliberately *never* claimable,
+     * because writing it back needs the catalogue and the engine may not read
+     * one.
+     */
     const { result } = migrateCase('veteran');
-    expect(Object.keys(result.legacy).length).toBeGreaterThan(60);
+    expect(Object.keys(result.legacy).length).toBeGreaterThan(35);
     expect(result.legacy.achievements).toBeDefined();
     expect(result.legacy.classMasteryXp).toBeDefined();
-    expect(result.legacy.mailbox).toBeDefined();
+    expect(result.legacy.summonHistory).toBeDefined();
   });
 
   it('has stopped leaving equipment, the guildhall or the usables in the bag', () => {
@@ -178,6 +193,10 @@ describe('nothing is dropped', () => {
       'autoDismantleRarityFloor',
       'guildhallFacilities',
       'usableItemCounts',
+      'mailbox',
+      'miniBounty',
+      'lastDiceRollDay',
+      'expeditionContractOffers',
     ]) {
       expect({ key, inLegacy: key in result.legacy }).toEqual({ key, inLegacy: false });
     }

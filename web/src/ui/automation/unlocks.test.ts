@@ -25,11 +25,20 @@ describe('earning an automation', () => {
     expect(isUnlocked('burst', profileWith({ totalKills: burst.goal }), emptySnapshot())).toBe(true);
   });
 
-  it('counts this run towards it, not just the save', () => {
-    // Otherwise the unlock could not be earned in the session that earns it.
+  it('reaches the goal through the bank rather than by adding the run on top', () => {
+    /*
+     * This asserted that a run's kills were added to the saved figure, on the
+     * grounds that "otherwise the unlock could not be earned in the session
+     * that earns it". That was true while nothing banked a run's kills.
+     * `bankRun` credits them now, on the shell's save cadence, so the unlock
+     * still arrives within a tick — and adding them on top would count every
+     * banked kill twice, because `snapshot.totals.kills` is the whole run and
+     * not the unbanked part of it.
+     */
     const burst = automationById('burst');
     if (!burst) return;
-    expect(isUnlocked('burst', profileWith({ totalKills: burst.goal - 10 }), killedThisRun(10))).toBe(true);
+    expect(isUnlocked('burst', profileWith({ totalKills: burst.goal - 10 }), killedThisRun(10))).toBe(false);
+    expect(isUnlocked('burst', profileWith({ totalKills: burst.goal }), killedThisRun(10))).toBe(true);
   });
 
   it('never reports one this build cannot honour, however far past the goal', () => {

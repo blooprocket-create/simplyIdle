@@ -1,0 +1,142 @@
+{
+  "note": "The mailbox and the welcome gift, measured through the shipped reducer.",
+  "generatedFrom": "src/useGameState.ts CREATE_CHARACTER, src/reducers/economyReducer.ts",
+  "onCreation": {
+    "startingGold": 100,
+    "mailCount": 1,
+    "welcomeGift": {
+      "gold": 10000000,
+      "shards": 50000,
+      "diamonds": 500,
+      "essence": 500,
+      "tears": 20
+    }
+  },
+  "partialClaims": [
+    {
+      "key": "gold",
+      "paid": {
+        "gold": 10000000,
+        "shards": 0,
+        "diamonds": 0,
+        "essence": 0,
+        "tears": 0
+      },
+      "leftOnMessage": {
+        "gold": 0,
+        "shards": 50000,
+        "diamonds": 500,
+        "essence": 500,
+        "tears": 20
+      }
+    },
+    {
+      "key": "shards",
+      "paid": {
+        "gold": 0,
+        "shards": 50000,
+        "diamonds": 0,
+        "essence": 0,
+        "tears": 0
+      },
+      "leftOnMessage": {
+        "gold": 10000000,
+        "shards": 0,
+        "diamonds": 500,
+        "essence": 500,
+        "tears": 20
+      }
+    },
+    {
+      "key": "diamonds",
+      "paid": {
+        "gold": 0,
+        "shards": 0,
+        "diamonds": 500,
+        "essence": 0,
+        "tears": 0
+      },
+      "leftOnMessage": {
+        "gold": 10000000,
+        "shards": 50000,
+        "diamonds": 0,
+        "essence": 500,
+        "tears": 20
+      }
+    },
+    {
+      "key": "essence",
+      "paid": {
+        "gold": 0,
+        "shards": 0,
+        "diamonds": 0,
+        "essence": 500,
+        "tears": 0
+      },
+      "leftOnMessage": {
+        "gold": 10000000,
+        "shards": 50000,
+        "diamonds": 500,
+        "essence": 0,
+        "tears": 20
+      }
+    },
+    {
+      "key": "tears",
+      "paid": {
+        "gold": 0,
+        "shards": 0,
+        "diamonds": 0,
+        "essence": 0,
+        "tears": 20
+      },
+      "leftOnMessage": {
+        "gold": 10000000,
+        "shards": 50000,
+        "diamonds": 500,
+        "essence": 500,
+        "tears": 0
+      }
+    }
+  ],
+  "claimAll": {
+    "gold": 10000000,
+    "shards": 50000,
+    "diamonds": 500,
+    "essence": 500,
+    "tears": 20
+  },
+  "recordsWhatItPaid": true,
+  "refusals": [
+    {
+      "name": "a mail nobody has",
+      "paid": {
+        "gold": 0,
+        "shards": 0,
+        "diamonds": 0,
+        "essence": 0,
+        "tears": 0
+      }
+    },
+    {
+      "name": "an attachment already taken",
+      "paid": {
+        "gold": 0,
+        "shards": 0,
+        "diamonds": 0,
+        "essence": 0,
+        "tears": 0
+      }
+    },
+    {
+      "name": "claiming all of an empty mailbox",
+      "paid": {
+        "gold": 0,
+        "shards": 0,
+        "diamonds": 0,
+        "essence": 0,
+        "tears": 0
+      }
+    }
+  ]
+}

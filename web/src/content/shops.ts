@@ -26,8 +26,10 @@ import { getUsableItem } from './usableItems';
  * ones a run finds, and there the item was free. Charging diamonds for it is
  * the gold-sink mistake the skills tree was declined for.
  *
- * Raid tickets are the same shape with a different missing half: the ticket
- * works, and there is nowhere to spend it until dungeons land.
+ * Raid tickets *were* the same shape with a different missing half — the
+ * ticket worked and there was nowhere to spend it. Phase 11 built the two
+ * dungeons, so that offer is on sale, and its row is the worked example of
+ * what withholding is for: one flag, and nothing else about it changed.
  *
  * All of them stay listed, priced and described, because a shop that showed
  * three offers would be telling the player this game sells three. Each one
@@ -139,8 +141,11 @@ export const SHOP_OFFERS: readonly ShopOffer[] = [
     detail: 'One run at a dungeon.',
     grants: [],
     raidTickets: 1,
-    available: false,
-    unavailableBecause: 'There are no dungeons to spend it on yet.',
+    // Available as of Phase 11, which built the two dungeons a ticket opens.
+    // It pays the level *below* the one you are on, outright, and leaves the
+    // day's free entries alone — which is what a ticket is for.
+    available: true,
+    unavailableBecause: null,
   },
 ];
 

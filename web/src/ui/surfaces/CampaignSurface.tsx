@@ -3,8 +3,48 @@ import { bossMechanicForAct } from '../../content/bossMechanics';
 import { getMonsterForWave, isBossWave } from '../../content/monsters';
 import { CHAPTER_WAVES, chapterStartWave } from '../../engine/combat/chapters';
 import { barFraction } from '../../game/fx/ratio';
+import { missingGate, nextBeat, STORY_BEAT_COUNT, type StoryBeat, type StoryProgress } from '../../content/story';
+import { unreadBeats } from '../../engine/progression/story';
+import type { SaveV3 } from '../../engine/save/schema';
 import type { SurfaceProps } from './SurfaceProps';
 import { Empty, Meter, Row, Rows, Section } from './parts/parts';
+
+/**
+ * The story, on the screen the story is about.
+ *
+ * A `dashboard` cannot scroll nineteen beats, and it does not need to: what a
+ * player wants here is the one they have not read and a line saying what the
+ * next one is waiting on. The full list is the Codex's job.
+ */
+export interface StoryView {
+  /** The earliest unlocked beat they have not read, or null. */
+  unread: StoryBeat | null;
+  unreadCount: number;
+  readCount: number;
+  next: StoryBeat | null;
+  /** What the next one is waiting on. Null when there is no next one. */
+  needs: { wave: boolean; prestige: boolean } | null;
+}
+
+export function storyView(save: SaveV3, progress: StoryProgress): StoryView {
+  const unread = unreadBeats(save, progress);
+  const next = nextBeat(progress);
+  return {
+    unread: unread[0] ?? null,
+    unreadCount: unread.length,
+    readCount: save.story.seenIds.length,
+    next,
+    needs: next === null ? null : missingGate(next, progress),
+  };
+}
+
+/** What the next-beat row says, which is the gate rather than always a wave. */
+export function nextBeatHint(view: StoryView): string {
+  if (view.next === null) return 'Every beat unlocked';
+  if (view.needs?.prestige && !view.needs.wave) return `Needs rebirth ${view.next.unlockPrestige}`;
+  if (view.needs?.prestige) return `Wave ${view.next.unlockWave}, and rebirth ${view.next.unlockPrestige}`;
+  return `Wave ${view.next.unlockWave}`;
+}
 
 /**
  * Where the fight is. A `dashboard`, so the fight stays visible behind it —
@@ -29,7 +69,7 @@ function unlockHint(unlock: string | null): string {
   return `Unlocks ${words}`;
 }
 
-export function CampaignSurface({ snapshot }: SurfaceProps) {
+export function CampaignSurface({ snapshot, profile, save, actions }: SurfaceProps) {
   const wave = snapshot.wave;
   const act = getActForWave(wave);
   const start = chapterStartWave(wave);
@@ -53,27 +93,54 @@ export function CampaignSurface({ snapshot }: SurfaceProps) {
    */
   const mechanic = bossMechanicForAct(act.id);
   const teamPercent = Math.round(barFraction(snapshot.team.hp, snapshot.team.maxHp) * 100);
+  // The record rather than this run: a beat unlocks on the deepest wave the
+  // account ever reached, so wiping back a chapter does not lock the story.
+  const story = storyView(save, {
+    highestWave: Math.max(profile.highestWave, snapshot.wave),
+    prestigeCount: profile.prestigeCount,
+  });
 
   return (
-    <Section title={`Act ${act.id} — ${act.name}`}>
-      <Rows>
-        <Row label="Wave" hint={isBossWave(wave) ? 'Boss wave' : `Chapter starts at ${start}`}>
-          {wave}
-        </Row>
-        <Row label="Facing">
-          {monster.emoji} {monster.name}
-        </Row>
-        <Row label="Act boss" hint={`${mechanic.name} · ${unlockHint(act.unlock)}`}>
-          Wave {act.bossWave}
-        </Row>
-        <Row label="Enemy health" hint={`Team at ${teamPercent}%`}>
-          {snapshot.enemy === null
-            ? 'Between waves'
-            : `${Math.round(barFraction(snapshot.enemy.hp, snapshot.enemy.maxHp) * 100)}%`}
-        </Row>
-      </Rows>
-      <Meter fraction={throughChapter} tone="gold" label="Progress through this chapter" />
-      <Empty>{mechanic.tell}</Empty>
-    </Section>
+    <>
+      <Section title={`Act ${act.id} — ${act.name}`}>
+        <Rows>
+          <Row label="Wave" hint={isBossWave(wave) ? 'Boss wave' : `Chapter starts at ${start}`}>
+            {wave}
+          </Row>
+          <Row label="Facing">
+            {monster.emoji} {monster.name}
+          </Row>
+          <Row label="Act boss" hint={`${mechanic.name} · ${unlockHint(act.unlock)}`}>
+            Wave {act.bossWave}
+          </Row>
+          <Row label="Enemy health" hint={`Team at ${teamPercent}%`}>
+            {snapshot.enemy === null
+              ? 'Between waves'
+              : `${Math.round(barFraction(snapshot.enemy.hp, snapshot.enemy.maxHp) * 100)}%`}
+          </Row>
+        </Rows>
+        <Meter fraction={throughChapter} tone="gold" label="Progress through this chapter" />
+        <Empty>{mechanic.tell}</Empty>
+      </Section>
+
+      <Section title="Story">
+        <Rows>
+          {story.unread === null ? (
+            <Row label="Nothing new" hint={`${story.readCount} of ${STORY_BEAT_COUNT} read`}>
+              —
+            </Row>
+          ) : (
+            <Row label={`${story.unread.chapter} — ${story.unread.title}`} hint={story.unread.body}>
+              <button type="button" onClick={() => actions.markStoryBeatSeen(story.unread!.id)}>
+                {story.unreadCount > 1 ? `Read (${story.unreadCount} waiting)` : 'Read'}
+              </button>
+            </Row>
+          )}
+          <Row label="Next beat" hint={nextBeatHint(story)}>
+            {story.next === null ? 'Complete' : story.next.title}
+          </Row>
+        </Rows>
+      </Section>
+    </>
   );
 }

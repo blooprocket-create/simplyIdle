@@ -152,7 +152,7 @@ export function autoPotionThresholdFromLegacy(save: SaveV3): number {
 
 /** Which weekly event is running, out of the bag. Its rotation is Phase 11's. */
 export function weeklyEventWeekFromLegacy(save: SaveV3): number {
-  return boundedInt(save.legacy.weeklyEventWeek, 0, MAX_WEEKLY_EVENT_WEEK, 0);
+  return boundedInt(save.calendar.weeklyEventWeek, 0, MAX_WEEKLY_EVENT_WEEK, 0);
 }
 
 /**

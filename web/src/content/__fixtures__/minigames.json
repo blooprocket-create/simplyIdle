@@ -1,0 +1,683 @@
+{
+  "note": "The four mini ops and the bounty draft, measured through the shipped reducer.",
+  "generatedFrom": "src/reducers/minigamesReducer.ts",
+  "cooldownMs": [
+    {
+      "op": "dice",
+      "field": "lastDiceRollDay",
+      "measuredMs": 14400000
+    },
+    {
+      "op": "lockpick",
+      "field": "lastLockpickDay",
+      "measuredMs": 14400000
+    },
+    {
+      "op": "target",
+      "field": "lastTargetPracticeDay",
+      "measuredMs": 14400000
+    }
+  ],
+  "cooldownWindow": [
+    {
+      "gapMs": -2592000000,
+      "open": false
+    },
+    {
+      "gapMs": -3600000,
+      "open": false
+    },
+    {
+      "gapMs": -1,
+      "open": false
+    },
+    {
+      "gapMs": 0,
+      "open": false
+    },
+    {
+      "gapMs": 1,
+      "open": false
+    },
+    {
+      "gapMs": 14399999,
+      "open": false
+    },
+    {
+      "gapMs": 14400000,
+      "open": true
+    },
+    {
+      "gapMs": 14400001,
+      "open": true
+    },
+    {
+      "gapMs": 2592000000,
+      "open": true
+    }
+  ],
+  "cooldownNaming": {
+    "fields": [
+      "lastDiceRollDay",
+      "lastReconSweepDay",
+      "lastLockpickDay",
+      "lastTargetPracticeDay",
+      "lastBountyDraftDay"
+    ],
+    "allNamedDay": true,
+    "measuredHours": 4,
+    "clampCanChangeTheAnswer": false
+  },
+  "dice": [
+    {
+      "roll": 1,
+      "diamonds": 5,
+      "shards": 0
+    },
+    {
+      "roll": 2,
+      "diamonds": 5,
+      "shards": 0
+    },
+    {
+      "roll": 3,
+      "diamonds": 5,
+      "shards": 0
+    },
+    {
+      "roll": 4,
+      "diamonds": 5,
+      "shards": 0
+    },
+    {
+      "roll": 5,
+      "diamonds": 5,
+      "shards": 0
+    },
+    {
+      "roll": 6,
+      "diamonds": 5,
+      "shards": 0
+    },
+    {
+      "roll": 7,
+      "diamonds": 5,
+      "shards": 0
+    },
+    {
+      "roll": 8,
+      "diamonds": 5,
+      "shards": 0
+    },
+    {
+      "roll": 9,
+      "diamonds": 8,
+      "shards": 0
+    },
+    {
+      "roll": 10,
+      "diamonds": 8,
+      "shards": 0
+    },
+    {
+      "roll": 11,
+      "diamonds": 8,
+      "shards": 0
+    },
+    {
+      "roll": 12,
+      "diamonds": 8,
+      "shards": 0
+    },
+    {
+      "roll": 13,
+      "diamonds": 12,
+      "shards": 0
+    },
+    {
+      "roll": 14,
+      "diamonds": 12,
+      "shards": 0
+    },
+    {
+      "roll": 15,
+      "diamonds": 12,
+      "shards": 180
+    },
+    {
+      "roll": 16,
+      "diamonds": 12,
+      "shards": 192
+    },
+    {
+      "roll": 17,
+      "diamonds": 18,
+      "shards": 204
+    },
+    {
+      "roll": 18,
+      "diamonds": 18,
+      "shards": 216
+    },
+    {
+      "roll": 19,
+      "diamonds": 18,
+      "shards": 228
+    },
+    {
+      "roll": 20,
+      "diamonds": 30,
+      "shards": 240
+    }
+  ],
+  "diceScreenCopy": {
+    "agrees": true,
+    "copies": [
+      "src/reducers/minigamesReducer.ts",
+      "src/screens/GameScreen.tsx:getDiceOutcome"
+    ]
+  },
+  "recon": [
+    {
+      "outcome": "intel_gold",
+      "result": {
+        "diamonds": 0,
+        "shards": 0,
+        "gold": 1160586,
+        "totalGold": 1160586,
+        "buffPct": 0,
+        "buffMs": 0
+      }
+    },
+    {
+      "outcome": "intel_shards",
+      "result": {
+        "diamonds": 0,
+        "shards": 256,
+        "gold": 1160586,
+        "totalGold": 1160586,
+        "buffPct": 0,
+        "buffMs": 0
+      }
+    },
+    {
+      "outcome": "intel_buff",
+      "result": {
+        "diamonds": 0,
+        "shards": 0,
+        "gold": 1160586,
+        "totalGold": 1160586,
+        "buffPct": 0.18,
+        "buffMs": 120000
+      }
+    },
+    {
+      "outcome": "ambush",
+      "result": {
+        "diamonds": 0,
+        "shards": 0,
+        "gold": 406205,
+        "totalGold": 406205,
+        "buffPct": 0,
+        "buffMs": 0
+      }
+    }
+  ],
+  "bossWaveGold": [
+    {
+      "wave": 49,
+      "isBoss": false,
+      "recon": 144486,
+      "lockpick": 160540,
+      "bountyGold": 521755
+    },
+    {
+      "wave": 50,
+      "isBoss": true,
+      "recon": 1160586,
+      "lockpick": 1289540,
+      "bountyGold": 4191005
+    },
+    {
+      "wave": 51,
+      "isBoss": false,
+      "recon": 190278,
+      "lockpick": 211420,
+      "bountyGold": 687115
+    },
+    {
+      "wave": 99,
+      "isBoss": false,
+      "recon": 54329760,
+      "lockpick": 60366400,
+      "bountyGold": 196190800
+    },
+    {
+      "wave": 100,
+      "isBoss": true,
+      "recon": 433551510,
+      "lockpick": 481723900,
+      "bountyGold": 1565602675
+    },
+    {
+      "wave": 101,
+      "isBoss": false,
+      "recon": 70606962,
+      "lockpick": 78452180,
+      "bountyGold": 254969585
+    }
+  ],
+  "lockpick": [
+    {
+      "success": true,
+      "result": {
+        "diamonds": 88,
+        "shards": 0,
+        "gold": 0,
+        "totalGold": 0,
+        "buffPct": 0,
+        "buffMs": 0
+      }
+    },
+    {
+      "success": false,
+      "result": {
+        "diamonds": 0,
+        "shards": 0,
+        "gold": 1289540,
+        "totalGold": 1289540,
+        "buffPct": 0,
+        "buffMs": 0
+      }
+    }
+  ],
+  "target": [
+    {
+      "score": 0,
+      "weekNumber": 0,
+      "shardMultiplier": 1,
+      "result": {
+        "diamonds": 2,
+        "shards": 104,
+        "gold": 0,
+        "totalGold": 0,
+        "buffPct": 0,
+        "buffMs": 0
+      }
+    },
+    {
+      "score": 0,
+      "weekNumber": 5,
+      "shardMultiplier": 2.5,
+      "result": {
+        "diamonds": 2,
+        "shards": 260,
+        "gold": 0,
+        "totalGold": 0,
+        "buffPct": 0,
+        "buffMs": 0
+      }
+    },
+    {
+      "score": 59,
+      "weekNumber": 0,
+      "shardMultiplier": 1,
+      "result": {
+        "diamonds": 2,
+        "shards": 104,
+        "gold": 0,
+        "totalGold": 0,
+        "buffPct": 0,
+        "buffMs": 0
+      }
+    },
+    {
+      "score": 59,
+      "weekNumber": 5,
+      "shardMultiplier": 2.5,
+      "result": {
+        "diamonds": 2,
+        "shards": 260,
+        "gold": 0,
+        "totalGold": 0,
+        "buffPct": 0,
+        "buffMs": 0
+      }
+    },
+    {
+      "score": 60,
+      "weekNumber": 0,
+      "shardMultiplier": 1,
+      "result": {
+        "diamonds": 6,
+        "shards": 172,
+        "gold": 0,
+        "totalGold": 0,
+        "buffPct": 0,
+        "buffMs": 0
+      }
+    },
+    {
+      "score": 60,
+      "weekNumber": 5,
+      "shardMultiplier": 2.5,
+      "result": {
+        "diamonds": 6,
+        "shards": 430,
+        "gold": 0,
+        "totalGold": 0,
+        "buffPct": 0,
+        "buffMs": 0
+      }
+    },
+    {
+      "score": 84,
+      "weekNumber": 0,
+      "shardMultiplier": 1,
+      "result": {
+        "diamonds": 6,
+        "shards": 172,
+        "gold": 0,
+        "totalGold": 0,
+        "buffPct": 0,
+        "buffMs": 0
+      }
+    },
+    {
+      "score": 84,
+      "weekNumber": 5,
+      "shardMultiplier": 2.5,
+      "result": {
+        "diamonds": 6,
+        "shards": 430,
+        "gold": 0,
+        "totalGold": 0,
+        "buffPct": 0,
+        "buffMs": 0
+      }
+    },
+    {
+      "score": 85,
+      "weekNumber": 0,
+      "shardMultiplier": 1,
+      "result": {
+        "diamonds": 12,
+        "shards": 296,
+        "gold": 0,
+        "totalGold": 0,
+        "buffPct": 0,
+        "buffMs": 0
+      }
+    },
+    {
+      "score": 85,
+      "weekNumber": 5,
+      "shardMultiplier": 2.5,
+      "result": {
+        "diamonds": 12,
+        "shards": 740,
+        "gold": 0,
+        "totalGold": 0,
+        "buffPct": 0,
+        "buffMs": 0
+      }
+    },
+    {
+      "score": 100,
+      "weekNumber": 0,
+      "shardMultiplier": 1,
+      "result": {
+        "diamonds": 12,
+        "shards": 296,
+        "gold": 0,
+        "totalGold": 0,
+        "buffPct": 0,
+        "buffMs": 0
+      }
+    },
+    {
+      "score": 100,
+      "weekNumber": 5,
+      "shardMultiplier": 2.5,
+      "result": {
+        "diamonds": 12,
+        "shards": 740,
+        "gold": 0,
+        "totalGold": 0,
+        "buffPct": 0,
+        "buffMs": 0
+      }
+    }
+  ],
+  "targetFloor": [
+    {
+      "wave": 1,
+      "weekNumber": 0,
+      "shardMultiplier": 1,
+      "shards": 140
+    },
+    {
+      "wave": 1,
+      "weekNumber": 1,
+      "shardMultiplier": 2,
+      "shards": 163
+    },
+    {
+      "wave": 1,
+      "weekNumber": 2,
+      "shardMultiplier": 1.15,
+      "shards": 140
+    },
+    {
+      "wave": 1,
+      "weekNumber": 3,
+      "shardMultiplier": 1,
+      "shards": 140
+    },
+    {
+      "wave": 1,
+      "weekNumber": 4,
+      "shardMultiplier": 1,
+      "shards": 140
+    },
+    {
+      "wave": 1,
+      "weekNumber": 5,
+      "shardMultiplier": 2.5,
+      "shards": 204
+    },
+    {
+      "wave": 1,
+      "weekNumber": 6,
+      "shardMultiplier": 1.5,
+      "shards": 140
+    },
+    {
+      "wave": 1,
+      "weekNumber": 7,
+      "shardMultiplier": 1.15,
+      "shards": 140
+    },
+    {
+      "wave": 120,
+      "weekNumber": 0,
+      "shardMultiplier": 1,
+      "shards": 296
+    },
+    {
+      "wave": 120,
+      "weekNumber": 1,
+      "shardMultiplier": 2,
+      "shards": 592
+    },
+    {
+      "wave": 120,
+      "weekNumber": 2,
+      "shardMultiplier": 1.15,
+      "shards": 340
+    },
+    {
+      "wave": 120,
+      "weekNumber": 3,
+      "shardMultiplier": 1,
+      "shards": 296
+    },
+    {
+      "wave": 120,
+      "weekNumber": 4,
+      "shardMultiplier": 1,
+      "shards": 296
+    },
+    {
+      "wave": 120,
+      "weekNumber": 5,
+      "shardMultiplier": 2.5,
+      "shards": 740
+    },
+    {
+      "wave": 120,
+      "weekNumber": 6,
+      "shardMultiplier": 1.5,
+      "shards": 444
+    },
+    {
+      "wave": 120,
+      "weekNumber": 7,
+      "shardMultiplier": 1.15,
+      "shards": 340
+    }
+  ],
+  "bounty": [
+    {
+      "draftType": "assault",
+      "title": "Assault Writ",
+      "metric": "kills",
+      "startValue": 4000,
+      "targetValue": 4125,
+      "rewardGold": 3223850,
+      "rewardShards": 108,
+      "rewardDiamonds": 6
+    },
+    {
+      "draftType": "push",
+      "title": "Frontline Push",
+      "metric": "wave",
+      "startValue": 50,
+      "targetValue": 58,
+      "rewardGold": 4191005,
+      "rewardShards": 132,
+      "rewardDiamonds": 8
+    },
+    {
+      "draftType": "recruit",
+      "title": "Recruit Surge",
+      "metric": "summons",
+      "startValue": 30,
+      "targetValue": 38,
+      "rewardGold": 2579080,
+      "rewardShards": 90,
+      "rewardDiamonds": 5
+    }
+  ],
+  "assaultTargets": [
+    {
+      "wave": 1,
+      "delta": 120
+    },
+    {
+      "wave": 44,
+      "delta": 120
+    },
+    {
+      "wave": 45,
+      "delta": 120
+    },
+    {
+      "wave": 50,
+      "delta": 125
+    },
+    {
+      "wave": 200,
+      "delta": 260
+    }
+  ],
+  "bountyClaim": [
+    {
+      "name": "one wave short",
+      "result": {
+        "diamonds": 0,
+        "shards": 0,
+        "gold": 0,
+        "totalGold": 0,
+        "buffPct": 0,
+        "buffMs": 0
+      },
+      "bountyAfter": "unclaimed"
+    },
+    {
+      "name": "exactly on target",
+      "result": {
+        "diamonds": 8,
+        "shards": 132,
+        "gold": 4191005,
+        "totalGold": 4191005,
+        "buffPct": 0,
+        "buffMs": 0
+      },
+      "bountyAfter": "null"
+    }
+  ],
+  "claimedFlag": {
+    "readAtLoad": true,
+    "guardedOn": true,
+    "everSetTrue": false
+  },
+  "refusals": [
+    {
+      "name": "dice inside the cooldown",
+      "moved": false
+    },
+    {
+      "name": "recon inside the cooldown",
+      "moved": false
+    },
+    {
+      "name": "a second writ while one is live",
+      "moved": false
+    },
+    {
+      "name": "a writ inside the cooldown, with none live",
+      "moved": false
+    },
+    {
+      "name": "claiming with no writ at all",
+      "moved": false
+    },
+    {
+      "name": "claiming a writ that is short",
+      "moved": false
+    },
+    {
+      "name": "dice with the stamp in the future",
+      "moved": false
+    }
+  ],
+  "callSites": [
+    {
+      "op": "playDiceRoll",
+      "forced": true
+    },
+    {
+      "op": "playReconSweep",
+      "forced": true
+    },
+    {
+      "op": "playLockpickCache",
+      "forced": true
+    },
+    {
+      "op": "playTargetPractice",
+      "forced": true
+    }
+  ]
+}

@@ -1,6 +1,12 @@
 import { equipmentToLegacy } from './equipmentSlice';
 import { usablesToLegacy } from './usablesSlice';
 import { vipToLegacy } from './vipSlice';
+import { calendarToLegacy } from '../progression/calendar';
+import { dungeonsToLegacy } from '../dungeons/run';
+import { expeditionsToLegacy } from '../expeditions/contracts';
+import { mailboxToLegacy } from '../mail/mailbox';
+import { miniOpsToLegacy } from '../minigames/miniOps';
+import { storyToLegacy } from '../progression/story';
 import { facilitiesToLegacy } from './facilitiesSlice';
 import { STAT_POINTS_PER_LEVEL, statPointsSpent } from './migrate';
 import { LEGACY_SAVE_VERSION, type SaveV3 } from './schema';
@@ -153,6 +159,32 @@ export function toLegacyPayload(save: SaveV3): Record<string, unknown> {
      * two disagreeing leaves agreeing — see `vipSlice.ts`.
      */
     ...vipToLegacy(save.vip),
+
+    // The mission goals already collected, back under the v2 name.
+    claimedMissionIds: [...save.missions.claimedIds],
+
+    // The streak and the week, back under their six v2 names.
+    ...calendarToLegacy(save.calendar),
+
+    // The two dungeons and their shared ticket pool, back under seven names.
+    ...dungeonsToLegacy(save.dungeons),
+
+    // Expeditions still out, in the shape the shipped queue holds them.
+    ...expeditionsToLegacy(save.expeditions),
+
+    // The mailbox, with every unclaimed attachment exactly as it stood.
+    ...mailboxToLegacy(save.mail),
+
+    // The story beats already read.
+    ...storyToLegacy(save.story),
+
+    /*
+     * The five mini-op clocks and the writ, back under their seven v2 names —
+     * including the five that say `Day` and hold a millisecond stamp. The
+     * rewrite's field is honest and the key it writes is not, because the key
+     * is what a v2 build reads.
+     */
+    ...miniOpsToLegacy(save.miniOps),
 
     /*
      * The summon counters, back under the names the shipped state uses.

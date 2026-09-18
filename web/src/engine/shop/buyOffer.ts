@@ -4,6 +4,7 @@ import { createEquipmentInstance, type EquipmentInstance } from '../equipment/in
 import { craftInventoryCap } from '../equipment/forge';
 import { rollEquipmentRarityByTier } from '../equipment/rarity';
 import { addInstance, type EquipmentContent } from '../equipment/equipmentSave';
+import { grantRaidTickets } from '../dungeons/run';
 
 /**
  * Buying from a shop.
@@ -74,18 +75,14 @@ export function buyOffer(request: BuyRequest): BuyOutcome | null {
 
   if (terms.raidTickets !== undefined && terms.raidTickets > 0) {
     /*
-     * Raid tickets have no typed home: dungeons are a later phase and the
-     * count lives in `legacy` until that phase claims it. Written back into
-     * the bag rather than dropped, so an account that buys one here still has
-     * it when there is somewhere to spend it — which is the whole argument for
-     * `legacy` existing.
-     *
-     * Unreachable today: every ticket offer is `available: false` for exactly
-     * the reason that there is nowhere to spend one. This is here so that
-     * flipping that flag is the only change the dungeons phase has to make.
+     * Tickets had no typed home when this was written, so they went into the
+     * `legacy` bag with a note saying flipping `available` would be the only
+     * change the dungeons phase had to make. It was not quite: Phase 11
+     * *claimed* `riftRaidTickets`, which removes it from the bag, so the write
+     * moved too. That is the same lesson the VIP claim taught — a claim takes
+     * the readers *and* the writers with it.
      */
-    const current = typeof next.legacy.riftRaidTickets === 'number' ? next.legacy.riftRaidTickets : 0;
-    next = { ...next, legacy: { ...next.legacy, riftRaidTickets: current + terms.raidTickets } };
+    next = grantRaidTickets(next, terms.raidTickets);
   }
 
   return { save: next, item: null };

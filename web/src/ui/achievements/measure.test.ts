@@ -47,7 +47,7 @@ describe('measuring an achievement signal', () => {
     expect(measure('vipLevel', emptyProfile(), emptySnapshot())).toBeNull();
   });
 
-  it('adds this run to the saved baseline', () => {
+  it('reads a lifetime tally off the save and a record off whichever is ahead', () => {
     /*
      * The profile is loaded once and never changes while the game runs, so
      * reading it alone froze every kill achievement at whatever the save
@@ -57,7 +57,17 @@ describe('measuring an achievement signal', () => {
      */
     const profile = profileWith({ totalKills: 1_000, highestWave: 40 });
     const live = { ...emptySnapshot(), wave: 55, totals: { ...emptySnapshot().totals, kills: 23 } };
-    expect(measure('totalKills', profile, live)).toBe(1_023);
+    /*
+     * Kills are a **max of nothing** — the saved figure alone. This read
+     * `profile.totalKills + snapshot.totals.kills` and asserted 1,023, which
+     * was right while nothing banked a run's kills. `bankRun` credits them
+     * now, and `snapshot.totals.kills` is the whole run rather than the
+     * unbanked part of it, so the sum counts every banked kill twice.
+     *
+     * The record is still a max, because a max is right either way: banking
+     * raises it, and until the next tick the snapshot is still ahead.
+     */
+    expect(measure('totalKills', profile, live)).toBe(1_000);
     expect(measure('highestWaveReached', profile, live)).toBe(55);
   });
 

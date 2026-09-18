@@ -5,6 +5,11 @@ import type { FormationRole } from '../combat/formation';
 import type { EquipmentSource } from '../equipment/instance';
 import type { SavedUsables } from './usablesSlice';
 import type { SavedVip } from './vipSlice';
+import type { SavedCalendar } from '../progression/calendar';
+import type { SavedDungeons } from '../dungeons/run';
+import type { SavedExpeditions } from '../expeditions/contracts';
+import type { SavedMailbox } from '../mail/mailbox';
+import type { SavedMiniOps } from '../minigames/miniOps';
 import type { FacilityId } from '../prestige/facilities';
 
 /**
@@ -149,6 +154,55 @@ export interface SaveV3 {
    * that needs it, claim it on the phase that owns it.
    */
   vip: SavedVip;
+
+  /**
+   * Mission goals already collected, claimed out of `legacy` in Phase 11
+   * because this is the phase with a board to claim them on.
+   */
+  missions: { claimedIds: string[] };
+
+  /**
+   * The login streak and the week, claimed out of `legacy` in Phase 11.
+   *
+   * `weeklyEventWeek` has been *read* out of the bag since Phase 8 — it picks
+   * which of the eight events multiplies the gold and EXP chains — which is
+   * the arrangement `legacy` exists for. This is the phase that can move it.
+   */
+  calendar: SavedCalendar;
+
+  /**
+   * The two dungeons and the tickets that skip them, claimed out of `legacy`
+   * in Phase 11. Phase 10's shop has been selling a ticket into the bag since
+   * it had nowhere typed to put one.
+   */
+  dungeons: SavedDungeons;
+
+  /**
+   * Expeditions out on contract, claimed out of `legacy` in Phase 11. The
+   * wait is enforced here and is not in the shipped game — see
+   * `engine/expeditions/contracts.ts`, which is the one place that decision
+   * is made.
+   */
+  expeditions: SavedExpeditions;
+
+  /**
+   * The mailbox, claimed out of `legacy` in Phase 11 so a v2 account's
+   * unclaimed attachments survive the migration. Its sender is Phase 12's.
+   */
+  mail: SavedMailbox;
+
+  /** Story beats already read, claimed out of `legacy` in Phase 11. */
+  story: { seenIds: string[] };
+
+  /**
+   * The four mini ops and the bounty writ, claimed out of `legacy` in Phase 11.
+   *
+   * Seven v2 keys collapse to three fields here. Five of them are named
+   * `last…Day` and hold a millisecond stamp against a four-hour cooldown, so
+   * they become one `lastUsedMs` record keyed by op — the name stops lying and
+   * the shape stops repeating itself five times.
+   */
+  miniOps: SavedMiniOps;
 
   wallet: {
     gold: number;

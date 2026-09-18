@@ -98,6 +98,17 @@ export const REGISTRY: readonly Destination[] = [
   { id: 'achievements', group: 'record', label: 'Achievements', archetype: 'ledger' },
   { id: 'missions', group: 'record', label: 'Missions', archetype: 'ledger' },
   { id: 'codex', group: 'record', label: 'Codex', archetype: 'ledger' },
+  /*
+   * The mailbox, which REVAMP's table does not name and the shipped game
+   * keeps behind a modal. Filed here rather than left out, on the registry's
+   * own rule: nothing is deleted, it is filed.
+   *
+   * Short in this build on purpose. Its sender is the social layer in Phase
+   * 12, so the only messages are the ones a migrated account arrived with —
+   * and a v2 account's unclaimed attachments were promised to them, which is
+   * why the mailbox is carried across at all.
+   */
+  { id: 'mail', group: 'record', label: 'Mail', archetype: 'ledger' },
   { id: 'leaderboard', group: 'record', label: 'Leaderboard', archetype: 'graph' },
 
   // Social. REVAMP's table names only Leaderboard, but the shipped game also

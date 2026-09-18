@@ -5,6 +5,13 @@ import { PITY_THRESHOLD } from '../roster/summon';
 import { readEquipment } from './equipmentSlice';
 import { readUsables } from './usablesSlice';
 import { readVipFromLegacy } from './vipSlice';
+import { readMissions } from '../progression/missions';
+import { readCalendar } from '../progression/calendar';
+import { readDungeons } from '../dungeons/run';
+import { readExpeditions } from '../expeditions/contracts';
+import { readMailbox } from '../mail/mailbox';
+import { readMiniOps } from '../minigames/miniOps';
+import { readStory } from '../progression/story';
 import { readFacilities } from './facilitiesSlice';
 import { roundTo4 } from '../math/safe';
 import {
@@ -299,6 +306,32 @@ export const CLAIMED_V2_KEYS: readonly string[] = [
   'vipRewardClaimedLevels',
   'codexVipClaimedHeroIds',
   'codexVipClaimedUniqueIds',
+  'claimedMissionIds',
+  'dailyLoginStreak',
+  'lastDailyLoginDay',
+  'streakInsuranceCharges',
+  'weeklyEventWeek',
+  'weeklyKills',
+  'weeklyTrackClaimed',
+  'riftDungeonLevel',
+  'riftEntriesUsedToday',
+  'riftEntryDay',
+  'treasureDungeonLevel',
+  'treasureEntriesUsedToday',
+  'treasureEntryDay',
+  'riftRaidTickets',
+  'expeditionQueue',
+  'expeditionContractOffers',
+  'expeditionContractsRefreshedAt',
+  'mailbox',
+  'seenStoryBeatIds',
+  'lastDiceRollDay',
+  'lastDiceRollValue',
+  'lastReconSweepDay',
+  'lastLockpickDay',
+  'lastTargetPracticeDay',
+  'lastBountyDraftDay',
+  'miniBounty',
 ];
 
 export interface MigrateOptions {
@@ -447,6 +480,13 @@ export function migrateSave(payload: unknown, options: MigrateOptions): SaveV3 {
     facilities,
     usables,
     vip: readVipFromLegacy(raw),
+    missions: readMissions({ claimedMissionIds: raw.claimedMissionIds }),
+    calendar: readCalendar(raw, true),
+    dungeons: readDungeons(raw, true),
+    expeditions: readExpeditions(raw, true),
+    mail: readMailbox(raw, true),
+    story: readStory(raw, true),
+    miniOps: readMiniOps(raw, nowMs, true),
     equipment,
     wallet: {
       gold,

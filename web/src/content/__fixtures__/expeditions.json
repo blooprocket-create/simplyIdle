@@ -1,0 +1,96 @@
+{
+  "note": "Expeditions, measured through the shipped reducer.",
+  "generatedFrom": "src/reducers/economyReducer.ts",
+  "tiers": [
+    {
+      "rarity": "common",
+      "goldCost": 25000,
+      "durationMs": 300000,
+      "reward": {
+        "diamonds": 35,
+        "shards": 150,
+        "essence": 0,
+        "artifacts": 0
+      }
+    },
+    {
+      "rarity": "rare",
+      "goldCost": 75000,
+      "durationMs": 1200000,
+      "reward": {
+        "diamonds": 75,
+        "shards": 320,
+        "essence": 0,
+        "artifacts": 1
+      }
+    },
+    {
+      "rarity": "epic",
+      "goldCost": 220000,
+      "durationMs": 5400000,
+      "reward": {
+        "diamonds": 140,
+        "shards": 700,
+        "essence": 1,
+        "artifacts": 2
+      }
+    },
+    {
+      "rarity": "legendary",
+      "goldCost": 500000,
+      "durationMs": 14400000,
+      "reward": {
+        "diamonds": 240,
+        "shards": 1300,
+        "essence": 2,
+        "artifacts": 4
+      }
+    },
+    {
+      "rarity": "godly",
+      "goldCost": 1000000,
+      "durationMs": 28800000,
+      "reward": {
+        "diamonds": 400,
+        "shards": 2400,
+        "essence": 4,
+        "artifacts": 8
+      }
+    }
+  ],
+  "types": [
+    "artifact",
+    "merchant",
+    "ruins",
+    "vault",
+    "abyss"
+  ],
+  "completedImmediately": {
+    "waitedMs": 0,
+    "durationMs": 28800000,
+    "paid": {
+      "diamonds": 400,
+      "shards": 2400,
+      "essence": 4
+    }
+  },
+  "artifactsPaid": false,
+  "refreshGoldCost": 100000,
+  "refusals": [
+    {
+      "name": "cannot afford the contract",
+      "goldSpent": 0,
+      "queued": 0
+    },
+    {
+      "name": "completing one that is not queued",
+      "goldSpent": 0,
+      "queued": 0
+    },
+    {
+      "name": "completing the same one twice",
+      "goldSpent": 0,
+      "queued": 0
+    }
+  ]
+}

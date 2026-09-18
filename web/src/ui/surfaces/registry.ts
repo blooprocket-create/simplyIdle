@@ -5,7 +5,13 @@ import { CampaignSurface } from './CampaignSurface';
 import { CharacterSurface } from './CharacterSurface';
 import { CodexSurface } from './CodexSurface';
 import { EquipmentSurface } from './EquipmentSurface';
+import { EventsSurface } from './EventsSurface';
+import { DungeonsSurface } from './DungeonsSurface';
+import { ExpeditionsSurface } from './ExpeditionsSurface';
+import { MailSurface } from './MailSurface';
 import { ItemsSurface } from './ItemsSurface';
+import { MissionsSurface } from './MissionsSurface';
+import { OperationsSurface } from './OperationsSurface';
 import { RebirthSurface } from './RebirthSurface';
 import { PartySurface } from './PartySurface';
 import { RosterSurface } from './RosterSurface';
@@ -36,6 +42,12 @@ export const SURFACES: Partial<Record<string, ComponentType<SurfaceProps>>> = {
   campaign: CampaignSurface,
   roster: RosterSurface,
   codex: CodexSurface,
+  missions: MissionsSurface,
+  operations: OperationsSurface,
+  events: EventsSurface,
+  dungeons: DungeonsSurface,
+  expeditions: ExpeditionsSurface,
+  mail: MailSurface,
   summon: SummonSurface,
   shop: ShopSurface,
   settings: SettingsSurface,

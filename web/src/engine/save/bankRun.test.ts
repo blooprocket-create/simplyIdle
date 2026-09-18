@@ -29,7 +29,15 @@ function save(wallet: Record<string, number> = {}): SaveV3 {
   );
 }
 
-const run = (gold: number, essence = 0, bossTears = 0, exp = 0, kills = 0, equipmentDrops: number[] = []) => ({
+const run = (
+  gold: number,
+  essence = 0,
+  bossTears = 0,
+  exp = 0,
+  kills = 0,
+  equipmentDrops: number[] = [],
+  wave = 1,
+) => ({
   gold: new Decimal(gold),
   exp: new Decimal(exp),
   essence,
@@ -37,6 +45,59 @@ const run = (gold: number, essence = 0, bossTears = 0, exp = 0, kills = 0, equip
   kills,
   equipmentDrops,
   usableDrops: [] as string[],
+  // Where the run stands rather than something it earned, which is why it is
+  // last and defaulted: most of these cases are about the purse.
+  wave,
+});
+
+describe('the three tallies a run moves that nothing else does', () => {
+  it('adds the kills to the account, not just to the heroes', () => {
+    /*
+     * They were used to level fielded heroes and then dropped. Nothing else in
+     * the rewrite wrote `totalKills`, so five achievements and two automations
+     * gated on it were measured against whatever the save was read with, plus
+     * a run tally that goes back to zero on reload.
+     */
+    const banked = bankRun(save(), run(0, 0, 0, 0, 40));
+    expect(banked.progression.totalKills).toBe(40);
+    // And instalments add up, which is the property that makes banking on a
+    // timer indistinguishable from banking once.
+    expect(bankRun(banked, run(0, 0, 0, 0, 2)).progression.totalKills).toBe(42);
+  });
+
+  it('raises the deepest wave, and never lowers it', () => {
+    /*
+     * `highestWave` gates the rebirth button and both team-slot purchases, and
+     * was written by the save reader and by nothing after it — so a player who
+     * fought to wave 200 found rebirth still locked.
+     *
+     * It only ever climbs. A run that wiped back a chapter is still a run that
+     * got there, which is the rule the shipped `highestWaveReached` follows.
+     */
+    const deep = bankRun(save(), run(0, 0, 0, 0, 0, [], 214));
+    expect(deep.progression.highestWave).toBe(214);
+    expect(bankRun(deep, run(0, 0, 0, 0, 0, [], 41)).progression.highestWave).toBe(214);
+  });
+
+  it('adds the kills to the week as well as to the account', () => {
+    /*
+     * The third tally, and the one that is *meant* to go backwards: the
+     * weekly track is measured on it and the rollover clears it. Without this
+     * the track could never move.
+     */
+    const banked = bankRun(save(), run(0, 0, 0, 0, 40));
+    expect(banked.calendar.weeklyKills).toBe(40);
+    expect(bankRun(banked, run(0, 0, 0, 0, 2)).calendar.weeklyKills).toBe(42);
+  });
+
+  it('takes a fractional or negative count as nothing rather than as a loss', () => {
+    // Neither should ever arrive; both would silently *reduce* a lifetime
+    // tally, which is the one direction it must never move.
+    const banked = bankRun(save(), run(0, 0, 0, 0, -5, [], -3));
+    expect(banked.progression.totalKills).toBe(0);
+    expect(banked.calendar.weeklyKills).toBe(0);
+    expect(banked.progression.highestWave).toBe(save().progression.highestWave);
+  });
 });
 
 describe('putting a run in the wallet', () => {

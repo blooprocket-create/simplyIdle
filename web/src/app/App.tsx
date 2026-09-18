@@ -11,6 +11,18 @@ import { canAffordSpark, canSummon, priceOfSummon, rosterActions, sparkExchange,
 import { equipmentActions, migrateLegacyEquipment } from './equipmentActions';
 import { prestigeActions } from './prestigeActions';
 import * as shopActions from './shopActions';
+import * as missionActions from './missionActions';
+import * as calendarActions from './calendarActions';
+import * as dungeonActions from './dungeonActions';
+import * as expeditionActions from './expeditionActions';
+import * as miniOpActions from './miniOpActions';
+import { ATTACHMENT_KEYS, claimEverything, claimFrom } from '../engine/mail/mailbox';
+import { markBeatSeen } from '../engine/progression/story';
+import { abandonBounty } from '../engine/minigames/miniOps';
+import type { BountyDraft, ReconOutcome } from '../content/miniOps';
+import { teamDps } from '../engine/entities/HeroEntity';
+import type { DungeonId } from '../content/dungeons';
+import type { ExpeditionType } from '../content/expeditions';
 import { EMPTY_AUTOMATION_STATE, runAutomations } from './automationRunner';
 import { worthBanking } from '../engine/save/bankRun';
 import { bankInto } from './bank';
@@ -53,6 +65,17 @@ import styles from './App.module.css';
 export function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(() => emptySnapshot());
+  /*
+   * The latest snapshot, for verbs rather than for rendering.
+   *
+   * A verb memoised on `snapshot` would rebuild every callback in the game
+   * sixty times a second; one closing over a stale `snapshot` would price a
+   * mission claim against a wave the player left minutes ago. The ref is
+   * neither, and it is the same arrangement `activeRef` makes for the
+   * automation set two screens up.
+   */
+  const snapshotRef = useRef(snapshot);
+  snapshotRef.current = snapshot;
   const [openId, setOpenId] = useState<string | null>(null);
   const [railOpen, setRailOpen] = useState(false);
   // The loop is held so the one player-driven verb can reach the simulation.
@@ -80,7 +103,18 @@ export function App() {
     // every load. The engine's reader may not — it draws and reads the
     // catalogue — so it happens here, at the same moment, with both supplied.
     // See `migrateLegacyEquipment`.
-    return stored === null ? startingSave(nowMs) : migrateLegacyEquipment(stored, nowMs, Math.random);
+    const loaded = stored === null ? startingSave(nowMs) : migrateLegacyEquipment(stored, nowMs, Math.random);
+    /*
+     * And everything that happens *because* the account was opened: the week
+     * rolling over and the day's login. Both are no-ops when nothing is due,
+     * which is what lets them be called here unconditionally rather than the
+     * shell doing date arithmetic.
+     *
+     * Applied to the loaded save rather than after mount, so the first frame a
+     * player sees already has their streak paid — the same reason the away
+     * credit is taken before anything subscribes.
+     */
+    return calendarActions.opened(loaded, nowMs).save;
   });
   const [save, setSave] = useState<SaveV3>(initialSave);
   const saveRef = useRef(save);
@@ -214,6 +248,30 @@ export function App() {
     return next;
   }, [applySave]);
 
+  /**
+   * What a mini op is priced against: the live save, the clock, and the wave
+   * the player is standing on right now.
+   *
+   * Built per call rather than memoised, because two of its three fields move
+   * every frame and a stale one silently changes what a press is worth.
+   */
+  const miniOpContext = () => ({
+    save: live(),
+    nowMs: Date.now(),
+    wave: snapshotRef.current.wave,
+    highestWave: live().progression.highestWave,
+  });
+
+  /** The three metrics a writ can be measured against, from where each lives. */
+  const bountyStandingNow = () => {
+    const current = live();
+    return {
+      kills: current.progression.totalKills,
+      wave: snapshotRef.current.wave,
+      summons: current.summon.totalSummons,
+    };
+  };
+
   const actions = useMemo(
     () => ({
       summon: (pay: SummonPayment) => {
@@ -311,6 +369,129 @@ export function App() {
       // A query: it counts what a sweep would record without recording it, so
       // the disabled button and any badge can both ask the same function.
       claimableCodex: () => shopActions.claimableCodexEntries(save),
+      claimMission: (id: string) => {
+        /*
+         * `snapshotRef` rather than the `snapshot` in scope: this callback is
+         * memoised on the save and the snapshot changes sixty times a second,
+         * so closing over it would either price a claim against a stale wave
+         * or rebuild every verb in the game on every frame.
+         */
+        const outcome = missionActions.claim(live(), snapshotRef.current, id);
+        if (outcome === null) return false;
+        applySave(outcome.save);
+        return true;
+      },
+      runDungeon: (id: DungeonId) => {
+        /*
+         * The same DPS the fight is built on, handed over rather than derived
+         * again — a dungeon that disagreed with the fight about how hard the
+         * player hits is a divergence nobody notices until the numbers stop
+         * making sense.
+         */
+        const dps = teamDps(rosterRef.current.heroes).toNumber();
+        const outcome = dungeonActions.run({ save: live(), dps, nowMs: Date.now(), random: Math.random }, id);
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      raidDungeon: (id: DungeonId) => {
+        const outcome = dungeonActions.raid(live(), id, Date.now());
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      /*
+       * A destination, not a rarity: the board decides the terms. The shipped
+       * action takes a rarity and trusts it, which makes its board a
+       * suggestion — see `startExpedition`.
+       */
+      sendExpedition: (type: ExpeditionType) => {
+        const outcome = expeditionActions.send(live(), type, Date.now(), Math.random);
+        if (outcome === null) return false;
+        applySave(outcome.save);
+        return true;
+      },
+      refreshContracts: () => {
+        const outcome = expeditionActions.refresh(live(), Date.now(), Math.random);
+        if (outcome === null) return false;
+        applySave(outcome.save);
+        return true;
+      },
+      collectExpedition: (id: string) => {
+        const outcome = expeditionActions.collect(live(), id, Date.now());
+        if (outcome === null) return false;
+        applySave(outcome.save);
+        return true;
+      },
+      collectExpeditions: () => {
+        const swept = expeditionActions.collectDue(live(), Date.now());
+        if (swept.completed.length > 0) applySave(swept.save);
+        return swept.completed.length;
+      },
+      claimMail: (id: string) => {
+        const claim = claimFrom(live(), id, ATTACHMENT_KEYS);
+        if (claim === null) return false;
+        applySave(claim.save);
+        return true;
+      },
+      claimAllMail: () => {
+        const claim = claimEverything(live());
+        if (claim === null) return false;
+        applySave(claim.save);
+        return true;
+      },
+      markStoryBeatSeen: (id: string) => applying(markBeatSeen(live(), id)),
+      claimWeeklyTrack: (milestone: number) => {
+        const claim = calendarActions.claimTrack(live(), milestone);
+        if (claim === null) return false;
+        applySave(claim.save);
+        return true;
+      },
+      claimAllMissions: () => {
+        const swept = missionActions.claimAll(live(), snapshotRef.current);
+        if (swept.claimed.length > 0) applySave(swept.save);
+        return swept.claimed.length;
+      },
+      /*
+       * The mini ops. Each takes the outcome the surface produced rather than
+       * rolling for itself — the shipped screens work the same way, and the
+       * engine may not read a generator in any case.
+       *
+       * `snapshotRef` again, and it matters more here than anywhere: every
+       * gold payout is priced off the wave the player is *standing on*, and a
+       * boss wave is worth seven times its neighbours. A stale wave is not a
+       * rounding error, it is a sixfold one.
+       */
+      playDice: (roll: number) => {
+        const outcome = miniOpActions.dice(miniOpContext(), roll);
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      playRecon: (pick: ReconOutcome) => {
+        const outcome = miniOpActions.recon(miniOpContext(), pick);
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      playLockpick: (cracked: boolean) => {
+        const outcome = miniOpActions.lockpick(miniOpContext(), cracked);
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      playTarget: (score: number, shardMultiplier: number) => {
+        const outcome = miniOpActions.target(miniOpContext(), score, shardMultiplier);
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      acceptBounty: (draft: BountyDraft) => {
+        const started = miniOpActions.accept(miniOpContext(), draft, bountyStandingNow());
+        if (started === null) return false;
+        applySave(started.save);
+        return true;
+      },
+      claimBounty: () => {
+        const outcome = miniOpActions.claim(miniOpContext(), bountyStandingNow());
+        if (outcome) applySave(outcome.save);
+        return outcome;
+      },
+      abandonBounty: () => applying(abandonBounty(live())),
     }),
     [save, applySave, applying, live],
   );

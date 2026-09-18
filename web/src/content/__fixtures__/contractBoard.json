@@ -1,0 +1,92 @@
+{
+  "note": "The expedition contract board, measured through the shipped reducer.",
+  "generatedFrom": "src/reducers/economyReducer.ts",
+  "refreshMs": 28800000,
+  "refreshGoldCost": 100000,
+  "types": [
+    "artifact",
+    "merchant",
+    "ruins",
+    "vault",
+    "abyss"
+  ],
+  "rarities": [
+    "common",
+    "rare",
+    "epic",
+    "legendary",
+    "godly"
+  ],
+  "startingBoard": {
+    "types": [
+      "abyss",
+      "artifact",
+      "merchant",
+      "ruins",
+      "vault"
+    ],
+    "everyTypeOffered": true
+  },
+  "rarityByDraw": [
+    {
+      "draw": 0,
+      "rarity": "common"
+    },
+    {
+      "draw": 0.19,
+      "rarity": "common"
+    },
+    {
+      "draw": 0.2,
+      "rarity": "rare"
+    },
+    {
+      "draw": 0.39,
+      "rarity": "rare"
+    },
+    {
+      "draw": 0.4,
+      "rarity": "epic"
+    },
+    {
+      "draw": 0.59,
+      "rarity": "epic"
+    },
+    {
+      "draw": 0.6,
+      "rarity": "legendary"
+    },
+    {
+      "draw": 0.79,
+      "rarity": "legendary"
+    },
+    {
+      "draw": 0.8,
+      "rarity": "godly"
+    },
+    {
+      "draw": 0.999,
+      "rarity": "godly"
+    }
+  ],
+  "reroll": [
+    {
+      "name": "paid for, exactly affordable",
+      "goldBefore": 100000,
+      "goldAfter": 0,
+      "boardChanged": true
+    },
+    {
+      "name": "one gold short",
+      "goldBefore": 99999,
+      "goldAfter": 99999,
+      "boardChanged": false
+    }
+  ],
+  "autoRefreshMs": 28800000,
+  "autoRefreshOnRead": true,
+  "boardIsEnforced": {
+    "passingAnotherRarityWorks": true,
+    "screenPassesTheOffer": true
+  }
+}

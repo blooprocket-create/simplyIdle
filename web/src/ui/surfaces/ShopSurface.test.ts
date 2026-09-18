@@ -60,7 +60,9 @@ describe('which offers get a live button', () => {
     const withheld = rowFor(rich, 'coolant_i_pack');
     expect(withheld.affordable).toBe(false);
     expect(withheld.blockedBy).toContain('runs hot');
-    expect(rowFor(rich, 'rift_raid_ticket').blockedBy).toContain('no dungeons');
+    // The raid ticket was the second example here until Phase 11 built the
+    // dungeons; it quotes a price now, like anything else on sale.
+    expect(rowFor(rich, 'rift_raid_ticket').blockedBy).toBeNull();
   });
 });
 
